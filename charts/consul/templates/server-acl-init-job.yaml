@@ -167,6 +167,9 @@ spec:
                 -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
                 {{- end }}
                 {{- end }}
+                {{- if and .Values.global.federation.enabled .Values.global.federation.k8sAuthMethodHost }}
+                -inject-auth-method-host={{ .Values.global.federation.k8sAuthMethodHost }} \
+                {{- end }}
 
                 {{- if .Values.meshGateway.enabled }}
                 -create-mesh-gateway-token=true \
@@ -238,8 +241,8 @@ spec:
 
                 {{- if .Values.controller.enabled }}
                 -create-controller-token=true \
-                -create-component-auth-method=true \
                 {{- end }}
+                -create-component-auth-method=true \
 
                 {{- if .Values.apiGateway.enabled }}
                 -create-api-gateway-token=true \

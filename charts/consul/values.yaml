@@ -414,6 +414,8 @@ global:
     # `<helm-release-name>-consul-federation`.
     createFederationSecret: false
 
+    k8sAuthMethodHost: null
+
   # Configures metrics for Consul service mesh
   metrics:
     # Configures the Helm chart’s components

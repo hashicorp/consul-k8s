@@ -467,8 +467,8 @@ func defaultValues() map[string]string {
 		"dns.enabled": "false",
 
 		// Enable trace logs for servers and clients.
-		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
-		"client.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
+		//"server.extraConfig": `"{\"log_level\": \"DEBUG\"}"`,
+		//"client.extraConfig": `"{\"log_level\": \"DEBUG\"}"`,
 	}
 	return values
 }

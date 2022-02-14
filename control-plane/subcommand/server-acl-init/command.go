@@ -447,7 +447,13 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateComponentAuthMethod {
-		err := c.configureComponentAuthMethod(consulClient)
+		if isPrimary {
+			c.log.Info("creating auth method in the primary")
+			err = c.configureComponentAuthMethod(consulClient, "", "", "")
+		} else {
+			c.log.Info("creating auth method in the secondary", "dc", consulDC, "primary", primaryDC, "auth-method-host", c.flagInjectAuthMethodHost)
+			err = c.configureComponentAuthMethod(consulClient, consulDC, primaryDC, c.flagInjectAuthMethodHost)
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -729,7 +735,7 @@ func (c *Command) Run(args []string) int {
 		// Controller token must be global because config entry writes all
 		// go to the primary datacenter. This means secondary datacenters need
 		// a token that is known by the primary datacenters.
-		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, isPrimary, globalTokenTrue, authMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, primaryDC, globalTokenTrue, authMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -905,7 +911,7 @@ func (c *Command) validateFlags() error {
 }
 
 // addRoleAndBindingRule adds an ACLRole and ACLBindingRule which reference the authMethod.
-func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName string, authMethodName string, policies []*api.ACLRolePolicyLink) error {
+func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName string, authMethodName string, policies []*api.ACLRolePolicyLink, dc, primaryDC string) error {
 
 	// This is the ACLRole which will allow the component which uses the serviceaccount
 	// to be able to do a consul login.
@@ -1022,12 +1028,20 @@ func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName s
 }
 
 // configureComponentAuthMethod sets up an AuthMethod that the Consul components will use to issue ACL logins with.
-func (c *Command) configureComponentAuthMethod(consulClient *api.Client) error {
+func (c *Command) configureComponentAuthMethod(consulClient *api.Client, currentDC, primaryDC, authMethodHost string) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
 	authMethodName := c.withPrefix("k8s-component-auth-method")
 	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {
 		return err
+	}
+	var writeOpts api.WriteOptions
+	if primaryDC != "" && authMethodHost != "" {
+		authMethodTmpl.Name = authMethodName + "-" + currentDC
+		authMethodTmpl.Config["Host"] = authMethodHost
+		//authMethodTmpl.TokenLocality = "global"
+		writeOpts.Datacenter = primaryDC
+		c.log.Info("creating auth method in the primary for the secondary", "auth-method-template", authMethodTmpl)
 	}
 	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
 		func() error {
@@ -1035,7 +1049,7 @@ func (c *Command) configureComponentAuthMethod(consulClient *api.Client) error {
 			// `AuthMethodCreate` will also be able to update an existing
 			// AuthMethod based on the name provided. This means that any
 			// configuration changes will correctly update the AuthMethod.
-			_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &api.WriteOptions{})
+			_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOpts)
 			return err
 		})
 	return err
@@ -1044,13 +1058,13 @@ func (c *Command) configureComponentAuthMethod(consulClient *api.Client) error {
 // createACLPolicyRoleAndBindingRule will create the ACL Policy for the component
 // then create a set of ACLRole and ACLBindingRule which tie the component's serviceaccount
 // to the authMethod, allowing the serviceaccount to later be allowed to issue a Consul Login.
-func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules string, dc string, isPrimary bool, globalToken bool,
+func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules string, dc, primaryDC string, globalToken bool,
 	authMethodName string, serviceAccountName string, client *api.Client) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", componentName)
-	if c.flagFederation && !isPrimary {
+	if c.flagFederation && dc != primaryDC {
 		// If performing ACL replication, we must ensure policy names are
-		// globally unique so we append the datacenter name but only in secondary datacenters..
+		// globally unique so we append the datacenter name but only in secondary datacenters.
 		policyName += fmt.Sprintf("-%s", dc)
 	}
 	var datacenters []string
@@ -1072,14 +1086,14 @@ func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules 
 	}
 
 	// Create an ACLRolePolicyLink list to attach to the ACLRole.
-	ap := &api.ACLRolePolicyLink{
-		Name: policyName,
+	ap := []*api.ACLRolePolicyLink{
+		{
+			Name: policyName,
+		},
 	}
-	apl := []*api.ACLRolePolicyLink{}
-	apl = append(apl, ap)
 
 	// Add the ACLRole and ACLBindingRule.
-	err = c.addRoleAndBindingRule(client, serviceAccountName, authMethodName, apl)
+	err = c.addRoleAndBindingRule(client, serviceAccountName, authMethodName, ap, dc, primaryDC)
 	if err != nil {
 		return err
 	}

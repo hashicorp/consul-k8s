@@ -86,7 +86,11 @@ spec:
           - "-ec"
           - |
             consul-k8s-control-plane acl-init \
+              {{- if eq .Values.global.datacenter "dc2" }}
+              -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method-dc2" \
+              {{- else }}
               -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
+              {{- end }}
               {{- if .Values.global.adminPartitions.enabled }}
               -enable-partitions=true \
               -partition={{ .Values.global.adminPartitions.name }} \
