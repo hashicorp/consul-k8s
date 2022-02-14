@@ -216,28 +216,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: ent license acl option disabled missing global.enterpriseLicense.secretName" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "serverACLInit/Job: ent license acl option disabled missing global.enterpriseLicense.secretKey" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enterpriseLicense.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
 #--------------------------------------------------------------------
 # client.snapshotAgent
 
