@@ -1851,19 +1851,19 @@ load _helpers
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.enterpriseLicense.secretName=path/to/secret' \
+    --set 'global.enterpriseLicense.secretName=path/to/enterpriselicensesecret' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
-  [ "${actual}" = "path/to/secret" ]
+  [ "${actual}" = "path/to/enterpriselicensesecret" ]
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)
   local actual="$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.enterpriselicense -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"path/to/enterpriselicensesecret\" -}}\n{{- .Data.data.enterpriselicense -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 

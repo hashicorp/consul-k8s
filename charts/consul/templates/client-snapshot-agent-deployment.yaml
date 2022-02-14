@@ -28,7 +28,8 @@ spec:
         component: client-snapshot-agent
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        {{- if .Values.global.tls.enabled }}
         "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/agent-inject": "true"
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
@@ -40,7 +41,14 @@ spec:
         {{- end }}
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}        
         {{- end }}
+        {{- if .Values.global.enterpriseLicense.secretName }}
+        {{- with .Values.global.enterpriseLicense }}
+        "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-enterpriselicense.txt": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}        
         {{- end }}
     spec:
       {{- if .Values.client.tolerations }}
@@ -116,7 +124,7 @@ spec:
                   name: "{{ template "consul.fullname" . }}-client-snapshot-agent-acl-token"
                   key: "token"
             {{- else }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: CONSUL_LICENSE_PATH
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
@@ -129,6 +137,9 @@ spec:
               cat <<EOF > /etc/ssl/certs/custom-ca.pem
               {{- .Values.client.snapshotAgent.caCert | nindent 14 }}
               EOF
+              {{- end }}
+              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.enterpriseLicense.secretName }}
+              CONSUL_LICENSE_PATH=`cat /vault/secrets/enterpriselicense.txt`
               {{- end }}
               exec /bin/consul snapshot agent \
                 {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
