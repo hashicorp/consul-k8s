@@ -93,43 +93,6 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 		secure, autoEncrypt bool
 		initial, upgrade    map[string]string
 	}{
-		// "Helm upgrade changes nothing": {
-		// 	clusterGen:  consul.NewHelmCluster,
-		// 	releaseName: helpers.RandomName(),
-		// },
-		// "Helm upgrade from 1.10 to 1.11": {
-		// 	clusterGen:  consul.NewCLICluster,
-		// 	releaseName: helpers.RandomName(),
-		// 	initial: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.10.7",
-		// 	},
-		// 	upgrade: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.11.2",
-		// 	},
-		// },
-		// "Helm upgrade with secure from 1.10 to 1.11": {
-		// 	clusterGen:  consul.NewCLICluster,
-		// 	releaseName: helpers.RandomName(),
-		// 	secure:      true,
-		// 	initial: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.10.7",
-		// 	},
-		// 	upgrade: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.11.2",
-		// 	},
-		// },
-		// "Helm upgrade with secure and auto-encrypt from 1.10 to 1.11": {
-		// 	clusterGen:  consul.NewHelmCluster,
-		// 	releaseName: helpers.RandomName(),
-		// 	secure:      true,
-		// 	autoEncrypt: true,
-		// 	initial: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.10.7",
-		// 	},
-		// 	upgrade: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.11.2",
-		// 	},
-		// },
 		"CLI upgrade changes nothing": {
 			clusterGen:  consul.NewCLICluster,
 			releaseName: consul.CLIReleaseName,
