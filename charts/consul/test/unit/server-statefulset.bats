@@ -1332,6 +1332,7 @@ load _helpers
 #--------------------------------------------------------------------
 # license-autoload
 
+
 @test "server/StatefulSet: adds volume for license secret when enterprise license secret name and key are provided" {
   cd `chart_dir`
   local actual=$(helm template \

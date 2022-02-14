@@ -13,6 +13,8 @@
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}{{ fail "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.secretsBackend.vault.consulCARole)) }}{{ fail "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
+{{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
