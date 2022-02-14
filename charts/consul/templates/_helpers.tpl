@@ -15,7 +15,7 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
-{{- define "consul.vaultGossipTemplate" -}}
+{{- define "consul.vaultSecretTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
             {{ "{{" }}- {{ printf ".Data.data.%s" .secretKey }} -{{ "}}" }}

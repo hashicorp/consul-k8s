@@ -53,7 +53,7 @@ spec:
         {{- if .Values.global.gossipEncryption.secretName }}
         {{- with .Values.global.gossipEncryption }}
         "vault.hashicorp.com/agent-inject-secret-gossip.txt": {{ .secretName }}
-        "vault.hashicorp.com/agent-inject-template-gossip.txt": {{ template "consul.vaultGossipTemplate" . }}
+        "vault.hashicorp.com/agent-inject-template-gossip.txt": {{ template "consul.vaultSecretTemplate" . }}
         {{- end }}
         {{- end }}
         {{- if .Values.global.tls.enabled }}

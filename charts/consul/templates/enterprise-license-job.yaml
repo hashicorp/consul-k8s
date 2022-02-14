@@ -53,11 +53,13 @@ spec:
         - name: apply-enterprise-license
           image: "{{ default .Values.global.image .Values.server.image }}"
           env:
+            {{- if not .Values.global.secretsBackend.vault.enabled }}
             - name: ENTERPRISE_LICENSE
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.global.enterpriseLicense.secretName }}
                   key: {{ .Values.global.enterpriseLicense.secretKey }}
+            {{- end}}
             - name: CONSUL_HTTP_ADDR
               {{- if .Values.global.tls.enabled }}
               value: https://{{ template "consul.fullname" . }}-server:8501
@@ -85,6 +87,9 @@ spec:
                 #!/bin/sh
                 while true; do
                   echo "Applying license..."
+                  {{- if .Values.global.secretsBackend.vault.enabled }}
+                  ENTERPRISE_LICENSE=`cat /vault/secrets/enterpriselicense.txt`
+                  {{- end }}
                   if consul license put "${ENTERPRISE_LICENSE}" 2>&1; then
                     echo "License applied successfully"
                     break
