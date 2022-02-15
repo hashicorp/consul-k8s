@@ -87,6 +87,14 @@ func TestConnectInject(t *testing.T) {
 
 // TestConnectInjectOnUpgrade tests that Connect works before and after an upgrade is performed on the cluster.
 func TestConnectInjectOnUpgrade(t *testing.T) {
+	latestConsulVersion, err := helpers.FetchLatestConsulVersion()
+	require.NoError(t, err)
+	latestConsulImage := fmt.Sprintf("hashicorp/consul:%s", latestConsulVersion[1:])
+
+	previousConsulVersion, err := helpers.FetchPreviousConsulVersion()
+	require.NoError(t, err)
+	previousConsulImage := fmt.Sprintf("hashicorp/consul:%s", previousConsulVersion[1:])
+
 	cases := map[string]struct {
 		clusterGen          func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
 		releaseName         string
@@ -97,40 +105,39 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			clusterGen:  consul.NewCLICluster,
 			releaseName: consul.CLIReleaseName,
 		},
-		"CLI upgrade from 1.10 to 1.11": {
+		fmt.Sprintf("CLI upgrade from %s to %s", previousConsulImage, latestConsulImage): {
 			clusterGen:  consul.NewCLICluster,
 			releaseName: consul.CLIReleaseName,
 			initial: map[string]string{
-				"global.image": "hashicorp/consul:1.10.7",
+				"global.image": previousConsulImage,
 			},
 			upgrade: map[string]string{
-				"global.image": "hashicorp/consul:1.11.2",
+				"global.image": latestConsulImage,
 			},
 		},
-		// TODO: these tests are failing on cleanup. Unsure why. Not ACL cleanup according to Iryna.
-		// "CLI upgrade with secure from 1.10 to 1.11": {
-		// 	clusterGen:  consul.NewCLICluster,
-		// 	releaseName: consul.CLIReleaseName,
-		// 	secure:      true,
-		// 	initial: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.10.7",
-		// 	},
-		// 	upgrade: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.11.2",
-		// 	},
-		// },
-		// "CLI upgrade with secure and auto-encrypt from 1.10 to 1.11": {
-		// 	clusterGen:  consul.NewCLICluster,
-		// 	releaseName: consul.CLIReleaseName,
-		// 	secure:      true,
-		// 	autoEncrypt: true,
-		// 	initial: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.10.7",
-		// 	},
-		// 	upgrade: map[string]string{
-		// 		"global.image": "hashicorp/consul:1.11.2",
-		// 	},
-		// },
+		fmt.Sprintf("CLI upgrade with secure from %s to %s", previousConsulImage, latestConsulImage): {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+			initial: map[string]string{
+				"global.image": previousConsulImage,
+			},
+			upgrade: map[string]string{
+				"global.image": latestConsulImage,
+			},
+		},
+		fmt.Sprintf("CLI upgrade with secure and auto-encrypt from %s to %s", previousConsulImage, latestConsulImage): {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+			autoEncrypt: true,
+			initial: map[string]string{
+				"global.image": previousConsulImage,
+			},
+			upgrade: map[string]string{
+				"global.image": latestConsulImage,
+			},
+		},
 	}
 
 	for name, c := range cases {
