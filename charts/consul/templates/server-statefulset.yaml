@@ -348,7 +348,7 @@ spec:
               mountPath: /consul/tls/server
               readOnly: true
             {{- end }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true

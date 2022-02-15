@@ -616,7 +616,7 @@ exec /bin/consul snapshot agent \'
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.enterpriseLicense.secretName=a/b/c/d' \
-    --set 'global.enterpriseLicense.secretKey=gossip' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
 
@@ -628,6 +628,36 @@ exec /bin/consul snapshot agent \'
     yq -r '.containers[] | select(.name=="consul-snapshot-agent") | .command | any(contains("CONSUL_LICENSE_PATH="))' \
       | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault does not add volume for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+      --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault does not add volume mount for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+      --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
 }
 
 #--------------------------------------------------------------------

@@ -74,7 +74,7 @@ spec:
         - name: aclconfig
           emptyDir: {}
         {{- else }}
-        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
+        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-license
           secret:
             secretName: {{ .Values.global.enterpriseLicense.secretName }}
@@ -159,7 +159,7 @@ spec:
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- else }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true
