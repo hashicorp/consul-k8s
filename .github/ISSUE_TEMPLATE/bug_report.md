@@ -1,7 +1,7 @@
 ---
 name: Bug Report
 about: You're experiencing an issue with the Consul Helm chart or consul-k8s-control-plane binary that is different than the documented behavior.
-labels: bug
+labels: type/bug
 
 ---
 
