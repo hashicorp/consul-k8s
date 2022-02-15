@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -22,7 +23,12 @@ path "consul/data/secret/replication" {
   capabilities = ["read", "update"]
 }`
 
-	// connectCAPolicyTemplate allows Consul to bootstrap all certificates for the service mesh in Vault.
+	enterpriseLicensePolicy = `
+path "consul/data/secret/enterpriselicense" {
+  capabilities = ["read"]
+}`
+
+	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
 	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
 	connectCAPolicyTemplate = `
 path "/sys/mounts" {
@@ -93,6 +99,26 @@ func configureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
 	return gossipKey
 }
 
+// configureEnterpriseLicenseVaultSecret stores it in vault as a secret and configures a policy to access it.
+func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Client) {
+	// Retrieve the license.
+	enterpriseLicense := os.Getenv("CONSUL_ENT_LICENSE")
+
+	// Create the gossip secret.
+	logger.Log(t, "Creating the Enterprise License secret")
+	params := map[string]interface{}{
+		"data": map[string]interface{}{
+			"enterpriselicense": enterpriseLicense,
+		},
+	}
+	_, err := vaultClient.Logical().Write("consul/data/secret/enterpriselicense", params)
+	require.NoError(t, err)
+
+	// Create the Vault Policy for the consul-enterpriselicense.
+	err = vaultClient.Sys().PutPolicy("consul-enterpriselicense", enterpriseLicensePolicy)
+	require.NoError(t, err)
+}
+
 // configureKubernetesAuthRoles configures roles for the Kubernetes auth method
 // that will be used by the test Helm chart installation.
 func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, authPath, datacenter string) {
@@ -109,7 +135,7 @@ func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consul
 	params := map[string]interface{}{
 		"bound_service_account_names":      consulClientServiceAccountName,
 		"bound_service_account_namespaces": ns,
-		"policies":                         "consul-gossip",
+		"policies":                         "consul-gossip,consul-enterpriselicense",
 		"ttl":                              "24h",
 	}
 	_, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-client", authPath), params)

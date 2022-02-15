@@ -74,6 +74,9 @@ func TestVault(t *testing.T) {
 		"global.tls.caCert.secretName": "pki/cert/ca",
 		"global.tls.enableAutoEncrypt": "true",
 
+		"global.enterpriseLicense.secretName": "consul/data/secret/enterpriselicense",
+		"global.enterpriseLicense.secretKey":  "enterpriselicense",
+
 		// For sync catalog, it is sufficient to check that the deployment is running and ready
 		// because we only care that get-auto-encrypt-client-ca init container was able
 		// to talk to the Consul server using the CA from Vault. For this reason,
@@ -99,6 +102,12 @@ func TestVault(t *testing.T) {
 	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
 	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
+
+	// Validate that the enterprise license is set correctly.
+	logger.Log(t, "Validating the enterprise license has been set correctly.")
+	license, licenseErr := consulClient.Operator().LicenseGet(nil)
+	require.NoError(t, licenseErr)
+	require.True(t, license.Valid)
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
