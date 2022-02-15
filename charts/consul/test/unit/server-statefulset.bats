@@ -1375,6 +1375,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/StatefulSet: when global.enterpriseLicense.secretKey!=null and global.enterpriseLicense.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.enterpriseLicense.secretName=' \
+        --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "enterpriseLicense.secretKey and secretName must both be specified." ]]
+}
+
+@test "server/StatefulSet: when global.enterpriseLicense.secretName!=null and global.enterpriseLicense.secretKey=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.enterpriseLicense.secretName=foo' \
+        --set 'global.enterpriseLicense.secretKey=' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "enterpriseLicense.secretKey and secretName must both be specified." ]]
+}
 #--------------------------------------------------------------------
 # extraContainers
 
