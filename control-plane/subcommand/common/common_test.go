@@ -61,7 +61,7 @@ func TestConsulLogin(t *testing.T) {
 	tokenFile := WriteTempFile(t, "")
 
 	client := startMockServer(t, &counter)
-	err := ConsulLogin(client, bearerTokenFile, testAuthMethod, tokenFile, "", testPodMeta)
+	err := ConsulLogin(client, bearerTokenFile, testAuthMethod, tokenFile, "", testPodMeta, "")
 	require.NoError(err)
 	require.Equal(counter, 1)
 	// Validate that the token file was written to disk.
@@ -75,14 +75,7 @@ func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 	require := require.New(t)
 
 	bearerTokenFile := WriteTempFile(t, "")
-	err := ConsulLogin(
-		nil,
-		bearerTokenFile,
-		testAuthMethod,
-		"",
-		"",
-		testPodMeta,
-	)
+	err := ConsulLogin(nil, bearerTokenFile, testAuthMethod, "", "", testPodMeta, "")
 	require.EqualError(err, fmt.Sprintf("no bearer token found in %s", bearerTokenFile))
 }
 
@@ -90,14 +83,7 @@ func TestConsulLogin_BearerTokenFileDoesNotExist(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-	err := ConsulLogin(
-		nil,
-		randFileName,
-		testAuthMethod,
-		"",
-		"",
-		testPodMeta,
-	)
+	err := ConsulLogin(nil, randFileName, testAuthMethod, "", "", testPodMeta, "")
 	require.Error(err)
 	require.Contains(err.Error(), "unable to read bearerTokenFile")
 }
@@ -109,14 +95,7 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	bearerTokenFile := WriteTempFile(t, "foo")
 	client := startMockServer(t, &counter)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-	err := ConsulLogin(
-		client,
-		bearerTokenFile,
-		testAuthMethod,
-		randFileName,
-		"",
-		testPodMeta,
-	)
+	err := ConsulLogin(client, bearerTokenFile, testAuthMethod, randFileName, "", testPodMeta, "")
 	require.Error(err)
 	require.Contains(err.Error(), "error writing token to file sink")
 }

@@ -66,8 +66,9 @@ type Command struct {
 	help   string
 	logger hclog.Logger
 
-	ctx          context.Context
-	consulClient *api.Client
+	ctx            context.Context
+	consulClient   *api.Client
+	flagDatacenter string
 }
 
 func (c *Command) init() {
@@ -96,6 +97,8 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
 		"[Enterprise Only] Enables Admin Partitions")
 	c.flags.StringVar(&c.flagPartitionName, "partition", "",
+		"[Enterprise Only] Name of the Admin Partition")
+	c.flags.StringVar(&c.flagDatacenter, "datacenter", "",
 		"[Enterprise Only] Name of the Admin Partition")
 
 	if c.bearerTokenFile == "" {
@@ -163,9 +166,10 @@ func (c *Command) Run(args []string) int {
 			}
 
 		}
+		c.logger.Info("running login with datacenter")
 		err = backoff.Retry(func() error {
 			//err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagAuthMethodNamespace, map[string]string{})
-			err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, "", map[string]string{})
+			err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, "", nil, c.flagDatacenter)
 			if err != nil {
 				c.logger.Error("Consul login failed; retrying", "error", err)
 			}

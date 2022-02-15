@@ -728,7 +728,12 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		authMethodName := c.withPrefix("k8s-component-auth-method")
+		var authMethodName string
+		if isPrimary {
+			authMethodName = c.withPrefix("k8s-component-auth-method")
+		} else {
+			authMethodName = fmt.Sprintf("%s-%s", c.withPrefix("k8s-component-auth-method"), consulDC)
+		}
 		serviceAccountName := fmt.Sprintf("%s-controller", c.flagResourcePrefix)
 
 		// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
@@ -916,6 +921,9 @@ func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName s
 	// This is the ACLRole which will allow the component which uses the serviceaccount
 	// to be able to do a consul login.
 	aclRoleName := fmt.Sprintf("%s-acl-role", serviceAccountName)
+	if c.flagFederation {
+		aclRoleName += "-" + dc
+	}
 	role := &api.ACLRole{
 		Name:        aclRoleName,
 		Description: fmt.Sprintf("ACL Role for %s", serviceAccountName),
@@ -935,7 +943,19 @@ func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName s
 		BindType:    api.BindingRuleBindTypeRole,
 		BindName:    aclRoleName,
 	}
-	return c.updateOrCreateBindingRule(client, authMethodName, &abr, true)
+
+	bindingRuleWriteOpts := &api.WriteOptions{}
+	if primaryDC != dc {
+		c.log.Info("binding rule DC", "primary-dc", primaryDC, "dc", dc)
+		bindingRuleWriteOpts.Datacenter = primaryDC
+	}
+
+	err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
+		func() error {
+			_, _, err := client.ACL().BindingRuleCreate(&abr, bindingRuleWriteOpts)
+			return err
+		})
+	return err
 }
 
 // updateOrCreateACLRole will query to see if existing role is in place and update them
@@ -1039,7 +1059,7 @@ func (c *Command) configureComponentAuthMethod(consulClient *api.Client, current
 	if primaryDC != "" && authMethodHost != "" {
 		authMethodTmpl.Name = authMethodName + "-" + currentDC
 		authMethodTmpl.Config["Host"] = authMethodHost
-		//authMethodTmpl.TokenLocality = "global"
+		authMethodTmpl.TokenLocality = "global"
 		writeOpts.Datacenter = primaryDC
 		c.log.Info("creating auth method in the primary for the secondary", "auth-method-template", authMethodTmpl)
 	}

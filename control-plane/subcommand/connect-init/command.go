@@ -134,7 +134,7 @@ func (c *Command) Run(args []string) int {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
 		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagAuthMethodNamespace, loginMeta)
+			err := common.ConsulLogin(consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagAuthMethodNamespace, loginMeta, "")
 			if err != nil {
 				c.logger.Error("Consul login failed; retrying", "error", err)
 			}

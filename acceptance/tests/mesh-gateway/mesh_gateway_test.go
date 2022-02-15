@@ -138,14 +138,14 @@ func TestMeshGatewaySecure(t *testing.T) {
 		name              string
 		enableAutoEncrypt string
 	}{
-		{
-			"with ACLs and TLS without auto-encrypt",
-			"false",
-		},
 		//{
-		//	"with ACLs and auto-encrypt",
-		//	"true",
+		//	"with ACLs and TLS without auto-encrypt",
+		//	"false",
 		//},
+		{
+			"with ACLs and auto-encrypt",
+			"true",
+		},
 	}
 
 	for _, c := range cases {
@@ -226,6 +226,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 				"global.federation.enabled":           "true",
 				"global.federation.k8sAuthMethodHost": k8sAuthMethodHost,
+				"global.federation.primaryDC":         "dc1",
 
 				"server.extraVolumes[0].type":          "secret",
 				"server.extraVolumes[0].name":          federationSecretName,

@@ -416,6 +416,8 @@ global:
 
     k8sAuthMethodHost: null
 
+    primaryDC: ""
+
   # Configures metrics for Consul service mesh
   metrics:
     # Configures the Helm chart’s components
