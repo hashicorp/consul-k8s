@@ -231,6 +231,7 @@ spec:
               value: /vault/secrets/enterpriselicense.txt
               {{- else }}
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
             {{- end }}
             {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: ACL_REPLICATION_TOKEN
