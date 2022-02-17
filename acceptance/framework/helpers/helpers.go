@@ -12,13 +12,12 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
+	"github.com/hashicorp/consul/api"
 
-	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -70,37 +69,6 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 	})
 }
 
-// WaitForAllPodsToBeReady waits until all pods with the provided podLabelSelector
-// are in the ready status. It checks every 5 seconds for a total of 20 tries.
-// If there is at least one container in a pod that isn't ready after that,
-// it fails the test.
-func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
-	t.Helper()
-
-	logger.Logf(t, "Waiting for pods with label %q to be ready.", podLabelSelector)
-
-	// Wait up to 10m.
-	// On Azure, volume provisioning can sometimes take close to 5 min,
-	// so we need to give a bit more time for pods to become healthy.
-	counter := &retry.Counter{Count: 600, Wait: 1 * time.Second}
-	retry.RunWith(counter, t, func(r *retry.R) {
-		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
-		require.NoError(r, err)
-		require.NotEmpty(r, pods.Items)
-
-		var notReadyPods []string
-		for _, pod := range pods.Items {
-			if !IsReady(pod) {
-				notReadyPods = append(notReadyPods, pod.Name)
-			}
-		}
-		if len(notReadyPods) > 0 {
-			r.Errorf("%d pods are not ready: %s", len(notReadyPods), strings.Join(notReadyPods, ","))
-		}
-	})
-	logger.Log(t, "Finished waiting for pods to be ready.")
-}
-
 // SetupInterruptHandler sets up a goroutine that will wait for interrupt signals
 // and call cleanup function when it catches it.
 func SetupInterruptHandler(cleanup func()) {
@@ -138,69 +106,45 @@ func Cleanup(t *testing.T, noCleanupOnFailure bool, cleanup func()) {
 	t.Cleanup(wrappedCleanupFunc)
 }
 
-// KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
-func KubernetesClientFromOptions(t *testing.T, options *terratestk8s.KubectlOptions) kubernetes.Interface {
-	configPath, err := options.GetConfigPath(t)
-	require.NoError(t, err)
+// VerifyFederation checks that the WAN federation between servers is successful
+// by first checking members are alive from the perspective of both servers.
+// If secure is true, it will also check that the ACL replication is running on the secondary server.
+func VerifyFederation(t *testing.T, primaryClient, secondaryClient *api.Client, releaseName string, secure bool) {
+	retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+	start := time.Now()
 
-	config, err := terratestk8s.LoadApiClientConfigE(configPath, options.ContextName)
-	require.NoError(t, err)
+	// Check that server in dc1 is healthy from the perspective of the server in dc2, and vice versa.
+	// We're calling the Consul health API, as opposed to checking serf membership status,
+	// because we need to make sure that the federated servers can make API calls and forward requests
+	// from one server to another. From running tests in CI for a while and using serf membership status before,
+	// we've noticed that the status could be "alive" as soon as the server in the secondary cluster joins the primary
+	// and then switch to "failed". This would require us to check that the status is "alive" is showing consistently for
+	// some amount of time, which could be quite flakey. Calling the API in another datacenter allows us to check that
+	// each server can forward calls to another, which is what we need for connect.
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		secondaryServerHealth, _, err := primaryClient.Health().Node(fmt.Sprintf("%s-consul-server-0", releaseName), &api.QueryOptions{Datacenter: "dc2"})
+		require.NoError(r, err)
+		require.Equal(r, secondaryServerHealth.AggregatedStatus(), api.HealthPassing)
 
-	client, err := kubernetes.NewForConfig(config)
-	require.NoError(t, err)
+		primaryServerHealth, _, err := secondaryClient.Health().Node(fmt.Sprintf("%s-consul-server-0", releaseName), &api.QueryOptions{Datacenter: "dc1"})
+		require.NoError(r, err)
+		require.Equal(r, primaryServerHealth.AggregatedStatus(), api.HealthPassing)
 
-	return client
-}
-
-// KubernetesContextFromOptions returns the Kubernetes context from options.
-// If context is explicitly set in options, it returns that context.
-// Otherwise, it returns the current context.
-func KubernetesContextFromOptions(t *testing.T, options *terratestk8s.KubectlOptions) string {
-	t.Helper()
-
-	// First, check if context set in options and return that
-	if options.ContextName != "" {
-		return options.ContextName
-	}
-
-	// Otherwise, get current context from config
-	configPath, err := options.GetConfigPath(t)
-	require.NoError(t, err)
-
-	rawConfig, err := terratestk8s.LoadConfigFromPath(configPath).RawConfig()
-	require.NoError(t, err)
-
-	return rawConfig.CurrentContext
-}
-
-// KubernetesAPIServerHostFromOptions returns the Kubernetes API server host from options.
-func KubernetesAPIServerHostFromOptions(t *testing.T, options *terratestk8s.KubectlOptions) string {
-	t.Helper()
-
-	configPath, err := options.GetConfigPath(t)
-	require.NoError(t, err)
-
-	config, err := terratestk8s.LoadApiClientConfigE(configPath, options.ContextName)
-	require.NoError(t, err)
-
-	return config.Host
-}
-
-// IsReady returns true if pod is ready.
-func IsReady(pod corev1.Pod) bool {
-	if pod.Status.Phase == corev1.PodPending {
-		return false
-	}
-
-	for _, cond := range pod.Status.Conditions {
-		if cond.Type == corev1.PodReady {
-			if cond.Status == corev1.ConditionTrue {
-				return true
-			} else {
-				return false
-			}
+		if secure {
+			replicationStatus, _, err := secondaryClient.ACL().Replication(nil)
+			require.NoError(r, err)
+			require.True(r, replicationStatus.Enabled)
+			require.True(r, replicationStatus.Running)
 		}
-	}
+	})
 
-	return false
+	logger.Logf(t, "Took %s to verify federation", time.Since(start))
+}
+
+// MergeMaps will merge the values in b with values in a and save in a.
+// If there are conflicts, the values in b will overwrite the values in a.
+func MergeMaps(a, b map[string]string) {
+	for k, v := range b {
+		a[k] = v
+	}
 }
