@@ -607,9 +607,9 @@ exec /bin/consul snapshot agent \'
   [ "${actual}" = "${expected}" ]
 }
 
-@test "client/SnapshotAgentDeployment: vault no CONSUL_LICENSE_PATH env variable and command defines CONSUL_LICENSE_PATH" {
+@test "client/SnapshotAgentDeployment: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
   cd `chart_dir`
-  local object=$(helm template \
+  local env=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
@@ -618,16 +618,12 @@ exec /bin/consul snapshot agent \'
     --set 'global.enterpriseLicense.secretName=a/b/c/d' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     . | tee /dev/stderr |
-      yq -r '.spec.template.spec' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-    yq -r '.containers[] | select(.name=="consul-snapshot-agent") | .env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  local actual
 
-  local actual=$(echo $object |
-    yq -r '.containers[] | select(.name=="consul-snapshot-agent") | .command | any(contains("CONSUL_LICENSE_PATH="))' \
-      | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LICENSE_PATH") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/enterpriselicense.txt" ]
 }
 
 @test "client/SnapshotAgentDeployment: vault does not add volume for license secret" {

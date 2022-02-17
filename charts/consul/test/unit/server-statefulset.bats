@@ -1888,26 +1888,22 @@ load _helpers
   [ "${actual}" = "${expected}" ]
 }
 
-@test "server/StatefulSet: vault no CONSUL_LICENSE_PATH env variable and command defines CONSUL_LICENSE_PATH" {
+@test "server/StatefulSet: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
   cd `chart_dir`
-  local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
+  local env=$(helm template \
+     -s templates/server-statefulset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.enterpriseLicense.secretName=a/b/c/d' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     . | tee /dev/stderr |
-      yq -r '.spec.template.spec' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  local actual
 
-  local actual=$(echo $object |
-    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("CONSUL_LICENSE_PATH="))' \
-      | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LICENSE_PATH") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/enterpriselicense.txt" ]
 }
 
 @test "server/StatefulSet: vault does not add volume for license secret" {

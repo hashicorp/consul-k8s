@@ -1859,9 +1859,9 @@ rollingUpdate:
   [ "${actual}" = "${expected}" ]
 }
 
-@test "client/DaemonSet: vault no CONSUL_LICENSE_PATH env variable and command defines CONSUL_LICENSE_PATH" {
+@test "client/DaemonSet: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
   cd `chart_dir`
-  local object=$(helm template \
+  local env=$(helm template \
     -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1869,16 +1869,12 @@ rollingUpdate:
     --set 'global.enterpriseLicense.secretName=a/b/c/d' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     . | tee /dev/stderr |
-      yq -r '.spec.template.spec' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  local actual
 
-  local actual=$(echo $object |
-    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("CONSUL_LICENSE_PATH="))' \
-      | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LICENSE_PATH") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/enterpriselicense.txt" ]
 }
 
 @test "client/DaemonSet: vault does not add volume for license secret" {
