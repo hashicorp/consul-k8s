@@ -77,9 +77,6 @@ func TestVault(t *testing.T) {
 		"global.tls.caCert.secretName": "pki/cert/ca",
 		"global.tls.enableAutoEncrypt": "true",
 
-		"global.enterpriseLicense.secretName": "consul/data/secret/enterpriselicense",
-		"global.enterpriseLicense.secretKey":  "enterpriselicense",
-
 		// For sync catalog, it is sufficient to check that the deployment is running and ready
 		// because we only care that get-auto-encrypt-client-ca init container was able
 		// to talk to the Consul server using the CA from Vault. For this reason,
@@ -88,6 +85,12 @@ func TestVault(t *testing.T) {
 		"syncCatalog.toConsul": "false",
 		"syncCatalog.toK8S":    "false",
 	}
+
+	if cfg.EnableEnterprise {
+		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
+		consulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+	}
+
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
 	consulCluster.Create(t)

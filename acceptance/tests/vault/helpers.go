@@ -104,7 +104,7 @@ func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 	// Retrieve the license.
 	enterpriseLicense := os.Getenv("CONSUL_ENT_LICENSE")
 
-	// Create the gossip secret.
+	// Create the enterprise license secret.
 	logger.Log(t, "Creating the Enterprise License secret")
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
