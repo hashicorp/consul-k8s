@@ -136,7 +136,7 @@ func (c *CLICluster) Create(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	helpers.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
 
 // Upgrade uses the `consul-k8s upgrade` command to upgrade a Consul cluster.
@@ -165,7 +165,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	}
 	require.NoError(t, err)
 
-	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, consulNS, fmt.Sprintf("release=%s", h.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
 
 // Destroy uses the `consul-k8s uninstall` command to destroy a Consul cluster.
@@ -190,15 +190,7 @@ func (c *CLICluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
-	t.Helper()
-
-	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
-	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
-	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
-}
-
-func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
+func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	t.Helper()
 
 	namespace := c.kubectlOptions.Namespace
