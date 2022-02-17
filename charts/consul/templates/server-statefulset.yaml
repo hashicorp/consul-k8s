@@ -143,7 +143,7 @@ spec:
             secretName: {{ template "consul.fullname" . }}-server-cert
             {{- end }}
         {{- end }}
-        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
+        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-license
           secret:
             secretName: {{ .Values.global.enterpriseLicense.secretName }}
@@ -225,7 +225,7 @@ spec:
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: CONSUL_LICENSE_PATH
               {{- if  .Values.global.secretsBackend.vault.enabled }}
               value: /vault/secrets/enterpriselicense.txt
@@ -348,7 +348,7 @@ spec:
               mountPath: /consul/tls/server
               readOnly: true
             {{- end }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true
