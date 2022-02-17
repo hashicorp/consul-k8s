@@ -208,6 +208,9 @@ global:
         # The address of the Vault server.
         address: ""
 
+        # The mount path of the Kubernetes auth method in Vault.
+        authMethodPath: "kubernetes"
+
         # The path to a PKI secrets engine for the root certificate.
         # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
         rootPKIPath: ""

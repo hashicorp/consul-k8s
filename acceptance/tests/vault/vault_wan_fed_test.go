@@ -118,6 +118,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	replicationToken := configureReplicationTokenVaultSecret(t, vaultClient, consulReleaseName, ns, "kubernetes", "kubernetes-dc2")
 
+	// Create the Vault Policy for the Connect CA in both datacenters.
+	createConnectCAPolicy(t, vaultClient, "dc1")
+	createConnectCAPolicy(t, vaultClient, "dc2")
+
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
@@ -164,13 +168,16 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"server.extraVolumes[0].load": "false",
 
 		// Vault config.
-		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulServerRole":     "consul-server",
-		"global.secretsBackend.vault.consulClientRole":     "consul-client",
-		"global.secretsBackend.vault.consulCARole":         "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
-		"global.secretsBackend.vault.ca.secretName":        vaultCASecretName,
-		"global.secretsBackend.vault.ca.secretKey":         "tls.crt",
+		"global.secretsBackend.vault.enabled":                       "true",
+		"global.secretsBackend.vault.consulServerRole":              "consul-server",
+		"global.secretsBackend.vault.consulClientRole":              "consul-client",
+		"global.secretsBackend.vault.consulCARole":                  "consul-ca",
+		"global.secretsBackend.vault.manageSystemACLsRole":          "server-acl-init",
+		"global.secretsBackend.vault.ca.secretName":                 vaultCASecretName,
+		"global.secretsBackend.vault.ca.secretKey":                  "tls.crt",
+		"global.secretsBackend.vault.connectCA.address":             primaryVaultCluster.Address(),
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 	}
 
 	if cfg.UseKind {
@@ -216,14 +223,19 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"server.extraConfig":          serverExtraConfig,
 
 		// Vault config.
-		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulServerRole":     "consul-server",
-		"global.secretsBackend.vault.consulClientRole":     "consul-client",
-		"global.secretsBackend.vault.consulCARole":         "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
-		"global.secretsBackend.vault.ca.secretName":        vaultCASecretName,
-		"global.secretsBackend.vault.ca.secretKey":         "tls.crt",
-		"global.secretsBackend.vault.agentAnnotations":     fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
+		"global.secretsBackend.vault.enabled":                       "true",
+		"global.secretsBackend.vault.consulServerRole":              "consul-server",
+		"global.secretsBackend.vault.consulClientRole":              "consul-client",
+		"global.secretsBackend.vault.consulCARole":                  "consul-ca",
+		"global.secretsBackend.vault.manageSystemACLsRole":          "server-acl-init",
+		"global.secretsBackend.vault.ca.secretName":                 vaultCASecretName,
+		"global.secretsBackend.vault.ca.secretKey":                  "tls.crt",
+		"global.secretsBackend.vault.agentAnnotations":              fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
+		"global.secretsBackend.vault.connectCA.address":             externalVaultAddress,
+		"global.secretsBackend.vault.connectCA.authMethodPath":      "kubernetes-dc2",
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc2/connect_inter",
+		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{"connect": [{"ca_config": [{"tls_server_name": "%s-vault"}]}]}"`, vaultReleaseName),
 	}
 
 	if cfg.UseKind {
