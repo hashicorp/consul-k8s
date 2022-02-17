@@ -51,7 +51,7 @@ func NewCLICluster(
 	ctx environment.TestContext,
 	cfg *config.TestConfig,
 	releaseName string,
-) Cluster {
+) *CLICluster {
 
 	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
 	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)

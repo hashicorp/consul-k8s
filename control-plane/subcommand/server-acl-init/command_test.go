@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -323,6 +325,70 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestRun_ReplicationTokenPrimaryDC_WithProvidedSecretID(t *testing.T) {
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
+	defer testSvr.Stop()
+	require := require.New(t)
+
+	replicationToken := "123e4567-e89b-12d3-a456-426614174000"
+	replicationTokenFile, err := ioutil.TempFile("", "replicationtoken")
+	require.NoError(err)
+	defer os.Remove(replicationTokenFile.Name())
+
+	replicationTokenFile.WriteString(replicationToken)
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-create-acl-replication-token",
+		"-acl-replication-token-file", replicationTokenFile.Name(),
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that this token is created.
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   replicationToken,
+	})
+	require.NoError(err)
+	token, _, err := consul.ACL().TokenReadSelf(nil)
+	require.NoError(err)
+
+	for _, policyLink := range token.Policies {
+		policy := policyExists(t, policyLink.Name, consul)
+		require.Nil(policy.Datacenters)
+
+		// Test that the token was not created as a Kubernetes Secret.
+		_, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-acl-replication-acl-token", metav1.GetOptions{})
+		require.True(k8serrors.IsNotFound(err))
+	}
+
+	// Test that if the same command is run again, it doesn't error.
+	t.Run(t.Name()+"-retried", func(t *testing.T) {
+		ui = cli.NewMockUi()
+		cmd = Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+		responseCode = cmd.Run(cmdArgs)
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	})
 }
 
 // Test creating each token type when replication is enabled.

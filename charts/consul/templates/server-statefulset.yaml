@@ -75,6 +75,10 @@ spec:
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ include "consul.serverTLSCATemplate" . }}
         {{- end }}
+        {{- if (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.createReplicationToken)) }}
+        "vault.hashicorp.com/agent-inject-secret-replication-token-config.hcl": "{{ .Values.global.acls.replicationToken.secretName }}"
+        "vault.hashicorp.com/agent-inject-template-replication-token-config.hcl":  {{ template "consul.vaultReplicationTokenConfigTemplate" . }}
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
@@ -217,7 +221,7 @@ spec:
             - name: CONSUL_LICENSE_PATH
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
-            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: ACL_REPLICATION_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -294,7 +298,11 @@ spec:
                 -hcl="connect { enable_mesh_gateway_wan_federation = true }" \
                 {{- end }}
                 {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+                {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.acls.createReplicationToken)) }}
+                -config-file=/vault/secrets/replication-token-config.hcl \
+                {{- else }}
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
+                {{- end }}
                 {{- end }}
                 {{- if .Values.ui.enabled }}
                 -ui \

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -115,6 +116,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	primaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
 	secondaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
 
+	replicationToken := configureReplicationTokenVaultSecret(t, vaultClient, consulReleaseName, ns, "kubernetes", "kubernetes-dc2")
+
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
@@ -135,7 +138,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// TLS config.
 		"global.tls.enabled":           "true",
-		"global.tls.httpsOnly":         "false",
 		"global.tls.enableAutoEncrypt": "true",
 		"global.tls.caCert.secretName": "pki/cert/ca",
 		"server.serverCert.secretName": primaryCertPath,
@@ -143,6 +145,12 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// Gossip config.
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
+
+		// ACL config.
+		"global.acls.manageSystemACLs":            "true",
+		"global.acls.createReplicationToken":      "true",
+		"global.acls.replicationToken.secretName": "consul/data/secret/replication",
+		"global.acls.replicationToken.secretKey":  "replication",
 
 		// Mesh config.
 		"connectInject.enabled": "true",
@@ -156,12 +164,13 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"server.extraVolumes[0].load": "false",
 
 		// Vault config.
-		"global.secretsBackend.vault.enabled":          "true",
-		"global.secretsBackend.vault.consulServerRole": "consul-server",
-		"global.secretsBackend.vault.consulClientRole": "consul-client",
-		"global.secretsBackend.vault.consulCARole":     "consul-ca",
-		"global.secretsBackend.vault.ca.secretName":    vaultCASecretName,
-		"global.secretsBackend.vault.ca.secretKey":     "tls.crt",
+		"global.secretsBackend.vault.enabled":              "true",
+		"global.secretsBackend.vault.consulServerRole":     "consul-server",
+		"global.secretsBackend.vault.consulClientRole":     "consul-client",
+		"global.secretsBackend.vault.consulCARole":         "consul-ca",
+		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
+		"global.secretsBackend.vault.ca.secretName":        vaultCASecretName,
+		"global.secretsBackend.vault.ca.secretKey":         "tls.crt",
 	}
 
 	if cfg.UseKind {
@@ -182,7 +191,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// TLS config.
 		"global.tls.enabled":           "true",
-		"global.tls.httpsOnly":         "false",
 		"global.tls.enableAutoEncrypt": "true",
 		"global.tls.caCert.secretName": "pki/cert/ca",
 		"server.serverCert.secretName": secondaryCertPath,
@@ -190,6 +198,11 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// Gossip config.
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
+
+		// ACL config.
+		"global.acls.manageSystemACLs":            "true",
+		"global.acls.replicationToken.secretName": "consul/data/secret/replication",
+		"global.acls.replicationToken.secretKey":  "replication",
 
 		// Mesh config.
 		"connectInject.enabled": "true",
@@ -203,13 +216,14 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"server.extraConfig":          serverExtraConfig,
 
 		// Vault config.
-		"global.secretsBackend.vault.enabled":          "true",
-		"global.secretsBackend.vault.consulServerRole": "consul-server",
-		"global.secretsBackend.vault.consulClientRole": "consul-client",
-		"global.secretsBackend.vault.consulCARole":     "consul-ca",
-		"global.secretsBackend.vault.ca.secretName":    vaultCASecretName,
-		"global.secretsBackend.vault.ca.secretKey":     "tls.crt",
-		"global.secretsBackend.vault.agentAnnotations": fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
+		"global.secretsBackend.vault.enabled":              "true",
+		"global.secretsBackend.vault.consulServerRole":     "consul-server",
+		"global.secretsBackend.vault.consulClientRole":     "consul-client",
+		"global.secretsBackend.vault.consulCARole":         "consul-ca",
+		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
+		"global.secretsBackend.vault.ca.secretName":        vaultCASecretName,
+		"global.secretsBackend.vault.ca.secretKey":         "tls.crt",
+		"global.secretsBackend.vault.agentAnnotations":     fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 	}
 
 	if cfg.UseKind {
@@ -223,9 +237,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	// Verify federation between servers.
 	logger.Log(t, "verifying federation was successful")
-	primaryClient := primaryConsulCluster.SetupConsulClient(t, false)
-	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, false)
-	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, false)
+	primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
+	secondaryConsulCluster.ACLToken = replicationToken
+	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
+	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
 
 	// Create a ProxyDefaults resource to configure services to use the mesh
 	// gateways.
@@ -242,6 +257,19 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	logger.Log(t, "creating static-client in dc1")
 	k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+
+	logger.Log(t, "creating intention")
+	_, _, err = primaryClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+		Kind: api.ServiceIntentions,
+		Name: "static-server",
+		Sources: []*api.SourceIntention{
+			{
+				Name:   "static-client",
+				Action: api.IntentionActionAllow,
+			},
+		},
+	}, nil)
+	require.NoError(t, err)
 
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), "http://localhost:1234")

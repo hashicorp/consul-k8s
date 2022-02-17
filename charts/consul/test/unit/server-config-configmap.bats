@@ -168,28 +168,6 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "server/ConfigMap: enable_token_replication is not set when acls.replicationToken.secretName is set but secretKey is not" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretName=name' \
-      . | tee /dev/stderr |
-      yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "server/ConfigMap: enable_token_replication is not set when acls.replicationToken.secretKey is set but secretName is not" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretKey=key' \
-      . | tee /dev/stderr |
-      yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
 @test "server/ConfigMap: enable_token_replication is set when acls.replicationToken.secretKey and secretName are set" {
   cd `chart_dir`
   local actual=$(helm template \
