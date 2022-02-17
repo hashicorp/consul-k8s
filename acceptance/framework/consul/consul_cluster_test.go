@@ -65,7 +65,7 @@ func TestNewHelmCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster := NewHelmCluster(t, tt.helmValues, &ctx{}, &config.TestConfig{ConsulImage: "test-config-image"}, "test")
-			require.Equal(t, cluster.(*HelmCluster).helmOptions.SetValues, tt.want)
+			require.Equal(t, cluster.helmOptions.SetValues, tt.want)
 		})
 	}
 }

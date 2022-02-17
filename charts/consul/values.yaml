@@ -138,7 +138,10 @@ global:
       # The Vault role for the Consul server.
       # The role must be connected to the Consul server's service account and
       # have a policy with read capabilities for the following secrets:
-      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`
+      # - certificate issue path defined by `server.serverCert.secretName`
+      # - CA certificate defined by `global.tls.caCert.secretName`
+      # - replication token defined by `global.acls.replicationToken.secretName` if `global.federation.enabled` is `true`
       # To discover the service account name of the Consul server, run
       #     ```shell-session
       #     $ helm template --show-only templates/server-serviceaccount.yaml <release-name> hashicorp/consul
@@ -150,12 +153,22 @@ global:
       # The role must be connected to the Consul client's service account and
       # have a policy with read capabilities for the following secrets:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
-      # To discover the service account name of the Consul server, run
+      # To discover the service account name of the Consul client, run
       #     ```shell-session
-      #     $ helm template --show-only templates/client-daemonset.yaml <release-name> charts/consul
+      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> charts/consul
       #     ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
+
+      # A Vault role to allow Kubernetes job that manages ACLs for this Helm chart (`server-acl-init`)
+      # to read and update Vault secrets for the Consul's bootstrap and replication tokens.
+      # This role must be bound the `server-acl-init`'s service account.
+      # To discover the service account name of the `server-acl-init` job, run
+      #     ```shell-session
+      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      manageSystemACLsRole: ""
 
       # This value defines additional annotations for
       # Vault agent on any pods where it'll be running.
@@ -376,9 +389,9 @@ global:
     # and create ACL tokens and policies.
     # This value is ignored if `bootstrapToken` is also set.
     replicationToken:
-      # The name of the Kubernetes secret.
+      # The name of the Kubernetes secret or the path of the secret in Vault.
       secretName: null
-      # The key of the Kubernetes secret.
+      # The key of the Kubernetes or Vault secret.
       secretKey: null
 
   # [Enterprise Only] This value refers to a Kubernetes secret that you have created
