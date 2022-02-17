@@ -225,8 +225,11 @@ spec:
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: CONSUL_LICENSE_PATH
+              {{- if  .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
             {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
@@ -245,10 +248,6 @@ spec:
 
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
-              {{- end }}
-
-              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.enterpriseLicense.secretName }}
-              CONSUL_LICENSE_PATH=`cat /vault/secrets/enterpriselicense.txt`
               {{- end }}
               
               {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}

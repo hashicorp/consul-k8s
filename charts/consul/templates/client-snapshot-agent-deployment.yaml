@@ -124,9 +124,13 @@ spec:
                   name: "{{ template "consul.fullname" . }}-client-snapshot-agent-acl-token"
                   key: "token"
             {{- else }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: CONSUL_LICENSE_PATH
+              {{- if  .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
             {{- end }}
             {{- end}}
           command:
@@ -137,9 +141,6 @@ spec:
               cat <<EOF > /etc/ssl/certs/custom-ca.pem
               {{- .Values.client.snapshotAgent.caCert | nindent 14 }}
               EOF
-              {{- end }}
-              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.enterpriseLicense.secretName }}
-              CONSUL_LICENSE_PATH=`cat /vault/secrets/enterpriselicense.txt`
               {{- end }}
               exec /bin/consul snapshot agent \
                 {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}

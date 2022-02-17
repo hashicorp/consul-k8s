@@ -217,9 +217,13 @@ spec:
                 {{- end }}
             {{- end }}
             {{- end }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs) (not .Values.global.secretsBackend.vault.enabled)) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs))}}
             - name: CONSUL_LICENSE_PATH
+              {{- if  .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
@@ -242,9 +246,6 @@ spec:
               {{- if .Values.global.secretsBackend.vault.enabled }}
               {{- if .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
-              {{- end }}
-              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.enterpriseLicense.secretName }}
-              CONSUL_LICENSE_PATH=`cat /vault/secrets/enterpriselicense.txt`
               {{- end }}
               {{- end }}
               {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
