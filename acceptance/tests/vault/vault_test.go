@@ -31,6 +31,9 @@ func TestVault(t *testing.T) {
 	gossipKey := configureGossipVaultSecret(t, vaultClient)
 
 	createConnectCAPolicy(t, vaultClient, "dc1")
+	if cfg.EnableEnterprise {
+		configureEnterpriseLicenseVaultSecret(t, vaultClient)
+	}
 
 	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1")
 
@@ -103,11 +106,13 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
 
-	// Validate that the enterprise license is set correctly.
-	logger.Log(t, "Validating the enterprise license has been set correctly.")
-	license, licenseErr := consulClient.Operator().LicenseGet(nil)
-	require.NoError(t, licenseErr)
-	require.True(t, license.Valid)
+	if cfg.EnableEnterprise {
+		// Validate that the enterprise license is set correctly.
+		logger.Log(t, "Validating the enterprise license has been set correctly.")
+		license, licenseErr := consulClient.Operator().LicenseGet(nil)
+		require.NoError(t, licenseErr)
+		require.True(t, license.Valid)
+	}
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
