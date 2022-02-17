@@ -22,9 +22,9 @@ path "consul/data/secret/replication" {
   capabilities = ["read", "update"]
 }`
 
-	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
+	// connectCAPolicyTemplate allows Consul to bootstrap all certificates for the service mesh in Vault.
 	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
-	connectCAPolicy = `
+	connectCAPolicyTemplate = `
 path "/sys/mounts" {
   capabilities = [ "read" ]
 }
@@ -33,7 +33,7 @@ path "/sys/mounts/connect_root" {
   capabilities = [ "create", "read", "update", "delete", "list" ]
 }
 
-path "/sys/mounts/connect_inter" {
+path "/sys/mounts/%s/connect_inter" {
   capabilities = [ "create", "read", "update", "delete", "list" ]
 }
 
@@ -41,7 +41,7 @@ path "/connect_root/*" {
   capabilities = [ "create", "read", "update", "delete", "list" ]
 }
 
-path "/connect_inter/*" {
+path "/%s/connect_inter/*" {
   capabilities = [ "create", "read", "update", "delete", "list" ]
 }
 `
@@ -118,7 +118,7 @@ func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consul
 	params = map[string]interface{}{
 		"bound_service_account_names":      consulServerServiceAccountName,
 		"bound_service_account_namespaces": ns,
-		"policies":                         fmt.Sprintf("consul-gossip,connect-ca,consul-server-%s,consul-replication-token", datacenter),
+		"policies":                         fmt.Sprintf("consul-gossip,connect-ca-%s,consul-server-%s,consul-replication-token", datacenter, datacenter),
 		"ttl":                              "24h",
 	}
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-server", authPath), params)
@@ -221,4 +221,12 @@ func configureReplicationTokenVaultSecret(t *testing.T, vaultClient *vapi.Client
 	}
 
 	return token
+}
+
+// createConnectCAPolicy creates the Vault Policy for the connect-ca in a given datacenter.
+func createConnectCAPolicy(t *testing.T, vaultClient *vapi.Client, datacenter string) {
+	err := vaultClient.Sys().PutPolicy(
+		fmt.Sprintf("connect-ca-%s", datacenter),
+		fmt.Sprintf(connectCAPolicyTemplate, datacenter, datacenter))
+	require.NoError(t, err)
 }

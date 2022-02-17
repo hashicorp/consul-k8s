@@ -30,9 +30,7 @@ func TestVault(t *testing.T) {
 
 	gossipKey := configureGossipVaultSecret(t, vaultClient)
 
-	// Create the Vault Policy for the connect-ca.
-	err := vaultClient.Sys().PutPolicy("connect-ca", connectCAPolicy)
-	require.NoError(t, err)
+	createConnectCAPolicy(t, vaultClient, "dc1")
 
 	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1")
 
@@ -60,7 +58,7 @@ func TestVault(t *testing.T) {
 
 		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "connect_inter",
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 
 		"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",
