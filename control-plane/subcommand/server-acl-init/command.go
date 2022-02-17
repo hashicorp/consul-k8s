@@ -507,7 +507,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateInjectToken {
 		authMethodName := c.withPrefix("k8s-auth-method")
-		err := c.configureConnectInjectAuthMethod(consulClient, authMethodName, true)
+		err := c.configureConnectInjectAuthMethod(consulClient, authMethodName)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
