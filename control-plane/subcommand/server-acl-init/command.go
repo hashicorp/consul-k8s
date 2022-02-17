@@ -83,9 +83,6 @@ type Command struct {
 	flagEnableInjectK8SNSMirroring       bool   // Enables mirroring of k8s namespaces into Consul for Connect inject
 	flagInjectK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring injected services
 
-	// Flags to support ACL Login method of provisioning tokens.
-	flagCreateComponentAuthMethod bool // Whether or not to create the comoponent auth method in Consul for components to use to fetch acl tokens
-
 	// Flag to support a custom bootstrap token.
 	flagBootstrapTokenFile string
 

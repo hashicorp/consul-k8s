@@ -26,12 +26,6 @@ import (
 const (
 	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	defaultTokenSinkFile   = "/consul/connect-inject/acl-token"
-
-	// The number of times to attempt ACL Login.
-	numLoginRetries = 300
-
-	raftReplicationTimeout   = 2 * time.Second
-	tokenReadPollingInterval = 100 * time.Millisecond
 )
 
 type Command struct {
