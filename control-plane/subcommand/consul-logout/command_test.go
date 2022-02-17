@@ -65,10 +65,6 @@ func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
 
-	// We are not setting up the Component Auth Method here because testing logout
-	// does not need to use the auth method and this auth method can still issue a login.
-	test.SetupK8sAuthMethod(t, consulClient, "test-sa", "default")
-
 	bogusToken := "00000000-00-0-001110aacddbderf"
 	err = os.WriteFile(tokenFile, []byte(bogusToken), 0444)
 	require.NoError(t, err)

@@ -216,9 +216,6 @@ func (c *Command) init() {
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
 
-	c.flags.BoolVar(&c.flagCreateComponentAuthMethod, "create-component-auth-method", false,
-		"Toggle for creating an auth method for components to use to fetch their ACL tokens.")
-
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -446,13 +443,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateComponentAuthMethod {
-		err := c.configureComponentAuthMethod(consulClient)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
-		}
+	// Create the component auth method, this is the auth method that Consul components will use
+	// to issue an `ACL().Login()` against at startup, for local tokens.
+	componentAuthMethodName := c.withPrefix("k8s-component-auth-method")
+	err = c.configureComponentAuthMethod(consulClient, componentAuthMethodName)
+	if err != nil {
+		c.log.Error(err.Error())
+		return 1
 	}
+
 	if c.flagCreateClientToken {
 		agentRules, err := c.agentRules()
 		if err != nil {
@@ -722,14 +721,13 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		authMethodName := c.withPrefix("k8s-component-auth-method")
-		serviceAccountName := fmt.Sprintf("%s-controller", c.flagResourcePrefix)
+		serviceAccountName := c.withPrefix("controller")
 
 		// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
 		// Controller token must be global because config entry writes all
 		// go to the primary datacenter. This means secondary datacenters need
 		// a token that is known by the primary datacenters.
-		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, isPrimary, globalTokenTrue, authMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, isPrimary, globalTokenTrue, componentAuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -870,10 +868,6 @@ func (c *Command) validateFlags() error {
 		return errors.New("-resource-prefix must be set")
 	}
 
-	if c.flagCreateControllerToken && !c.flagCreateComponentAuthMethod {
-		return errors.New("-create-component-auth-method is required with -create-controller-token")
-	}
-
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
@@ -935,28 +929,30 @@ func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName s
 // updateOrCreateACLRole will query to see if existing role is in place and update them
 // or create them if they do not yet exist.
 func (c *Command) updateOrCreateACLRole(client *api.Client, role *api.ACLRole) error {
-	aclRoleList, _, err := client.ACL().RoleList(nil)
-	if err != nil {
-		c.log.Error("unable to read ACL Roles", err)
-		return err
-	}
-	for _, y := range aclRoleList {
-		if y.Name == role.Name {
-			role.ID = y.ID
-			_, _, err := client.ACL().RoleUpdate(role, &api.WriteOptions{})
+	err := c.untilSucceeds(fmt.Sprintf("update or create acl role for %s", role.Name),
+		func() error {
+			var err error
+			aclRole, _, err := client.ACL().RoleReadByName(role.Name, &api.QueryOptions{})
 			if err != nil {
-				c.log.Error("unable to update role", err)
+				c.log.Error("unable to read ACL Roles", err)
 				return err
 			}
-			return nil
-		}
-	}
-	_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
-	if err != nil {
-		c.log.Error("unable to create role", err)
-		return err
-	}
-	return nil
+			if aclRole != nil {
+				_, _, err := client.ACL().RoleUpdate(aclRole, &api.WriteOptions{})
+				if err != nil {
+					c.log.Error("unable to update role", err)
+					return err
+				}
+				return nil
+			}
+			_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
+			if err != nil {
+				c.log.Error("unable to create role", err)
+				return err
+			}
+			return err
+		})
+	return err
 }
 
 // updateOrCreateBindingRule will query to see if existing binding rules are in place and update them
@@ -1022,9 +1018,8 @@ func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName s
 }
 
 // configureComponentAuthMethod sets up an AuthMethod that the Consul components will use to issue ACL logins with.
-func (c *Command) configureComponentAuthMethod(consulClient *api.Client) error {
+func (c *Command) configureComponentAuthMethod(consulClient *api.Client, authMethodName string) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
-	authMethodName := c.withPrefix("k8s-component-auth-method")
 	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {
 		return err
@@ -1087,9 +1082,6 @@ func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules 
 }
 
 const globalTokenTrue = true
-
-// stupid linter: uncomment this when we add a non-global token
-// const globalTokenFalse = false
 
 const consulDefaultNamespace = "default"
 const consulDefaultPartition = "default"

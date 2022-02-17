@@ -69,7 +69,7 @@ spec:
             {{- end }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
-        - mountPath: /consul/connect-inject
+        - mountPath: /consul/login
           name: consul-data
           readOnly: false
         {{- if .Values.global.tls.enabled }}
@@ -91,7 +91,8 @@ spec:
               -enable-partitions=true \
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
-              -k8s-namespace={{ .Release.Namespace }}
+              -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
+              -log-json={{ .Values.global.logJSON }} \
         resources:
           requests:
             memory: "25Mi"
@@ -143,7 +144,7 @@ spec:
         env:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN_FILE
-          value: "/consul/connect-inject/acl-token"
+          value: "/consul/login/acl-token"
         {{- end }}
         - name: HOST_IP
           valueFrom:
@@ -177,7 +178,7 @@ spec:
           {{- toYaml . | nindent 12 }}
         {{- end }}
         volumeMounts:
-        - mountPath: /consul/connect-inject
+        - mountPath: /consul/login
           name: consul-data
           readOnly: false
         - mountPath: /tmp/controller-webhook/certs

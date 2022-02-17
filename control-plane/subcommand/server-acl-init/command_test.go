@@ -65,14 +65,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			Flags: []string{
 				"-server-address=localhost",
 				"-resource-prefix=prefix",
-				"-create-controller-token",
-			},
-			ExpErr: "-create-component-auth-method is required with -create-controller-token",
-		},
-		{
-			Flags: []string{
-				"-server-address=localhost",
-				"-resource-prefix=prefix",
 				"-sync-consul-node-name=Speci@l_Chars",
 			},
 			ExpErr: "-sync-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
@@ -174,8 +166,7 @@ func TestRun_ComponentAuthMethod(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-resource-prefix=" + resourcePrefix,
-		"-create-component-auth-method"}
+		"-resource-prefix=" + resourcePrefix}
 
 	responseCode := cmd.Run(cmdArgs)
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
@@ -291,7 +282,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		},
 		{
 			TestName:    "Controller token",
-			TokenFlags:  []string{"-create-controller-token", "-create-component-auth-method"},
+			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
 			PolicyDCs:   nil,
 			SecretNames: nil,
@@ -476,7 +467,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		},
 		{
 			TestName:    "Controller token",
-			TokenFlags:  []string{"-create-component-auth-method", "-create-controller-token"},
+			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token-dc2"},
 			PolicyDCs:   nil,
 			SecretNames: nil,
@@ -630,7 +621,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		},
 		{
 			TestName:    "Controller token",
-			TokenFlags:  []string{"-create-controller-token", "-create-component-auth-method"},
+			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
 			SecretNames: nil,
 		},
@@ -2355,7 +2346,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 	}{
 		{
 			TestName:    "Controller",
-			TokenFlags:  []string{"-create-component-auth-method", "-create-controller-token"},
+			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
 			Roles:       []string{resourcePrefix + "-controller-acl-role"},
 		},

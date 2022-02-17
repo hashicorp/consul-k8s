@@ -2,6 +2,7 @@ package aclinit
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -53,7 +54,6 @@ func TestRun_TokenSinkFile(t *testing.T) {
 		k8sClient: k8s,
 	}
 	code := cmd.Run([]string{
-		"-k8s-namespace", k8sNS,
 		"-token-sink-file", sinkFile,
 		"-secret-name", secretName,
 	})
@@ -94,7 +94,6 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 		k8sClient: k8s,
 	}
 	code := cmd.Run([]string{
-		"-k8s-namespace", k8sNS,
 		"-token-sink-file", "/this/filepath/does/not/exist",
 		"-secret-name", secretName,
 	})
@@ -145,7 +144,6 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 	// Run twice.
 	for i := 0; i < 2; i++ {
 		code := cmd.Run([]string{
-			"-k8s-namespace", k8sNS,
 			"-token-sink-file", sinkFile,
 			"-secret-name", secretName,
 		})
@@ -160,7 +158,6 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 // TestRun_PerformsConsulLogin executes the consul login path and validates the token
 // is written to disk.
 func TestRun_PerformsConsulLogin(t *testing.T) {
-	var caFile, certFile, keyFile string
 	// This is the test file that we will write the token to so consul-logout can read it.
 	tokenFile := common.WriteTempFile(t, "")
 	bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
@@ -176,10 +173,6 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 		c.ACL.Enabled = true
 		c.ACL.DefaultPolicy = "deny"
 		c.ACL.Tokens.InitialManagement = masterToken
-		caFile, certFile, keyFile = test.GenerateServerCerts(t)
-		c.CAFile = caFile
-		c.CertFile = certFile
-		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
 	defer server.Stop()
@@ -188,11 +181,6 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 		Scheme:  "http",
 		Address: server.HTTPAddr,
 		Token:   masterToken,
-	}
-	cfg.Address = server.HTTPSAddr
-	cfg.Scheme = "https"
-	cfg.TLSConfig = api.TLSConfig{
-		CAFile: caFile,
 	}
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
@@ -206,12 +194,14 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 		UI:              ui,
 		k8sClient:       k8s,
 		bearerTokenFile: bearerFile,
-		consulClient:    consulClient,
 		tokenSinkFile:   tokenFile,
 	}
 
 	code := cmd.Run([]string{
+		"-token-file", tokenFile,
 		"-acl-auth-method", common.ComponentAuthMethod,
+		"-component-name", "foo",
+		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 	// Validate the Token got written.

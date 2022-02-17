@@ -286,7 +286,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-terminating-gateway-name=gw",
 				"-terminating-gateway-name=anothergw",
 				"-create-controller-token",
-				"-create-component-auth-method",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -749,7 +748,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			LocalToken:  false,
 		},
 		"controller token": {
-			TokenFlags:  []string{"-create-controller-token", "-create-component-auth-method"},
+			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
 			PolicyDCs:   nil,
 			SecretNames: nil,

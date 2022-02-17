@@ -212,6 +212,22 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "controller/Deployment: auto-encrypt init container is created and is the first init-container when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "get-auto-encrypt-client-ca" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enabled
 
@@ -623,6 +639,28 @@ load _helpers
 #--------------------------------------------------------------------
 # aclToken
 
+@test "controller/Deployment: aclToken disabled when secretName is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'controller.aclToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: aclToken disabled when secretKey is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'controller.aclToken.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "controller/Deployment: aclToken enabled when secretName and secretKey is provided" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -664,11 +702,16 @@ load _helpers
   local cmd=$(helm template \
       -s templates/controller-deployment.yaml  \
       --set 'controller.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+    yq '.containers[0].command | any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq '.initContainers[0].command | any(contains("-log-level=info"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -678,11 +721,16 @@ load _helpers
       -s templates/controller-deployment.yaml  \
       --set 'controller.enabled=true' \
       --set 'controller.logLevel=error' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-log-level=error"))' | tee /dev/stderr)
+    yq '.containers[0].command | any(contains("-log-level=error"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq '.initContainers[0].command | any(contains("-log-level=error"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
