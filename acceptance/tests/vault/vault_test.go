@@ -35,7 +35,7 @@ func TestVault(t *testing.T) {
 		configureEnterpriseLicenseVaultSecret(t, vaultClient)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1")
+	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
 
 	configurePKICA(t, vaultClient)
 	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")

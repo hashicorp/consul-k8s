@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/go-uuid"
 	vapi "github.com/hashicorp/vault/api"
@@ -121,9 +122,13 @@ func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 
 // configureKubernetesAuthRoles configures roles for the Kubernetes auth method
 // that will be used by the test Helm chart installation.
-func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, authPath, datacenter string) {
+func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, authPath, datacenter string, cfg *config.TestConfig) {
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
 	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
+	sharedPolicies := "consul-gossip"
+	if cfg.EnableEnterprise {
+		sharedPolicies += ",consul-enterpriselicense"
+	}
 
 	// Create the Auth Roles for consul-server and consul-client.
 	// Auth roles bind policies to Kubernetes service accounts, which
@@ -135,7 +140,7 @@ func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consul
 	params := map[string]interface{}{
 		"bound_service_account_names":      consulClientServiceAccountName,
 		"bound_service_account_namespaces": ns,
-		"policies":                         "consul-gossip,consul-enterpriselicense",
+		"policies":                         sharedPolicies,
 		"ttl":                              "24h",
 	}
 	_, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-client", authPath), params)
@@ -144,7 +149,7 @@ func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consul
 	params = map[string]interface{}{
 		"bound_service_account_names":      consulServerServiceAccountName,
 		"bound_service_account_namespaces": ns,
-		"policies":                         fmt.Sprintf("consul-gossip,connect-ca-%s,consul-server-%s,consul-replication-token", datacenter, datacenter),
+		"policies":                         fmt.Sprintf(sharedPolicies+",connect-ca-%s,consul-server-%s,consul-replication-token", datacenter, datacenter),
 		"ttl":                              "24h",
 	}
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-server", authPath), params)
