@@ -10,7 +10,7 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,9 +23,9 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 	if t.Failed() {
 		// Create k8s client from kubectl options.
-		client := helpers.KubernetesClientFromOptions(t, kubectlOptions)
+		client := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
-		contextName := helpers.KubernetesContextFromOptions(t, kubectlOptions)
+		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
 
 		// Create a directory for the test.
 		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)

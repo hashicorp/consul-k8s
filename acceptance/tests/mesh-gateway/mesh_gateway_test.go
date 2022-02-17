@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -12,7 +11,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -108,7 +106,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	// Verify federation between servers
 	logger.Log(t, "verifying federation was successful")
-	verifyFederation(t, primaryClient, secondaryClient, releaseName, false)
+	helpers.VerifyFederation(t, primaryClient, secondaryClient, releaseName, false)
 
 	// Create a ProxyDefaults resource to configure services to use the mesh
 	// gateways.
@@ -244,7 +242,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 			// Verify federation between servers
 			logger.Log(t, "verifying federation was successful")
-			verifyFederation(t, primaryClient, secondaryClient, releaseName, true)
+			helpers.VerifyFederation(t, primaryClient, secondaryClient, releaseName, true)
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways.
@@ -279,39 +277,4 @@ func TestMeshGatewaySecure(t *testing.T) {
 			k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), "http://localhost:1234")
 		})
 	}
-}
-
-// verifyFederation checks that the WAN federation between servers is successful
-// by first checking members are alive from the perspective of both servers.
-// If secure is true, it will also check that the ACL replication is running on the secondary server.
-func verifyFederation(t *testing.T, primaryClient, secondaryClient *api.Client, releaseName string, secure bool) {
-	retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
-	start := time.Now()
-
-	// Check that server in dc1 is healthy from the perspective of the server in dc2, and vice versa.
-	// We're calling the Consul health API, as opposed to checking serf membership status,
-	// because we need to make sure that the federated servers can make API calls and forward requests
-	// from one server to another. From running tests in CI for a while and using serf membership status before,
-	// we've noticed that the status could be "alive" as soon as the server in the secondary cluster joins the primary
-	// and then switch to "failed". This would require us to check that the status is "alive" is showing consistently for
-	// some amount of time, which could be quite flakey. Calling the API in another datacenter allows us to check that
-	// each server can forward calls to another, which is what we need for connect.
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		secondaryServerHealth, _, err := primaryClient.Health().Node(fmt.Sprintf("%s-consul-server-0", releaseName), &api.QueryOptions{Datacenter: "dc2"})
-		require.NoError(r, err)
-		require.Equal(r, secondaryServerHealth.AggregatedStatus(), api.HealthPassing)
-
-		primaryServerHealth, _, err := secondaryClient.Health().Node(fmt.Sprintf("%s-consul-server-0", releaseName), &api.QueryOptions{Datacenter: "dc1"})
-		require.NoError(r, err)
-		require.Equal(r, primaryServerHealth.AggregatedStatus(), api.HealthPassing)
-
-		if secure {
-			replicationStatus, _, err := secondaryClient.ACL().Replication(nil)
-			require.NoError(r, err)
-			require.True(r, replicationStatus.Enabled)
-			require.True(r, replicationStatus.Running)
-		}
-	})
-
-	logger.Logf(t, "Took %s to verify federation", time.Since(start))
 }
