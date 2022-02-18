@@ -134,7 +134,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 		}
 	}
 
-	multiPort := mpi != multiPortInfo{}
+	multiPort := mpi.serviceName != ""
 
 	data := initContainerCommandData{
 		AuthMethod:                 h.AuthMethod,

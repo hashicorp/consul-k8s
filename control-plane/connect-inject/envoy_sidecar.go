@@ -16,7 +16,7 @@ func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi m
 		return corev1.Container{}, err
 	}
 
-	multiPort := mpi != multiPortInfo{}
+	multiPort := mpi.serviceName != ""
 	cmd, err := h.getContainerSidecarCommand(pod, mpi.serviceName, mpi.serviceIndex)
 	if err != nil {
 		return corev1.Container{}, err
