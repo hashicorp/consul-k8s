@@ -54,10 +54,14 @@ spec:
           image: "{{ default .Values.global.image .Values.server.image }}"
           env:
             - name: ENTERPRISE_LICENSE
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.global.enterpriseLicense.secretName }}
                   key: {{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
             - name: CONSUL_HTTP_ADDR
               {{- if .Values.global.tls.enabled }}
               value: https://{{ template "consul.fullname" . }}-server:8501

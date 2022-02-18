@@ -29,24 +29,6 @@ load _helpers
       .
 }
 
-@test "enterpriseLicense/Role: disabled when ent secretName missing" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/enterprise-license-role.yaml  \
-      --set 'global.enterpriseLicense.secretKey=bar' \
-      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
-      .
-}
-
-@test "enterpriseLicense/Role: disabled when ent secretKey missing" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/enterprise-license-role.yaml  \
-      --set 'global.enterpriseLicense.secretName=foo' \
-      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
-      .
-}
-
 @test "enterpriseLicense/Role: enabled when ent license defined" {
   cd `chart_dir`
   local actual=$(helm template \

@@ -404,10 +404,10 @@ global:
   # introduce the license key via another route, then set these fields to null.
   # Note: the job to apply license runs on both Helm installs and upgrades.
   enterpriseLicense:
-    # The name of the Kubernetes secret that holds the enterprise license.
-    # The secret must be in the same namespace that Consul is installed into.
+    # secretName is the name of the Kubernetes secret or Vault secret path that holds the enterprise license.
+    # A Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: null
-    # The key within the Kubernetes secret that holds the enterprise license.
+    # secretKey is the key within the Kubernetes secret or Vault secret key that holds the enterprise license.
     secretKey: null
     # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
