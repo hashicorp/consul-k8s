@@ -19,7 +19,6 @@ import (
 
 const staticClientName = "static-client"
 const staticServerName = "static-server"
-const staticServerAdminName = "static-server-admin"
 
 // ConnectInjectConnectivityCheck is a helper function used by the connect tests and cli smoke tests to test service
 // mesh connectivity.
