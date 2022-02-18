@@ -84,9 +84,9 @@ spec:
               -consul-destination-namespace={{ .Values.apiGateway.consulNamespaces.consulDestinationNamespace }} \
               {{- end }}
               {{- if .Values.apiGateway.consulNamespaces.mirroringK8S }}
-              -mirror-k8s-namespaces=true \
+              -mirroring-k8s=true \
               {{- if .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }}
-              -mirror-k8s-namespace-prefix={{ .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }} \
+              -mirroring-k8s-prefix={{ .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }} \
               {{- end }}
               {{- end }}
               {{- end }}
