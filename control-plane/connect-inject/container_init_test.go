@@ -740,7 +740,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 	}
 }
 
-func TestHandlerContainerInit_authMethodMultiport(t *testing.T) {
+func TestHandlerContainerInit_Multiport(t *testing.T) {
 	minimal := func() *corev1.Pod {
 		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

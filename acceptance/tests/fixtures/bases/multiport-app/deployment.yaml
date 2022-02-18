@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: multiport
-          image: ndhanushkodi/http-echo:latest
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="hello world"
             - -listen=:8080
@@ -49,7 +49,7 @@ spec:
             failureThreshold: 1
             periodSeconds: 1
         - name: multiport-admin
-          image: ndhanushkodi/http-echo:latest
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="hello world from 9090 admin"
             - -listen=:9090
