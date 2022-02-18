@@ -97,15 +97,6 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 		},
-		"CLI upgrade to enable metrics": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"global.metrics.enabled":            "true",
-				"global.metrics.enableAgentMetrics": "true",
-			},
-		},
 		"CLI upgrade to enable ingressGateway": {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
