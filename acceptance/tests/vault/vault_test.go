@@ -32,7 +32,7 @@ func TestVault(t *testing.T) {
 
 	createConnectCAPolicy(t, vaultClient, "dc1")
 	if cfg.EnableEnterprise {
-		configureEnterpriseLicenseVaultSecret(t, vaultClient)
+		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
 	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)

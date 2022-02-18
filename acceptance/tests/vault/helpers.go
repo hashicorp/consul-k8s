@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -101,15 +100,12 @@ func configureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
 }
 
 // configureEnterpriseLicenseVaultSecret stores it in vault as a secret and configures a policy to access it.
-func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Client) {
-	// Retrieve the license.
-	enterpriseLicense := os.Getenv("CONSUL_ENT_LICENSE")
-
+func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig) {
 	// Create the enterprise license secret.
 	logger.Log(t, "Creating the Enterprise License secret")
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
-			"enterpriselicense": enterpriseLicense,
+			"enterpriselicense": cfg.EnterpriseLicense,
 		},
 	}
 	_, err := vaultClient.Logical().Write("consul/data/secret/enterpriselicense", params)

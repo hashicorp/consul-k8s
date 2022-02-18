@@ -69,7 +69,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	configureGossipVaultSecret(t, vaultClient)
 
 	if cfg.EnableEnterprise {
-		configureEnterpriseLicenseVaultSecret(t, vaultClient)
+		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
 	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
