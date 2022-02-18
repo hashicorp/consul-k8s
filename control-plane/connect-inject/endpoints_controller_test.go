@@ -171,7 +171,14 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	pod := createPod("pod1", "1.2.3.4", true, true)
 	pod.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 
-	upstreams, err := ep.processUpstreams(*pod)
+	upstreams, err := ep.processUpstreams(*pod, corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "svcname",
+			Namespace:   "default",
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+	})
 	require.NoError(t, err)
 
 	expected := []api.Upstream{
@@ -527,7 +534,14 @@ func TestProcessUpstreams(t *testing.T) {
 				EnableConsulPartitions: tt.consulPartitionsEnabled,
 			}
 
-			upstreams, err := ep.processUpstreams(*tt.pod())
+			upstreams, err := ep.processUpstreams(*tt.pod(), corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "svcname",
+					Namespace:   "default",
+					Labels:      map[string]string{},
+					Annotations: map[string]string{},
+				},
+			})
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {
@@ -740,13 +754,6 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 							DestinationServiceID:   "pod1-web-admin",
 							LocalServiceAddress:    "127.0.0.1",
 							LocalServicePort:       9090,
-							Upstreams: []api.Upstream{
-								{
-									DestinationType: api.UpstreamDestTypeService,
-									DestinationName: "upstream1",
-									LocalBindPort:   1234,
-								},
-							},
 						},
 						ServiceMeta: map[string]string{
 							MetaKeyPodName:         "pod1",

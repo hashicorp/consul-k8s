@@ -481,7 +481,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		proxyConfig.LocalServicePort = consulServicePort
 	}
 
-	upstreams, err := r.processUpstreams(pod)
+	upstreams, err := r.processUpstreams(pod, serviceEndpoints)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -830,7 +830,14 @@ func serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNam
 
 // processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
 // objects.
-func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, error) {
+func (r *EndpointsController) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints) ([]api.Upstream, error) {
+	// In a multiport pod, only the first service's proxy should have upstreams configured. This skips configuring
+	// upstreams on additional services on the pod.
+	mpIdx := getMultiPortIdx(pod, endpoints)
+	if mpIdx > 0 {
+		return []api.Upstream{}, nil
+	}
+
 	var upstreams []api.Upstream
 	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {
