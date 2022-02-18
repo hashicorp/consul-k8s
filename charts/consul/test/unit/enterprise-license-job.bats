@@ -29,24 +29,6 @@ load _helpers
       .
 }
 
-@test "enterpriseLicense/Job: disabled when secretName is missing" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/enterprise-license-job.yaml  \
-      --set 'global.enterpriseLicense.secretKey=bar' \
-      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
-      .
-}
-
-@test "enterpriseLicense/Job: disabled when secretKey is missing" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/enterprise-license-job.yaml  \
-      --set 'global.enterpriseLicense.secretName=foo' \
-      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
-      .
-}
-
 @test "enterpriseLicense/Job: enabled when secretName, secretKey is provided and autoload is disabled" {
   cd `chart_dir`
   local actual=$(helm template \

@@ -31,8 +31,11 @@ func TestVault(t *testing.T) {
 	gossipKey := configureGossipVaultSecret(t, vaultClient)
 
 	createConnectCAPolicy(t, vaultClient, "dc1")
+	if cfg.EnableEnterprise {
+		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
+	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1")
+	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
 
 	configurePKICA(t, vaultClient)
 	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
@@ -82,6 +85,12 @@ func TestVault(t *testing.T) {
 		"syncCatalog.toConsul": "false",
 		"syncCatalog.toK8S":    "false",
 	}
+
+	if cfg.EnableEnterprise {
+		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
+		consulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+	}
+
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
 	consulCluster.Create(t)
@@ -99,6 +108,14 @@ func TestVault(t *testing.T) {
 	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
 	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
+
+	if cfg.EnableEnterprise {
+		// Validate that the enterprise license is set correctly.
+		logger.Log(t, "Validating the enterprise license has been set correctly.")
+		license, licenseErr := consulClient.Operator().LicenseGet(nil)
+		require.NoError(t, licenseErr)
+		require.True(t, license.Valid)
+	}
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")

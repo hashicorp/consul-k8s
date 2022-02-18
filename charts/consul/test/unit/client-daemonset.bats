@@ -1414,6 +1414,27 @@ rollingUpdate:
       [ "${actual}" = "" ]
 }
 
+@test "client/DaemonSet: when global.enterpriseLicense.secretKey!=null and global.enterpriseLicense.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/client-daemonset.yaml \
+        --set 'global.enterpriseLicense.secretName=' \
+        --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "enterpriseLicense.secretKey and secretName must both be specified." ]]
+}
+
+@test "client/DaemonSet: when global.enterpriseLicense.secretName!=null and global.enterpriseLicense.secretKey=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/client-daemonset.yaml \
+        --set 'global.enterpriseLicense.secretName=foo' \
+        --set 'global.enterpriseLicense.secretKey=' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "enterpriseLicense.secretKey and secretName must both be specified." ]]
+}
 #--------------------------------------------------------------------
 # recursors
 
@@ -1834,6 +1855,75 @@ rollingUpdate:
   local actual=$(echo $object |
       yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: vault enterprise license annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=path/to/secret' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.enterpriselicense -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "client/DaemonSet: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
+  cd `chart_dir`
+  local env=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LICENSE_PATH") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/enterpriselicense.txt" ]
+}
+
+@test "client/DaemonSet: vault does not add volume for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+      --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "client/DaemonSet: vault does not add volume mount for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+      --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
 }
 
 #--------------------------------------------------------------------
