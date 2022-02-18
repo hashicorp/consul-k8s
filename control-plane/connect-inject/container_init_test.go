@@ -819,7 +819,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
-  -address=127.0.0.1:20000 \
   -admin-bind=127.0.0.1:19000 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
 
@@ -834,7 +833,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
-  -address=127.0.0.1:20001 \
   -admin-bind=127.0.0.1:19001 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
 			},
@@ -874,7 +872,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
   -token-file="/consul/connect-inject/acl-token-web" \
-  -address=127.0.0.1:20000 \
   -admin-bind=127.0.0.1:19000 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
 
@@ -894,7 +891,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
   -token-file="/consul/connect-inject/acl-token-web-admin" \
-  -address=127.0.0.1:20001 \
   -admin-bind=127.0.0.1:19001 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
 			},
