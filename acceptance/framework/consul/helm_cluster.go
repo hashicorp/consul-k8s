@@ -50,7 +50,6 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
-
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
