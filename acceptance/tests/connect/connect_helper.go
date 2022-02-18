@@ -24,8 +24,8 @@ const (
 
 // ConnectHelper configures and runs a consul cluster for connect injection tests.
 type ConnectHelper struct {
-	// ClusterGenerator creates a new instance of a cluster (e.g. a Helm cluster or CLI cluster).
-	ClusterGenerator func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
+	// ClusterKind is the kind of Consul cluster to use (e.g. "Helm", "CLI").
+	ClusterKind consul.ClusterKind
 
 	// Secure determines if the cluster is considered "secure" based on the Helm values configured.
 	Secure bool
@@ -52,12 +52,21 @@ type ConnectHelper struct {
 	consulClient *api.Client
 }
 
+// Setup creates a new cluster using the New*Cluster function and assigns the cluster to the consulCluster field.
+func (c *ConnectHelper) Setup() {
+	switch c.ClusterKind {
+	case consul.Helm:
+		c.consulCluster = consul.NewHelmCluster(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
+	case consul.CLI:
+		c.consulCluster = consul.NewCLICluster(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
+	}
+}
+
 // Install creates a new cluster using the ClusterGenerator function then runs its Create method
 // to install Consul. If the Secure field is true, it checks if ACL tokens relevant to the test do not exist
 // to avoid test pollution. It sets up static-server and static-client pods for the test.
 func (c *ConnectHelper) Install() {
 	logger.Log(c.T, "installing Consul cluster")
-	c.consulCluster = c.ClusterGenerator(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	c.consulCluster.Create(c.T)
 
 	c.consulClient = c.consulCluster.SetupConsulClient(c.T, c.Secure)

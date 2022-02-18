@@ -8,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -23,41 +21,41 @@ import (
 // TestConnectInject tests that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
 	cases := map[string]struct {
-		clusterGen  func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
+		clusterKind consul.ClusterKind
 		releaseName string
 		secure      bool
 		autoEncrypt bool
 	}{
 		"Helm install without secure or auto-encrypt": {
-			clusterGen:  consul.NewHelmCluster,
+			clusterKind: consul.Helm,
 			releaseName: helpers.RandomName(),
 		},
 		"Helm install with secure": {
-			clusterGen:  consul.NewHelmCluster,
+			clusterKind: consul.Helm,
 			releaseName: helpers.RandomName(),
 			secure:      true,
 		},
 		"Helm install with secure and auto-encrypt": {
-			clusterGen:  consul.NewHelmCluster,
+			clusterKind: consul.Helm,
 			releaseName: helpers.RandomName(),
 			secure:      true,
 			autoEncrypt: true,
 		},
 		"CLI install without secure or auto-encrypt": {
-			clusterGen:  consul.NewCLICluster,
+			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 		},
-		"CLI install with secure": {
-			clusterGen:  consul.NewCLICluster,
-			releaseName: consul.CLIReleaseName,
-			secure:      true,
-		},
-		"CLI install with secure and auto-encrypt": {
-			clusterGen:  consul.NewCLICluster,
-			releaseName: consul.CLIReleaseName,
-			secure:      true,
-			autoEncrypt: true,
-		},
+		// "CLI install with secure": {
+		// 	clusterKind: consul.CLI,
+		// 	releaseName: consul.CLIReleaseName,
+		// 	secure:      true,
+		// },
+		// "CLI install with secure and auto-encrypt": {
+		// 	clusterKind: consul.CLI,
+		// 	releaseName: consul.CLIReleaseName,
+		// 	secure:      true,
+		// 	autoEncrypt: true,
+		// },
 	}
 
 	for name, c := range cases {
@@ -66,14 +64,16 @@ func TestConnectInject(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := ConnectHelper{
-				ClusterGenerator: c.clusterGen,
-				Secure:           c.secure,
-				AutoEncrypt:      c.autoEncrypt,
-				ReleaseName:      c.releaseName,
-				T:                t,
-				Ctx:              ctx,
-				Cfg:              cfg,
+				ClusterKind: c.clusterKind,
+				Secure:      c.secure,
+				AutoEncrypt: c.autoEncrypt,
+				ReleaseName: c.releaseName,
+				T:           t,
+				Ctx:         ctx,
+				Cfg:         cfg,
 			}
+
+			connHelper.Setup()
 
 			connHelper.Install()
 			connHelper.DeployClientAndServer()
@@ -89,17 +89,17 @@ func TestConnectInject(t *testing.T) {
 func TestConnectInjectOnUpgrade(t *testing.T) {
 
 	cases := map[string]struct {
-		clusterGen          func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
+		clusterKind         consul.ClusterKind
 		releaseName         string
 		secure, autoEncrypt bool
 		initial, upgrade    map[string]string
 	}{
 		"CLI upgrade changes nothing": {
-			clusterGen:  consul.NewCLICluster,
+			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 		},
 		"CLI upgrade to enable metrics": {
-			clusterGen:  consul.NewCLICluster,
+			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 			initial:     map[string]string{},
 			upgrade: map[string]string{
@@ -108,7 +108,7 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			},
 		},
 		"CLI upgrade to enable ingressGateway": {
-			clusterGen:  consul.NewCLICluster,
+			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 			initial:     map[string]string{},
 			upgrade: map[string]string{
@@ -123,7 +123,7 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := ConnectHelper{
-				ClusterGenerator:     c.clusterGen,
+				ClusterKind:          c.clusterKind,
 				Secure:               c.secure,
 				AutoEncrypt:          c.autoEncrypt,
 				AdditionalHelmValues: c.initial,
@@ -132,6 +132,8 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 				Ctx:                  ctx,
 				Cfg:                  cfg,
 			}
+
+			connHelper.Setup()
 
 			connHelper.Install()
 			connHelper.DeployClientAndServer()
