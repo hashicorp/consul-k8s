@@ -199,11 +199,12 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	// Get the address of the mesh gateway.
 	primaryMeshGWAddress := meshGatewayAddress(t, cfg, primaryCtx, consulReleaseName)
-	serverExtraConfig := fmt.Sprintf(`"{\"primary_gateways\":[\"%s\"]\,\"primary_datacenter\":\"dc1\"}"`, primaryMeshGWAddress)
 	secondaryConsulHelmValues := map[string]string{
 		"global.datacenter": "dc2",
 
-		"global.federation.enabled": "true",
+		"global.federation.enabled":            "true",
+		"global.federation.primaryDatacenter":  "dc1",
+		"global.federation.primaryGateways[0]": primaryMeshGWAddress,
 
 		// TLS config.
 		"global.tls.enabled":           "true",
@@ -229,7 +230,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
 		"server.extraVolumes[0].load": "false",
-		"server.extraConfig":          serverExtraConfig,
 
 		// Vault config.
 		"global.secretsBackend.vault.enabled":                       "true",

@@ -430,6 +430,13 @@ global:
     # `<helm-release-name>-consul-federation`.
     createFederationSecret: false
 
+    # The name of the primary datacenter.
+    primaryDatacenter: ""
+
+    # A list of addresses of the primary mesh gateways in the form <ip>:<port>.
+    # @type: array<string>
+    primaryGateways: []
+
   # Configures metrics for Consul service mesh
   metrics:
     # Configures the Helm chart’s components

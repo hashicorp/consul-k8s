@@ -58,12 +58,15 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 		{
 			"sets ent license secret",
 			TestConfig{
+				EnableEnterprise:  true,
 				EnterpriseLicense: "ent-license",
+				ConsulImage:       "consul:test-version",
 			},
 			map[string]string{
 				"global.enterpriseLicense.secretName":           "license",
 				"global.enterpriseLicense.secretKey":            "key",
 				"connectInject.transparentProxy.defaultEnabled": "false",
+				"global.image": "consul:test-version",
 			},
 		},
 		{
@@ -109,7 +112,7 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			values, err := tt.testConfig.HelmValuesFromConfig()
 			require.NoError(t, err)
-			require.Equal(t, values, tt.want)
+			require.Equal(t, tt.want, values)
 		})
 	}
 }
