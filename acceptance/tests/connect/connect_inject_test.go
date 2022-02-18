@@ -93,36 +93,6 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 		secure, autoEncrypt bool
 		initial, upgrade    map[string]string
 	}{
-		"Helm upgrade changes nothing": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-		},
-		"Helm upgrade to enable metrics": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"global.metrics.enabled":            "true",
-				"global.metrics.enableAgentMetrics": "true",
-			},
-		},
-		"Helm upgrade to enable ingressGateway": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"ingressGateways.enabled":           "true",
-				"ingressGateways.defaults.replicas": "1",
-			},
-		},
-		"Helm upgrade to enable UI": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"ui.enabled": "true",
-			},
-		},
 		"CLI upgrade changes nothing": {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
