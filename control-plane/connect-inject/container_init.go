@@ -150,7 +150,6 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 		ConsulDNSClusterIP:         consulDNSClusterIP,
 		EnvoyUID:                   envoyUserAndGroupID,
 		MultiPort:                  multiPort,
-		EnvoyAddressPort:           20000 + mpi.serviceIndex,
 		EnvoyAdminPort:             19000 + mpi.serviceIndex,
 	}
 
@@ -404,7 +403,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   {{- if .MultiPort }}
-  -address=127.0.0.1:{{ .EnvoyAddressPort }} \
   -admin-bind=127.0.0.1:{{ .EnvoyAdminPort }} \
   {{- end }}
   -bootstrap > {{ if .MultiPort }}/consul/connect-inject/envoy-bootstrap-{{.ServiceName}}.yaml{{ else }}/consul/connect-inject/envoy-bootstrap.yaml{{ end }}
