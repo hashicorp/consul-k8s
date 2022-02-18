@@ -237,7 +237,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	multiPort := len(annotatedSvcNames) > 1
 
 	// For single port pods, add the single init container and envoy sidecar.
-	if len(annotatedSvcNames) == 0 || len(annotatedSvcNames) == 1 {
+	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
 		initContainer, err := h.containerInit(*ns, pod, multiPortInfo{})
 		if err != nil {
@@ -253,15 +253,14 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
-	}
+	} else {
+		// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
+		// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
+		// In a single port pod, the service account specified in the pod is sufficient for mounting the service account
+		// token to the pod. In a multi port pod, where multiple services are registered with Consul, we also require a
+		// service account per service. So, this will look for service accounts whose name matches the service and mount
+		// those tokens if not already specified via the pod's serviceAccountName.
 
-	// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
-	// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
-	// In a single port pod, the service account specified in the pod is sufficient for mounting the service account
-	// token to the pod. In a multi port pod, where multiple services are registered with Consul, we also require a
-	// service account per service. So, this will look for service accounts whose name matches the service and mount
-	// those tokens if not already specified via the pod's serviceAccountName.
-	if multiPort {
 		h.Log.Info("processing multiport pod")
 		err := h.checkUnsupportedMultiPortCases(*ns, pod)
 		if err != nil {

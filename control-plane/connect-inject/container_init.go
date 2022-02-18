@@ -73,10 +73,17 @@ type initContainerCommandData struct {
 	// ConsulDNSClusterIP is the IP of the Consul DNS Service.
 	ConsulDNSClusterIP string
 
-	MultiPort        bool
-	EnvoyAdminPort   int
-	EnvoyAddressPort int
-	BearerTokenFile  string
+	// MultiPort determines whether this is a multi port Pod, which configures the init container to be specific to one
+	// of the services on the multi port Pod.
+	MultiPort bool
+
+	// EnvoyAdminPort configures the admin port of the Envoy sidecar. This will be unique per service in a multi port
+	// Pod.
+	EnvoyAdminPort int
+
+	// BearerTokenFile configures where the service account token can be found. This will be unique per service in a
+	// multi port Pod.
+	BearerTokenFile string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
