@@ -68,6 +68,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	configureGossipVaultSecret(t, vaultClient)
 
+	if cfg.EnableEnterprise {
+		configureEnterpriseLicenseVaultSecret(t, vaultClient)
+	}
+
 	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
 
 	// Configure Vault Kubernetes auth method for the secondary datacenter.
@@ -180,6 +184,11 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 	}
 
+	if cfg.EnableEnterprise {
+		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
+		primaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+	}
+
 	if cfg.UseKind {
 		primaryConsulHelmValues["meshGateway.service.type"] = "NodePort"
 		primaryConsulHelmValues["meshGateway.service.nodePort"] = "30000"
@@ -236,6 +245,11 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc2/connect_inter",
 		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{"connect": [{"ca_config": [{"tls_server_name": "%s-vault"}]}]}"`, vaultReleaseName),
+	}
+
+	if cfg.EnableEnterprise {
+		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
+		secondaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
 	}
 
 	if cfg.UseKind {
