@@ -87,7 +87,6 @@ func TestConnectInject(t *testing.T) {
 
 // TestConnectInjectOnUpgrade tests that Connect works before and after an upgrade is performed on the cluster.
 func TestConnectInjectOnUpgrade(t *testing.T) {
-
 	cases := map[string]struct {
 		clusterKind         consul.ClusterKind
 		releaseName         string
@@ -112,7 +111,16 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			releaseName: consul.CLIReleaseName,
 			initial:     map[string]string{},
 			upgrade: map[string]string{
-				"ingressGateways.enabled": "true",
+				"ingressGateways.enabled":           "true",
+				"ingressGateways.defaults.replicas": "1",
+			},
+		},
+		"CLI upgrade to enable UI": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			initial:     map[string]string{},
+			upgrade: map[string]string{
+				"ui.enabled": "true",
 			},
 		},
 	}
