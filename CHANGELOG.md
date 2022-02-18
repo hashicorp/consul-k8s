@@ -2,6 +2,7 @@
 IMPROVEMENTS:
 * Helm
   * Vault: Allow passing arbitrary annotations to the vault agent. [[GH-1015](https://github.com/hashicorp/consul-k8s/pull/1015)]
+  * API Gateway: Allow Kubernetes namespace to Consul enterprise namespace mapping for deployed gateways and mesh services. [[GH-1024](https://github.com/hashicorp/consul-k8s/pull/1024)]
 
 BUG FIXES:
 * API Gateway
