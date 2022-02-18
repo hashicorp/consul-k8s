@@ -159,7 +159,9 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 const multiport = "multiport"
 const multiportAdmin = "multiport-admin"
 
-// Test that Connect works in a default and a secure installation.
+// Test that Connect works for an application with multiple ports. The multiport application is a Pod listening on
+// two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
+// multiport app to static-server.
 func TestConnectInject_MultiportServices(t *testing.T) {
 	cases := []struct {
 		secure      bool
@@ -175,6 +177,11 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
+
+			// Multi port apps don't work with transparent proxy.
+			if cfg.EnableTransparentProxy {
+				t.Skipf("skipping this test because transparent proxy is enabled")
+			}
 
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
@@ -236,7 +243,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:2234")
 
-				logger.Log(t, fmt.Sprintf("creating intention for %s", staticServerName))
+				logger.Log(t, fmt.Sprintf("creating intention for %s", multiport))
 				_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 					Kind: api.ServiceIntentions,
 					Name: multiport,
@@ -248,7 +255,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 					},
 				}, nil)
 				require.NoError(t, err)
-				logger.Log(t, fmt.Sprintf("creating intention for %s", staticServerAdminName))
+				logger.Log(t, fmt.Sprintf("creating intention for %s", multiportAdmin))
 				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 					Kind: api.ServiceIntentions,
 					Name: multiportAdmin,
