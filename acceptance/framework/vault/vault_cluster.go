@@ -45,20 +45,24 @@ type VaultCluster struct {
 }
 
 // NewVaultCluster creates a VaultCluster which will be used to install Vault using Helm.
-func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.TestConfig, releaseName string) *VaultCluster {
+func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.TestConfig, releaseName string, helmValues map[string]string) *VaultCluster {
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
 
+	values := defaultHelmValues(releaseName)
+	if cfg.EnablePodSecurityPolicies {
+		values["global.psp.enable"] = "true"
+	}
+
+	helpers.MergeMaps(values, helmValues)
 	vaultHelmOpts := &helm.Options{
-		SetValues:      defaultHelmValues(releaseName),
+		SetValues:      values,
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
-	if cfg.EnablePodSecurityPolicies {
-		vaultHelmOpts.SetValues["global.psp.enable"] = "true"
-	}
+
 	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
@@ -80,7 +84,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 }
 
 // VaultClient returns the vault client.
-func (v *VaultCluster) VaultClient(t *testing.T) *vapi.Client { return v.vaultClient }
+func (v *VaultCluster) VaultClient(*testing.T) *vapi.Client { return v.vaultClient }
 
 // SetupVaultClient sets up and returns a Vault Client.
 func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
@@ -125,8 +129,11 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 }
 
 // bootstrap sets up Kubernetes auth method and enables secrets engines.
-func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
-
+func (v *VaultCluster) bootstrap(t *testing.T) {
+	if !v.serverEnabled() {
+		v.logger.Logf(t, "skipping bootstrapping Vault because Vault server is not enabled")
+		return
+	}
 	v.vaultClient = v.SetupVaultClient(t)
 
 	// Enable the KV-V2 Secrets engine.
@@ -143,26 +150,39 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	})
 	require.NoError(t, err)
 
-	// Enable Kube Auth.
-	err = v.vaultClient.Sys().EnableAuthWithOptions("kubernetes", &vapi.EnableAuthOptions{
+	namespace := v.helmOptions.KubectlOptions.Namespace
+	vaultServerServiceAccountName := fmt.Sprintf("%s-vault", v.releaseName)
+	v.ConfigureAuthMethod(t, v.vaultClient, "kubernetes", "https://kubernetes.default.svc", vaultServerServiceAccountName, namespace)
+}
+
+// ConfigureAuthMethod configures the auth method in Vault from the provided service account name and namespace,
+// kubernetes host and auth path.
+// We need to take vaultClient here in case this Vault cluster does not have a server to run API commands against.
+func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Client, authPath, k8sHost, saName, saNS string) {
+	v.logger.Logf(t, "enabling kubernetes auth method on %s path", authPath)
+	err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
 		Type: "kubernetes",
 	})
 	require.NoError(t, err)
 
-	v.logger.Logf(t, "updating vault kube auth config")
-
-	// To configure the auth method, we need to read the token and the ca cert from the Vault's server
+	// To configure the auth method, we need to read the token and the CA cert from the auth method's
 	// service account token.
-	namespace := v.helmOptions.KubectlOptions.Namespace
-	sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), fmt.Sprintf("%s-vault", v.releaseName), metav1.GetOptions{})
+	// The JWT token and CA cert is what Vault server will use to validate service account token
+	// with the Kubernetes API.
+	var sa *corev1.ServiceAccount
+	retry.Run(t, func(r *retry.R) {
+		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Len(t, sa.Secrets, 1)
+	})
+
+	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
+	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
 	require.NoError(t, err)
-	require.Len(t, sa.Secrets, 1)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
-	require.NoError(t, err)
-	_, err = v.vaultClient.Logical().Write("auth/kubernetes/config", map[string]interface{}{
-		"token_reviewer_jwt": tokenSecret.StringData["token"],
-		"kubernetes_ca_cert": tokenSecret.StringData["ca.crt"],
-		"kubernetes_host":    "https://kubernetes.default.svc",
+	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
+		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
+		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
+		"kubernetes_host":    k8sHost,
 	})
 	require.NoError(t, err)
 }
@@ -188,10 +208,10 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	v.initAndUnseal(t)
 
 	// Wait for the injector and vault server pods to become Ready.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, v.releaseLabelSelector())
+	k8s.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, v.releaseLabelSelector())
 
 	// Now call bootstrap().
-	v.bootstrap(t, ctx)
+	v.bootstrap(t)
 }
 
 // Destroy issues a helm delete and deletes the PVC + any helm secrets related to the release that are leftover.
@@ -261,10 +281,23 @@ func (v *VaultCluster) releaseLabelSelector() string {
 	return fmt.Sprintf("%s=%s", releaseLabel, v.releaseName)
 }
 
+// serverEnabled returns true if this Vault cluster has a server.
+func (v *VaultCluster) serverEnabled() bool {
+	serverEnabled, ok := v.helmOptions.SetValues["server.enabled"]
+	// Server is enabled by default in the Vault Helm chart, so it's enabled either when that helm value is
+	// not provided or when it's not explicitly disabled.
+	return !ok || serverEnabled != "false"
+}
+
 // createTLSCerts generates a self-signed CA and uses it to generate
-// certificate and key  for the Vault server. It then saves those as
+// certificate and key for the Vault server. It then saves those as
 // Kubernetes secrets.
 func (v *VaultCluster) createTLSCerts(t *testing.T) {
+	if !v.serverEnabled() {
+		v.logger.Logf(t, "skipping generating Vault TLS certificates because Vault server is not enabled")
+		return
+	}
+
 	v.logger.Logf(t, "generating Vault TLS certificates")
 
 	namespace := v.helmOptions.KubectlOptions.Namespace
@@ -318,8 +351,12 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 // initAndUnseal initializes and unseals Vault.
 // Once initialized, it saves the Vault root token into a Kubernetes secret.
 func (v *VaultCluster) initAndUnseal(t *testing.T) {
-	v.logger.Logf(t, "initializing and unsealing Vault")
+	if !v.serverEnabled() {
+		v.logger.Logf(t, "skipping initializing and unsealing Vault because Vault server is not enabled")
+		return
+	}
 
+	v.logger.Logf(t, "initializing and unsealing Vault")
 	namespace := v.helmOptions.KubectlOptions.Namespace
 	retrier := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {

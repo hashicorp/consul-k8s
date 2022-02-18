@@ -6,7 +6,6 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -87,6 +86,27 @@ type kubernetesContext struct {
 	options *k8s.KubectlOptions
 }
 
+// KubernetesContextFromOptions returns the Kubernetes context from options.
+// If context is explicitly set in options, it returns that context.
+// Otherwise, it returns the current context.
+func KubernetesContextFromOptions(t *testing.T, options *k8s.KubectlOptions) string {
+	t.Helper()
+
+	// First, check if context set in options and return that
+	if options.ContextName != "" {
+		return options.ContextName
+	}
+
+	// Otherwise, get current context from config
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	rawConfig, err := k8s.LoadConfigFromPath(configPath).RawConfig()
+	require.NoError(t, err)
+
+	return rawConfig.CurrentContext
+}
+
 func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
 	if k.options != nil {
 		return k.options
@@ -107,7 +127,7 @@ func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
 		rawConfig, err := k8s.LoadConfigFromPath(configPath).RawConfig()
 		require.NoError(t, err)
 
-		contextName := helpers.KubernetesContextFromOptions(t, k.options)
+		contextName := KubernetesContextFromOptions(t, k.options)
 		if rawConfig.Contexts[contextName].Namespace != "" {
 			k.options.Namespace = rawConfig.Contexts[contextName].Namespace
 		} else {
@@ -117,12 +137,26 @@ func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
 	return k.options
 }
 
+// KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
+func KubernetesClientFromOptions(t *testing.T, options *k8s.KubectlOptions) kubernetes.Interface {
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	config, err := k8s.LoadApiClientConfigE(configPath, options.ContextName)
+	require.NoError(t, err)
+
+	client, err := kubernetes.NewForConfig(config)
+	require.NoError(t, err)
+
+	return client
+}
+
 func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
 	if k.client != nil {
 		return k.client
 	}
 
-	k.client = helpers.KubernetesClientFromOptions(t, k.KubectlOptions(t))
+	k.client = KubernetesClientFromOptions(t, k.KubectlOptions(t))
 
 	return k.client
 }

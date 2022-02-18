@@ -216,28 +216,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: ent license acl option disabled missing global.enterpriseLicense.secretName" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "serverACLInit/Job: ent license acl option disabled missing global.enterpriseLicense.secretKey" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enterpriseLicense.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
 #--------------------------------------------------------------------
 # client.snapshotAgent
 
@@ -724,6 +702,72 @@ load _helpers
   [ "${actual}" = "ca" ]
   local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
+}
+
+#--------------------------------------------------------------------
+# Replication token in Vault
+
+@test "serverACLInit/Job: vault replication token can be provided" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-acl-init-job.yaml  \
+    --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+    --set 'global.acls.replicationToken.secretName=/vault/secret' \
+    --set 'global.acls.replicationToken.secretKey=token' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that the role is set.
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  [ "${actual}" = "acl-role" ]
+
+  # Check Vault secret annotations.
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
+  [ "${actual}" = "/vault/secret" ]
+
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
+  local expected=$'{{- with secret \"/vault/secret\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
+  [ "${actual}" = "/vault/secret" ]
+
+  local actual=$(echo $object | jq -r '.spec.volumes')
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").volumeMounts')
+  [ "${actual}" = "null" ]
+
+  # Check that the replication token flag is set to the path of the Vault secret.
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: manageSystemACLsRole is required when Vault is enabled and replication token is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.replicationToken.secretName=/vault/secret' \
+      --set 'global.acls.replicationToken.secretKey=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.manageSystemACLsRole must be set if global.secretsBackend.vault.enabled is true and global.acls.replicationToken is provided" ]]
 }
 
 #--------------------------------------------------------------------
@@ -1230,59 +1274,31 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.replicationToken
 
+@test "serverACLInit/Job: replicationToken.secretKey is required when replicationToken.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.replicationToken.secretName=name' \ .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" ]]
+}
+
+@test "serverACLInit/Job: replicationToken.secretName is required when replicationToken.secretKey is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.replicationToken.secretKey=key' \ .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" ]]
+}
+
 @test "serverACLInit/Job: -acl-replication-token-file is not set by default" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr)
-
-  # Test the flag is not set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  # Test the volume doesn't exist
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.volumes | length == 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  # Test the volume mount doesn't exist
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].volumeMounts | length == 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: -acl-replication-token-file is not set when acls.replicationToken.secretName is set but secretKey is not" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretName=name' \
-      . | tee /dev/stderr)
-
-  # Test the flag is not set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  # Test the volume doesn't exist
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.volumes | length == 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  # Test the volume mount doesn't exist
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].volumeMounts | length == 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: -acl-replication-token-file is not set when acls.replicationToken.secretKey is set but secretName is not" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretKey=key' \
       . | tee /dev/stderr)
 
   # Test the flag is not set.

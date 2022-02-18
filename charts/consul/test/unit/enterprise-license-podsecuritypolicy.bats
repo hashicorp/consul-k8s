@@ -30,24 +30,6 @@ load _helpers
       .
 }
 
-@test "enterpriseLicense/PodSecurityPolicy: disabled when ent secretName missing" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/enterprise-license-podsecuritypolicy.yaml  \
-      --set 'global.enterpriseLicense.secretKey=bar' \
-      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
-      .
-}
-
-@test "enterpriseLicense/PodSecurityPolicy: disabled when ent secretKey missing" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/enterprise-license-podsecuritypolicy.yaml  \
-      --set 'global.enterpriseLicense.secretName=foo' \
-      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
-      .
-}
-
 @test "enterpriseLicense/PodSecurityPolicy: disabled when enablePodSecurityPolicies=false" {
   cd `chart_dir`
   assert_empty helm template \

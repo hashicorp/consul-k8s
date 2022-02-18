@@ -15,7 +15,7 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
-{{- define "consul.vaultGossipTemplate" -}}
+{{- define "consul.vaultSecretTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
             {{ "{{" }}- {{ printf ".Data.data.%s" .secretKey }} -{{ "}}" }}
@@ -32,7 +32,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSCertTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -40,7 +40,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSKeyTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -48,7 +48,29 @@ as well as the global.name setting.
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
-{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
+{{- end -}}
+
+{{- define "consul.serverAdditionalDNSSANs" -}}
+{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalDNSSANs -}}{{- range $san := .Values.global.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}
+{{- end -}}
+
+{{- define "consul.serverAdditionalIPSANs" -}}
+{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.global.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}
+{{- end -}}
+
+{{- define "consul.vaultReplicationTokenTemplate" -}}
+|
+          {{ "{{" }}- with secret "{{ .Values.global.acls.replicationToken.secretName }}" -{{ "}}" }}
+          {{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}
+          {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.vaultReplicationTokenConfigTemplate" -}}
+|
+          {{ "{{" }}- with secret "{{ .Values.global.acls.replicationToken.secretName }}" -{{ "}}" }}
+          acl { tokens { agent = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}", replication = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}" }}
+          {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
 {{/*
