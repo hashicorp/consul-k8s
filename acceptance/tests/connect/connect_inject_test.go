@@ -45,17 +45,17 @@ func TestConnectInject(t *testing.T) {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 		},
-		// "CLI install with secure": {
-		// 	clusterKind: consul.CLI,
-		// 	releaseName: consul.CLIReleaseName,
-		// 	secure:      true,
-		// },
-		// "CLI install with secure and auto-encrypt": {
-		// 	clusterKind: consul.CLI,
-		// 	releaseName: consul.CLIReleaseName,
-		// 	secure:      true,
-		// 	autoEncrypt: true,
-		// },
+		"CLI install with secure": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+		},
+		"CLI install with secure and auto-encrypt": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+			autoEncrypt: true,
+		},
 	}
 
 	for name, c := range cases {
@@ -123,14 +123,14 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := ConnectHelper{
-				ClusterKind:          c.clusterKind,
-				Secure:               c.secure,
-				AutoEncrypt:          c.autoEncrypt,
-				AdditionalHelmValues: c.initial,
-				ReleaseName:          c.releaseName,
-				T:                    t,
-				Ctx:                  ctx,
-				Cfg:                  cfg,
+				ClusterKind: c.clusterKind,
+				Secure:      c.secure,
+				AutoEncrypt: c.autoEncrypt,
+				HelmValues:  c.initial,
+				ReleaseName: c.releaseName,
+				T:           t,
+				Ctx:         ctx,
+				Cfg:         cfg,
 			}
 
 			connHelper.Setup()
@@ -142,7 +142,7 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			connHelper.TestConnectionSuccess()
 			connHelper.TestConnectionFailureWhenUnhealthy()
 
-			connHelper.AdditionalHelmValues = c.upgrade
+			connHelper.HelmValues = c.upgrade
 
 			connHelper.Upgrade()
 			connHelper.TestConnectionSuccess()
