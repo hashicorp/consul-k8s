@@ -51,7 +51,7 @@ func NewCLICluster(
 	ctx environment.TestContext,
 	cfg *config.TestConfig,
 	releaseName string,
-) Cluster {
+) *CLICluster {
 
 	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
 	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
@@ -74,8 +74,8 @@ func NewCLICluster(
 	require.NoError(t, err)
 
 	// Merge all helm values
-	MergeMaps(values, valuesFromConfig)
-	MergeMaps(values, helmValues)
+	helpers.MergeMaps(values, valuesFromConfig)
+	helpers.MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
@@ -144,7 +144,7 @@ func (h *CLICluster) Create(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, consulNS, fmt.Sprintf("release=%s", h.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, consulNS, fmt.Sprintf("release=%s", h.releaseName))
 }
 
 func (h *CLICluster) Destroy(t *testing.T) {
@@ -179,9 +179,9 @@ func (h *CLICluster) Destroy(t *testing.T) {
 func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
-	MergeMaps(h.helmOptions.SetValues, helmValues)
+	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
 	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
-	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
 func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {

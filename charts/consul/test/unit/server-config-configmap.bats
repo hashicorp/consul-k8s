@@ -168,28 +168,6 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "server/ConfigMap: enable_token_replication is not set when acls.replicationToken.secretName is set but secretKey is not" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretName=name' \
-      . | tee /dev/stderr |
-      yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "server/ConfigMap: enable_token_replication is not set when acls.replicationToken.secretKey is set but secretName is not" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretKey=key' \
-      . | tee /dev/stderr |
-      yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
 @test "server/ConfigMap: enable_token_replication is set when acls.replicationToken.secretKey and secretName are set" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -397,7 +375,7 @@ load _helpers
       --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
       . | tee /dev/stderr |
       yq '.data["connect-ca-config.json"]' | tee /dev/stderr)
-  [ "${actual}" = '"{\n  \"connect\": [\n    {\n      \"ca_config\": [\n        {\n          \"address\": \"example.com\",\n          \"intermediate_pki_path\": \"int\",\n          \"root_pki_path\": \"root\",\n          \"auth_method\": {\n            \"type\": \"kubernetes\",\n            \"params\": {\n              \"role\": \"foo\"\n            }\n          }\n        }\n      ],\n      \"ca_provider\": \"vault\"\n    }\n  ]\n}\n"' ]
+  [ "${actual}" = '"{\n  \"connect\": [\n    {\n      \"ca_config\": [\n        {\n          \"address\": \"example.com\",\n          \"intermediate_pki_path\": \"int\",\n          \"root_pki_path\": \"root\",\n          \"auth_method\": {\n            \"type\": \"kubernetes\",\n            \"mount_path\": \"kubernetes\",\n            \"params\": {\n              \"role\": \"foo\"\n            }\n          }\n        }\n      ],\n      \"ca_provider\": \"vault\"\n    }\n  ]\n}\n"' ]
 
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
@@ -427,6 +405,25 @@ load _helpers
       . | tee /dev/stderr |
       yq '.data["additional-connect-ca-config.json"]' | tee /dev/stderr)
   [ "${actual}" = '"{\"hello\": \"world\"}\n"' ]
+}
+
+@test "server/ConfigMap: can set auth method mount path" {
+  cd `chart_dir`
+
+  local caConfig=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.connectCA.authMethodPath=kubernetes2' \
+      . | tee /dev/stderr |
+      yq -r '.data["connect-ca-config.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $caConfig |  jq -r .connect[0].ca_config[0].auth_method.mount_path)
+  [ "${actual}" = "kubernetes2" ]
 }
 
 @test "server/ConfigMap: doesn't set Vault CA cert in connect CA config by default" {

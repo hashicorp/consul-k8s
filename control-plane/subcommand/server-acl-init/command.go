@@ -325,7 +325,7 @@ func (c *Command) Run(args []string) int {
 		// the provided token to create policies and tokens for the rest of the components.
 		c.log.Info("Bootstrap token is provided so skipping Consul server ACL bootstrapping")
 		bootstrapToken = providedBootstrapToken
-	} else if c.flagACLReplicationTokenFile != "" {
+	} else if c.flagACLReplicationTokenFile != "" && !c.flagCreateACLReplicationToken {
 		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
 		// since they will be performing replication.
 		// We can use the replication token as our bootstrap token because it
@@ -694,7 +694,11 @@ func (c *Command) Run(args []string) int {
 		}
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
-		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient)
+		if aclReplicationToken != "" {
+			err = c.createGlobalACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient, aclReplicationToken)
+		} else {
+			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient)
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1

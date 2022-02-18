@@ -29,6 +29,7 @@ data:
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {
                 "type": "kubernetes",
+                "mount_path": "{{ .connectCA.authMethodPath }}",
                 "params": {
                   "role": "{{ .consulServerRole }}"
                 }

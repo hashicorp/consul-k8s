@@ -1375,6 +1375,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/StatefulSet: when global.enterpriseLicense.secretKey!=null and global.enterpriseLicense.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.enterpriseLicense.secretName=' \
+        --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "enterpriseLicense.secretKey and secretName must both be specified." ]]
+}
+
+@test "server/StatefulSet: when global.enterpriseLicense.secretName!=null and global.enterpriseLicense.secretKey=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.enterpriseLicense.secretName=foo' \
+        --set 'global.enterpriseLicense.secretKey=' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "enterpriseLicense.secretKey and secretName must both be specified." ]]
+}
 #--------------------------------------------------------------------
 # extraContainers
 
@@ -1786,6 +1807,133 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "server/StatefulSet: vault - can set additional alt_names on server cert when tls is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    --set 'global.tls.serverAdditionalDNSSANs[0]=*.foo.com' \
+    --set 'global.tls.serverAdditionalDNSSANs[1]=*.bar.com' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "server/StatefulSet: vault - can set additional ip_sans on server cert when tls is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    --set 'global.tls.serverAdditionalIPSANs[0]=1.1.1.1' \
+    --set 'global.tls.serverAdditionalIPSANs[1]=2.2.2.2' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "server/StatefulSet: vault enterprise license annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=path/to/enterpriselicensesecret' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/enterpriselicensesecret" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/enterpriselicensesecret\" -}}\n{{- .Data.data.enterpriselicense -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "server/StatefulSet: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
+  cd `chart_dir`
+  local env=$(helm template \
+     -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LICENSE_PATH") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/enterpriselicense.txt" ]
+}
+
+@test "server/StatefulSet: vault does not add volume for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: vault does not add volume mount for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
 #--------------------------------------------------------------------
 # Vault agent annotations
 
@@ -1812,6 +1960,40 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# Vault replication token
+
+@test "server/StatefulSet: vault replication token is configured when secret provided and createReplicationToken is false" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.acls.replicationToken.secretName=vault/replication-token' \
+    --set 'global.acls.replicationToken.secretKey=token' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that Vault annotations are set.
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-replication-token-config.hcl"]' | tee /dev/stderr)"
+  [ "${actual}" = "vault/replication-token" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-replication-token-config.hcl"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"vault/replication-token\" -}}\nacl { tokens { agent = \"{{- .Data.data.token -}}\", replication = \"{{- .Data.data.token -}}\" }}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that ACL_REPLICATION_TOKEN env var is not provided.
+  local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").env[] | select(.name=="ACL_REPLICATION_TOKEN")' | tee /dev/stderr)"
+  [ "${actual}" = "" ]
+
+  # Check that path to Vault secret config is provided to the command.
+  local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
