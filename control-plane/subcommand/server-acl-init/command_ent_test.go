@@ -64,7 +64,8 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			}
 			methods, _, err := consul.ACL().AuthMethodList(namespaceQuery)
 			require.NoError(err)
-			require.Len(methods, 1)
+			// connect inject auth method + component auth method.
+			require.Len(methods, 2)
 
 			// Check the ACL auth method is created in the expected namespace.
 			authMethodName := resourcePrefix + "-k8s-auth-method"
