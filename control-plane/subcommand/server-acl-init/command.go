@@ -257,7 +257,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
-
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
 		// Load the ACL replication token from file.

@@ -172,6 +172,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-acl-auth-method", test.AuthMethod,
 				"-service-account-name", tt.serviceAccountName,
 				"-service-name", tt.serviceName,
+				"-token", masterToken,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.

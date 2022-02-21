@@ -1030,6 +1030,7 @@ partition "default" {
 		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeEnterpriseSetup(t)
 			defer testSvr.Stop()
+			setUpK8sServiceAccount(t, k8s, ns)
 			require := require.New(t)
 
 			// Run the command.

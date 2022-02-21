@@ -45,10 +45,6 @@ type Command struct {
 	flagLogLevel      string
 	flagLogJSON       bool
 
-	// Flags to support partitions.
-	//flagEnablePartitions bool // true if Admin Partitions are enabled
-	//flagPartitionName    string // name of the Admin Partition
-
 	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
 	tokenSinkFile     string // Location to write the output token. Default is defaultTokenSinkFile.
 	flagComponentName string // Name of the component to be used as metadata to ACL Login.

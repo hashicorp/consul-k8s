@@ -83,7 +83,6 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
-
 }
 
 func (c *Command) Run(args []string) int {
@@ -128,7 +127,6 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
-
 		err = common.ConsulLogin(consulClient, cfg, c.logger, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagAuthMethodNamespace, c.flagServiceAccountName, loginMeta)
 		if err != nil {
 			c.logger.Error("unable to complete login", "error", err)

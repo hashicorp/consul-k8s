@@ -103,6 +103,7 @@ func TestRun_Defaults(t *testing.T) {
 	k8s, testSvr := completeSetup(t)
 	defer testSvr.Stop()
 	require := require.New(t)
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1134,6 +1135,7 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
+	setUpK8sServiceAccount(t, k8s, ns)
 	responseCode := cmd.Run(firstRunArgs)
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -1252,6 +1254,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
+	setUpK8sServiceAccount(t, k8s, ns)
 	randomPorts := freeport.GetN(t, 6)
 
 	ui := cli.NewMockUi()
@@ -1379,6 +1382,8 @@ func TestRun_NoLeader(t *testing.T) {
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
 
+	setUpK8sServiceAccount(t, k8s, ns)
+
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -1443,6 +1448,10 @@ func TestRun_NoLeader(t *testing.T) {
 		{
 			"GET",
 			"/v1/agent/self",
+		},
+		{
+			"PUT",
+			"/v1/acl/auth-method",
 		},
 		{
 			"PUT",
@@ -1596,6 +1605,7 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1637,6 +1647,10 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 		{
 			"GET",
 			"/v1/agent/self",
+		},
+		{
+			"PUT",
+			"/v1/acl/auth-method",
 		},
 		// This call should happen twice since the first will fail.
 		{
@@ -1688,6 +1702,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Create the bootstrap secret.
 	_, err = k8s.CoreV1().Secrets(ns).Create(
@@ -1752,6 +1767,10 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		},
 		{
 			"PUT",
+			"/v1/acl/auth-method",
+		},
+		{
+			"PUT",
 			"/v1/acl/policy",
 		},
 		{
@@ -1770,8 +1789,9 @@ func TestRun_AlreadyBootstrapped_ServerTokenExists(t *testing.T) {
 	// First set everything up with ACLs bootstrapped.
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
-	setUpK8sServiceAccount(t, k8s, ns)
 	defer testAgent.Stop()
+	setUpK8sServiceAccount(t, k8s, ns)
+
 	k8s.CoreV1().Secrets(ns).Create(context.Background(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resourcePrefix + "-bootstrap-acl-token",
@@ -1871,6 +1891,7 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1898,6 +1919,10 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 			"GET",
 			"/v1/agent/self",
 		},
+		{
+			"PUT",
+			"/v1/acl/auth-method",
+		},
 	}, consulAPICalls)
 }
 
@@ -1907,6 +1932,7 @@ func TestRun_Timeout(t *testing.T) {
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 	ui := cli.NewMockUi()
+
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
@@ -1939,6 +1965,7 @@ func TestRun_HTTPS(t *testing.T) {
 	})
 	require.NoError(err)
 	defer srv.Stop()
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1975,6 +2002,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 
 	secondaryK8s, secondaryConsulClient, secondaryAddr, aclReplicationToken, _, _, clean := completeReplicatedSetup(t)
 	defer clean()
+	setUpK8sServiceAccount(t, secondaryK8s, ns)
 
 	// completeReplicatedSetup ran the command in our primary dc so now we
 	// need to run the command in our secondary dc.
@@ -2030,8 +2058,8 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile := common.WriteTempFile(t, bootToken)
 			k8s, consul, serverAddr, _, _, cleanup := mockReplicatedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
+			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -2070,6 +2098,7 @@ func TestRun_CloudAutoJoin(t *testing.T) {
 
 	k8s, testSvr := completeSetup(t)
 	defer testSvr.Stop()
+	setUpK8sServiceAccount(t, k8s, ns)
 	require := require.New(t)
 
 	// create a mock provider
@@ -2149,6 +2178,7 @@ func TestRun_GatewayErrors(t *testing.T) {
 
 			k8s, testSvr := completeSetup(tt)
 			defer testSvr.Stop()
+			setUpK8sServiceAccount(t, k8s, ns)
 			require := require.New(tt)
 
 			// Run the command.
@@ -2246,6 +2276,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	if bootToken == "" {
 		primaryK8s := fake.NewSimpleClientset()
 		require.NoError(t, err)
+		setUpK8sServiceAccount(t, primaryK8s, ns)
 
 		// Run the command to bootstrap ACLs
 		primaryUI := cli.NewMockUi()
@@ -2433,8 +2464,9 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace
 
 // setUpK8sServiceAccount creates a Service Account for the connect injector.
 // This Service Account would normally automatically be created by Kubernetes
-// when the injector deployment is created. It returns the Service Account
-// CA Cert and JWT token.
+// when the injector deployment is created or when ACLs are enabled as it
+// is also used by the consul-k8s-component-auth-method.
+// It returns the Service Account CA Cert and JWT token.
 func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
