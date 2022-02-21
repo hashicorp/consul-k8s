@@ -193,6 +193,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 			// CONSUL_HTTP_ADDR when it processes the command template.
 			flags := []string{"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
+				"-token", masterToken,
 				"-service-account-name", testServiceAccountName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-consul-service-namespace", c.consulServiceNamespace,

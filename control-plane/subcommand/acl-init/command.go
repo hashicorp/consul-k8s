@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	corev1 "k8s.io/api/core/v1"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -72,6 +73,7 @@ func (c *Command) init() {
 		"Optional filepath to write acl token")
 
 	// Flags related to using consul login to fetch the ACL token.
+	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of the auth method to login to.")
 	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
 	c.flags.StringVar(&c.flagComponentName, "component-name", "",
 		"Name of the component to pass to ACL Login as metadata.")
@@ -86,6 +88,9 @@ func (c *Command) init() {
 	}
 	if c.tokenSinkFile == "" {
 		c.tokenSinkFile = defaultTokenSinkFile
+	}
+	if c.flagNamespace == "" {
+		c.flagNamespace = corev1.NamespaceDefault
 	}
 
 	c.k8s = &flags.K8SFlags{}
@@ -205,6 +210,7 @@ func (c *Command) Run(args []string) int {
 func (c *Command) getSecret(secretName string) (string, error) {
 	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err != nil {
+		c.logger.Error("====== here error secret", "error", err, "ns", c.flagNamespace)
 		return "", err
 	}
 
