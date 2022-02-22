@@ -450,6 +450,11 @@ global:
     # @type: string
     agentMetricsRetentionTime: 1m
 
+    # If true, controllers will expose their metrics on port `20200` at the
+    # `/metrics` path and will have Prometheus scrape annotations. Only applicable
+    # if `global.metrics.enabled` is true.
+    enableControllerMetrics: true
+
     # If true, mesh, terminating, ingress, and API gateways will expose their
     # Envoy metrics on port `20200` at the `/metrics` path and all gateway pods
     # will have Prometheus scrape annotations. Only applicable if `global.metrics.enabled` is true.

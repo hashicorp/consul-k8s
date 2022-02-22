@@ -36,7 +36,7 @@ spec:
         "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
         {{- end }}
         {{- end }}
-        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableControllerMetrics) }}
         "prometheus.io/scrape": "true"
         "prometheus.io/path": "/metrics"
         "prometheus.io/port": "20200"
@@ -85,7 +85,7 @@ spec:
               -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
               -k8s-namespace {{ .Release.Namespace }} \
               -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
-              {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+              {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableControllerMetrics) }}
               -metrics-port 20200 \
               {{ end }}
         volumeMounts:
