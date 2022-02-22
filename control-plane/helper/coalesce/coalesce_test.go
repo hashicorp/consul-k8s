@@ -46,11 +46,11 @@ func TestCoalesce_max(t *testing.T) {
 		testSummer(&total, deltaCh))
 	duration := time.Since(start)
 	if total < 4 || total > 6 {
-		// 4 to 6 to account for CI weirdness
+		// 4 to 6 to account for CI weirdness.
 		t.Fatalf("total should be 4 to 6: %d", total)
 	}
 
-	// We should complete in the max period
+	// We should complete in the max period.
 	if duration < 500*time.Millisecond {
 		t.Fatalf("duration should be greater than max: %s", duration)
 	}
@@ -58,7 +58,7 @@ func TestCoalesce_max(t *testing.T) {
 
 // Test that if the cancel function is called, Coalesce exits.
 // We test this via having a function that just sleeps and then calling
-// cancel on it. We expect that Coalesce exits
+// cancel on it. We expect that Coalesce exits.
 func TestCoalesce_cancel(t *testing.T) {
 	total := 0
 	deltaCh := make(chan int, 10)

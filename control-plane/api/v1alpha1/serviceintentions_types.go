@@ -40,14 +40,14 @@ type ServiceIntentions struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceIntentionsList contains a list of ServiceIntentions
+// ServiceIntentionsList contains a list of ServiceIntentions.
 type ServiceIntentionsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceIntentions `json:"items"`
 }
 
-// ServiceIntentionsSpec defines the desired state of ServiceIntentions
+// ServiceIntentionsSpec defines the desired state of ServiceIntentions.
 type ServiceIntentionsSpec struct {
 	// Destination is the intention destination that will have the authorization granted to.
 	Destination Destination `json:"destination,omitempty"`

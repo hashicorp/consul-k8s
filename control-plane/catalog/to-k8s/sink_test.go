@@ -221,7 +221,7 @@ func TestK8SSink_updateReconcile(t *testing.T) {
 	})
 }
 
-// Test that if the service is updated locally, it is reconciled
+// Test that if the service is updated locally, it is reconciled.
 func TestK8SSink_updateService(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -284,7 +284,7 @@ func TestK8SSink_updateService(t *testing.T) {
 	})
 }
 
-// Test that if the service is deleted remotely, it is recreated
+// Test that if the service is deleted remotely, it is recreated.
 func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -347,7 +347,7 @@ func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 	})
 }
 
-// Test that if the service is deleted locally, it is recreated
+// Test that if the service is deleted locally, it is recreated.
 func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()

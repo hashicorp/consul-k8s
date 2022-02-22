@@ -8,7 +8,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- EnumVar and enumValue
+// -- EnumVar and enumValue.
 type EnumVar struct {
 	Name       string
 	Aliases    []string

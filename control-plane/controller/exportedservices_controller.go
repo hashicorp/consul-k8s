@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ExportedServicesController reconciles a ExportedServices object
+// ExportedServicesController reconciles a ExportedServices object.
 type ExportedServicesController struct {
 	client.Client
 	Log                   logr.Logger

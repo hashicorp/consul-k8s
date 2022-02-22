@@ -11,7 +11,7 @@ import (
 // ErrNonInteractive is returned when Input is called on a non-Interactive UI.
 var ErrNonInteractive = errors.New("noninteractive UI doesn't support this operation")
 
-// Passed to UI.NamedValues to provide a nicely formatted key: value output
+// Passed to UI.NamedValues to provide a nicely formatted key: value output.
 type NamedValue struct {
 	Name  string
 	Value interface{}
@@ -66,7 +66,7 @@ type Input struct {
 	Secret bool
 }
 
-// Interpret decomposes the msg and arguments into the message, style, and writer
+// Interpret decomposes the msg and arguments into the message, style, and writer.
 func Interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
 	// Build our args and options
 	var args []interface{}

@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ServiceSplitterReconciler reconciles a ServiceSplitter object
+// ServiceSplitterReconciler reconciles a ServiceSplitter object.
 type ServiceSplitterController struct {
 	client.Client
 	Log                   logr.Logger

@@ -6,7 +6,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- StringVar and stringValue
+// -- StringVar and stringValue.
 type StringVar struct {
 	Name       string
 	Aliases    []string

@@ -7,7 +7,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- IntVar and intValue
+// -- IntVar and intValue.
 type IntVar struct {
 	Name       string
 	Aliases    []string
@@ -79,7 +79,7 @@ func (i *intValue) String() string   { return strconv.Itoa(int(*i.target)) }
 func (i *intValue) Example() string  { return "int" }
 func (i *intValue) Hidden() bool     { return i.hidden }
 
-// -- Int64Var and int64Value
+// -- Int64Var and int64Value.
 type Int64Var struct {
 	Name       string
 	Aliases    []string
@@ -151,7 +151,7 @@ func (i *int64Value) String() string   { return strconv.FormatInt(int64(*i.targe
 func (i *int64Value) Example() string  { return "int" }
 func (i *int64Value) Hidden() bool     { return i.hidden }
 
-// -- UintVar && uintValue
+// -- UintVar && uintValue.
 type UintVar struct {
 	Name       string
 	Aliases    []string
@@ -223,7 +223,7 @@ func (i *uintValue) String() string   { return strconv.FormatUint(uint64(*i.targ
 func (i *uintValue) Example() string  { return "uint" }
 func (i *uintValue) Hidden() bool     { return i.hidden }
 
-// -- Uint64Var and uint64Value
+// -- Uint64Var and uint64Value.
 type Uint64Var struct {
 	Name       string
 	Aliases    []string

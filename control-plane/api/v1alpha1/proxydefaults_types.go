@@ -41,7 +41,7 @@ type ProxyDefaults struct {
 
 // +kubebuilder:object:root=true
 
-// ProxyDefaultsList contains a list of ProxyDefaults
+// ProxyDefaultsList contains a list of ProxyDefaults.
 type ProxyDefaultsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -50,7 +50,7 @@ type ProxyDefaultsList struct {
 
 // RawMessage for Config based on recommendation here: https://github.com/kubernetes-sigs/controller-tools/issues/294#issuecomment-518380816
 
-// ProxyDefaultsSpec defines the desired state of ProxyDefaults
+// ProxyDefaultsSpec defines the desired state of ProxyDefaults.
 type ProxyDefaultsSpec struct {
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.

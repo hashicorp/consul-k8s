@@ -34,14 +34,14 @@ type Mesh struct {
 
 //+kubebuilder:object:root=true
 
-// MeshList contains a list of Mesh
+// MeshList contains a list of Mesh.
 type MeshList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Mesh `json:"items"`
 }
 
-// MeshSpec defines the desired state of Mesh
+// MeshSpec defines the desired state of Mesh.
 type MeshSpec struct {
 	TransparentProxy TransparentProxyMeshConfig `json:"transparentProxy,omitempty"`
 }

@@ -37,7 +37,7 @@ type ServiceSplitter struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceSplitterList contains a list of ServiceSplitter
+// ServiceSplitterList contains a list of ServiceSplitter.
 type ServiceSplitterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -46,7 +46,7 @@ type ServiceSplitterList struct {
 
 type ServiceSplits []ServiceSplit
 
-// ServiceSplitterSpec defines the desired state of ServiceSplitter
+// ServiceSplitterSpec defines the desired state of ServiceSplitter.
 type ServiceSplitterSpec struct {
 	// Splits defines how much traffic to send to which set of service instances during a traffic split.
 	// The sum of weights across all splits must add up to 100.

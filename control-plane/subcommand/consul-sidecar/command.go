@@ -398,7 +398,7 @@ func (c *Command) parseConsulFlags() []string {
 }
 
 // interrupt sends os.Interrupt signal to the command
-// so it can exit gracefully. This function is needed for tests
+// so it can exit gracefully. This function is needed for tests.
 func (c *Command) interrupt() {
 	c.sendSignal(syscall.SIGINT)
 }

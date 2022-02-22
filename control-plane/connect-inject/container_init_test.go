@@ -956,7 +956,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 // If Consul CA cert is set,
 // Consul addresses should use HTTPS
-// and CA cert should be set as env variable
+// and CA cert should be set as env variable.
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{

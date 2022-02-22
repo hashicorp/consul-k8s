@@ -134,7 +134,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	}, time.Second, stopCh)
 }
 
-// HasSynced implements cache.Controller
+// HasSynced implements cache.Controller.
 func (c *Controller) HasSynced() bool {
 	if c.informer == nil {
 		return false
@@ -143,7 +143,7 @@ func (c *Controller) HasSynced() bool {
 	return c.informer.HasSynced()
 }
 
-// LastSyncResourceVersion implements cache.Controller
+// LastSyncResourceVersion implements cache.Controller.
 func (c *Controller) LastSyncResourceVersion() string {
 	if c.informer == nil {
 		return ""

@@ -18,7 +18,7 @@ import (
 const staticClientName = "static-client"
 
 // Test that Connect and wan federation over mesh gateways work in a default installation
-// i.e. without ACLs because TLS is required for WAN federation over mesh gateways
+// i.e. without ACLs because TLS is required for WAN federation over mesh gateways.
 func TestMeshGatewayDefault(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()

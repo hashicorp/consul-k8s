@@ -233,7 +233,7 @@ partition "{{ .PartitionName }}" {
 // Creating a separate terminating gateway rule function because
 // eventually this may need to be created with permissions for
 // all of the services it represents, though that is not part
-// of the initial implementation
+// of the initial implementation.
 func (c *Command) terminatingGatewayRules(name, namespace string) (string, error) {
 	terminatingGatewayRulesTpl := `
 {{- if .EnablePartitions }}

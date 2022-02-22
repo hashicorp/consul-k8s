@@ -13,7 +13,7 @@ const (
 
 	// annotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
-	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
+	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
 	// annotationService is the name of the service to proxy. This defaults
@@ -39,7 +39,7 @@ const (
 	annotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
 
 	// annotationTags is a list of tags to register with the service
-	// this is specified as a comma separated list e.g. abc,123
+	// this is specified as a comma separated list e.g. abc,123.
 	annotationTags = "consul.hashicorp.com/service-tags"
 
 	// annotationConnectTags is a list of tags to register with the service
@@ -53,7 +53,7 @@ const (
 
 	// annotationMeta is a list of metadata key/value pairs to add to the service
 	// registration. This is specified in the format `<key>:<value>`
-	// e.g. consul.hashicorp.com/service-meta-foo:bar
+	// e.g. consul.hashicorp.com/service-meta-foo:bar.
 	annotationMeta = "consul.hashicorp.com/service-meta-"
 
 	// annotationSyncPeriod controls the -sync-period flag passed to the
