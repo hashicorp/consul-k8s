@@ -183,7 +183,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy() {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 	}
 
-	// Return the static-server to a "healthy state
+	// Return the static-server to a "healthy state".
 	k8s.RunKubectl(c.T, c.Ctx.KubectlOptions(c.T), "exec", "deploy/"+staticServerName, "--", "rm", "/tmp/unhealthy")
 }
 
