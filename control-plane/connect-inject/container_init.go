@@ -117,7 +117,7 @@ func (h *Handler) initCopyContainer() corev1.Container {
 }
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
-// so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id
+// so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
 func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
