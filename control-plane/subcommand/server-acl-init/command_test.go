@@ -38,6 +38,10 @@ import (
 var ns = "default"
 var resourcePrefix = "release-name-consul"
 
+const (
+	componentAuthMethod = "consul-k8s-component-auth-method"
+)
+
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
 
@@ -2435,7 +2439,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 				require.True(t, found)
 
 				// Check that there exists a BindingRule that references this Role.
-				rb, _, err := consul.ACL().BindingRuleList("release-name-"+common.ComponentAuthMethod, &api.QueryOptions{})
+				rb, _, err := consul.ACL().BindingRuleList("release-name-"+componentAuthMethod, &api.QueryOptions{})
 				require.NoError(t, err)
 				require.NotNil(t, rb)
 				found = false
