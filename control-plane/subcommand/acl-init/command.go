@@ -26,7 +26,7 @@ import (
 
 const (
 	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	defaultTokenSinkFile   = "/consul/connect-inject/acl-token"
+	defaultTokenSinkFile   = "/consul/login/acl-token"
 )
 
 type Command struct {
