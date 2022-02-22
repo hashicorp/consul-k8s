@@ -17,7 +17,7 @@ type testSyncer struct {
 	Registrations []*api.CatalogRegistration
 }
 
-// Sync implements Syncer
+// Sync implements Syncer.
 func (s *testSyncer) Sync(rs []*api.CatalogRegistration) {
 	s.Lock()
 	defer s.Unlock()

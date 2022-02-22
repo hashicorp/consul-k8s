@@ -82,7 +82,7 @@ type K8SSink struct {
 	triggerCh        chan struct{}
 }
 
-// SetServices implements Sink
+// SetServices implements Sink.
 func (s *K8SSink) SetServices(svcs map[string]string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()

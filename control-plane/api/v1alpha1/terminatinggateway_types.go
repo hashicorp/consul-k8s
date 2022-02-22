@@ -41,20 +41,20 @@ type TerminatingGateway struct {
 
 // +kubebuilder:object:root=true
 
-// TerminatingGatewayList contains a list of TerminatingGateway
+// TerminatingGatewayList contains a list of TerminatingGateway.
 type TerminatingGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []TerminatingGateway `json:"items"`
 }
 
-// TerminatingGatewaySpec defines the desired state of TerminatingGateway
+// TerminatingGatewaySpec defines the desired state of TerminatingGateway.
 type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
 }
 
-// A LinkedService is a service represented by a terminating gateway
+// A LinkedService is a service represented by a terminating gateway.
 type LinkedService struct {
 	// The namespace the service is registered in.
 	Namespace string `json:"namespace,omitempty"`

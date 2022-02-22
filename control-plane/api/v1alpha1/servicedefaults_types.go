@@ -39,14 +39,14 @@ type ServiceDefaults struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceDefaultsList contains a list of ServiceDefaults
+// ServiceDefaultsList contains a list of ServiceDefaults.
 type ServiceDefaultsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceDefaults `json:"items"`
 }
 
-// ServiceDefaultsSpec defines the desired state of ServiceDefaults
+// ServiceDefaultsSpec defines the desired state of ServiceDefaults.
 type ServiceDefaultsSpec struct {
 	// Protocol sets the protocol of the service. This is used by Connect proxies for
 	// things like observability features and to unlock usage of the

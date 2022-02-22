@@ -35,14 +35,14 @@ type NodePortSyncType string
 
 const (
 	// Only sync NodePort services with a node's ExternalIP address.
-	// Doesn't sync if an ExternalIP doesn't exist
+	// Doesn't sync if an ExternalIP doesn't exist.
 	ExternalOnly NodePortSyncType = "ExternalOnly"
 
 	// Sync with an ExternalIP first, if it doesn't exist, use the
-	// node's InternalIP address instead
+	// node's InternalIP address instead.
 	ExternalFirst NodePortSyncType = "ExternalFirst"
 
-	// Sync NodePort services using
+	// Sync NodePort services using.
 	InternalOnly NodePortSyncType = "InternalOnly"
 )
 
@@ -226,7 +226,7 @@ func (t *ServiceResource) Delete(key string, _ interface{}) error {
 
 // doDelete is a helper function for deletion.
 //
-// Precondition: assumes t.serviceLock is held
+// Precondition: assumes t.serviceLock is held.
 func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
 	t.Log.Debug("[doDelete] deleting service from serviceMap", "key", key)
@@ -292,7 +292,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 // shouldTrackEndpoints returns true if the endpoints for the given key
 // should be tracked.
 //
-// Precondition: this requires the lock to be held
+// Precondition: this requires the lock to be held.
 func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 	// The service must be one we care about for us to watch the endpoints.
 	// We care about a service that exists in our service map (is enabled
@@ -664,7 +664,7 @@ func (t *ServiceResource) registerServiceInstance(
 
 // sync calls the Syncer.Sync function from the generated registrations.
 //
-// Precondition: lock must be held
+// Precondition: lock must be held.
 func (t *ServiceResource) sync() {
 	// NOTE(mitchellh): This isn't the most efficient way to do this and
 	// the times that sync are called are also not the most efficient. All

@@ -1468,7 +1468,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 }
 
 // Test that if the config entry exists in Consul but is not managed by the
-// controller, creating/updating the resource fails
+// controller, creating/updating the resource fails.
 func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 	t.Parallel()
 	kubeNS := "default"
@@ -1566,7 +1566,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 }
 
 // Test that if the config entry exists in Consul but is not managed by the
-// controller, deleting the resource does not delete the Consul config entry
+// controller, deleting the resource does not delete the Consul config entry.
 func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 	t.Parallel()
 	kubeNS := "default"

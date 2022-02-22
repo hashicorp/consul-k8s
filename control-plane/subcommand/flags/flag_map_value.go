@@ -9,7 +9,7 @@ import (
 // Taken from https://github.com/hashicorp/consul/blob/35daee45bc3bf9fdce5845f2219576e861b23f40/command/flags/flag_map_value.go
 // This was done so we don't depend on internal Consul implementation.
 
-// Ensure implements
+// Ensure implements.
 var _ flag.Value = (*FlagMapValue)(nil)
 
 // FlagMapValue is a flag implementation used to provide key=value semantics

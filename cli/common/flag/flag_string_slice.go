@@ -7,7 +7,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- StringSliceVar and stringSliceValue
+// -- StringSliceVar and stringSliceValue.
 type StringSliceVar struct {
 	Name       string
 	Aliases    []string

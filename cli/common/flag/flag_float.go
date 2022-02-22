@@ -7,7 +7,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- Float64Var and float64Value
+// -- Float64Var and float64Value.
 type Float64Var struct {
 	Name       string
 	Aliases    []string

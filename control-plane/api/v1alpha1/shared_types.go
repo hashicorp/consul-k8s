@@ -52,7 +52,7 @@ type TransparentProxy struct {
 }
 
 // MeshGateway controls how Mesh Gateways are used for upstream Connect
-// services
+// services.
 type MeshGateway struct {
 	// Mode is the mode that should be used for the upstream connection.
 	// One of none, local, or remote.
