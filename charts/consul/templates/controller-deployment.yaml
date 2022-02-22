@@ -140,7 +140,7 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  consul-k8s-control-plane consul-logout
+                  consul-k8s-control-plane consul-logout -token-file=/consul/login/acl-token
         {{- end }}
         env:
         {{- if .Values.global.acls.manageSystemACLs }}

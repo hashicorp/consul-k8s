@@ -12,10 +12,6 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const (
-	defaultAclTokenLocation = "/consul/login/acl-token"
-)
-
 // The consul-logout Command just issues a consul logout API request to destroy a token.
 type Command struct {
 	UI cli.Ui
