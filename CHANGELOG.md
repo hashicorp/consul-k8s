@@ -4,6 +4,7 @@ IMPROVEMENTS:
   * Vault: Allow passing arbitrary annotations to the vault agent. [[GH-1015](https://github.com/hashicorp/consul-k8s/pull/1015)]
   * Vault: Add support for customized IP and DNS SANs for server cert in Vault. [[GH-1020](https://github.com/hashicorp/consul-k8s/pull/1020)]
   * Vault: Add support for Enterprise License to be configured in Vault. [[GH-1032](https://github.com/hashicorp/consul-k8s/pull/1032)]
+  * API Gateway: Allow Kubernetes namespace to Consul enterprise namespace mapping for deployed gateways and mesh services. [[GH-1024](https://github.com/hashicorp/consul-k8s/pull/1024)]
 
 BUG FIXES:
 * API Gateway
