@@ -1,4 +1,12 @@
 ## UNRELEASED
+
+FEATURES:
+* Support WAN federation via Mesh Gateways with Vault as the secrets backend. [[GH-1016](https://github.com/hashicorp/consul-k8s/pull/1016),[GH-1025](https://github.com/hashicorp/consul-k8s/pull/1025),[GH-1029](https://github.com/hashicorp/consul-k8s/pull/1029),[GH-1038](https://github.com/hashicorp/consul-k8s/pull/1038)]
+  **Note**: To use WAN federation with ACLs and Vault, you will need to create a KV secret in Vault that will serve as the replication token with
+    a random UUID: `vault kv put secret/consul/replication key="$(uuidgen)"`. You will need to then provide this secret to both the primary
+    and the secondary datacenters with `global.acls.replicationToken` values and allow the `global.secretsBackend.vault.manageSystemACLsRole` Vault role to read it.
+    In the primary datacenter, the Helm chart will create the replication token in Consul using the UUID as the secret ID of the token.
+
 IMPROVEMENTS:
 * Helm
   * Vault: Allow passing arbitrary annotations to the vault agent. [[GH-1015](https://github.com/hashicorp/consul-k8s/pull/1015)]
