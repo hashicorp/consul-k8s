@@ -525,6 +525,60 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+		{
+			"multi port pod",
+			Handler{
+				Log:                   logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationService: "web, web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(keyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -1610,6 +1664,42 @@ func TestOverwriteProbes(t *testing.T) {
 
 		})
 	}
+}
+
+func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
+	cases := []struct {
+		name        string
+		annotations map[string]string
+		expErr      string
+	}{
+		{
+			name:        "tproxy",
+			annotations: map[string]string{keyTransparentProxy: "true"},
+			expErr:      "multi port services are not compatible with transparent proxy",
+		},
+		{
+			name:        "metrics",
+			annotations: map[string]string{annotationEnableMetrics: "true"},
+			expErr:      "multi port services are not compatible with metrics",
+		},
+		{
+			name:        "metrics merging",
+			annotations: map[string]string{annotationEnableMetricsMerging: "true"},
+			expErr:      "multi port services are not compatible with metrics merging",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			h := Handler{}
+			pod := minimal()
+			pod.Annotations = tt.annotations
+			err := h.checkUnsupportedMultiPortCases(corev1.Namespace{}, *pod)
+			require.Error(t, err)
+			require.Equal(t, tt.expErr, err.Error())
+		})
+
+	}
+
 }
 
 // encodeRaw is a helper to encode some data into a RawExtension.

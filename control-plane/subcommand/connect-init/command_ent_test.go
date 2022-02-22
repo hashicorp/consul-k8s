@@ -184,9 +184,6 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				bearerTokenFile:                    bearerFile,
-				tokenSinkFile:                      tokenFile,
-				proxyIDFile:                        proxyFile,
 				serviceRegistrationPollingAttempts: 5,
 			}
 			// We build the http-addr because normally it's defined by the init container setting
@@ -196,6 +193,9 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				"-service-account-name", testServiceAccountName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-consul-service-namespace", c.consulServiceNamespace,
+				"-acl-token-sink", tokenFile,
+				"-bearer-token-file", bearerFile,
+				"-proxy-id-file", proxyFile,
 			}
 			if c.acls {
 				flags = append(flags, "-acl-auth-method", test.AuthMethod, "-auth-method-namespace", c.authMethodNamespace)

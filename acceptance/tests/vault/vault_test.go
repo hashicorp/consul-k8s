@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const staticClientName = "static-client"
+
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
@@ -132,8 +134,8 @@ func TestVault(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 }
