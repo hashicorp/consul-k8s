@@ -63,11 +63,11 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 			return nil, err
 		}
 		setIfNotEmpty(helmValues, "global.image", entImage)
-	}
 
-	if t.EnterpriseLicense != "" {
-		setIfNotEmpty(helmValues, "global.enterpriseLicense.secretName", LicenseSecretName)
-		setIfNotEmpty(helmValues, "global.enterpriseLicense.secretKey", LicenseSecretKey)
+		if t.EnterpriseLicense != "" {
+			setIfNotEmpty(helmValues, "global.enterpriseLicense.secretName", LicenseSecretName)
+			setIfNotEmpty(helmValues, "global.enterpriseLicense.secretKey", LicenseSecretKey)
+		}
 	}
 
 	if t.EnableOpenshift {

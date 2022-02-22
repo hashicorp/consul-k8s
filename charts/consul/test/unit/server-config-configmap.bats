@@ -493,3 +493,41 @@ load _helpers
       yq '.data["connect-ca-config.json"] | contains("\"ca_file\": \"/consul/vault-ca/tls.crt\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "server/ConfigMap: doesn't add federation config by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq '.data["federation-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: adds empty federation config when global.federation.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["federation-config.json"]' | tee /dev/stderr)
+  [ "${actual}" = '"{\n  \"primary_datacenter\": \"\",\n  \"primary_gateways\": []\n}"' ]
+}
+
+@test "server/ConfigMap: can set primary dc and gateways when global.federation.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'global.federation.primaryGateways[0]=1.1.1.1:443' \
+      --set 'global.federation.primaryGateways[1]=2.2.2.2:443' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["federation-config.json"]' | tee /dev/stderr)
+  [ "${actual}" = '"{\n  \"primary_datacenter\": \"dc1\",\n  \"primary_gateways\": [\"1.1.1.1:443\",\"2.2.2.2:443\"]\n}"' ]
+}
