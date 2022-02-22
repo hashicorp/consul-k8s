@@ -79,6 +79,17 @@ spec:
             consul-api-gateway server \
               -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
               -k8s-namespace {{ .Release.Namespace }} \
+              {{- if .Values.global.enableConsulNamespaces }}
+              {{- if .Values.apiGateway.consulNamespaces.consulDestinationNamespace }}
+              -consul-destination-namespace={{ .Values.apiGateway.consulNamespaces.consulDestinationNamespace }} \
+              {{- end }}
+              {{- if .Values.apiGateway.consulNamespaces.mirroringK8S }}
+              -mirroring-k8s=true \
+              {{- if .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }}
+              -mirroring-k8s-prefix={{ .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }} \
+              {{- end }}
+              {{- end }}
+              {{- end }}
               -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
         volumeMounts:
           {{- if .Values.global.tls.enabled }}
