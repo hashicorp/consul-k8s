@@ -49,5 +49,10 @@ rules:
   - {{ template "consul.fullname" . }}-connect-inject-acl-token
   verbs:
   - get
+- apiGroups: [""]
+  resources:
+    - serviceaccounts
+  verbs:
+    - get
 {{- end }}
 {{- end }}

@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const staticClientName = "static-client"
+
 // Test that ingress gateways work in a default installation and a secure installation.
 func TestIngressGateway(t *testing.T) {
 	cases := []struct {
@@ -92,7 +94,7 @@ func TestIngressGateway(t *testing.T) {
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				logger.Log(t, "testing intentions prevent ingress")
-				k8s.CheckStaticServerConnectionFailing(t, k8sOptions, "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+				k8s.CheckStaticServerConnectionFailing(t, k8sOptions, staticClientName, "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
@@ -112,7 +114,7 @@ func TestIngressGateway(t *testing.T) {
 			// Test that we can make a call to the ingress gateway
 			// via the static-client pod. It should route to the static-server pod.
 			logger.Log(t, "trying calls to ingress gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, staticClientName, "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
 		})
 	}
 }

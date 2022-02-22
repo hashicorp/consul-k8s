@@ -298,7 +298,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	require.NoError(t, err)
 
 	logger.Log(t, "checking that connection is successful")
-	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), "http://localhost:1234")
+	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 }
 
 // vaultAddress returns Vault's server URL depending on test configuration.
