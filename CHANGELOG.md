@@ -6,6 +6,8 @@ FEATURES:
     a random UUID: `vault kv put secret/consul/replication key="$(uuidgen)"`. You will need to then provide this secret to both the primary
     and the secondary datacenters with `global.acls.replicationToken` values and allow the `global.secretsBackend.vault.manageSystemACLsRole` Vault role to read it.
     In the primary datacenter, the Helm chart will create the replication token in Consul using the UUID as the secret ID of the token.
+* Multi-port Pods: Support workaround for pods with multiple ports, by registering a Consul service and injecting an Envoy sidecar and init container per port. [[GH-1012](https://github.com/hashicorp/consul-k8s/pull/1012)]
+  * Transparent proxying, metrics, and metrics merging are not supported for multi port pods.
 
 IMPROVEMENTS:
 * Helm
