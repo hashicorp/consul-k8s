@@ -20,7 +20,7 @@ func init() {
 	hasOpenSSL = err == nil
 }
 
-// Test that valid certificates are generated
+// Test that valid certificates are generated.
 func TestGenSource_valid(t *testing.T) {
 	t.Parallel()
 
@@ -36,7 +36,7 @@ func TestGenSource_valid(t *testing.T) {
 	testBundleVerify(t, &bundle)
 }
 
-// Test that certs are regenerated near expiry
+// Test that certs are regenerated near expiry.
 func TestGenSource_expiry(t *testing.T) {
 	t.Parallel()
 

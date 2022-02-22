@@ -8,7 +8,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- DurationVar and durationValue
+// -- DurationVar and durationValue.
 type DurationVar struct {
 	Name       string
 	Aliases    []string

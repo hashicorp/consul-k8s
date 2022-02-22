@@ -7,7 +7,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- BoolVar  and boolValue
+// -- BoolVar  and boolValue.
 type BoolVar struct {
 	Name       string
 	Aliases    []string

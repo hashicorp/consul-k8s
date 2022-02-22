@@ -8,7 +8,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- VarFlag
+// -- VarFlag.
 type VarFlag struct {
 	Name       string
 	Aliases    []string

@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Cluster represents a consul cluster object
+// Cluster represents a consul cluster object.
 type Cluster interface {
 	Create(t *testing.T)
 	Destroy(t *testing.T)
@@ -38,7 +38,7 @@ type Cluster interface {
 }
 
 // HelmCluster implements Cluster and uses Helm
-// to create, destroy, and upgrade consul
+// to create, destroy, and upgrade consul.
 type HelmCluster struct {
 	// ACLToken is an optional ACL token that will be used to create
 	// a Consul API client. If not provided, we will attempt to read

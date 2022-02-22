@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ServiceIntentionsController reconciles a ServiceIntentions object
+// ServiceIntentionsController reconciles a ServiceIntentions object.
 type ServiceIntentionsController struct {
 	client.Client
 	Log                   logr.Logger

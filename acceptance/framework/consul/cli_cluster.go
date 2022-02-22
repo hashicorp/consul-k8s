@@ -29,7 +29,7 @@ const (
 	CLIReleaseName = "consul"
 )
 
-// CLICluster
+// CLICluster.
 type CLICluster struct {
 	ctx                environment.TestContext
 	namespace          string

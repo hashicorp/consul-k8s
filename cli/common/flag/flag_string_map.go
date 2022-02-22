@@ -8,7 +8,7 @@ import (
 	"github.com/posener/complete"
 )
 
-// -- StringMapVar and stringMapValue
+// -- StringMapVar and stringMapValue.
 type StringMapVar struct {
 	Name       string
 	Aliases    []string

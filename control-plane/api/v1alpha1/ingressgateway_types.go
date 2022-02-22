@@ -43,14 +43,14 @@ type IngressGateway struct {
 
 // +kubebuilder:object:root=true
 
-// IngressGatewayList contains a list of IngressGateway
+// IngressGatewayList contains a list of IngressGateway.
 type IngressGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []IngressGateway `json:"items"`
 }
 
-// IngressGatewaySpec defines the desired state of IngressGateway
+// IngressGatewaySpec defines the desired state of IngressGateway.
 type IngressGatewaySpec struct {
 	// TLS holds the TLS configuration for this gateway.
 	TLS GatewayTLSConfig `json:"tls,omitempty"`

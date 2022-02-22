@@ -225,7 +225,7 @@ func (em *mockEnvoyMetricsGetter) Get(_ string) (resp *http.Response, err error)
 	return response, nil
 }
 
-// mockServiceMetricsGetter
+// mockServiceMetricsGetter.
 type mockServiceMetricsGetter struct {
 	// reqURL is the last URL that was passed to Get(url)
 	reqURL string

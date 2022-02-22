@@ -15,7 +15,7 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// basicUI
+// basicUI.
 type basicUI struct {
 	ctx context.Context
 }
@@ -26,7 +26,7 @@ func NewBasicUI(ctx context.Context) *basicUI {
 	}
 }
 
-// Input implements UI
+// Input implements UI.
 func (ui *basicUI) Input(input *Input) (string, error) {
 	var buf bytes.Buffer
 
@@ -67,12 +67,12 @@ func (ui *basicUI) Input(input *Input) (string, error) {
 	}
 }
 
-// Interactive implements UI
+// Interactive implements UI.
 func (ui *basicUI) Interactive() bool {
 	return isatty.IsTerminal(os.Stdin.Fd())
 }
 
-// Output implements UI
+// Output implements UI.
 func (ui *basicUI) Output(msg string, raw ...interface{}) {
 	msg, style, w := Interpret(msg, raw...)
 
@@ -112,7 +112,7 @@ func (ui *basicUI) Output(msg string, raw ...interface{}) {
 	fmt.Fprintln(w, msg)
 }
 
-// NamedValues implements UI
+// NamedValues implements UI.
 func (ui *basicUI) NamedValues(rows []NamedValue, opts ...Option) {
 	cfg := &config{Writer: color.Output}
 	for _, opt := range opts {
@@ -143,7 +143,7 @@ func (ui *basicUI) NamedValues(rows []NamedValue, opts ...Option) {
 	_, _ = colorInfo.Fprintln(cfg.Writer, buf.String())
 }
 
-// OutputWriters implements UI
+// OutputWriters implements UI.
 func (ui *basicUI) OutputWriters() (io.Writer, io.Writer, error) {
 	return os.Stdout, os.Stderr, nil
 }

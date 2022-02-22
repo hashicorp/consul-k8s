@@ -259,7 +259,7 @@ func TestSource_deleteServiceInstance(t *testing.T) {
 	})
 }
 
-// testRegistration creates a Consul test registration
+// testRegistration creates a Consul test registration.
 func testRegistration(node, service string, tags []string) *api.CatalogRegistration {
 	return &api.CatalogRegistration{
 		Node:    node,
@@ -271,13 +271,13 @@ func testRegistration(node, service string, tags []string) *api.CatalogRegistrat
 	}
 }
 
-// testSource creates a Source and Sink for testing
+// testSource creates a Source and Sink for testing.
 func testSource(client *api.Client) (*Source, *TestSink, func()) {
 	return testSourceWithConfig(client, func(source *Source) {})
 }
 
 // testSourceWithConfig starts a Source that can be configured
-// prior to starting via the configurator method
+// prior to starting via the configurator method.
 func testSourceWithConfig(client *api.Client, configurator func(*Source)) (*Source, *TestSink, func()) {
 	sink := &TestSink{}
 	s := &Source{

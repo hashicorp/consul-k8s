@@ -41,14 +41,14 @@ type ServiceRouter struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceRouterList contains a list of ServiceRouter
+// ServiceRouterList contains a list of ServiceRouter.
 type ServiceRouterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceRouter `json:"items"`
 }
 
-// ServiceRouterSpec defines the desired state of ServiceRouter
+// ServiceRouterSpec defines the desired state of ServiceRouter.
 type ServiceRouterSpec struct {
 	// Routes are the list of routes to consider when processing L7 requests.
 	// The first route to match in the list is terminal and stops further

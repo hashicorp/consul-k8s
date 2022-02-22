@@ -17,7 +17,7 @@ const (
 )
 
 // TestEnvironment represents the infrastructure environment of the test,
-// such as the kubernetes cluster(s) the test is running against
+// such as the kubernetes cluster(s) the test is running against.
 type TestEnvironment interface {
 	DefaultContext(t *testing.T) TestContext
 	Context(t *testing.T, name string) TestContext

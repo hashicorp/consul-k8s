@@ -39,7 +39,7 @@ func (t *Table) Rich(cols []string, colors []string) {
 	t.Rows = append(t.Rows, row)
 }
 
-// Table implements UI
+// Table implements UI.
 func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	// Build our config and set our options
 	cfg := &config{Writer: color.Output}

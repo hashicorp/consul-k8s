@@ -40,14 +40,14 @@ type ExportedServices struct {
 
 //+kubebuilder:object:root=true
 
-// ExportedServicesList contains a list of ExportedServices
+// ExportedServicesList contains a list of ExportedServices.
 type ExportedServicesList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ExportedServices `json:"items"`
 }
 
-// ExportedServicesSpec defines the desired state of ExportedServices
+// ExportedServicesSpec defines the desired state of ExportedServices.
 type ExportedServicesSpec struct {
 	// Services is a list of services to be exported and the list of partitions
 	// to expose them to.

@@ -37,14 +37,14 @@ type ServiceResolver struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceResolverList contains a list of ServiceResolver
+// ServiceResolverList contains a list of ServiceResolver.
 type ServiceResolverList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceResolver `json:"items"`
 }
 
-// ServiceResolverSpec defines the desired state of ServiceResolver
+// ServiceResolverSpec defines the desired state of ServiceResolver.
 type ServiceResolverSpec struct {
 	// DefaultSubset is the subset to use when no explicit subset is requested.
 	// If empty the unnamed subset is used.

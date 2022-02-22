@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// Test flag validation
+// Test flag validation.
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
 
@@ -51,7 +51,7 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-// Test that the default consul service is synced to k8s
+// Test that the default consul service is synced to k8s.
 func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	t.Parallel()
 
@@ -83,7 +83,7 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	})
 }
 
-// Test that the command exits cleanly on signals
+// Test that the command exits cleanly on signals.
 func TestRun_ExitCleanlyOnSignals(t *testing.T) {
 	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
@@ -126,7 +126,7 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 }
 
 // Test that when -add-k8s-namespace-suffix flag is used
-// k8s namespaces are appended to the service names synced to Consul
+// k8s namespaces are appended to the service names synced to Consul.
 func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	t.Parallel()
 
@@ -171,7 +171,7 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 }
 
 // Test that switching AddK8SNamespaceSuffix from false to true
-// results in re-registering services in Consul with namespaced names
+// results in re-registering services in Consul with namespaced names.
 func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	t.Parallel()
 
@@ -231,7 +231,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 
 // Test that services with same name but in different namespaces
 // get registered as different services in consul
-// when using -add-k8s-namespace-suffix
+// when using -add-k8s-namespace-suffix.
 func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T) {
 	t.Parallel()
 
@@ -574,7 +574,7 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 	}
 }
 
-// Set up test consul agent and fake kubernetes cluster client
+// Set up test consul agent and fake kubernetes cluster client.
 func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
 

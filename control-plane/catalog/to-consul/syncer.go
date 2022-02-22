@@ -98,7 +98,7 @@ type ConsulSyncer struct {
 	watchers map[string]map[string]context.CancelFunc
 }
 
-// Sync implements Syncer
+// Sync implements Syncer.
 func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 	// Grab the lock so we can replace the sync state
 	s.lock.Lock()
@@ -317,7 +317,7 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name, namespace string)
 // scheduleReapService finds all the instances of the service with the given
 // name that have the k8s tag and schedules them for removal.
 //
-// Precondition: lock must be held
+// Precondition: lock must be held.
 func (s *ConsulSyncer) scheduleReapServiceLocked(name, namespace string) error {
 	// Set up query options
 	opts := api.QueryOptions{AllowStale: true}

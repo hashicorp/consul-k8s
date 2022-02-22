@@ -863,7 +863,7 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 	}
 }
 
-// Test portValue function
+// Test portValue function.
 func TestHandlerPortValue(t *testing.T) {
 	cases := []struct {
 		Name     string
@@ -950,7 +950,7 @@ func TestHandlerPortValue(t *testing.T) {
 	}
 }
 
-// Test consulNamespace function
+// Test consulNamespace function.
 func TestConsulNamespace(t *testing.T) {
 	cases := []struct {
 		Name                       string
