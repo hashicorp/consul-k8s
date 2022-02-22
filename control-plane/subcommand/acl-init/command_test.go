@@ -19,6 +19,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+const (
+	componentAuthMethod = "consul-k8s-component-auth-method"
+)
+
 // Test that we write the secret data to a file.
 func TestRun_TokenSinkFile(t *testing.T) {
 	t.Parallel()
@@ -199,7 +203,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 
 	code := cmd.Run([]string{
 		"-token-file", tokenFile,
-		"-acl-auth-method", common.ComponentAuthMethod,
+		"-acl-auth-method", componentAuthMethod,
 		"-component-name", "foo",
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 	})
@@ -208,5 +212,6 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	bytes, err := ioutil.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.Equal(t, 36, len(bytes))
-
+	_, _, err = consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: string(bytes)})
+	require.NoError(t, err)
 }

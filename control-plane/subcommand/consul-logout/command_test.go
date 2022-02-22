@@ -22,10 +22,11 @@ func TestRun_InvalidSinkFile(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:            ui,
-		tokenSinkFile: randFileName,
+		UI: ui,
 	}
-	code := cmd.Run([]string{})
+	code := cmd.Run([]string{
+		"-token-file", randFileName,
+	})
 	require.Equal(t, 1, code)
 }
 
@@ -62,7 +63,6 @@ func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 			CAFile: caFile,
 		},
 	}
-	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
 
 	bogusToken := "00000000-00-0-001110aacddbderf"
@@ -71,13 +71,14 @@ func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:            ui,
-		tokenSinkFile: tokenFile,
-		consulClient:  consulClient,
+		UI: ui,
 	}
 
 	// Run the command.
-	code := cmd.Run([]string{})
+	code := cmd.Run([]string{
+		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+		"-token-file", tokenFile,
+	})
 	require.Equal(t, 1, code, ui.ErrorWriter.String())
 	require.Contains(t, "Unexpected response code: 403 (ACL not found)", ui.ErrorWriter.String())
 }
@@ -87,7 +88,6 @@ func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 // subcommand/acl-init. It then runs `consul-logout` and ensures that the ACL token
 // is properly destroyed.
 func Test_RunUsingLogin(t *testing.T) {
-	var caFile, certFile, keyFile string
 	// This is the test file that we will write the token to so consul-logout can read it.
 	tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
 	t.Cleanup(func() {
@@ -100,21 +100,14 @@ func Test_RunUsingLogin(t *testing.T) {
 		c.ACL.Enabled = true
 		c.ACL.DefaultPolicy = "deny"
 		c.ACL.Tokens.InitialManagement = masterToken
-		caFile, certFile, keyFile = test.GenerateServerCerts(t)
-		c.CAFile = caFile
-		c.CertFile = certFile
-		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
 	defer server.Stop()
 	server.WaitForLeader(t)
 	cfg := &api.Config{
-		Address: server.HTTPSAddr,
-		Scheme:  "https",
+		Address: server.HTTPAddr,
+		Scheme:  "http",
 		Token:   masterToken,
-		TLSConfig: api.TLSConfig{
-			CAFile: caFile,
-		},
 	}
 	consulClient, err := consul.NewClient(cfg)
 	require.NoError(t, err)
@@ -133,7 +126,7 @@ func Test_RunUsingLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that the token was created.
-	_, _, err = consulClient.ACL().TokenRead(token.AccessorID, &api.QueryOptions{})
+	tok, _, err := consulClient.ACL().TokenRead(token.AccessorID, &api.QueryOptions{})
 	require.NoError(t, err)
 
 	// Write the token's SecretID to the tokenFile which mimics loading
@@ -143,19 +136,18 @@ func Test_RunUsingLogin(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:            ui,
-		tokenSinkFile: tokenFile,
-		consulClient:  consulClient,
+		UI: ui,
 	}
 
 	// Run the command.
-	code := cmd.Run([]string{})
+	code := cmd.Run([]string{
+		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+		"-token-file", tokenFile,
+	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 	// Validate the ACL token was destroyed.
-	tokenList, _, err := consulClient.ACL().TokenList(nil)
-	require.NoError(t, err)
-	for _, tok := range tokenList {
-		require.NotEqual(t, tok.SecretID, token.SecretID)
-	}
+	noTok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: tok.SecretID})
+	require.Error(t, err)
+	require.Nil(t, noTok)
 }

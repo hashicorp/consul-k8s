@@ -2,7 +2,6 @@ package consullogout
 
 import (
 	"flag"
-	"io/ioutil"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -14,7 +13,7 @@ import (
 )
 
 const (
-	defaultAclTokenLocation = "/consul/connect-inject/acl-token"
+	defaultAclTokenLocation = "/consul/login/acl-token"
 )
 
 // The consul-logout Command just issues a consul logout API request to destroy a token.
@@ -26,10 +25,6 @@ type Command struct {
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
-
-	tokenSinkFile string // This is the path to the ACL token to be destroyed.
-
-	consulClient *api.Client
 
 	once   sync.Once
 	help   string
@@ -64,30 +59,16 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-	// This will always be /consul/connect-inject/acl-token
-	if c.tokenSinkFile == "" {
-		c.tokenSinkFile = defaultAclTokenLocation
-	}
 
-	if c.consulClient == nil {
-		cfg := api.DefaultConfig()
-		c.http.MergeOntoConfig(cfg)
-		c.consulClient, err = consul.NewClient(cfg)
-		if err != nil {
-			c.logger.Error("Unable to get client connection", "error", err)
-			return 1
-		}
-	}
-
-	token, err := ioutil.ReadFile(c.tokenSinkFile)
+	cfg := api.DefaultConfig()
+	c.http.MergeOntoConfig(cfg)
+	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
-		c.logger.Error("Unable to read ACL token", "error", err)
+		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
 	}
-
-	_, err = c.consulClient.ACL().Logout(&api.WriteOptions{
-		Token: string(token),
-	})
+	// Issue the logout.
+	_, err = consulClient.ACL().Logout(&api.WriteOptions{})
 	if err != nil {
 		c.logger.Error("Unable to destroy consul ACL token", "error", err)
 		return 1

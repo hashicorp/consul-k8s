@@ -210,7 +210,6 @@ func (c *Command) Run(args []string) int {
 func (c *Command) getSecret(secretName string) (string, error) {
 	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		c.logger.Error("====== here error secret", "error", err, "ns", c.flagNamespace)
 		return "", err
 	}
 

@@ -35,8 +35,6 @@ const (
 	CLILabelKey   = "managed-by"
 	CLILabelValue = "consul-k8s"
 
-	ComponentAuthMethod = "consul-k8s-component-auth-method"
-
 	// The number of times to attempt ACL Login.
 	numLoginRetries = 3
 

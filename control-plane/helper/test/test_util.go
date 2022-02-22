@@ -11,9 +11,12 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	componentAuthMethod = "consul-k8s-component-auth-method"
 )
 
 // GenerateServerCerts generates Consul CA
@@ -77,7 +80,7 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 
 	// Set up Component's auth method.
 	authMethodTmpl := api.ACLAuthMethod{
-		Name:        common.ComponentAuthMethod,
+		Name:        componentAuthMethod,
 		Type:        "kubernetes",
 		Description: "Kubernetes Auth Method",
 		Config: map[string]interface{}{
@@ -122,7 +125,7 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 	// as long as its serviceaccount matches the Selector.
 	abr := api.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
-		AuthMethod:  common.ComponentAuthMethod,
+		AuthMethod:  componentAuthMethod,
 		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
 		BindType:    api.BindingRuleBindTypeRole,
 		BindName:    aclRoleName,
