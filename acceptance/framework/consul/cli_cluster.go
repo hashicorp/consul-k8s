@@ -144,6 +144,10 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
+	if t.Failed() {
+		c.logger.Logf(t, "skipping upgrade due to previous failure")
+		return
+	}
 
 	// Set the args for running the upgrade command.
 	args := []string{"upgrade"}
