@@ -85,7 +85,8 @@ func TestConnectInject(t *testing.T) {
 	}
 }
 
-// TestConnectInjectOnUpgrade tests that Connect works before and after an upgrade is performed on the cluster.
+// TestConnectInjectOnUpgrade tests that Connect works before and after an
+// upgrade is performed on the cluster.
 func TestConnectInjectOnUpgrade(t *testing.T) {
 	cases := map[string]struct {
 		clusterKind         consul.ClusterKind

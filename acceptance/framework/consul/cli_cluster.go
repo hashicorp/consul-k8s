@@ -46,8 +46,8 @@ type CLICluster struct {
 	logger             terratestLogger.TestLogger
 }
 
-// NewCLICluster creates a new Consul cluster struct which can be used to create and destroy a Consul cluster using the
-// Consul K8s CLI.
+// NewCLICluster creates a new Consul cluster struct which can be used to create
+// and destroy a Consul cluster using the Consul K8s CLI.
 func NewCLICluster(
 	t *testing.T,
 	helmValues map[string]string,
@@ -55,7 +55,8 @@ func NewCLICluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *CLICluster {
-	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
+	// Create the namespace so the PSPs, SCCs, and enterprise secret can be
+	// created in the right namespace.
 	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
 
 	if cfg.EnablePodSecurityPolicies {
