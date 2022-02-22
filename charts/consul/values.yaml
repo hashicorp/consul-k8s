@@ -2552,7 +2552,7 @@ apiGateway:
       # @type: string
       service: null
 
-  # [Enterprise Only] These settings manage the api gateway's interaction with
+  # [Enterprise Only] These settings manage the API Gateway's interaction with
   # Consul namespaces (requires consul-ent v1.7+).
   # Also, `global.enableConsulNamespaces` must be true.
   consulNamespaces:
