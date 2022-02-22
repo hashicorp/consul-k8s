@@ -142,6 +142,10 @@ func (c *Command) Run(args []string) int {
 	// We need a new client so that we can use the ACL token that was fetched during login to do the next bit,
 	// otherwise `consulClient` will still be using the bearerToken that was passed in.
 	consulClient, err = consul.NewClient(cfg)
+	if err != nil {
+		c.logger.Error("Unable to update client connection", "error", err)
+		return 1
+	}
 	err = backoff.Retry(func() error {
 		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
