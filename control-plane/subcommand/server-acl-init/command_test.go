@@ -168,7 +168,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			SecretNames: nil,
 			LocalToken:  true,
 		},
 		{
@@ -339,7 +339,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			SecretNames: nil,
 			LocalToken:  true,
 		},
 		{
@@ -486,7 +486,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TestName:    "Client token",
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			SecretNames: nil,
 		},
 		{
 			TestName:    "Endpoints controller ACL token",
@@ -1533,13 +1533,15 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-	responseCode := cmd.Run([]string{
+	cmdArgs := []string{
 		"-timeout=1m",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address=" + serverURL.Hostname(),
 		"-server-port=" + serverURL.Port(),
-	})
+	}
+	cmd.init()
+	responseCode := cmd.Run(cmdArgs)
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 	// Test that the expected API calls were made.
@@ -2299,6 +2301,12 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 			PolicyNames: []string{"controller-policy"},
 			Roles:       []string{resourcePrefix + "-controller-acl-role"},
 		},
+		{
+			TestName:    "Client",
+			TokenFlags:  []string{"-create-client-token"},
+			PolicyNames: []string{"client-token"},
+			Roles:       []string{resourcePrefix + "-client-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2321,7 +2329,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
-			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.OutputWriter.String())
 
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{

@@ -668,7 +668,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			SecretNames: nil,
 			LocalToken:  true,
 		},
 		"catalog-sync token": {
