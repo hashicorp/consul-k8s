@@ -66,7 +66,6 @@ load _helpers
      --set 'ui.ingress.enabled=true' \
      --set 'global.tls.enabled=false' \
      --set 'ui.ingress.hosts[0].host=foo.com' \
-     --kube-version "1.19" \
      . | tee /dev/stderr |
      yq -r '.spec.rules[0].http.paths[0].backend.service.port.number' | tee /dev/stderr)
   [ "${actual}" = "80" ]
