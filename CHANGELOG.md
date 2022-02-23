@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.41.0 (February 23, 2022)
 
 FEATURES:
 * Support WAN federation via Mesh Gateways with Vault as the secrets backend. [[GH-1016](https://github.com/hashicorp/consul-k8s/pull/1016),[GH-1025](https://github.com/hashicorp/consul-k8s/pull/1025),[GH-1029](https://github.com/hashicorp/consul-k8s/pull/1029),[GH-1038](https://github.com/hashicorp/consul-k8s/pull/1038)]
