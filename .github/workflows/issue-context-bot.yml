@@ -1,14 +1,10 @@
 name: Issue Context Bot
 
-on:
-  issues:
-    types: transferred
+on: [issues]
 
 jobs:
   add-context:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
     steps:
     - uses: wow-actions/auto-comment@v1.0.7
       with:
