@@ -59,19 +59,6 @@ load _helpers
   [ "${actual}" = "foo.com" ]
 }
 
-@test "ui/Ingress: exposes single port 80 when global.tls.enabled=false when Kube version < 1.19" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ui-ingress.yaml  \
-      --set 'ui.ingress.enabled=true' \
-      --set 'global.tls.enabled=false' \
-      --set 'ui.ingress.hosts[0].host=foo.com' \
-      --kube-version "1.18" \
-      . | tee /dev/stderr |
-      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
-  [ "${actual}" = "80" ]
-}
-
 @test "ui/Ingress: exposes single port 80 when global.tls.enabled=false when Kube version >= 1.19" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -83,19 +70,6 @@ load _helpers
      . | tee /dev/stderr |
      yq -r '.spec.rules[0].http.paths[0].backend.service.port.number' | tee /dev/stderr)
   [ "${actual}" = "80" ]
-}
-
-@test "ui/Ingress: exposes single port 443 when global.tls.enabled=true and global.tls.httpsOnly=true when Kube version < 1.19" {
-  cd `chart_dir`
-  local actual=$(helm template \
-    -s templates/ui-ingress.yaml  \
-    --set 'ui.ingress.enabled=true' \
-    --set 'global.tls.enabled=true' \
-    --set 'ui.ingress.hosts[0].host=foo.com' \
-    --kube-version "1.18" \
-    . | tee /dev/stderr |
-    yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
-  [ "${actual}" = "443" ]
 }
 
 @test "ui/Ingress: exposes single port 443 when global.tls.enabled=true and global.tls.httpsOnly=true when Kube version >= 1.19" {
@@ -111,20 +85,6 @@ load _helpers
   [ "${actual}" = "443" ]
 }
 
-@test "ui/Ingress: exposes the port 80 when global.tls.enabled=true and global.tls.httpsOnly=false when Kube version < 1.19" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ui-ingress.yaml  \
-      --set 'ui.ingress.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.httpsOnly=false' \
-      --set 'ui.ingress.hosts[0].host=foo.com' \
-      --kube-version "1.18" \
-      . | tee /dev/stderr |
-      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
-  [ "${actual}" = "80" ]
-}
-
 @test "ui/Ingress: exposes the port 80 when global.tls.enabled=true and global.tls.httpsOnly=false when Kube version >= 1.19" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -137,20 +97,6 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.rules[0].http.paths[0].backend.service.port.number' | tee /dev/stderr)
   [ "${actual}" = "80" ]
-}
-
-@test "ui/Ingress: exposes the port 443 when global.tls.enabled=true and global.tls.httpsOnly=false when Kube version < 1.19" {
-  cd `chart_dir`
-  local actual=$(helm template \
-    -s templates/ui-ingress.yaml  \
-    --set 'ui.ingress.enabled=true' \
-    --set 'global.tls.enabled=true' \
-    --set 'global.tls.httpsOnly=false' \
-    --set 'ui.ingress.hosts[0].host=foo.com' \
-    --kube-version "1.18" \
-    . | tee /dev/stderr |
-    yq -r '.spec.rules[0].http.paths[1].backend.servicePort' | tee /dev/stderr)
-  [ "${actual}" = "443" ]
 }
 
 @test "ui/Ingress: exposes the port 443 when global.tls.enabled=true and global.tls.httpsOnly=false when Kube version >= 1.19" {
