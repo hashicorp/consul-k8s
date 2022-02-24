@@ -83,7 +83,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "envoyproxy/envoy-alpine:v1.20.1" ]
+  [ "${actual}" = "envoyproxy/envoy-alpine:v1.20.2" ]
 }
 
 @test "terminatingGateways/Deployment: envoy image can be set using the global value" {
