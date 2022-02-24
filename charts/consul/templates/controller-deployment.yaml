@@ -89,7 +89,6 @@ spec:
               -component-name=controller \
               -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
               {{- if .Values.global.adminPartitions.enabled }}
-              -enable-partitions=true \
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
               -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
