@@ -47,7 +47,6 @@ type Command struct {
 	flagLogJSON       bool
 
 	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
-	tokenSinkFile     string // Location to write the output token. Default is defaultTokenSinkFile.
 	flagComponentName string // Name of the component to be used as metadata to ACL Login.
 
 	k8sClient kubernetes.Interface
@@ -86,8 +85,8 @@ func (c *Command) init() {
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile
 	}
-	if c.tokenSinkFile == "" {
-		c.tokenSinkFile = defaultTokenSinkFile
+	if c.flagTokenSinkFile == "" {
+		c.flagTokenSinkFile = defaultTokenSinkFile
 	}
 	if c.flagNamespace == "" {
 		c.flagNamespace = corev1.NamespaceDefault
@@ -150,7 +149,7 @@ func (c *Command) Run(args []string) int {
 		meta := map[string]string{
 			"component": c.flagComponentName,
 		}
-		err := common.ConsulLogin(c.consulClient, cfg, c.logger, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, "", "", meta)
+		err := common.ConsulLogin(c.consulClient, cfg, c.logger, c.bearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, "", "", meta)
 		if err != nil {
 			c.logger.Error("Consul login failed", "error", err)
 			return 1

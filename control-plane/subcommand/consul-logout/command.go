@@ -61,7 +61,10 @@ func (c *Command) Run(args []string) int {
 	}
 	// Set a default if it is not already set.
 	if c.http.TokenFile() == "" {
-		c.http.SetTokenFile(defaultACLTokenFile)
+		if err := c.http.SetTokenFile(defaultACLTokenFile); err != nil {
+			c.logger.Error("Unable to update client", "error", err)
+			return 1
+		}
 	}
 
 	cfg := api.DefaultConfig()
