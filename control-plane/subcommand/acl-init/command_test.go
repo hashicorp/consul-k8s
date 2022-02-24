@@ -198,7 +198,6 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 		UI:              ui,
 		k8sClient:       k8s,
 		bearerTokenFile: bearerFile,
-		tokenSinkFile:   tokenFile,
 	}
 
 	code := cmd.Run([]string{
