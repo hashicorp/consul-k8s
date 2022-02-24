@@ -1035,7 +1035,7 @@ func (c *Command) configureComponentAuthMethod(consulClient *api.Client, authMet
 // createACLPolicyRoleAndBindingRule will create the ACL Policy for the component
 // then create a set of ACLRole and ACLBindingRule which tie the component's serviceaccount
 // to the authMethod, allowing the serviceaccount to later be allowed to issue a Consul Login.
-func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules string, dc string, isPrimary bool, globalToken bool,
+func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules string, dc string, isPrimary bool, isGlobal bool,
 	authMethodName string, serviceAccountName string, client *api.Client) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", componentName)

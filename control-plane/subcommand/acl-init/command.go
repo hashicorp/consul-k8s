@@ -74,7 +74,7 @@ func (c *Command) init() {
 
 	// Flags related to using consul login to fetch the ACL token.
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of the auth method to login to.")
-	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
+	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login with.")
 	c.flags.StringVar(&c.flagComponentName, "component-name", "",
 		"Name of the component to pass to ACL Login as metadata.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",

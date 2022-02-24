@@ -12,7 +12,7 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-// The consul-logout Command just issues a consul logout API request to destroy a token.
+// The consul-logout command issues a Consul logout API request to delete an ACL token.
 type Command struct {
 	UI cli.Ui
 
@@ -66,10 +66,10 @@ func (c *Command) Run(args []string) int {
 	// Issue the logout.
 	_, err = consulClient.ACL().Logout(&api.WriteOptions{})
 	if err != nil {
-		c.logger.Error("Unable to destroy consul ACL token", "error", err)
+		c.logger.Error("Unable to delete consul ACL token as logout failed", "error", err)
 		return 1
 	}
-	c.logger.Error("ACL token successfully destroyed")
+	c.logger.Error("ACL token successfully deleted")
 	return 0
 }
 
@@ -79,10 +79,10 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Issue a consul logout to destroy the ACL token."
+const synopsis = "Issue a consul logout to delete the ACL token."
 const help = `
 Usage: consul-k8s-control-plane consul-logout [options]
 
-  Destroys the ACL token for this pod.
+  Deletes the ACL token for this pod.
   Not intended for stand-alone use.
 `
