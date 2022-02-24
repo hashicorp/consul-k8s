@@ -6,7 +6,7 @@ BREAKING CHANGES:
 
 IMPROVEMENTS:
 * Control Plane
-  * Bump `consul-k8s-control-plane` base image to use `alpine:3.15` [GH-1058](https://github.com/hashicorp/consul-k8s/pull/1058)
+  * Upgrade Docker image Alpine version from 3.14 to 3.15. [GH-1058](https://github.com/hashicorp/consul-k8s/pull/1058)
 
 ## 0.41.1 (February 24, 2022)
 
