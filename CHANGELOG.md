@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Helm
+  * Support Envoy 1.20.2. [[GH-1051](https://github.com/hashicorp/consul-k8s/pull/1051)]
+
 ## 0.41.0 (February 23, 2022)
 
 FEATURES:
