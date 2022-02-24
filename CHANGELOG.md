@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.41.1 (February 24, 2022)
 
 BUG FIXES:
 * Helm
