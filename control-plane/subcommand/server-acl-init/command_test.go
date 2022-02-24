@@ -293,18 +293,20 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
 
-				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-				require.NoError(err)
-				require.NotNil(tokenSecret)
-				token, ok := tokenSecret.Data["token"]
-				require.True(ok)
+				if len(c.SecretNames) > 0 {
+					// Test that the token was created as a Kubernetes Secret.
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+					require.NoError(err)
+					require.NotNil(tokenSecret)
+					token, ok := tokenSecret.Data["token"]
+					require.True(ok)
 
-				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-				require.NoError(err)
-				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
-				require.Equal(c.LocalToken, tokenData.Local)
+					// Test that the token has the expected policies in Consul.
+					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+					require.NoError(err)
+					require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
+					require.Equal(c.LocalToken, tokenData.Local)
+				}
 			}
 
 			// Test that if the same command is run again, it doesn't error.
@@ -454,18 +456,20 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 					policy := policyExists(r, c.PolicyNames[i], consul)
 					require.Equal(r, c.PolicyDCs, policy.Datacenters)
 
-					// Test that the token was created as a Kubernetes Secret.
-					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-					require.NoError(r, err)
-					require.NotNil(r, tokenSecret)
-					token, ok := tokenSecret.Data["token"]
-					require.True(r, ok)
+					if len(c.SecretNames) > 0 {
+						// Test that the token was created as a Kubernetes Secret.
+						tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+						require.NoError(r, err)
+						require.NotNil(r, tokenSecret)
+						token, ok := tokenSecret.Data["token"]
+						require.True(r, ok)
 
-					// Test that the token has the expected policies in Consul.
-					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-					require.NoError(r, err)
-					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
-					require.Equal(r, c.LocalToken, tokenData.Local)
+						// Test that the token has the expected policies in Consul.
+						tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+						require.NoError(r, err)
+						require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+						require.Equal(r, c.LocalToken, tokenData.Local)
+					}
 				}
 			})
 		})
@@ -593,17 +597,18 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 				for i := range c.PolicyNames {
 					policyExists(r, c.PolicyNames[i], consul)
 
-					// Test that the token was created as a Kubernetes Secret.
-					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-					require.NoError(r, err)
-					require.NotNil(r, tokenSecret)
-					token, ok := tokenSecret.Data["token"]
-					require.True(r, ok)
-
-					// Test that the token has the expected policies in Consul.
-					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-					require.NoError(r, err)
-					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+					if len(c.SecretNames) > 0 {
+						// Test that the token was created as a Kubernetes Secret.
+						tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+						require.NoError(r, err)
+						require.NotNil(r, tokenSecret)
+						token, ok := tokenSecret.Data["token"]
+						require.True(r, ok)
+						// Test that the token has the expected policies in Consul.
+						tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+						require.NoError(r, err)
+						require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+					}
 				}
 			})
 		})
