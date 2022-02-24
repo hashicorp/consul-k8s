@@ -1641,17 +1641,14 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: -create-controller-token set when controller.enabled=true is passed" {
+@test "serverACLInit/Job: -create-controller-token set when controller.enabled=true" {
   cd `chart_dir`
-  local object=$(helm template \
+  local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
-
-  local actual=$(echo "$object" |
-    yq '.command | any(contains("-create-controller-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("create-controller-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

@@ -753,13 +753,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  false,
 		},
-		"controller token": {
-			TokenFlags:  []string{"-create-controller-token"},
-			PolicyNames: []string{"controller-token"},
-			PolicyDCs:   nil,
-			SecretNames: nil,
-			LocalToken:  false,
-		},
 		"partitions token": {
 			TokenFlags:  []string{"-enable-partitions", "-partition=default"},
 			PolicyNames: []string{"partitions-token"},
@@ -804,27 +797,19 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			require.NoError(err)
 
 			// Check that the expected policy was created.
-			policyNames := map[string]bool{}
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
-				policyNames[policy.Name] = true
-			}
-			tokens := []string{}
-			for i := range c.SecretNames {
 				// Test that the token was created as a Kubernetes Secret.
 				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]
 				require.True(ok)
-				tokens = append(tokens, string(token))
-			}
-			for i := range tokens {
 				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: tokens[i]})
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
 				require.NoError(err)
-				require.True(policyNames[tokenData.Policies[0].Name])
+				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
 				require.Equal(c.LocalToken, tokenData.Local)
 			}
 
@@ -1086,6 +1071,99 @@ partition "default" {
 				responseCode := cmd.Run(cmdArgs)
 				require.Equal(0, responseCode, ui.ErrorWriter.String())
 			})
+		})
+	}
+}
+
+// Test creating the correct ACL policies and Binding Rules for components that use the auth method.
+// The test works by running the command and then ensuring that:
+// * An ACLBindingRule exists which references the ACLRole.
+// * An ACLRole exists and has the correct PolicyName in it's ACLPolicyLinkRule list.
+// * The ACLPolicy exists.
+func TestRun_PoliciesAndBindingRulesForACLLoginNamespacesEnabled(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		TestName    string
+		TokenFlags  []string
+		PolicyNames []string
+		Roles       []string
+		Namespace   string
+	}{
+		{
+			TestName:    "Controller",
+			TokenFlags:  []string{"-create-controller-token"},
+			PolicyNames: []string{"controller-policy"},
+			Roles:       []string{resourcePrefix + "-controller-acl-role"},
+			Namespace:   ns,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.TestName, func(t *testing.T) {
+			k8s, testSvr := completeSetup(t)
+			defer testSvr.Stop()
+			setUpK8sServiceAccount(t, k8s, ns)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-timeout=500ms",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			consul, err := api.NewClient(&api.Config{
+				Namespace: ns,
+				Address:   testSvr.HTTPAddr,
+				Token:     bootToken,
+			})
+			require.NoError(t, err)
+
+			// Check that the Role exists + has correct Policy and is associated with a BindingRule.
+			for i := range c.Roles {
+				// Check that the Policy exists.
+				policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+
+				// Check that the Role exists.
+				role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, role)
+
+				// Check that the Role references the Policy.
+				found := false
+				for x := range role.Policies {
+					if role.Policies[x].Name == policy.Name {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+
+				// Check that there exists a BindingRule that references this Role.
+				rb, _, err := consul.ACL().BindingRuleList("release-name-"+componentAuthMethod, &api.QueryOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, rb)
+				found = false
+				for x := range rb {
+					if rb[x].BindName == c.Roles[i] {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+			}
 		})
 	}
 }

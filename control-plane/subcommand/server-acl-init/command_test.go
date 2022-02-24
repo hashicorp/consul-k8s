@@ -2296,7 +2296,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 		{
 			TestName:    "Controller",
 			TokenFlags:  []string{"-create-controller-token"},
-			PolicyNames: []string{"controller-token"},
+			PolicyNames: []string{"controller-policy"},
 			Roles:       []string{resourcePrefix + "-controller-acl-role"},
 		},
 	}

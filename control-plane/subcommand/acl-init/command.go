@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	corev1 "k8s.io/api/core/v1"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,6 +19,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -165,9 +165,11 @@ func (c *Command) Run(args []string) int {
 		var err error
 		secret, err = c.getSecret(c.flagSecretName)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error getting Kubernetes secret: %s", err))
+			c.logger.Error("Error getting Kubernetes secret: ", "error", err)
+			//			c.UI.Error(fmt.Sprintf("Error getting Kubernetes secret: %s", err))
 		}
 		if err == nil {
+			c.logger.Info("Successfully read Kubernetes secret")
 			break
 		}
 		time.Sleep(1 * time.Second)

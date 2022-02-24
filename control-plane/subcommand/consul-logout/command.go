@@ -12,6 +12,10 @@ import (
 	"github.com/mitchellh/cli"
 )
 
+const (
+	defaultACLTokenFile = "/consul/login/acl-token"
+)
+
 // The consul-logout command issues a Consul logout API request to delete an ACL token.
 type Command struct {
 	UI cli.Ui
@@ -54,6 +58,10 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(err.Error())
 			return 1
 		}
+	}
+	// Set a default if it is not already set.
+	if c.http.TokenFile() == "" {
+		c.http.SetTokenFile(defaultACLTokenFile)
 	}
 
 	cfg := api.DefaultConfig()

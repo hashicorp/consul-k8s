@@ -63,17 +63,17 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 
 // SetupK8sComponentAuthMethod create a k8s auth method, sample acl:write ACL policy, Role and BindingRule
 // that allows the a client using `serviceAccount`'s JWT token to issue a consul login.
-func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, serviceAccountName, k8sServiceNS string) {
+func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, serviceAccountName, k8sComponentNS string) {
 	t.Helper()
 	// Start the mock k8s server.
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
-			w.Write([]byte(tokenReviewsResponse(serviceAccountName, k8sServiceNS)))
+			w.Write([]byte(tokenReviewsResponse(serviceAccountName, k8sComponentNS)))
 		}
-		if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", k8sServiceNS, serviceAccountName) &&
+		if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", k8sComponentNS, serviceAccountName) &&
 			r.Method == "GET" {
-			w.Write([]byte(serviceAccountGetResponse(serviceAccountName, k8sServiceNS)))
+			w.Write([]byte(serviceAccountGetResponse(serviceAccountName, k8sComponentNS)))
 		}
 	}))
 	t.Cleanup(k8sMockServer.Close)

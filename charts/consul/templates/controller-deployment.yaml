@@ -88,9 +88,6 @@ spec:
             consul-k8s-control-plane acl-init \
               -component-name=controller \
               -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
-              {{- if .Values.global.adminPartitions.enabled }}
-              -partition={{ .Values.global.adminPartitions.name }} \
-              {{- end }}
               -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
         resources:
@@ -139,7 +136,7 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  consul-k8s-control-plane consul-logout -token-file=/consul/login/acl-token
+                  consul-k8s-control-plane consul-logout
         {{- end }}
         env:
         {{- if .Values.global.acls.manageSystemACLs }}

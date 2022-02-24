@@ -3,15 +3,15 @@ package common
 
 import (
 	"fmt"
-	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
