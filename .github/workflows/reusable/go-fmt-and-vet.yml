@@ -1,0 +1,34 @@
+name: go-fmt-and-vet 
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:      
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: go mod download
+        working-directory: ${{inputs.directory}}
+        run: go mod download
+
+      - name: check go fmt
+        working-directory: ${{inputs.directory}}
+        run: |
+          files=$(go fmt ./...)
+          if [ -n "$files" ]; then
+            echo "The following file(s) do not conform to go fmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: go vet 
+        working-directory: ${{inputs.directory}}
+        run: go vet ./...
