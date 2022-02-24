@@ -1,7 +1,11 @@
 name: go-fmt-and-vet-helm-gen
-
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - v*
+    branches:
+      - crt-build-and-tests 
+  pull_request:
 
 jobs:
   go-fmt-and-vet-helm-gen:
