@@ -36,7 +36,7 @@ const (
 	CLILabelValue = "consul-k8s"
 
 	// The number of times to attempt ACL Login.
-	numLoginRetries = 3
+	numLoginRetries = 100
 
 	raftReplicationTimeout   = 2 * time.Second
 	tokenReadPollingInterval = 100 * time.Millisecond

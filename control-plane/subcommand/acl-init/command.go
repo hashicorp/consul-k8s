@@ -85,7 +85,11 @@ func (c *Command) init() {
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile
 	}
-	if c.flagTokenSinkFile == "" {
+	// This allows us to utilize the default path of `/consul/login/acl-token` for the ACL token
+	// but only in the case of when we're using ACL.Login. If flagACLAuthMethod is not set and
+	// the tokenSinkFile is also unset it means we do not want to write an ACL token in the case
+	// of the client token.
+	if c.flagTokenSinkFile == "" && c.flagACLAuthMethod != "" {
 		c.flagTokenSinkFile = defaultTokenSinkFile
 	}
 	if c.flagNamespace == "" {
