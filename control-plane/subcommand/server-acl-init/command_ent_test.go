@@ -320,7 +320,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			// Check that the expected policies were created.
 			firstRunExpectedPolicies := []string{
 				"anonymous-token-policy",
-				"client-token",
+				"client-policy",
 				"catalog-sync-token",
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
@@ -371,7 +371,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			// Check that the policies have all been updated.
 			secondRunExpectedPolicies := []string{
 				"anonymous-token-policy",
-				"client-token",
+				"client-policy",
 				"catalog-sync-token",
 				"connect-inject-token",
 				"mesh-gateway-token",
@@ -666,7 +666,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	}{
 		"client token": {
 			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token"},
+			PolicyNames: []string{"client-policy"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: nil,
 			LocalToken:  true,

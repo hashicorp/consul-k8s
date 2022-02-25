@@ -166,7 +166,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		{
 			TestName:    "Client token",
 			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token"},
+			PolicyNames: []string{"client-policy"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: nil,
 			LocalToken:  true,
@@ -339,7 +339,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		{
 			TestName:    "Client token",
 			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token-dc2"},
+			PolicyNames: []string{"client-policy-dc2"},
 			PolicyDCs:   []string{"dc2"},
 			SecretNames: nil,
 			LocalToken:  true,
@@ -489,7 +489,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		{
 			TestName:    "Client token",
 			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token"},
+			PolicyNames: []string{"client-policy"},
 			SecretNames: nil,
 		},
 		{
@@ -2057,7 +2057,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 
 	// Test that the client policy was created.
 	retry.Run(t, func(r *retry.R) {
-		p := policyExists(r, "client-token-dc2", secondaryConsulClient)
+		p := policyExists(r, "client-policy-dc2", secondaryConsulClient)
 		require.Equal(r, []string{"dc2"}, p.Datacenters)
 	})
 
