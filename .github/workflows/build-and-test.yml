@@ -26,9 +26,34 @@ jobs:
       directory: hack/helm-reference-gen
     needs: go-fmt-and-vet-helm-gen
 
+  lint-control-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+
   go-fmt-vet-control-plane:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-and-vet.yml@crt-build-and-tests
     with:
       directory: control-plane 
+
+  test-control-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [lint-control-plane, go-fmt-vet-control-plane]
+
+  test-enterprise-control-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [lint-control-plane, go-fmt-vet-control-plane]
+
+
 
 
