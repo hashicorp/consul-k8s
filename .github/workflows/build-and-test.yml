@@ -15,8 +15,8 @@ jobs:
         run:
          echo "Filler"
 
-  go-fmt-and-vet-helm-gen:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-and-vet.yml@crt-build-and-tests
+  go-fmt-vet-helm-gen:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
 
@@ -24,7 +24,7 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
-    needs: go-fmt-and-vet-helm-gen
+    needs: go-fmt-vet-helm-gen
 
   lint-control-plane:
     runs-on: ubuntu-latest
@@ -34,7 +34,7 @@ jobs:
          echo "Filler"
 
   go-fmt-vet-control-plane:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-and-vet.yml@crt-build-and-tests
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: control-plane 
 
@@ -77,6 +77,65 @@ jobs:
         run:
          echo "Filler"
     needs: [test-control-plane, test-enterprise-control-plane]
+
+  go-fmt-vet-acceptance:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
+    with:
+      directory: acceptance
+
+  unit-acceptance:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
+    with:
+      directory: acceptance
+    needs: go-fmt-vet-acceptance
+
+  go-fmt-vet-cli:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
+    with:
+      directory: cli 
+
+  unit-cli:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
+    with:
+      directory: cli 
+    needs: go-fmt-vet-cli
+
+  unit-test-helm-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+
+  dev-upload-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: build-distros-amd64
+
+  acceptance-tproxy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [unit-cli, dev-upload-docker, unit-acceptance, unit-test-helm-template]
+
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [unit-cli, dev-upload-docker, unit-acceptance, unit-test-helm-template]
+
+
+
+
+
+
 
 
 
