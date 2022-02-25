@@ -27,24 +27,27 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 		}
 	}
 
-	// Override our original client with a new one that has the bootstrap token
-	// set.
-	consulClient, err := consul.NewClient(&api.Config{
-		Address: firstServerAddr,
-		Scheme:  scheme,
-		Token:   bootstrapToken,
-		TLSConfig: api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
-	}
+	// We should only create and set server tokens when servers are running within this cluster.
+	if c.flagSetServerToken {
+		// Override our original client with a new one that has the bootstrap token
+		// set.
+		consulClient, err := consul.NewClient(&api.Config{
+			Address: firstServerAddr,
+			Scheme:  scheme,
+			Token:   bootstrapToken,
+			TLSConfig: api.TLSConfig{
+				Address: c.flagConsulTLSServerName,
+				CAFile:  c.flagConsulCACert,
+			},
+		})
+		if err != nil {
+			return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
+		}
 
-	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(consulClient, serverAddresses, bootstrapToken, scheme); err != nil {
-		return "", err
+		// Create new tokens for each server and apply them.
+		if err := c.setServerTokens(consulClient, serverAddresses, bootstrapToken, scheme); err != nil {
+			return "", err
+		}
 	}
 	return bootstrapToken, nil
 }

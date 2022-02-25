@@ -120,7 +120,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	primaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
 	secondaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
 
-	replicationToken := configureReplicationTokenVaultSecret(t, vaultClient, consulReleaseName, ns, "kubernetes", "kubernetes-dc2")
+	bootstrapToken := configureBootstrapTokenVaultSecret(t, vaultClient)
+	replicationToken := configureReplicationTokenVaultSecret(t, vaultClient)
 
 	// Create the Vault Policy for the Connect CA in both datacenters.
 	createConnectCAPolicy(t, vaultClient, "dc1")
@@ -156,9 +157,11 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// ACL config.
 		"global.acls.manageSystemACLs":            "true",
+		"global.acls.bootstrapToken.secretName":   "consul/data/secret/bootstrap",
+		"global.acls.bootstrapToken.secretKey":    "token",
 		"global.acls.createReplicationToken":      "true",
 		"global.acls.replicationToken.secretName": "consul/data/secret/replication",
-		"global.acls.replicationToken.secretKey":  "replication",
+		"global.acls.replicationToken.secretKey":  "token",
 
 		// Mesh config.
 		"connectInject.enabled": "true",
@@ -263,6 +266,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	// Verify federation between servers.
 	logger.Log(t, "verifying federation was successful")
+	primaryConsulCluster.ACLToken = bootstrapToken
 	primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
 	secondaryConsulCluster.ACLToken = replicationToken
 	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)

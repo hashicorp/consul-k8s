@@ -6,6 +6,7 @@
 {{- if .Values.global.acls.manageSystemACLs }}
 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.replicationToken.secretName (not .Values.global.secretsBackend.vault.manageSystemACLsRole) }}{{ fail "global.secretsBackend.vault.manageSystemACLsRole must be set if global.secretsBackend.vault.enabled is true and global.acls.replicationToken is provided" }}{{ end -}}
 {{- if or (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.replicationToken.secretKey))  (and .Values.global.acls.replicationToken.secretKey (not .Values.global.acls.replicationToken.secretName))}}{{ fail "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" }}{{ end -}}
+{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.acls.manageSystemACLs (not (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey))) }}{{fail "both global.acls.bootstrapToken.secretName and global.acls.bootstrapToken.secretKey must be provided when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true" }}{{ end -}}
   {{- /* We don't render this job when server.updatePartition > 0 because that
     means a server rollout is in progress and this job won't complete unless
     the rollout is finished (which won't happen until the partition is 0).
@@ -36,11 +37,17 @@ spec:
         component: server-acl-init
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        {{- if .Values.global.secretsBackend.vault.enabled }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
+        {{- with .Values.global.acls.bootstrapToken }}
+        "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.manageSystemACLsRole }}
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.manageSystemACLsRole }}
         {{- else if .Values.global.tls.enabled }}
@@ -75,7 +82,7 @@ spec:
               - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
                 path: tls.crt
         {{- end }}
-        {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+        {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: bootstrap-token
           secret:
             secretName: {{ .Values.global.acls.bootstrapToken.secretName }}
@@ -106,7 +113,7 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
-            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: bootstrap-token
               mountPath: /consul/acl/tokens
               readOnly: true
@@ -127,6 +134,7 @@ spec:
                 -log-json={{ .Values.global.logJSON }} \
                 -resource-prefix=${CONSUL_FULLNAME} \
                 -k8s-namespace={{ .Release.Namespace }} \
+                -set-server-token={{ $serverEnabled }} \
 
                 {{- if .Values.externalServers.enabled }}
                 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
@@ -241,7 +249,11 @@ spec:
                 {{- end }}
 
                 {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+                {{- if .Values.global.secretsBackend.vault.enabled }}
+                -bootstrap-token-file=/vault/secrets/bootstrap-token \
+                {{- else }}
                 -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
+                {{- end }}
                 {{- else if .Values.global.acls.replicationToken.secretName }}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
                 -acl-replication-token-file=/vault/secrets/replication-token \
