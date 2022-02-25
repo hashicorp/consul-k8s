@@ -454,7 +454,7 @@ func (c *Command) Run(args []string) int {
 
 		serviceAccountName := c.withPrefix("client")
 
-		err = c.createACLPolicyRoleAndBindingRule("client", agentRules, consulDC, isPrimary, false, componentAuthMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("client", agentRules, consulDC, isPrimary, componentAuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
