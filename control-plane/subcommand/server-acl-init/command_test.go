@@ -2429,7 +2429,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
-			require.Equal(t, 0, responseCode, ui.OutputWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
