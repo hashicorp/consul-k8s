@@ -8,7 +8,14 @@ on:
   pull_request:
 
 jobs:
-  go-fmt-and-vet-helm-gen:
+  validate-helm-gen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+
+  go-fmt-vet-helm-gen:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-and-vet.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
@@ -19,7 +26,7 @@ jobs:
       directory: hack/helm-reference-gen
     needs: go-fmt-and-vet-helm-gen
 
-  go-fmt-and-vet-control-plane:
+  go-fmt-vet-control-plane:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-and-vet.yml@crt-build-and-tests
     with:
       directory: control-plane 
