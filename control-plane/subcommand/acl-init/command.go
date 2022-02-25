@@ -82,20 +82,6 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	if c.bearerTokenFile == "" {
-		c.bearerTokenFile = defaultBearerTokenFile
-	}
-	// This allows us to utilize the default path of `/consul/login/acl-token` for the ACL token
-	// but only in the case of when we're using ACL.Login. If flagACLAuthMethod is not set and
-	// the tokenSinkFile is also unset it means we do not want to write an ACL token in the case
-	// of the client token.
-	if c.flagTokenSinkFile == "" && c.flagACLAuthMethod != "" {
-		c.flagTokenSinkFile = defaultTokenSinkFile
-	}
-	if c.flagNamespace == "" {
-		c.flagNamespace = corev1.NamespaceDefault
-	}
-
 	c.k8s = &flags.K8SFlags{}
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -112,6 +98,20 @@ func (c *Command) Run(args []string) int {
 	if len(c.flags.Args()) > 0 {
 		c.UI.Error("Should have no non-flag arguments.")
 		return 1
+	}
+
+	if c.bearerTokenFile == "" {
+		c.bearerTokenFile = defaultBearerTokenFile
+	}
+	// This allows us to utilize the default path of `/consul/login/acl-token` for the ACL token
+	// but only in the case of when we're using ACL.Login. If flagACLAuthMethod is not set and
+	// the tokenSinkFile is also unset it means we do not want to write an ACL token in the case
+	// of the client token.
+	if c.flagTokenSinkFile == "" && c.flagACLAuthMethod != "" {
+		c.flagTokenSinkFile = defaultTokenSinkFile
+	}
+	if c.flagNamespace == "" {
+		c.flagNamespace = corev1.NamespaceDefault
 	}
 
 	if c.ctx == nil {
