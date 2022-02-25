@@ -201,7 +201,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	}
 
 	code := cmd.Run([]string{
-		"-token-file", tokenFile,
+		"-token-sink-file", tokenFile,
 		"-acl-auth-method", componentAuthMethod,
 		"-component-name", "foo",
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),

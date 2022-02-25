@@ -330,7 +330,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
 				"connect-inject-token",
-				"controller-token",
+				"controller-policy",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -382,7 +382,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anothergw-ingress-gateway-token",
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
-				"controller-token",
+				"controller-policy",
 				"partitions-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)
