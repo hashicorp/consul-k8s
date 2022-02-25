@@ -1,4 +1,4 @@
-name: go-fmt-and-vet 
+name: reusable-unit 
 
 on:
   workflow_call:
@@ -31,20 +31,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Install gotestsum
+        run: |
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
+          rm gotestsum_1.6.4_linux_amd64.tar.gz
+
+      - run: mkdir -p /tmp/test-results
+
       - name: go mod download
         working-directory: ${{inputs.directory}}
         run: go mod download
 
-      - name: check go fmt
+      - name: Run tests 
         working-directory: ${{inputs.directory}}
         run: |
-          files=$(go fmt ./...)
-          if [ -n "$files" ]; then
-            echo "The following file(s) do not conform to go fmt:"
-            echo "$files"
-            exit 1
-          fi
-
-      - name: go vet 
-        working-directory: ${{inputs.directory}}
-        run: go vet ./...
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+         
