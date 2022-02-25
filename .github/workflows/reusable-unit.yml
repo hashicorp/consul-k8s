@@ -46,5 +46,5 @@ jobs:
       - name: Run tests 
         working-directory: ${{inputs.directory}}
         run: |
-          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+          gotestsum --junitfile /tmp/test-results/gotestsum-report.xml ./... -- -p 4
          
