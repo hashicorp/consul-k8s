@@ -110,11 +110,14 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 		if err != nil {
 			return fmt.Errorf("error logging in: %s", err)
 		}
-		// Write out the resultant token file.
-		// Must be 0644 because this is written by the consul-k8s user but needs
-		// to be readable by the consul user
-		if err := WriteFileWithPerms(tokenSinkFile, tok.SecretID, 0644); err != nil {
-			return fmt.Errorf("error writing token to file sink: %v", err)
+
+		if tokenSinkFile != "" {
+			// Write out the resultant token file.
+			// Must be 0644 because this is written by the consul-k8s user but needs
+			// to be readable by the consul user
+			if err := WriteFileWithPerms(tokenSinkFile, tok.SecretID, 0644); err != nil {
+				return fmt.Errorf("error writing token to file sink: %v", err)
+			}
 		}
 		return err
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))

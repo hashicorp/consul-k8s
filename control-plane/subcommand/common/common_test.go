@@ -64,6 +64,26 @@ func TestConsulLogin(t *testing.T) {
 	log, err := Logger("INFO", false)
 	require.NoError(err)
 	client, cfg := startMockServer(t, &counter)
+	token, err := ConsulLogin(client, cfg, log, bearerTokenFile, testAuthMethod, tokenFile, "", "", testPodMeta)
+	require.NoError(err)
+	require.Equal(counter, 1)
+	require.Equal(token.SecretID, "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
+}
+
+// TestConsulLogin_WriteSinkFileWhenFlagIsSet ensures that a sink file
+// is written to disk when the flag is set.
+func TestConsulLogin_WriteSinkFileWhenFlagIsSet(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	counter := 0
+	bearerTokenFile := WriteTempFile(t, "foo")
+	tokenFile := WriteTempFile(t, "")
+
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(err)
+	client, cfg := startMockServer(t, &counter)
 	_, err = ConsulLogin(client, cfg, log, bearerTokenFile, testAuthMethod, tokenFile, "", "", testPodMeta)
 	require.NoError(err)
 	require.Equal(counter, 1)
