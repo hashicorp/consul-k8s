@@ -1652,9 +1652,25 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		case "/v1/acl/tokens":
 			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/token":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/policy":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/agent/token/acl_agent_token":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/auth-method":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/role/name/release-name-consul-client-acl-role":
+			w.WriteHeader(404)
+		case "/v1/acl/role":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/binding-rules":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/binding-rule":
+			fmt.Fprintln(w, `{}`)
 		default:
-			// Send an empty JSON response with code 200 to all calls.
-			fmt.Fprintln(w, "{}")
+			w.WriteHeader(500)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
 		}
 	}))
 	defer consulServer.Close()
@@ -1720,6 +1736,10 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 			"/v1/agent/token/agent",
 		},
 		{
+			"PUT",
+			"/v1/agent/token/acl_agent_token",
+		},
+		{
 			"GET",
 			"/v1/agent/self",
 		},
@@ -1732,8 +1752,20 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 			"/v1/acl/policy",
 		},
 		{
+			"GET",
+			"/v1/acl/role/name/release-name-consul-client-acl-role",
+		},
+		{
 			"PUT",
-			"/v1/acl/token",
+			"/v1/acl/role",
+		},
+		{
+			"GET",
+			"/v1/acl/binding-rules",
+		},
+		{
+			"PUT",
+			"/v1/acl/binding-rule",
 		},
 	}, consulAPICalls)
 }
