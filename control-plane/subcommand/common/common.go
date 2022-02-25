@@ -111,7 +111,9 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 			return fmt.Errorf("error logging in: %s", err)
 		}
 		// Write out the resultant token file.
-		if err := WriteFileWithPerms(tokenSinkFile, tok.SecretID, 0444); err != nil {
+		// Must be 0644 because this is written by the consul-k8s user but needs
+		// to be readable by the consul user
+		if err := WriteFileWithPerms(tokenSinkFile, tok.SecretID, 0644); err != nil {
 			return fmt.Errorf("error writing token to file sink: %v", err)
 		}
 		return err
