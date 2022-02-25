@@ -800,17 +800,19 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
-				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-				require.NoError(err)
-				require.NotNil(tokenSecret)
-				token, ok := tokenSecret.Data["token"]
-				require.True(ok)
-				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-				require.NoError(err)
-				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
-				require.Equal(c.LocalToken, tokenData.Local)
+				if len(c.SecretNames) > 0 {
+					// Test that the token was created as a Kubernetes Secret.
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+					require.NoError(err)
+					require.NotNil(tokenSecret)
+					token, ok := tokenSecret.Data["token"]
+					require.True(ok)
+					// Test that the token has the expected policies in Consul.
+					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+					require.NoError(err)
+					require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
+					require.Equal(c.LocalToken, tokenData.Local)
+				}
 			}
 
 			// Test that if the same command is run again, it doesn't error.
