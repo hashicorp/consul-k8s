@@ -15,7 +15,7 @@ jobs:
         run:
          echo "Filler"
 
-  go-fmt-vet-helm-gen:
+  go-fmt-and-vet-helm-gen:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-and-vet.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
