@@ -54,6 +54,30 @@ jobs:
          echo "Filler"
     needs: [lint-control-plane, go-fmt-vet-control-plane]
 
+  build-distros-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [test-control-plane, test-enterprise-control-plane]
+
+  build-distros-arm-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [test-control-plane, test-enterprise-control-plane]
+
+  build-distros-386:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TODO
+        run:
+         echo "Filler"
+    needs: [test-control-plane, test-enterprise-control-plane]
+
 
 
 
