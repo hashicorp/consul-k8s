@@ -88,16 +88,17 @@ func ValidateUnprivilegedPort(flagName, flagValue string) error {
 
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
 // The logic of this is taken from the `consul login` command.
-func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTokenFile, authMethodName, tokenSinkFile, namespace string, serviceAccountName string, meta map[string]string) error {
+func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTokenFile, authMethodName, tokenSinkFile, namespace string, serviceAccountName string, meta map[string]string) (*api.ACLToken, error) {
 	// Read the bearerTokenFile.
 	data, err := ioutil.ReadFile(bearerTokenFile)
 	if err != nil {
-		return fmt.Errorf("unable to read bearerTokenFile: %v, err: %v", bearerTokenFile, err)
+		return nil, fmt.Errorf("unable to read bearerTokenFile: %v, err: %v", bearerTokenFile, err)
 	}
 	bearerToken := strings.TrimSpace(string(data))
 	if bearerToken == "" {
-		return fmt.Errorf("no bearer token found in %s", bearerTokenFile)
+		return nil, fmt.Errorf("no bearer token found in %s", bearerTokenFile)
 	}
+	var tok *api.ACLToken
 	err = backoff.Retry(func() error {
 		// Do the login.
 		req := &api.ACLLoginParams{
@@ -105,7 +106,7 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 			BearerToken: bearerToken,
 			Meta:        meta,
 		}
-		tok, _, err := client.ACL().Login(req, &api.WriteOptions{Namespace: namespace})
+		tok, _, err = client.ACL().Login(req, &api.WriteOptions{Namespace: namespace})
 		if err != nil {
 			return fmt.Errorf("error logging in: %s", err)
 		}
@@ -123,14 +124,14 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 				" or the consul.hashicorp.com/connect-service annotation.")
 		}
 		log.Error("Hit maximum retries for consul login", "error", err)
-		return err
+		return nil, err
 	}
 	// Now update the client so that it will read the ACL token we just fetched.
 	cfg.TokenFile = tokenSinkFile
 	client, err = consul.NewClient(cfg)
 	if err != nil {
 		log.Error("Unable to update client connection", "error", err)
-		return err
+		return nil, err
 	}
 	log.Info("Consul login complete")
 
@@ -173,10 +174,10 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 	if err != nil {
 		log.Error("Unable to read ACL token from a Consul server; "+
 			"please check that your server cluster is healthy", "err", err)
-		return err
+		return nil, err
 	}
 	log.Info("Successfully read ACL token from the server")
-	return nil
+	return tok, nil
 }
 
 // WriteFileWithPerms will write payload as the contents of the outputFile and set permissions after writing the contents. This function is necessary since using ioutil.WriteFile() alone will create the new file with the requested permissions prior to actually writing the file, so you can't set read-only permissions.
