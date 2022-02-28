@@ -576,6 +576,8 @@ load _helpers
   local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.server.serverCert.secretName=foo' \
@@ -584,6 +586,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -596,7 +599,7 @@ load _helpers
   [ "${actual}" = "true" ]
   local actual
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
-  [ "${actual}" = "carole" ]
+  [ "${actual}" = "aclrole" ]
   local actual
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
@@ -617,6 +620,8 @@ load _helpers
   local object=$(helm template \
     -s templates/server-acl-init-job.yaml  \
     --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.acls.bootstrapToken.secretName=foo' \
+    --set 'global.acls.bootstrapToken.secretKey=bar' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -625,6 +630,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -639,6 +645,8 @@ load _helpers
   local object=$(helm template \
     -s templates/server-acl-init-job.yaml  \
     --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.acls.bootstrapToken.secretName=foo' \
+    --set 'global.acls.bootstrapToken.secretKey=bar' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.server.serverCert.secretName=foo' \
@@ -648,6 +656,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -662,6 +671,8 @@ load _helpers
   local object=$(helm template \
     -s templates/server-acl-init-job.yaml  \
     --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.acls.bootstrapToken.secretName=foo' \
+    --set 'global.acls.bootstrapToken.secretKey=bar' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -671,6 +682,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -685,6 +697,8 @@ load _helpers
   local object=$(helm template \
     -s templates/server-acl-init-job.yaml  \
     --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.acls.bootstrapToken.secretName=foo' \
+    --set 'global.acls.bootstrapToken.secretKey=bar' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -695,6 +709,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -752,24 +767,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: manageSystemACLsRole is required when Vault is enabled and replication token is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.replicationToken.secretName=/vault/secret' \
-      --set 'global.acls.replicationToken.secretKey=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=foo' \
-      --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'global.secretsBackend.vault.consulCARole=carole' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.secretsBackend.vault.manageSystemACLsRole must be set if global.secretsBackend.vault.enabled is true and global.acls.replicationToken is provided" ]]
-}
-
 #--------------------------------------------------------------------
 # Vault agent annotations
 
@@ -778,13 +775,16 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/agent-pre-populate-only") | del(."vault.hashicorp.com/role") | del(."vault.hashicorp.com/agent-inject-secret-bootstrap-token") | del(."vault.hashicorp.com/agent-inject-template-bootstrap-token")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -793,6 +793,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -800,6 +802,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)

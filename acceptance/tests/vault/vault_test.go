@@ -59,7 +59,7 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.consulServerRole":     "consul-server",
 		"global.secretsBackend.vault.consulClientRole":     "consul-client",
 		"global.secretsBackend.vault.consulCARole":         "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init", // todo: we need to fail in helm templates if this role is not provided
+		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",

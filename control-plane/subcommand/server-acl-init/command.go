@@ -119,7 +119,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 
-	c.flags.BoolVar(&c.flagSetServerToken, "set-server-token", false, "Toggle for setting server's agent token.")
+	c.flags.BoolVar(&c.flagSetServerToken, "set-server-tokens", true, "Toggle for setting server's agent token.")
 
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
