@@ -6,7 +6,10 @@ on:
       directory:
         required: true
         type: string
-      
+      go-version:
+        required: true
+        type: string
+
 
 jobs:
   execute:
@@ -19,7 +22,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.5
+          go-version: ${{inputs.go-version}}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
