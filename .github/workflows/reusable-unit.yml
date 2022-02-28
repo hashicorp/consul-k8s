@@ -10,7 +10,7 @@ on:
         required: true
         type: string
 
-
+# Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   GOTESTSUM_VERSION: 1.6.4
