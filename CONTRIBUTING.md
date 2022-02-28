@@ -953,12 +953,12 @@ To generate the docs and update the `helm.mdx` file:
    ```shell-session
    cd /path/to/consul-k8s
    ```
-1. Run `make gen-docs` using the path to your consul (not consul-k8s) repo:
+1. Run `make gen-helm-docs` using the path to your consul (not consul-k8s) repo:
    ```shell-session
-   make gen-docs consul=<path-to-consul-repo>
+   make gen-helm-docs consul=<path-to-consul-repo>
    # Examples:
-   # make gen-docs consul=/Users/my-name/code/hashicorp/consul
-   # make gen-docs consul=../consul
+   # make gen-helm-docs consul=/Users/my-name/code/hashicorp/consul
+   # make gen-helm-docs consul=../consul
    ```
 1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
 
