@@ -40,9 +40,11 @@ spec:
         {{- if .Values.global.secretsBackend.vault.enabled }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
+        {{- if .Values.global.acls.bootstrapToken.secretName }}
         {{- with .Values.global.acls.bootstrapToken }}
         "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
         "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
         {{- end }}
         {{- if .Values.global.tls.enabled }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}

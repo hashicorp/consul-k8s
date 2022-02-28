@@ -323,12 +323,7 @@ func (c *Command) Run(args []string) int {
 
 	var bootstrapToken string
 
-	if c.flagBootstrapTokenFile != "" {
-		// If bootstrap token is provided, we skip server bootstrapping and use
-		// the provided token to create policies and tokens for the rest of the components.
-		c.log.Info("Bootstrap token is provided so skipping Consul server ACL bootstrapping")
-		bootstrapToken = providedBootstrapToken
-	} else if c.flagACLReplicationTokenFile != "" && !c.flagCreateACLReplicationToken {
+	if c.flagACLReplicationTokenFile != "" && !c.flagCreateACLReplicationToken {
 		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
 		// since they will be performing replication.
 		// We can use the replication token as our bootstrap token because it
@@ -337,19 +332,19 @@ func (c *Command) Run(args []string) int {
 		bootstrapToken = aclReplicationToken
 	} else {
 		// Check if we've already been bootstrapped.
-		var err error
-		bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
-		bootstrapToken, err = c.getBootstrapToken(bootTokenSecretName)
-		if err != nil {
-			c.log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
-			return 1
+		var bootTokenSecretName string
+		if providedBootstrapToken != "" {
+			c.log.Info("Using provided bootstrap token")
+			bootstrapToken = providedBootstrapToken
+		} else {
+			bootTokenSecretName = c.withPrefix("bootstrap-acl-token")
+			bootstrapToken, err = c.getBootstrapToken(bootTokenSecretName)
+			if err != nil {
+				c.log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
+				return 1
+			}
 		}
 
-		if bootstrapToken != "" {
-			c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
-		} else {
-			c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-		}
 		bootstrapToken, err = c.bootstrapServers(serverAddresses, bootstrapToken, bootTokenSecretName, scheme)
 		if err != nil {
 			c.log.Error(err.Error())

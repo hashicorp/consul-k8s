@@ -1659,112 +1659,134 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 // server tokens.
 func TestRun_AlreadyBootstrapped(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
-	k8s := fake.NewSimpleClientset()
-	setUpK8sServiceAccount(t, k8s, ns)
-
-	type APICall struct {
-		Method string
-		Path   string
+	cases := map[string]bool{
+		"token saved in k8s secret": true,
+		"token provided via file":   false,
 	}
-	var consulAPICalls []APICall
 
-	// Start the Consul server.
-	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Record all the API calls made.
-		consulAPICalls = append(consulAPICalls, APICall{
-			Method: r.Method,
-			Path:   r.URL.Path,
+	for name, tokenFromK8sSecret := range cases {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			k8s := fake.NewSimpleClientset()
+
+			type APICall struct {
+				Method string
+				Path   string
+			}
+			var consulAPICalls []APICall
+
+			// Start the Consul server.
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Record all the API calls made.
+				consulAPICalls = append(consulAPICalls, APICall{
+					Method: r.Method,
+					Path:   r.URL.Path,
+				})
+				switch r.URL.Path {
+				case "/v1/agent/self":
+					fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+				case "/v1/acl/tokens":
+					fmt.Fprintln(w, `[]`)
+				default:
+					// Send an empty JSON response with code 200 to all calls.
+					fmt.Fprintln(w, "{}")
+				}
+			}))
+			defer consulServer.Close()
+
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(err)
+
+			cmdArgs := []string{
+				"-timeout=500ms",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address=" + serverURL.Hostname(),
+				"-server-port=" + serverURL.Port(),
+			}
+
+			// Create the bootstrap secret.
+			if tokenFromK8sSecret {
+				_, err = k8s.CoreV1().Secrets(ns).Create(
+					context.Background(),
+					&v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   resourcePrefix + "-bootstrap-acl-token",
+							Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+						},
+						Data: map[string][]byte{
+							"token": []byte("old-token"),
+						},
+					},
+					metav1.CreateOptions{})
+				require.NoError(err)
+			} else {
+				// Write token to a file.
+				bootTokenFile, err := ioutil.TempFile("", "")
+				_, err = bootTokenFile.WriteString("old-token")
+				require.NoError(err)
+
+				require.NoError(err)
+				cmdArgs = append(cmdArgs, "-bootstrap-token-file", bootTokenFile.Name())
+			}
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Test that the Secret is the same.
+			if tokenFromK8sSecret {
+				secret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
+				require.NoError(err)
+				require.Contains(secret.Data, "token")
+				require.Equal("old-token", string(secret.Data["token"]))
+			}
+
+			// Test that the expected API calls were made.
+			require.Equal([]APICall{
+				// We expect calls for updating the server policy, setting server tokens,
+				// and updating client policy.
+				{
+					"PUT",
+					"/v1/acl/policy",
+				},
+				{
+					"GET",
+					"/v1/acl/tokens",
+				},
+				{
+					"PUT",
+					"/v1/acl/token",
+				},
+				{
+					"PUT",
+					"/v1/agent/token/agent",
+				},
+				{
+					"GET",
+					"/v1/agent/self",
+				},
+				{
+					"PUT",
+					"/v1/acl/auth-method",
+				},
+				{
+					"PUT",
+					"/v1/acl/policy",
+				},
+				{
+					"PUT",
+					"/v1/acl/token",
+				},
+			}, consulAPICalls)
 		})
-		switch r.URL.Path {
-		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
-		case "/v1/acl/tokens":
-			fmt.Fprintln(w, `[]`)
-		default:
-			// Send an empty JSON response with code 200 to all calls.
-			fmt.Fprintln(w, "{}")
-		}
-	}))
-	defer consulServer.Close()
-
-	serverURL, err := url.Parse(consulServer.URL)
-	require.NoError(err)
-
-	// Create the bootstrap secret.
-	_, err = k8s.CoreV1().Secrets(ns).Create(
-		context.Background(),
-		&v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   resourcePrefix + "-bootstrap-acl-token",
-				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
-			},
-			Data: map[string][]byte{
-				"token": []byte("old-token"),
-			},
-		},
-		metav1.CreateOptions{})
-	require.NoError(err)
-
-	// Run the command.
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
 	}
-
-	responseCode := cmd.Run([]string{
-		"-timeout=500ms",
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-server-address=" + serverURL.Hostname(),
-		"-server-port=" + serverURL.Port(),
-	})
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Test that the Secret is the same.
-	secret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
-	require.NoError(err)
-	require.Contains(secret.Data, "token")
-	require.Equal("old-token", string(secret.Data["token"]))
-
-	// Test that the expected API calls were made.
-	require.Equal([]APICall{
-		// We expect calls for updating the server policy, setting server tokens,
-		// and updating client policy.
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"GET",
-			"/v1/acl/tokens",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-		{
-			"PUT",
-			"/v1/agent/token/agent",
-		},
-		{
-			"GET",
-			"/v1/agent/self",
-		},
-		{
-			"PUT",
-			"/v1/acl/auth-method",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-	}, consulAPICalls)
 }
 
 // Test if there is an old bootstrap Secret and the server token exists
@@ -1842,13 +1864,12 @@ func TestRun_AlreadyBootstrapped_ServerTokenExists(t *testing.T) {
 	require.Equal(1, count)
 }
 
-// Test if there is a provided bootstrap we skip bootstrapping of the servers
+// Test if -set-server-tokens is false (i.e. servers are disabled), we skip bootstrapping of the servers
 // and continue on to the next step.
-func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
+func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
-	setUpK8sServiceAccount(t, k8s, ns)
 
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	tokenFile := common.WriteTempFile(t, bootToken)
@@ -1893,7 +1914,8 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 		"-server-address=" + serverURL.Hostname(),
 		"-server-port=" + serverURL.Port(),
 		"-bootstrap-token-file=" + tokenFile,
-		"-create-client-token=false", // disable client token, so there are less calls
+		"-set-server-tokens=false",
+		"-create-client-token=false", // disable client token, so there are fewer calls
 	})
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
