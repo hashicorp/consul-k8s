@@ -31,14 +31,14 @@ jobs:
   go-fmt-vet-helm-gen:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
-      directory: $HELM_GEN_PATH
-      go-version: $GO_VERSION
+      directory: ${{env.HELM_GEN_PATH}}
+      go-version: ${{env.GO_VERSION}}
 
   unit-helm-gen:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
-      directory: $HELM_GEN_PATH 
-      go-version: $GO_VERSION
+      directory: ${{env.HELM_GEN_PATH}}
+      go-version: ${{env.GO_VERSION}}
     needs: [go-fmt-vet-helm-gen, validate-helm-gen]
 
   unit-test-helm-template:
@@ -59,8 +59,8 @@ jobs:
   go-fmt-vet-control-plane:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
-      directory: $CONTROL_PLANE_PATH
-      go-version: $GO_VERSION
+      directory: ${{env.CONTROL_PLANE_PATH}}
+      go-version: ${{env.GO_VERSION}}
 
   test-control-plane:
     runs-on: ubuntu-latest
@@ -105,27 +105,27 @@ jobs:
   go-fmt-vet-acceptance:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
-      directory: $ACCEPTANCE_MOD_PATH
-      go-version: $GO_VERSION
+      directory: ${{env.ACCEPTANCE_MOD_PATH}}
+      go-version: ${{env.GO_VERSION}}
 
   unit-acceptance-framework:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
-      directory: $ACCEPTANCE_FRAMEWORK_PATH
-      go-version: $GO_VERSION
+      directory: ${{env.ACCEPTANCE_FRAMEWORK_PATH}}
+      go-version: ${{env.GO_VERSION}}
     needs: go-fmt-vet-acceptance
 
   go-fmt-vet-cli:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
-      directory: $CLI_PATH
-      go-version: $GO_VERSION
+      directory: ${{env.CLI_PATH}}
+      go-version: ${{env.GO_VERSION}}
 
   unit-cli:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
-      directory: $CLI_PATH
-      go-version: $GO_VERSION
+      directory: ${{env.CLI_PATH}}
+      go-version: ${{env.GO_VERSION}}
     needs: go-fmt-vet-cli
 
   dev-upload-docker:

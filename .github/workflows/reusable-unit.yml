@@ -40,11 +40,11 @@ jobs:
 
       - name: Install gotestsum
         run: |
-          wget https://github.com/gotestyourself/gotestsum/releases/download/v$GOTESTSUM_VERSION/gotestsum_$GOTESTSUM_VERSION_linux_amd64.tar.gz
-          sudo tar -C /usr/local/bin -xzf gotestsum_$GOTESTSUM_VERSION_linux_amd64.tar.gz
-          rm gotestsum_$GOTESTSUM_VERSION_linux_amd64.tar.gz
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
-      - run: mkdir -p $TEST_RESULTS 
+      - run: mkdir -p ${{env.TEST_RESULTS}}
 
       - name: go mod download
         working-directory: ${{inputs.directory}}
@@ -53,5 +53,5 @@ jobs:
       - name: Run tests 
         working-directory: ${{inputs.directory}}
         run: |
-          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+          gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml ./... -- -p 4
          
