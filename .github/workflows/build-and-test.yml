@@ -55,7 +55,9 @@ jobs:
 
   unit-test-helm-templates:
     runs-on: ubuntu-latest
-    container: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+    container: 
+      image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      options: --user root
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -109,14 +111,12 @@ jobs:
 
       - name: Run go tests 
         run: |
-             wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
-                  unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin &&
-                  rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
-             PACKAGE_NAMES=$(go list ./...)
-             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
-
-
-
+            mkdir -p ${{env.HOME}}/bin
+            wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
+              unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin && \
+              rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
+            PACKAGE_NAMES=$(go list ./...)
+            gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
 
   test-enterprise-control-plane:
@@ -150,12 +150,12 @@ jobs:
 
       - name: Run go tests 
         run: |
-             wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
-                  unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin &&
-                  rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
+            mkdir -p ${{env.HOME}}/bin
+            wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
+              unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin && \
+              rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
              PACKAGE_NAMES=$(go list ./...)
              gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
-
     needs: [lint-control-plane, go-fmt-vet-control-plane]
 
   build-distros-amd64:
