@@ -115,6 +115,7 @@ jobs:
             wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
               unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin && \
               rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
+            chmod +x -p ${{env.HOME}}/bin/consul
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
@@ -154,8 +155,9 @@ jobs:
             wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
               unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin && \
               rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
-             PACKAGE_NAMES=$(go list ./...)
-             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+            chmod +x ${{env.HOME}}/bin/consul
+            PACKAGE_NAMES=$(go list ./...)
+            gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
 
   build-distros-amd64:
