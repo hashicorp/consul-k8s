@@ -110,6 +110,7 @@ jobs:
       - run: mkdir -p ${{env.TEST_RESULTS}}
 
       - name: Run go tests 
+        working-directory: control-plane 
         run: |
             mkdir -p $HOME/bin
             wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
@@ -150,6 +151,7 @@ jobs:
       - run: mkdir -p ${{env.TEST_RESULTS}}
 
       - name: Run go tests 
+        working-directory: control-plane 
         run: |
             mkdir -p $HOME/bin
             wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
