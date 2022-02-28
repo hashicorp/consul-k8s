@@ -35,6 +35,10 @@ func TestInstallAfterFailedInstall(t *testing.T) {
 
 		// Delete the Consul cluster.
 		cluster.Destroy(t)
+
+		// Delete the service defaults CRD
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "servicedefaults.consul.hashicorp.com", "defaults")
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "crds", "servicedefaults.consul.hashicorp.com")
 	}
 
 	// Attempt to install Consul using the CLI without the Controller enabled.
