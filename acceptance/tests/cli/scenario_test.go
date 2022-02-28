@@ -55,3 +55,45 @@ func TestInstallAfterFailedInstall(t *testing.T) {
 		cluster.Create(t)
 	}
 }
+
+// TestReinstallingRecreatesCRDs tests the scenario where a user installs Consul
+// on Kubernetes with CRDs enabled, deletes the installation, then installs
+// Consul again with CRDs enabled. This scenario was created to address this
+// issue: https://github.com/hashicorp/consul-k8s/issues/1062
+func TestReinstallingRecreatesCRDs(t *testing.T) {
+	// Install Consul with the Controller enabled, then delete it.
+	{
+		helmValues := map[string]string{
+			"global.enabled":     "false",
+			"server.replicas":    "1",
+			"controller.enabled": "true",
+		}
+		ctx := suite.Environment().DefaultContext(t)
+		cfg := suite.Config()
+		cfg.NoCleanupOnFailure = true
+
+		cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
+		t.Log("Installing Consul...")
+		cluster.Create(t)
+
+		// Delete the Consul cluster.
+		t.Log("Deleting Consul...")
+		cluster.Destroy(t)
+	}
+
+	// Install Consul with the Controller enabled, then delete it.
+	{
+		helmValues := map[string]string{
+			"global.enabled":     "false",
+			"server.replicas":    "1",
+			"controller.enabled": "true",
+		}
+		ctx := suite.Environment().DefaultContext(t)
+		cfg := suite.Config()
+		cfg.NoCleanupOnFailure = true
+
+		cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
+		t.Log("Installing Consul...")
+		cluster.Create(t)
+	}
+}
