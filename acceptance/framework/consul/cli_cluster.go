@@ -43,6 +43,7 @@ type CLICluster struct {
 	noCleanupOnFailure bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
+	isDeleted          bool
 }
 
 func NewCLICluster(
@@ -99,6 +100,7 @@ func NewCLICluster(
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
+		isDeleted:          false,
 	}
 }
 
@@ -148,6 +150,11 @@ func (h *CLICluster) Create(t *testing.T) {
 }
 
 func (h *CLICluster) Destroy(t *testing.T) {
+	// No need to delete the cluster if it was already deleted.
+	if h.isDeleted {
+		return
+	}
+
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.kubectlOptions, h.debugDirectory, "release="+h.releaseName)
@@ -174,6 +181,9 @@ func (h *CLICluster) Destroy(t *testing.T) {
 		h.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
+
+	// Prevent the cleanup function from running on a deleted cluster.
+	h.isDeleted = true
 }
 
 func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
