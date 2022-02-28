@@ -330,6 +330,7 @@ func TestRun_ReplicationTokenPrimaryDC_WithProvidedSecretID(t *testing.T) {
 	k8s, testSvr := completeSetup(t)
 	defer testSvr.Stop()
 	require := require.New(t)
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	replicationToken := "123e4567-e89b-12d3-a456-426614174000"
 	replicationTokenFile, err := ioutil.TempFile("", "replicationtoken")
