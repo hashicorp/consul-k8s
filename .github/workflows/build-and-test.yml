@@ -111,11 +111,11 @@ jobs:
 
       - name: Run go tests 
         run: |
-            mkdir -p ${{env.HOME}}/bin
+            mkdir -p $HOME/bin
             wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
-              unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin && \
+              unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
               rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
-            chmod +x -p ${{env.HOME}}/bin/consul
+            chmod +x $HOME/bin/consul
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
@@ -151,11 +151,11 @@ jobs:
 
       - name: Run go tests 
         run: |
-            mkdir -p ${{env.HOME}}/bin
+            mkdir -p $HOME/bin
             wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
-              unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin && \
+              unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
               rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
-            chmod +x ${{env.HOME}}/bin/consul
+            chmod +x $HOME/bin/consul
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
