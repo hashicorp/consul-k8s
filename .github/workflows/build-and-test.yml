@@ -7,13 +7,37 @@ on:
       - crt-build-and-tests 
   pull_request:
 
+env:
+  TEST_RESULTS: /tmp/test-results # path to where test results are saved
+  CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
+  CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
+
 jobs:
   validate-helm-gen:
     runs-on: ubuntu-latest
     steps:
-      - name: TODO
-        run:
-         echo "Filler"
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{inputs.go-version}}
+
+      - name: Setup go mod cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Validate helm gen 
+        working-directory: hack/helm-reference-gen 
+        run: |
+          go run ./... -validate
 
   go-fmt-vet-helm-gen:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
@@ -52,17 +76,81 @@ jobs:
   test-control-plane:
     runs-on: ubuntu-latest
     steps:
-      - name: TODO
-        run:
-         echo "Filler"
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{inputs.go-version}}
+
+      - name: Setup go mod cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install gotestsum
+        run: |
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+
+      - run: mkdir -p ${{env.TEST_RESULTS}}
+
+      - name: Run go tests 
+        run: |
+             wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
+                  unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin &&
+                  rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
+             PACKAGE_NAMES=$(go list ./...)
+             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+
+
+
     needs: [lint-control-plane, go-fmt-vet-control-plane]
 
   test-enterprise-control-plane:
     runs-on: ubuntu-latest
     steps:
-      - name: TODO
-        run:
-         echo "Filler"
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{inputs.go-version}}
+
+      - name: Setup go mod cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install gotestsum
+        run: |
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+
+      - run: mkdir -p ${{env.TEST_RESULTS}}
+
+      - name: Run go tests 
+        run: |
+             wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
+                  unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d ${{env.HOME}}/bin &&
+                  rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
+             PACKAGE_NAMES=$(go list ./...)
+             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+
     needs: [lint-control-plane, go-fmt-vet-control-plane]
 
   build-distros-amd64:
