@@ -115,6 +115,9 @@ spec:
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-client-config
+        - name: consul-data
+          emptyDir:
+            medium: "Memory"
         {{- if .Values.global.tls.enabled }}
         {{- if not .Values.global.secretsBackend.vault.enabled }}
         - name: consul-ca-cert
@@ -168,7 +171,21 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.client.image }}"
+          {{- if .Values.global.acls.manageSystemACLs }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-ec"
+                  - |
+                    consul logout
+          {{- end }}
           env:
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_HTTP_TOKEN_FILE
+              value: "/consul/login/acl-token"
+            {{- end }}
             - name: ADVERTISE_IP
               valueFrom:
                 fieldRef:
@@ -327,6 +344,9 @@ spec:
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
+            - mountPath: /consul/login
+              name: consul-data
+              readOnly: false
             {{- if .Values.global.tls.enabled }}
             {{- if not .Values.global.secretsBackend.vault.enabled }}
             - name: consul-ca-cert
@@ -427,12 +447,20 @@ spec:
           - "-ec"
           - |
             consul-k8s-control-plane acl-init \
-              -secret-name="{{ template "consul.fullname" . }}-client-acl-token" \
-              -k8s-namespace={{ .Release.Namespace }} \
+              -component-name=client \
+              -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
+              {{- if .Values.global.adminPartitions.enabled }}
+              -partition={{ .Values.global.adminPartitions.name }} \
+              {{- end }}
+              -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
+              -log-json={{ .Values.global.logJSON }} \
               -init-type="client"
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig
+          - mountPath: /consul/login
+            name: consul-data
+            readOnly: false
         resources:
           requests:
             memory: "25Mi"
