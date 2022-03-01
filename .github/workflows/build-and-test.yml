@@ -194,31 +194,12 @@ jobs:
           CGO_ENABLED: 0
         run: |
           XC_OS=${{ matrix.goos }} XC_ARCH=${{ matrix.goarch }} ./build-support/scripts/build-local.sh
+          zip -r -j consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip bin
 
-
-  build-distros-amd64:
-    needs: [test-control-plane, test-enterprise-control-plane]
-    runs-on: ubuntu-latest
-    steps:
-      - name: TODO
-        run:
-         echo "Filler"
-
-  build-distros-arm-arm64:
-    needs: [test-control-plane, test-enterprise-control-plane]
-    runs-on: ubuntu-latest
-    steps:
-      - name: TODO
-        run:
-         echo "Filler"
-
-  build-distros-386:
-    needs: [test-control-plane, test-enterprise-control-plane]
-    runs-on: ubuntu-latest
-    steps:
-      - name: TODO
-        run:
-         echo "Filler"
+      - uses: actions/upload-artifact@v2
+        with:
+          name: consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          path: consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
   go-fmt-vet-acceptance:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
@@ -247,7 +228,7 @@ jobs:
       go-version: 1.17.2
 
   dev-upload-docker:
-    needs: build-distros-amd64
+    needs: build-distros
     runs-on: ubuntu-latest
     steps:
       - name: TODO
