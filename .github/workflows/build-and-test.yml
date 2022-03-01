@@ -118,6 +118,8 @@ jobs:
               rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
             echo "$HOME/bin" >> $GITHUB_PATH
+            env
+            ls $HOME/bin
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
@@ -160,6 +162,8 @@ jobs:
               rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
             echo "$HOME/bin" >> $GITHUB_PATH
+            env
+            ls $HOME/bin
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
