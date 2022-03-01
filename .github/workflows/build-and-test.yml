@@ -108,10 +108,8 @@ jobs:
           sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
           rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
-      - name: Setup environment
-        run: 
-          mkdir -p ${{env.TEST_RESULTS}}
-          echo "$HOME/bin" >> $GITHUB_PATH
+      - run:  mkdir -p ${{env.TEST_RESULTS}}
+      - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run go tests 
         working-directory: control-plane 
@@ -152,10 +150,8 @@ jobs:
           sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
           rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
-      - name: Setup environment
-        run: 
-          mkdir -p ${{env.TEST_RESULTS}}
-          echo "$HOME/bin" >> $GITHUB_PATH
+      - run:  mkdir -p ${{env.TEST_RESULTS}}
+      - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run go tests 
         working-directory: control-plane 
