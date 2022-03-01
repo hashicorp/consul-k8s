@@ -75,8 +75,8 @@ func (c *ConnectHelper) Install() {
 // Upgrade uses the existing Consul cluster and upgrades it using Helm values
 // set by the Secure, AutoEncrypt, and HelmValues fields.
 func (c *ConnectHelper) Upgrade() {
-	require.True(c.T, c.consulCluster != nil, "consulCluster must be set before calling Upgrade (Call Install first).")
-	require.True(c.T, c.consulClient != nil, "consulClient must be set before calling Upgrade (Call Install first).")
+	require.NotNil(c.T, c.consulCluster, "consulCluster must be set before calling Upgrade (Call Install first).")
+	require.NotNil(c.T, c.consulClient, "consulClient must be set before calling Upgrade (Call Install first).")
 
 	logger.Log(c.T, "upgrading Consul cluster")
 	c.consulCluster.Upgrade(c.T, c.helmValues())
