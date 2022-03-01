@@ -49,10 +49,6 @@ type Command struct {
 	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
 	flagComponentName string // Name of the component to be used as metadata to ACL Login.
 
-	// Flags to support partitions.
-	flagEnablePartitions bool   // true if Admin Partitions are enabled
-	flagPartitionName    string // name of the Admin Partition
-
 	k8sClient kubernetes.Interface
 
 	once   sync.Once
@@ -85,11 +81,6 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-
-	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
-		"[Enterprise Only] Enables Admin Partitions")
-	c.flags.StringVar(&c.flagPartitionName, "partition", "",
-		"[Enterprise Only] Name of the Admin Partition")
 
 	c.k8s = &flags.K8SFlags{}
 	c.http = &flags.HTTPFlags{}
@@ -153,9 +144,6 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		cfg := api.DefaultConfig()
 		c.http.MergeOntoConfig(cfg)
-		if c.flagEnablePartitions {
-			cfg.Partition = c.flagPartitionName
-		}
 		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
 			c.logger.Error("Unable to get client connection", "error", err)

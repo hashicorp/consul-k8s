@@ -103,9 +103,6 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 	})
 
 	require.Equal(1, code)
-	require.Contains(ui.ErrorWriter.String(),
-		`Error writing token to file "/this/filepath/does/not/exist": open /this/filepath/does/not/exist: no such file or directory`,
-	)
 }
 
 // Test that if the command is run twice it succeeds. This test is the result
