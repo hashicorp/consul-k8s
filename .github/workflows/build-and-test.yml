@@ -108,6 +108,7 @@ jobs:
           rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
       - run: mkdir -p ${{env.TEST_RESULTS}}
+      - run: echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run go tests 
         working-directory: control-plane 
@@ -117,9 +118,6 @@ jobs:
               unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
               rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
-            echo "$HOME/bin" >> $GITHUB_PATH
-            env
-            ls $HOME/bin
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
@@ -152,6 +150,7 @@ jobs:
           rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
       - run: mkdir -p ${{env.TEST_RESULTS}}
+      - run: echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run go tests 
         working-directory: control-plane 
@@ -161,9 +160,6 @@ jobs:
               unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
               rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
-            echo "$HOME/bin" >> $GITHUB_PATH
-            env
-            ls $HOME/bin
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
     needs: [lint-control-plane, go-fmt-vet-control-plane]
