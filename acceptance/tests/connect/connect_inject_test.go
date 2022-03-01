@@ -68,19 +68,18 @@ func TestConnectInject(t *testing.T) {
 				Secure:      c.secure,
 				AutoEncrypt: c.autoEncrypt,
 				ReleaseName: c.releaseName,
-				T:           t,
 				Ctx:         ctx,
 				Cfg:         cfg,
 			}
 
-			connHelper.Setup()
+			connHelper.Setup(t)
 
-			connHelper.Install()
-			connHelper.DeployClientAndServer()
-			connHelper.TestConnectionFailureWithoutIntention()
-			connHelper.CreateIntention()
-			connHelper.TestConnectionSuccess()
-			connHelper.TestConnectionFailureWhenUnhealthy()
+			connHelper.Install(t)
+			connHelper.DeployClientAndServer(t)
+			connHelper.TestConnectionFailureWithoutIntention(t)
+			connHelper.CreateIntention(t)
+			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}
 }
@@ -128,25 +127,24 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 				AutoEncrypt: c.autoEncrypt,
 				HelmValues:  c.initial,
 				ReleaseName: c.releaseName,
-				T:           t,
 				Ctx:         ctx,
 				Cfg:         cfg,
 			}
 
-			connHelper.Setup()
+			connHelper.Setup(t)
 
-			connHelper.Install()
-			connHelper.DeployClientAndServer()
-			connHelper.TestConnectionFailureWithoutIntention()
-			connHelper.CreateIntention()
-			connHelper.TestConnectionSuccess()
-			connHelper.TestConnectionFailureWhenUnhealthy()
+			connHelper.Install(t)
+			connHelper.DeployClientAndServer(t)
+			connHelper.TestConnectionFailureWithoutIntention(t)
+			connHelper.CreateIntention(t)
+			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionFailureWhenUnhealthy(t)
 
 			connHelper.HelmValues = c.upgrade
 
-			connHelper.Upgrade()
-			connHelper.TestConnectionSuccess()
-			connHelper.TestConnectionFailureWhenUnhealthy()
+			connHelper.Upgrade(t)
+			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}
 }

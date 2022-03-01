@@ -43,7 +43,6 @@ type ConnectHelper struct {
 	// RelaseName is the name of the Consul cluster.
 	ReleaseName string
 
-	T   *testing.T
 	Ctx environment.TestContext
 	Cfg *config.TestConfig
 
@@ -56,30 +55,30 @@ type ConnectHelper struct {
 
 // Setup creates a new cluster using the New*Cluster function and assigns it
 // to the consulCluster field.
-func (c *ConnectHelper) Setup() {
+func (c *ConnectHelper) Setup(t *testing.T) {
 	switch c.ClusterKind {
 	case consul.Helm:
-		c.consulCluster = consul.NewHelmCluster(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
+		c.consulCluster = consul.NewHelmCluster(t, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	case consul.CLI:
-		c.consulCluster = consul.NewCLICluster(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
+		c.consulCluster = consul.NewCLICluster(t, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	}
 }
 
 // Install uses the consulCluster to install Consul onto the Kubernetes cluster.
-func (c *ConnectHelper) Install() {
-	logger.Log(c.T, "Installing Consul cluster")
-	c.consulCluster.Create(c.T)
-	c.consulClient = c.consulCluster.SetupConsulClient(c.T, c.Secure)
+func (c *ConnectHelper) Install(t *testing.T) {
+	logger.Log(t, "Installing Consul cluster")
+	c.consulCluster.Create(t)
+	c.consulClient = c.consulCluster.SetupConsulClient(t, c.Secure)
 }
 
 // Upgrade uses the existing Consul cluster and upgrades it using Helm values
 // set by the Secure, AutoEncrypt, and HelmValues fields.
-func (c *ConnectHelper) Upgrade() {
-	require.NotNil(c.T, c.consulCluster, "consulCluster must be set before calling Upgrade (Call Install first).")
-	require.NotNil(c.T, c.consulClient, "consulClient must be set before calling Upgrade (Call Install first).")
+func (c *ConnectHelper) Upgrade(t *testing.T) {
+	require.NotNil(t, c.consulCluster, "consulCluster must be set before calling Upgrade (Call Install first).")
+	require.NotNil(t, c.consulClient, "consulClient must be set before calling Upgrade (Call Install first).")
 
-	logger.Log(c.T, "upgrading Consul cluster")
-	c.consulCluster.Upgrade(c.T, c.helmValues())
+	logger.Log(t, "upgrading Consul cluster")
+	c.consulCluster.Upgrade(t, c.helmValues())
 }
 
 // DeployClientAndServer deploys a client and server pod to the Kubernetes
@@ -87,14 +86,14 @@ func (c *ConnectHelper) Upgrade() {
 // flag is true, a pre-check is done to ensure that the ACL tokens for the test
 // are deleted. The status of the deployment and injection is checked after the
 // deployment is complete to ensure success.
-func (c *ConnectHelper) DeployClientAndServer() {
+func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	// Check that the ACL token is deleted.
 	if c.Secure {
 		// We need to register the cleanup function before we create the
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
-		c.T.Cleanup(func() {
-			retry.Run(c.T, func(r *retry.R) {
+		t.Cleanup(func() {
+			retry.Run(t, func(r *retry.R) {
 				tokens, _, err := c.consulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
 				for _, token := range tokens {
@@ -105,44 +104,45 @@ func (c *ConnectHelper) DeployClientAndServer() {
 		})
 	}
 
-	logger.Log(c.T, "creating static-server and static-client deployments")
-	c.deployFixtureCase("static-server-inject")
+	logger.Log(t, "creating static-server and static-client deployments")
+
+	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 	if c.Cfg.EnableTransparentProxy {
-		c.deployFixtureCase("static-client-tproxy")
+		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 	} else {
-		c.deployFixtureCase("static-client-inject")
+		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 	}
 
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-		podList, err := c.Ctx.KubernetesClient(c.T).CoreV1().Pods(c.Ctx.KubectlOptions(c.T).Namespace).List(context.Background(), metav1.ListOptions{
+		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
-		require.NoError(c.T, err)
-		require.Len(c.T, podList.Items, 1)
-		require.Len(c.T, podList.Items[0].Spec.Containers, 2)
+		require.NoError(t, err)
+		require.Len(t, podList.Items, 1)
+		require.Len(t, podList.Items[0].Spec.Containers, 2)
 	}
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
 // server fails when no intentions are configured.
-func (c *ConnectHelper) TestConnectionFailureWithoutIntention() {
+func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
 	if c.Secure {
-		logger.Log(c.T, "checking that the connection is not successful because there's no intention")
+		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.CheckStaticServerConnectionFailing(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, "http://static-server")
+			k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://static-server")
 		} else {
-			k8s.CheckStaticServerConnectionFailing(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 		}
 	}
 }
 
 // CreateIntention creates an intention for the static-server pod to connect to
 // the static-client pod.
-func (c *ConnectHelper) CreateIntention() {
+func (c *ConnectHelper) CreateIntention(t *testing.T) {
 	if c.Secure {
-		logger.Log(c.T, "creating intention")
+		logger.Log(t, "creating intention")
 		_, _, err := c.consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 			Kind: api.ServiceIntentions,
 			Name: staticServerName,
@@ -153,31 +153,31 @@ func (c *ConnectHelper) CreateIntention() {
 				},
 			},
 		}, nil)
-		require.NoError(c.T, err)
+		require.NoError(t, err)
 	}
 }
 
 // TestConnectionSuccessful ensures the static-server pod can connect to the
 // static-client pod once the intention is set.
-func (c *ConnectHelper) TestConnectionSuccess() {
-	logger.Log(c.T, "checking that connection is successful")
+func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
+	logger.Log(t, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
-		k8s.CheckStaticServerConnectionSuccessful(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), staticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 }
 
 // TestConnectionFailureWhenUnhealthy sets the static-server pod to be unhealthy
 // and ensures the connection fails. It restores the pod to a healthy state
 // after this check.
-func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy() {
+func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	// Test that kubernetes readiness status is synced to Consul.
 	// Create a file called "unhealthy" at "/tmp/" so that the readiness probe
 	// of the static-server pod fails.
-	logger.Log(c.T, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-	k8s.RunKubectl(c.T, c.Ctx.KubectlOptions(c.T), "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+	logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
+	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
 
 	// The readiness probe should take a moment to be reflected in Consul,
 	// CheckStaticServerConnection will retry until Consul marks the service
@@ -187,22 +187,22 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy() {
 	// That's why we can't assert that we receive an empty reply from server,
 	// which is the case when a connection is unsuccessful due to intentions in
 	// other tests.
-	logger.Log(c.T, "checking that connection is unsuccessful")
+	logger.Log(t, "checking that connection is unsuccessful")
 	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionMultipleFailureMessages(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, false, []string{
+		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), staticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
 			"curl: (7) Failed to connect to static-server port 80: Connection refused",
 		}, "", "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionMultipleFailureMessages(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, false, []string{
+		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), staticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
 		}, "", "http://localhost:1234")
 	}
 
 	// Return the static-server to a "healthy state".
-	k8s.RunKubectl(c.T, c.Ctx.KubectlOptions(c.T), "exec", "deploy/"+staticServerName, "--", "rm", "/tmp/unhealthy")
+	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+staticServerName, "--", "rm", "/tmp/unhealthy")
 }
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm
@@ -219,10 +219,4 @@ func (c *ConnectHelper) helmValues() map[string]string {
 	helpers.MergeMaps(helmValues, c.HelmValues)
 
 	return helmValues
-}
-
-// deployFixtureCase looks up the fixture case by name in the `../fixtures/cases`
-// directory and deploys it to the Kubernetes cluster.
-func (c *ConnectHelper) deployFixtureCase(name string) {
-	k8s.DeployKustomize(c.T, c.Ctx.KubectlOptions(c.T), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/"+name)
 }
