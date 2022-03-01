@@ -365,6 +365,9 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
+	if c.flagEnablePartitions {
+		clientConfig.Partition = c.flagPartitionName
+	}
 	consulClient, err := consul.NewClient(clientConfig)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))

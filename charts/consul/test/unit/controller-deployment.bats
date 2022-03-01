@@ -155,6 +155,18 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-enable-partitions=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
       yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 

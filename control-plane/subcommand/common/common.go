@@ -107,6 +107,7 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 		}
 		tok, _, err := client.ACL().Login(req, &api.WriteOptions{Namespace: namespace})
 		if err != nil {
+			log.Error("unable to login", "error", err)
 			return fmt.Errorf("error logging in: %s", err)
 		}
 		// Write out the resultant token file.

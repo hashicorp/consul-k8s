@@ -49,6 +49,10 @@ type Command struct {
 	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
 	flagComponentName string // Name of the component to be used as metadata to ACL Login.
 
+	// Flags to support partitions.
+	flagEnablePartitions bool   // true if Admin Partitions are enabled
+	flagPartitionName    string // name of the Admin Partition
+
 	k8sClient kubernetes.Interface
 
 	once   sync.Once
@@ -81,6 +85,11 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+
+	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
+		"[Enterprise Only] Enables Admin Partitions")
+	c.flags.StringVar(&c.flagPartitionName, "partition", "",
+		"[Enterprise Only] Name of the Admin Partition")
 
 	c.k8s = &flags.K8SFlags{}
 	c.http = &flags.HTTPFlags{}
@@ -144,6 +153,9 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		cfg := api.DefaultConfig()
 		c.http.MergeOntoConfig(cfg)
+		if c.flagEnablePartitions {
+			cfg.Partition = c.flagPartitionName
+		}
 		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
 			c.logger.Error("Unable to get client connection", "error", err)
@@ -169,7 +181,6 @@ func (c *Command) Run(args []string) int {
 		secret, err = c.getSecret(c.flagSecretName)
 		if err != nil {
 			c.logger.Error("Error getting Kubernetes secret: ", "error", err)
-			//			c.UI.Error(fmt.Sprintf("Error getting Kubernetes secret: %s", err))
 		}
 		if err == nil {
 			c.logger.Info("Successfully read Kubernetes secret")
@@ -185,7 +196,7 @@ func (c *Command) Run(args []string) int {
 		tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
 		err := tpl.Execute(&buf, secret)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating template: %s", err))
+			c.logger.Error("Error creating template: ", "error", err)
 			return 1
 		}
 
@@ -194,7 +205,7 @@ func (c *Command) Run(args []string) int {
 		// to be readable by the consul user.
 		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0644)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error writing config file: %s", err))
+			c.logger.Error("Error writing config file:", "error", err)
 			return 1
 		}
 	}
@@ -204,7 +215,7 @@ func (c *Command) Run(args []string) int {
 		// to have permissions to overwrite our file.
 		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0600)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error writing token to file %q: %s", c.flagTokenSinkFile, err))
+			c.logger.Error("Error writing token to file", "file", c.flagTokenSinkFile, "error", err)
 			return 1
 		}
 	}

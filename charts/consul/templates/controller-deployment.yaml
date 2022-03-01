@@ -87,7 +87,11 @@ spec:
           - |
             consul-k8s-control-plane acl-init \
               -component-name=controller \
-              -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
+              -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+              {{- if .Values.global.adminPartitions.enabled }}
+              -enable-partitions=true \
+              -partition={{ .Values.global.adminPartitions.name }} \
+              {{- end }}
               -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
         resources:
