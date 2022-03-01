@@ -88,10 +88,9 @@ func TestConnectInject(t *testing.T) {
 // upgrade is performed on the cluster.
 func TestConnectInjectOnUpgrade(t *testing.T) {
 	cases := map[string]struct {
-		clusterKind         consul.ClusterKind
-		releaseName         string
-		secure, autoEncrypt bool
-		initial, upgrade    map[string]string
+		clusterKind      consul.ClusterKind
+		releaseName      string
+		initial, upgrade map[string]string
 	}{
 		"CLI upgrade changes nothing": {
 			clusterKind: consul.CLI,
@@ -123,8 +122,6 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 
 			connHelper := ConnectHelper{
 				ClusterKind: c.clusterKind,
-				Secure:      c.secure,
-				AutoEncrypt: c.autoEncrypt,
 				HelmValues:  c.initial,
 				ReleaseName: c.releaseName,
 				Ctx:         ctx,
