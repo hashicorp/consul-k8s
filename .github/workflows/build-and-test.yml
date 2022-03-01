@@ -47,13 +47,14 @@ jobs:
       go-version: 1.17.2
 
   unit-helm-gen:
+    needs: [go-fmt-vet-helm-gen, validate-helm-gen]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
       go-version: 1.17.2
-    needs: [go-fmt-vet-helm-gen, validate-helm-gen]
 
   unit-test-helm-templates:
+    needs: [unit-helm-gen]
     runs-on: ubuntu-latest
     container: 
       image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
@@ -65,7 +66,6 @@ jobs:
       - name: Run Unit Tests
         working-directory: charts/consul
         run:  bats --jobs 4 ./test/unit
-    needs: [unit-helm-gen]
 
   lint-control-plane:
     runs-on: ubuntu-latest
@@ -81,6 +81,7 @@ jobs:
       go-version: 1.17.2
 
   test-control-plane:
+    needs: [lint-control-plane, go-fmt-vet-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -107,8 +108,10 @@ jobs:
           sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
           rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
-      - run: mkdir -p ${{env.TEST_RESULTS}}
-      - run: echo "$HOME/bin" >> $GITHUB_PATH
+      - name: Setup environment
+        run: 
+          mkdir -p ${{env.TEST_RESULTS}}
+          echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run go tests 
         working-directory: control-plane 
@@ -120,9 +123,9 @@ jobs:
             chmod +x $HOME/bin/consul
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
-    needs: [lint-control-plane, go-fmt-vet-control-plane]
 
   test-enterprise-control-plane:
+    needs: [lint-control-plane, go-fmt-vet-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -149,8 +152,10 @@ jobs:
           sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
           rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
-      - run: mkdir -p ${{env.TEST_RESULTS}}
-      - run: echo "$HOME/bin" >> $GITHUB_PATH
+      - name: Setup environment
+        run: 
+          mkdir -p ${{env.TEST_RESULTS}}
+          echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run go tests 
         working-directory: control-plane 
@@ -162,31 +167,62 @@ jobs:
             chmod +x $HOME/bin/consul
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
-    needs: [lint-control-plane, go-fmt-vet-control-plane]
+
+  build-distros:
+   #needs: [test-control-plane, test-enterprise-control-plane]
+    needs: test-control-plane
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {go: "1.17.2", goos: "linux", goarch: "386"}
+          - {go: "1.17.5", goos: "linux", goarch: "amd64"}
+          - {go: "1.17.5", goos: "linux", goarch: "arm"}
+          - {go: "1.17.5", goos: "linux", goarch: "arm64"}
+      fail-fast: true
+
+    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} build
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        working-directory: control-plane
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          XC_OS=${{ matrix.goos }} XC_ARCH=${{ matrix.goarch }} ./build-support/scripts/build-local.sh
+
 
   build-distros-amd64:
+    needs: [test-control-plane, test-enterprise-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: TODO
         run:
          echo "Filler"
-    needs: [test-control-plane, test-enterprise-control-plane]
 
   build-distros-arm-arm64:
+    needs: [test-control-plane, test-enterprise-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: TODO
         run:
          echo "Filler"
-    needs: [test-control-plane, test-enterprise-control-plane]
 
   build-distros-386:
+    needs: [test-control-plane, test-enterprise-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: TODO
         run:
          echo "Filler"
-    needs: [test-control-plane, test-enterprise-control-plane]
 
   go-fmt-vet-acceptance:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
@@ -195,11 +231,11 @@ jobs:
       go-version: 1.17.2
 
   unit-acceptance-framework:
+    needs: go-fmt-vet-acceptance
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: acceptance/framework
       go-version: 1.17.2
-    needs: go-fmt-vet-acceptance
 
   go-fmt-vet-cli:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
@@ -208,42 +244,32 @@ jobs:
       go-version: 1.17.2
 
   unit-cli:
+    needs: go-fmt-vet-cli
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: cli 
       go-version: 1.17.2
-    needs: go-fmt-vet-cli
 
   dev-upload-docker:
+    needs: build-distros-amd64
     runs-on: ubuntu-latest
     steps:
       - name: TODO
         run:
          echo "Filler"
-    needs: build-distros-amd64
 
   acceptance-tproxy:
+    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
     runs-on: ubuntu-latest
     steps:
       - name: TODO
         run:
          echo "Filler"
-    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
 
   acceptance:
+    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
     runs-on: ubuntu-latest
     steps:
       - name: TODO
         run:
          echo "Filler"
-    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
-
-
-
-
-
-
-
-
-
-
