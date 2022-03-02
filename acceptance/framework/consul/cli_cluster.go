@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +46,8 @@ type CLICluster struct {
 	logger             terratestLogger.TestLogger
 }
 
+// NewCLICluster creates a new Consul cluster struct which can be used to create
+// and destroy a Consul cluster using the Consul K8s CLI.
 func NewCLICluster(
 	t *testing.T,
 	helmValues map[string]string,
@@ -52,8 +55,8 @@ func NewCLICluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *CLICluster {
-
-	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
+	// Create the namespace so the PSPs, SCCs, and enterprise secret can be
+	// created in the right namespace.
 	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
 
 	if cfg.EnablePodSecurityPolicies {
@@ -86,6 +89,7 @@ func NewCLICluster(
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
+
 	return &CLICluster{
 		ctx:                ctx,
 		helmOptions:        hopts,
@@ -102,92 +106,98 @@ func NewCLICluster(
 	}
 }
 
-func (h *CLICluster) Create(t *testing.T) {
+// Create uses the `consul-k8s install` command to create a Consul cluster. The command itself will fail if there are
+// prior installations of Consul in the cluster so it is sufficient to run the install command without a pre-check.
+func (c *CLICluster) Create(t *testing.T) {
 	t.Helper()
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, h.noCleanupOnFailure, func() {
-		h.Destroy(t)
+	helpers.Cleanup(t, c.noCleanupOnFailure, func() {
+		c.Destroy(t)
 	})
 
-	// The install command itself will fail if there are prior installations, so it's sufficient to just run the install
-	// command.
+	// Set the args for running the install command.
 	args := []string{"install"}
-	kubeconfig := h.kubeConfig
-	if kubeconfig != "" {
-		args = append(args, "-kubeconfig", kubeconfig)
-	}
-	kubecontext := h.kubeContext
-	if kubecontext != "" {
-		args = append(args, "-context", kubecontext)
-	}
+	args = c.setKube(args)
 
-	for k, v := range h.values {
+	for k, v := range c.values {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
-
 	}
 
 	// Match the timeout for the helm tests.
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	// Use `go run` so that the CLI is recompiled and therefore uses the local
-	// charts directory rather than the directory from whenever it was last
-	// compiled.
-	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
-	cmd.Dir = config.CLIPath
-	out, err := cmd.Output()
+	out, err := c.runCLI(args)
 	if err != nil {
-		h.logger.Logf(t, "error running command [ consul-k8s %s ]: %s", args, err.Error())
-		h.logger.Logf(t, "command stdout: %s", string(out))
+		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+		c.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
 
-	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, consulNS, fmt.Sprintf("release=%s", h.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
 
-func (h *CLICluster) Destroy(t *testing.T) {
+// Upgrade uses the `consul-k8s upgrade` command to upgrade a Consul cluster.
+func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
-	k8s.WritePodsDebugInfoIfFailed(t, h.kubectlOptions, h.debugDirectory, "release="+h.releaseName)
+	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
+	if t.Failed() {
+		c.logger.Logf(t, "skipping upgrade due to previous failure")
+		return
+	}
 
+	// Set the args for running the upgrade command.
+	args := []string{"upgrade"}
+	args = c.setKube(args)
+
+	helpers.MergeMaps(c.helmOptions.SetValues, helmValues)
+	for k, v := range c.helmOptions.SetValues {
+		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Match the timeout for the helm tests.
+	args = append(args, "-timeout", "15m")
+	args = append(args, "-auto-approve")
+
+	out, err := c.runCLI(args)
+	if err != nil {
+		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+		c.logger.Logf(t, "command stdout: %s", string(out))
+	}
+	require.NoError(t, err)
+
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
+}
+
+// Destroy uses the `consul-k8s uninstall` command to destroy a Consul cluster.
+func (c *CLICluster) Destroy(t *testing.T) {
+	t.Helper()
+
+	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
+
+	// Set the args for running the uninstall command.
 	args := []string{"uninstall"}
-	kubeconfig := h.kubeConfig
-	if kubeconfig != "" {
-		args = append(args, "-kubeconfig", kubeconfig)
-	}
-	kubecontext := h.kubeContext
-	if kubecontext != "" {
-		args = append(args, "-context", kubecontext)
-	}
+	args = c.setKube(args)
 	args = append(args, "-auto-approve", "-wipe-data")
 
 	// Use `go run` so that the CLI is recompiled and therefore uses the local
 	// charts directory rather than the directory from whenever it was last
 	// compiled.
-	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
-	cmd.Dir = config.CLIPath
-	out, err := cmd.Output()
+	out, err := c.runCLI(args)
 	if err != nil {
-		h.logger.Logf(t, "error running command [ consul-k8s %s ]: %s", args, err.Error())
-		h.logger.Logf(t, "command stdout: %s", string(out))
+		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+		c.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
 }
 
-func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
+func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	t.Helper()
 
-	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
-	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
-	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
-}
-
-func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
-	t.Helper()
-
-	namespace := h.kubectlOptions.Namespace
+	namespace := c.kubectlOptions.Namespace
 	config := api.DefaultConfig()
 	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
@@ -206,17 +216,17 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 		// Instead, we provide a replication token that serves the role of the bootstrap token.
 
-		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", h.releaseName)
-		if h.releaseName == CLIReleaseName {
+		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.releaseName)
+		if c.releaseName == CLIReleaseName {
 			aclSecretName = "consul-bootstrap-acl-token"
 		}
-		aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
+		aclSecret, err := c.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
-			federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
-			if h.releaseName == CLIReleaseName {
+			federationSecret := fmt.Sprintf("%s-consul-federation", c.releaseName)
+			if c.releaseName == CLIReleaseName {
 				federationSecret = "consul-federation"
 			}
-			aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
+			aclSecret, err = c.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
 			require.NoError(t, err)
 			config.Token = string(aclSecret.Data["replicationToken"])
 		} else if err == nil {
@@ -226,17 +236,17 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		}
 	}
 
-	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	if h.releaseName == CLIReleaseName {
+	serverPod := fmt.Sprintf("%s-consul-server-0", c.releaseName)
+	if c.releaseName == CLIReleaseName {
 		serverPod = "consul-server-0"
 	}
 	tunnel := terratestk8s.NewTunnelWithLogger(
-		h.kubectlOptions,
+		c.kubectlOptions,
 		terratestk8s.ResourceTypePod,
 		serverPod,
 		localPort,
 		remotePort,
-		h.logger)
+		c.logger)
 
 	// Retry creating the port forward since it can fail occasionally.
 	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
@@ -270,4 +280,28 @@ func createOrUpdateNamespace(t *testing.T, client kubernetes.Interface, namespac
 	} else {
 		require.NoError(t, err)
 	}
+}
+
+// setKube adds the args for KubeConfig and KubeCluster if they have been set on the CLICluster.
+func (c *CLICluster) setKube(args []string) []string {
+	kubeconfig := c.kubeConfig
+	if kubeconfig != "" {
+		args = append(args, "-kubeconfig", kubeconfig)
+	}
+
+	kubecontext := c.kubeContext
+	if kubecontext != "" {
+		args = append(args, "-context", kubecontext)
+	}
+
+	return args
+}
+
+// runCLI runs the CLI with the given args.
+// Use `go run` so that the CLI is recompiled and therefore uses the local
+// charts directory rather than the directory from whenever it was last compiled.
+func (c *CLICluster) runCLI(args []string) ([]byte, error) {
+	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
+	cmd.Dir = config.CLIPath
+	return cmd.Output()
 }
