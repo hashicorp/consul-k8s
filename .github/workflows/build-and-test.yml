@@ -238,7 +238,6 @@ jobs:
     env: 
       GITHUB_PULL_REQUEST: ${{github.event.pull_request.number}}
     steps:
-
       - uses: actions/checkout@v2
 
       - uses: actions/download-artifact@v3
@@ -250,16 +249,43 @@ jobs:
         working-directory: control-plane
         run: |
           mkdir -p pkg/bin/linux_amd64
-          unzip control-plane/consul-k8s_linux_amd64.zip /pkg/bin/linux_amd64
+          unzip consul-k8s_linux_amd64.zip /pkg/bin/linux_amd64
           make ci.dev-docker
 
   acceptance-tproxy:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
     runs-on: ubuntu-latest
     steps:
-      - name: TODO
-        run:
-         echo "Filler"
+      - uses: actions/checkout@v2
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          version: 1.22.4
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.2
+
+      - name: Setup go mod cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Go mod download
+        working-directory: acceptance
+        run: go mod download
+
+      - run:  mkdir -p ${{env.TEST_RESULTS}}
+
+      - name: Run acceptance tests
+        
 
   acceptance:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
