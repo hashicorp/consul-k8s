@@ -85,11 +85,11 @@ func NewHelmCluster(
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
-	// Wait up to 20 min for K8s resources to be in a ready state. Increasing
+	// Wait up to 15 min for K8s resources to be in a ready state. Increasing
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "20m"},
+		"install": {"--timeout", "15m"},
 	}
 
 	opts := &helm.Options{
