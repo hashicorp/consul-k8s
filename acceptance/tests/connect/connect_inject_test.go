@@ -76,8 +76,10 @@ func TestConnectInject(t *testing.T) {
 
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
-			connHelper.TestConnectionFailureWithoutIntention(t)
-			connHelper.CreateIntention(t)
+			if c.secure {
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
+			}
 			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
@@ -132,8 +134,6 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
-			connHelper.TestConnectionFailureWithoutIntention(t)
-			connHelper.CreateIntention(t)
 			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 

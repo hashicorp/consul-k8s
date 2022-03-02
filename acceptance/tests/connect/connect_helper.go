@@ -128,33 +128,29 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 // TestConnectionFailureWithoutIntention ensures the connection to the static
 // server fails when no intentions are configured.
 func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
-	if c.Secure {
-		logger.Log(t, "checking that the connection is not successful because there's no intention")
-		if c.Cfg.EnableTransparentProxy {
-			k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://static-server")
-		} else {
-			k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
-		}
+	logger.Log(t, "checking that the connection is not successful because there's no intention")
+	if c.Cfg.EnableTransparentProxy {
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://static-server")
+	} else {
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 }
 
 // CreateIntention creates an intention for the static-server pod to connect to
 // the static-client pod.
 func (c *ConnectHelper) CreateIntention(t *testing.T) {
-	if c.Secure {
-		logger.Log(t, "creating intention")
-		_, _, err := c.consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-			Kind: api.ServiceIntentions,
-			Name: staticServerName,
-			Sources: []*api.SourceIntention{
-				{
-					Name:   staticClientName,
-					Action: api.IntentionActionAllow,
-				},
+	logger.Log(t, "creating intention")
+	_, _, err := c.consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+		Kind: api.ServiceIntentions,
+		Name: staticServerName,
+		Sources: []*api.SourceIntention{
+			{
+				Name:   staticClientName,
+				Action: api.IntentionActionAllow,
 			},
-		}, nil)
-		require.NoError(t, err)
-	}
+		},
+	}, nil)
+	require.NoError(t, err)
 }
 
 // TestConnectionSuccessful ensures the static-server pod can connect to the
