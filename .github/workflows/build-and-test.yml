@@ -199,7 +199,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-          path: consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          path: control-plane/consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
   go-fmt-vet-acceptance:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
