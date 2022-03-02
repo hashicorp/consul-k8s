@@ -574,7 +574,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Vault
 
-@test "serverACLInit/Job: fails when vault is enabled but neither bootstrap nor replication token are provided" {
+@test "serverACLInit/Job: fails when vault is enabled but neither bootstrap nor replication token is provided" {
   cd `chart_dir`
   run helm template \
       -s templates/server-acl-init-job.yaml  \
