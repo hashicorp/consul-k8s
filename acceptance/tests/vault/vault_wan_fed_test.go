@@ -69,6 +69,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	configureGossipVaultSecret(t, vaultClient)
 
 	if cfg.EnableEnterprise {
+		logger.Log(t, "configuring enterprise license secret")
 		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
@@ -222,7 +223,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// ACL config.
 		"global.acls.manageSystemACLs":            "true",
 		"global.acls.replicationToken.secretName": "consul/data/secret/replication",
-		"global.acls.replicationToken.secretKey":  "replication",
+		"global.acls.replicationToken.secretKey":  "token",
 
 		// Mesh config.
 		"connectInject.enabled": "true",

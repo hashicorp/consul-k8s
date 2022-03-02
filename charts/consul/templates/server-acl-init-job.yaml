@@ -256,7 +256,8 @@ spec:
                 {{- else }}
                 -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
                 {{- end }}
-                {{- else if .Values.global.acls.replicationToken.secretName }}
+                {{- end }}
+                {{- if .Values.global.acls.replicationToken.secretName }}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
                 -acl-replication-token-file=/vault/secrets/replication-token \
                 {{- else }}
