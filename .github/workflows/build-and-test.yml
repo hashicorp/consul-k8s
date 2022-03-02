@@ -13,6 +13,10 @@ env:
   CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.6.4
 
+# TODO: upload tests somewhere. An artifact?
+# TODO: prevent running some things on forks?
+# TODO: fix caching. Maybe cache on the first job
+
 jobs:
   validate-helm-gen:
     runs-on: ubuntu-latest
@@ -230,10 +234,24 @@ jobs:
   dev-upload-docker:
     needs: build-distros
     runs-on: ubuntu-latest
+
+    env: 
+      GITHUB_PULL_REQUEST: ${{github.event.pull_request.number}}
     steps:
-      - name: TODO
-        run:
-         echo "Filler"
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: my-artifact
+          path: control-plane/consul-k8s_linux_amd64.zip
+
+      - name: Docker build 
+        working-directory: control-plane
+        run: |
+          mkdir -p pkg/bin/linux_amd64
+          unzip control-plane/consul-k8s_linux_amd64.zip /pkg/bin/linux_amd64
+          make ci.dev-docker
 
   acceptance-tproxy:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
