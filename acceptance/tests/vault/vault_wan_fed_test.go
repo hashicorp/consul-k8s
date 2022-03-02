@@ -69,7 +69,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	configureGossipVaultSecret(t, vaultClient)
 
 	if cfg.EnableEnterprise {
-		logger.Log(t, "configuring enterprise license secret")
 		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 

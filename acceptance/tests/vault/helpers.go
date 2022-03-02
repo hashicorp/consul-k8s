@@ -24,10 +24,9 @@ path "consul/data/secret/bootstrap" {
   capabilities = ["read"]
 }`
 
-	// todo: should this policy be only "read"?
 	replicationTokenPolicy = `
 path "consul/data/secret/replication" {
-  capabilities = ["read", "update"]
+  capabilities = ["read"]
 }`
 
 	enterpriseLicensePolicy = `
