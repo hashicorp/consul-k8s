@@ -47,7 +47,7 @@ type Command struct {
 	flagInjectAuthMethodHost string
 	flagBindingRuleSelector  string
 
-	flagCreateControllerToken bool
+	flagCreateControllerPoliciesAndBindings bool
 
 	flagCreateEntLicenseToken bool
 
@@ -147,8 +147,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
 
-	c.flags.BoolVar(&c.flagCreateControllerToken, "create-controller-token", false,
-		"Toggle for creating a token for the controller.")
+	c.flags.BoolVar(&c.flagCreateControllerPoliciesAndBindings, "create-controller-token", false,
+		"Toggle for creating acl policies and rolebindings for the controller.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
@@ -257,7 +257,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
-
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
 		// Load the ACL replication token from file.
@@ -365,10 +364,10 @@ func (c *Command) Run(args []string) int {
 			CAFile:  c.flagConsulCACert,
 		},
 	}
+
 	if c.flagEnablePartitions {
 		clientConfig.Partition = c.flagPartitionName
 	}
-
 	consulClient, err := consul.NewClient(clientConfig)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
@@ -440,6 +439,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// Create the component auth method, this is the auth method that Consul components will use
+	// to issue an `ACL().Login()` against at startup, for local tokens.
+	componentAuthMethodName := c.withPrefix("k8s-component-auth-method")
+	err = c.configureComponentAuthMethod(consulClient, componentAuthMethodName)
+	if err != nil {
+		c.log.Error(err.Error())
+		return 1
+	}
+
 	if c.flagCreateClientToken {
 		agentRules, err := c.agentRules()
 		if err != nil {
@@ -497,7 +505,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateInjectToken {
-		err := c.configureConnectInjectAuthMethod(consulClient)
+		authMethodName := c.withPrefix("k8s-auth-method")
+		err := c.configureConnectInjectAuthMethod(consulClient, authMethodName)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -705,22 +714,25 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateControllerToken {
+	if c.flagCreateControllerPoliciesAndBindings {
 		rules, err := c.controllerRules()
 		if err != nil {
 			c.log.Error("Error templating controller token rules", "err", err)
 			return 1
 		}
+
+		serviceAccountName := c.withPrefix("controller")
+
+		// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
 		// Controller token must be global because config entry writes all
 		// go to the primary datacenter. This means secondary datacenters need
 		// a token that is known by the primary datacenters.
-		err = c.createGlobalACL("controller", rules, consulDC, isPrimary, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, isPrimary, componentAuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
 	}
-
 	c.log.Info("server-acl-init completed successfully")
 	return 0
 }
@@ -884,6 +896,25 @@ func (c *Command) validateFlags() error {
 		return errors.New("-enable-partitions must be 'true' if -partition is set")
 	}
 	return nil
+}
+
+// configureComponentAuthMethod sets up an AuthMethod that the Consul components will use to issue ACL logins with.
+func (c *Command) configureComponentAuthMethod(consulClient *api.Client, authMethodName string) error {
+	// Create the auth method template. This requires calls to the kubernetes environment.
+	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, false)
+	if err != nil {
+		return err
+	}
+	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
+		func() error {
+			var err error
+			// `AuthMethodCreate` will also be able to update an existing
+			// AuthMethod based on the name provided. This means that any
+			// configuration changes will correctly update the AuthMethod.
+			_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &api.WriteOptions{})
+			return err
+		})
+	return err
 }
 
 const consulDefaultNamespace = "default"
