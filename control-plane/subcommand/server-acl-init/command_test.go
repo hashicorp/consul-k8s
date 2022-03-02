@@ -1696,6 +1696,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 
 			serverURL, err := url.Parse(consulServer.URL)
 			require.NoError(err)
+			setUpK8sServiceAccount(t, k8s, ns)
 
 			cmdArgs := []string{
 				"-timeout=500ms",
@@ -1906,6 +1907,8 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		Path   string
 	}
 	var consulAPICalls []APICall
+
+	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Start the Consul server.
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

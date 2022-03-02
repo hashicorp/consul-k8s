@@ -32,7 +32,7 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 	}
 
 	// We should only create and set server tokens when servers are running within this cluster.
-	if c.flagSetServerToken {
+	if c.flagSetServerTokens {
 		c.log.Info("Setting Consul server tokens")
 
 		// Override our original client with a new one that has the bootstrap token

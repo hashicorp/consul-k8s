@@ -124,7 +124,13 @@ func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 
 // configureKubernetesAuthRoles configures roles for the Kubernetes auth method
 // that will be used by the test Helm chart installation.
-func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, authPath, datacenter string, cfg *config.TestConfig) {
+func configureKubernetesAuthRoles(
+	t *testing.T,
+	vaultClient *vapi.Client,
+	consulReleaseName, ns, authPath, datacenter string,
+	cfg *config.TestConfig,
+	isPrimary bool,
+) {
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
 	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
 	sharedPolicies := "consul-gossip"
@@ -148,12 +154,17 @@ func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consul
 	_, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-client", authPath), params)
 	require.NoError(t, err)
 
+	// Both primary and secondary datacenters need access to the replication token, but
+	// only the primary needs to be able to read the bootstrap token.
+	policies := fmt.Sprintf(sharedPolicies+",connect-ca-%s,consul-server-%s,consul-replication-token", datacenter, datacenter)
+	if isPrimary {
+		policies += ",consul-bootstrap-token"
+	}
 	params = map[string]interface{}{
 		"bound_service_account_names":      consulServerServiceAccountName,
 		"bound_service_account_namespaces": ns,
-		// todo: should we only allow the primary server have access to the bootstrap token? and only the secondary to have access to the replication token
-		"policies": fmt.Sprintf(sharedPolicies+",connect-ca-%s,consul-server-%s,consul-replication-token,consul-bootstrap-token", datacenter, datacenter),
-		"ttl":      "24h",
+		"policies":                         policies,
+		"ttl":                              "24h",
 	}
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-server", authPath), params)
 	require.NoError(t, err)
@@ -168,14 +179,16 @@ func configureKubernetesAuthRoles(t *testing.T, vaultClient *vapi.Client, consul
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-ca", authPath), params)
 	require.NoError(t, err)
 
-	// todo: server-acl-init in the primary needs access to both replication token and bootstrap token
-	// 	server-acl-init in the secondary needs only replication token
 	logger.Log(t, "Creating kubernetes auth role for the server-acl-init job")
+	policies = "consul-replication-token"
+	if isPrimary {
+		policies += ",consul-bootstrap-token"
+	}
 	serverACLInitSAName := fmt.Sprintf("%s-consul-server-acl-init", consulReleaseName)
 	params = map[string]interface{}{
 		"bound_service_account_names":      serverACLInitSAName,
 		"bound_service_account_namespaces": ns,
-		"policies":                         "consul-bootstrap-token,consul-replication-token",
+		"policies":                         policies,
 		"ttl":                              "24h",
 	}
 
@@ -257,8 +270,7 @@ func configureReplicationTokenVaultSecret(t *testing.T, vaultClient *vapi.Client
 	return token
 }
 
-// todo: update
-// configureReplicationTokenVaultSecret generates a replication token secret ID,
+// configureBootstrapTokenVaultSecret generates the bootstrap token secret ID,
 // stores it in vault as a secret and configures a policy to access it.
 func configureBootstrapTokenVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
 	// Create the Vault Policy for the bootstrap token.

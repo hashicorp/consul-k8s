@@ -72,7 +72,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
+	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg, true)
 
 	// Configure Vault Kubernetes auth method for the secondary datacenter.
 	{
@@ -113,7 +113,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-dc2", k8sAuthMethodHost, authMethodRBACName, ns)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "dc2", cfg)
+	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "dc2", cfg, false)
 
 	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
 	configurePKICA(t, vaultClient)

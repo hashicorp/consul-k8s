@@ -39,7 +39,7 @@ func TestVault(t *testing.T) {
 
 	bootstrapToken := configureBootstrapTokenVaultSecret(t, vaultClient)
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
+	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg, true)
 
 	configurePKICA(t, vaultClient)
 	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
