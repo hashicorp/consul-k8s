@@ -19,7 +19,6 @@ rules:
     verbs:
       - create
       - get
-{{- if .Values.connectInject.enabled }}
   - apiGroups: [""]
     resources:
       - serviceaccounts
@@ -27,7 +26,6 @@ rules:
       - {{ template "consul.fullname" . }}-connect-injector
     verbs:
       - get
-{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
