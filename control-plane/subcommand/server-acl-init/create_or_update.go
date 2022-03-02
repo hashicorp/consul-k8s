@@ -179,20 +179,20 @@ func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules 
 
 // createLocalACL creates a policy and acl token for this dc (datacenter), i.e.
 // the policy is only valid for this datacenter and the token is a local token.
-func (c *Command) createLocalACL(name, rules, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client) error {
-	return c.createACL(name, rules, true, dc, isPrimary, createKubeSecret, consulClient, "")
+func (c *Command) createLocalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
+	return c.createACL(name, rules, true, dc, isPrimary, consulClient, "")
 }
 
 // createGlobalACL creates a global policy and acl token. The policy is valid
 // for all datacenters and the token is global. dc must be passed because the
 // policy name may have the datacenter name appended.
-func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client) error {
-	return c.createACL(name, rules, false, dc, isPrimary, createKubeSecret, consulClient, "")
+func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
+	return c.createACL(name, rules, false, dc, isPrimary, consulClient, "")
 }
 
 // createGlobalACLWithSecretID creates a global policy and acl token with provided secret ID.
-func (c *Command) createGlobalACLWithSecretID(name, rules, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client, secretID string) error {
-	return c.createACL(name, rules, false, dc, isPrimary, createKubeSecret, consulClient, secretID)
+func (c *Command) createGlobalACLWithSecretID(name, rules, dc string, isPrimary bool, consulClient *api.Client, secretID string) error {
+	return c.createACL(name, rules, false, dc, isPrimary, consulClient, secretID)
 }
 
 // createACL creates a policy with rules and name. If localToken is true then
@@ -201,7 +201,7 @@ func (c *Command) createGlobalACLWithSecretID(name, rules, dc string, isPrimary 
 // When secretID is provided, we will use that value for the created token and
 // will skip writing it to a Kubernetes secret (because in this case we assume that
 // this value already exists in some secrets storage).
-func (c *Command) createACL(name, rules string, localToken bool, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client, secretID string) error {
+func (c *Command) createACL(name, rules string, localToken bool, dc string, isPrimary bool, consulClient *api.Client, secretID string) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", name)
 	if c.flagFederation && !isPrimary {
@@ -227,15 +227,6 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 		return err
 	}
 
-	// Check if the secret already exists, if so, we assume the ACL has already been
-	// created and return.
-	secretName := c.withPrefix(name + "-acl-token")
-	_, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
-	if err == nil {
-		c.log.Info(fmt.Sprintf("Secret %q already exists", secretName))
-		return nil
-	}
-
 	// Create token for the policy if the secret did not exist previously.
 	tokenTmpl := api.ACLToken{
 		Description: fmt.Sprintf("%s Token", policyTmpl.Name),
@@ -246,6 +237,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 	// Check if the replication token already exists in some form.
 	// When secretID is not provided, we assume that replication token should exist
 	// as a Kubernetes secret.
+	secretName := c.withPrefix(name + "-acl-token")
 	if secretID == "" {
 		// Check if the secret already exists, if so, we assume the ACL has already been
 		// created and return.

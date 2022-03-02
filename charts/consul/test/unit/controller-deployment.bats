@@ -57,6 +57,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "controller/Deployment: consul-logout preStop hook has partition when partitions are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "controller/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -639,28 +653,6 @@ load _helpers
 
 #--------------------------------------------------------------------
 # aclToken
-
-@test "controller/Deployment: aclToken disabled when secretName is missing" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'controller.aclToken.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "controller/Deployment: aclToken disabled when secretKey is missing" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'controller.aclToken.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
 
 @test "controller/Deployment: aclToken enabled when secretName and secretKey is provided" {
   cd `chart_dir`

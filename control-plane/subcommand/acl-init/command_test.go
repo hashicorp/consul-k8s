@@ -205,7 +205,8 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	tokenBytes, err := ioutil.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.Equal(t, 36, len(tokenBytes))
-	// Validate the Token.
-	_, _, err = consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: string(tokenBytes)})
+	// Validate the Token and its Description.
+	tok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: string(tokenBytes)})
 	require.NoError(t, err)
+	require.Equal(t, "token created via login: {\"component\":\"foo\"}", tok.Description)
 }

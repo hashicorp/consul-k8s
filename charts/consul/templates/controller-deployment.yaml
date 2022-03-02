@@ -139,7 +139,10 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  consul-k8s-control-plane consul-logout
+                  consul-k8s-control-plane consul-logout \
+                  {{- if .Values.global.adminPartitions.enabled }}
+                  -partition={{ .Values.global.adminPartitions.name }} \
+                  {{- end }}
         {{- end }}
         env:
         {{- if .Values.global.acls.manageSystemACLs }}
