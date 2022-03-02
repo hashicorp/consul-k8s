@@ -162,9 +162,6 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	// This is the test file that we will write the token to so consul-logout can read it.
 	tokenFile := common.WriteTempFile(t, "")
 	bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
-	t.Cleanup(func() {
-		os.Remove(tokenFile)
-	})
 
 	k8s := fake.NewSimpleClientset()
 

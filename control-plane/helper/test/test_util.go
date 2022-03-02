@@ -61,8 +61,8 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 	return caFile.Name(), certFile.Name(), certKeyFile.Name()
 }
 
-// SetupK8sComponentAuthMethod create a k8s auth method, sample acl:write ACL policy, Role and BindingRule
-// that allows the a client using `serviceAccount`'s JWT token to issue a consul login.
+// SetupK8sComponentAuthMethod creates a k8s auth method, sample "acl:write" ACL policy, Role and BindingRule
+// that allows a client using serviceAccount's JWT token to call "consul login".
 func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, serviceAccountName, k8sComponentNS string) {
 	t.Helper()
 	// Start the mock k8s server.

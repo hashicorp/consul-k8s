@@ -180,7 +180,7 @@ spec:
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data
-          readOnly: false
+          readOnly: true
         - mountPath: /tmp/controller-webhook/certs
           name: cert
           readOnly: true

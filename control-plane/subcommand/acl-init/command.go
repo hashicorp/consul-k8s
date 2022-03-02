@@ -72,7 +72,7 @@ func (c *Command) init() {
 		"Optional filepath to write acl token")
 
 	// Flags related to using consul login to fetch the ACL token.
-	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of the auth method to login to.")
+	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of Kubernetes namespace where the token Kubernetes secret is stored.")
 	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login with.")
 	c.flags.StringVar(&c.flagComponentName, "component-name", "",
 		"Name of the component to pass to ACL Login as metadata.")
@@ -158,7 +158,7 @@ func (c *Command) Run(args []string) int {
 			c.logger.Error("Consul login failed", "error", err)
 			return 1
 		}
-		c.logger.Info("Successfully read ACL token from the server")
+		c.logger.Info("Consul login succeeded")
 		return 0
 	}
 	// Check if the client secret exists yet
@@ -168,7 +168,7 @@ func (c *Command) Run(args []string) int {
 		var err error
 		secret, err = c.getSecret(c.flagSecretName)
 		if err != nil {
-			c.logger.Error("Error getting Kubernetes secret: ", "error", err)
+			c.logger.Error("Error getting Kubernetes secret", "error", err)
 		}
 		if err == nil {
 			c.logger.Info("Successfully read Kubernetes secret")
@@ -184,7 +184,7 @@ func (c *Command) Run(args []string) int {
 		tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
 		err := tpl.Execute(&buf, secret)
 		if err != nil {
-			c.logger.Error("Error creating template: ", "error", err)
+			c.logger.Error("Error creating template", "error", err)
 			return 1
 		}
 
@@ -193,7 +193,7 @@ func (c *Command) Run(args []string) int {
 		// to be readable by the consul user.
 		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0644)
 		if err != nil {
-			c.logger.Error("Error writing config file:", "error", err)
+			c.logger.Error("Error writing config file", "error", err)
 			return 1
 		}
 	}
