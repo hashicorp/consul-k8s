@@ -60,8 +60,11 @@ func TestConsulLogin(t *testing.T) {
 	bearerTokenFile := WriteTempFile(t, "foo")
 	tokenFile := WriteTempFile(t, "")
 
-	client := startMockServer(t, &counter)
-	err := ConsulLogin(client, bearerTokenFile, testAuthMethod, tokenFile, "", testPodMeta)
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(err)
+	client, cfg := startMockServer(t, &counter)
+	err = ConsulLogin(client, cfg, log, bearerTokenFile, testAuthMethod, tokenFile, "", "", testPodMeta)
 	require.NoError(err)
 	require.Equal(counter, 1)
 	// Validate that the token file was written to disk.
@@ -76,9 +79,10 @@ func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 
 	bearerTokenFile := WriteTempFile(t, "")
 	err := ConsulLogin(
-		nil,
+		nil, nil, nil,
 		bearerTokenFile,
 		testAuthMethod,
+		"",
 		"",
 		"",
 		testPodMeta,
@@ -91,9 +95,10 @@ func TestConsulLogin_BearerTokenFileDoesNotExist(t *testing.T) {
 	require := require.New(t)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 	err := ConsulLogin(
-		nil,
+		nil, nil, nil,
 		randFileName,
 		testAuthMethod,
+		"",
 		"",
 		"",
 		testPodMeta,
@@ -107,13 +112,17 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	require := require.New(t)
 	counter := 0
 	bearerTokenFile := WriteTempFile(t, "foo")
-	client := startMockServer(t, &counter)
+	client, cfg := startMockServer(t, &counter)
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(err)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-	err := ConsulLogin(
-		client,
+	err = ConsulLogin(
+		client, cfg, log,
 		bearerTokenFile,
 		testAuthMethod,
 		randFileName,
+		"",
 		"",
 		testPodMeta,
 	)
@@ -214,7 +223,7 @@ func TestGetResolvedServerAddresses(t *testing.T) {
 // startMockServer starts an httptest server used to mock a Consul server's
 // /v1/acl/login endpoint. apiCallCounter will be incremented on each call to /v1/acl/login.
 // It returns a consul client pointing at the server.
-func startMockServer(t *testing.T, apiCallCounter *int) *api.Client {
+func startMockServer(t *testing.T, apiCallCounter *int) (*api.Client, *api.Config) {
 
 	// Start the Consul server.
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +241,7 @@ func startMockServer(t *testing.T, apiCallCounter *int) *api.Client {
 	client, err := api.NewClient(clientConfig)
 	require.NoError(t, err)
 
-	return client
+	return client, clientConfig
 }
 
 const testAuthMethod = "consul-k8s-auth-method"

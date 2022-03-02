@@ -2,17 +2,25 @@ package aclinit
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+)
+
+const (
+	componentAuthMethod = "consul-k8s-component-auth-method"
 )
 
 // Test that we write the secret data to a file.
@@ -50,7 +58,6 @@ func TestRun_TokenSinkFile(t *testing.T) {
 		k8sClient: k8s,
 	}
 	code := cmd.Run([]string{
-		"-k8s-namespace", k8sNS,
 		"-token-sink-file", sinkFile,
 		"-secret-name", secretName,
 	})
@@ -91,15 +98,11 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 		k8sClient: k8s,
 	}
 	code := cmd.Run([]string{
-		"-k8s-namespace", k8sNS,
 		"-token-sink-file", "/this/filepath/does/not/exist",
 		"-secret-name", secretName,
 	})
 
 	require.Equal(1, code)
-	require.Contains(ui.ErrorWriter.String(),
-		`Error writing token to file "/this/filepath/does/not/exist": open /this/filepath/does/not/exist: no such file or directory`,
-	)
 }
 
 // Test that if the command is run twice it succeeds. This test is the result
@@ -142,7 +145,6 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 	// Run twice.
 	for i := 0; i < 2; i++ {
 		code := cmd.Run([]string{
-			"-k8s-namespace", k8sNS,
 			"-token-sink-file", sinkFile,
 			"-secret-name", secretName,
 		})
@@ -152,4 +154,59 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		require.NoError(err)
 		require.Equal(token, string(bytes), "exp: %s, got: %s", token, string(bytes))
 	}
+}
+
+// TestRun_PerformsConsulLogin executes the consul login path and validates the token
+// is written to disk.
+func TestRun_PerformsConsulLogin(t *testing.T) {
+	// This is the test file that we will write the token to so consul-logout can read it.
+	tokenFile := common.WriteTempFile(t, "")
+	bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
+
+	k8s := fake.NewSimpleClientset()
+
+	// Start Consul server with ACLs enabled and default deny policy.
+	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.DefaultPolicy = "deny"
+		c.ACL.Tokens.InitialManagement = masterToken
+	})
+	require.NoError(t, err)
+	defer server.Stop()
+	server.WaitForLeader(t)
+	cfg := &api.Config{
+		Scheme:  "http",
+		Address: server.HTTPAddr,
+		Token:   masterToken,
+	}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+
+	// Set up the Component Auth Method, this pre-loads Consul with bindingrule, roles and an acl:write policy so we
+	// can issue an ACL.Login().
+	test.SetupK8sComponentAuthMethod(t, consulClient, "test-sa", "default")
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:              ui,
+		k8sClient:       k8s,
+		bearerTokenFile: bearerFile,
+	}
+
+	code := cmd.Run([]string{
+		"-token-sink-file", tokenFile,
+		"-acl-auth-method", componentAuthMethod,
+		"-component-name", "foo",
+		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+	})
+	require.Equal(t, 0, code, ui.ErrorWriter.String())
+	// Validate the Token got written.
+	tokenBytes, err := ioutil.ReadFile(tokenFile)
+	require.NoError(t, err)
+	require.Equal(t, 36, len(tokenBytes))
+	// Validate the Token and its Description.
+	tok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: string(tokenBytes)})
+	require.NoError(t, err)
+	require.Equal(t, "token created via login: {\"component\":\"foo\"}", tok.Description)
 }
