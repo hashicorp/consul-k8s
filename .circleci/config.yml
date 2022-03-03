@@ -868,35 +868,6 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  update-helm-charts-index:
-    docker:
-      - image: docker.mirror.hashicorp.services/circleci/golang:latest
-    steps:
-      - checkout
-      - run:
-          name: verify chart version matches tag version
-          working_directory: *charts-consul-path
-          command: |
-            GO111MODULE=on go get github.com/mikefarah/yq/v2
-            git_tag=$(echo "${CIRCLE_TAG#v}")
-            chart_tag=$(yq r Chart.yaml version)
-            if [ "${git_tag}" != "${chart_tag}" ]; then
-              echo "chart version (${chart_tag}) did not match git version (${git_tag})"
-              exit 1
-            fi
-      - run:
-          name: update helm-charts index
-          command: |
-            curl --show-error --silent --fail --user "${CIRCLE_TOKEN}:" \
-                -X POST \
-                -H 'Content-Type: application/json' \
-                -H 'Accept: application/json' \
-                -d "{\"branch\": \"main\",\"parameters\":{\"SOURCE_REPO\": \"${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}\",\"SOURCE_TAG\": \"${CIRCLE_TAG}\"}}" \
-                "${CIRCLE_ENDPOINT}/${CIRCLE_PROJECT}/pipeline"
-      - slack/status:
-          fail_only: true
-          failure_message: "Failed to trigger an update to the helm charts index. Check the logs at: ${CIRCLE_BUILD_URL}"
-
 workflows:
   version: 2
   test-and-build:
