@@ -172,7 +172,6 @@ jobs:
 
   build-distros:
    #needs: [test-control-plane, test-enterprise-control-plane]
-    needs: test-control-plane
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -247,13 +246,14 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: consul-k8s_linux_amd64.zip
+          path: control-plane
 
       - name: Docker build 
         working-directory: control-plane
         run: |
           pwd
           ls
-          unzip consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
+          unzip ${{steps.download.outputs.download-path}}/consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
           make ci.dev-docker
 
   acceptance-tproxy:
