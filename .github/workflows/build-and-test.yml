@@ -258,38 +258,10 @@ jobs:
 
   acceptance-tproxy:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Create Kind Cluster
-        uses: helm/kind-action@v1.2.0
-        with:
-          version: 1.22.4
-
-      - name: Setup go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17.2
-
-      - name: Setup go mod cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Go mod download
-        working-directory: acceptance
-        run: go mod download
-
-      - run:  mkdir -p ${{env.TEST_RESULTS}}
-
-        #      - name: Run acceptance tests
-        
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
+    with:
+      directory: acceptance
+      go-version: 1.17.2
 
   acceptance:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
