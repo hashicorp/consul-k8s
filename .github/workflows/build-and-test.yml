@@ -247,14 +247,14 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: consul-k8s_linux_amd64.zip
-          path: control-plane/pkg/bin/linux_amd64/consul-k8s_linux_amd64.zip
+          path: consul-k8s_linux_amd64.zip
 
       - name: Docker build 
         working-directory: control-plane
         run: |
           pwd
           ls
-          unzip /pkg/bin/linux_amd64/consul-k8s_linux_amd64.zip
+          unzip consul-k8s_linux_amd64.zip -d ./pkg/bin
           make ci.dev-docker
 
   acceptance-tproxy:
