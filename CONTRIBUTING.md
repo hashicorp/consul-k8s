@@ -582,7 +582,7 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install python-yq
   ```
-* [Helm 3](https://helm.sh) (Helm 2 is not supported)
+* [Helm 3](https://helm.sh) (Currently, must use v3.6.3. Also, Helm 2 is not supported) 
   ```bash
   brew install kubernetes-helm
   ```
@@ -611,7 +611,11 @@ To run a specific test by name use the `--filter` flag:
     bats ./charts/consul/test/unit/<filename>.bats --filter "my test name"
 
 #### Acceptance Tests
-
+##### Pre-requisites 
+* [gox](https://github.com/mitchellh/gox) (v1.14+)
+  ```bash
+  brew install gox
+  ```
 To run the acceptance tests:
 
     cd acceptance/tests
