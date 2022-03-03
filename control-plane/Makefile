@@ -39,7 +39,7 @@ ci.dev-docker:
 	--label PULL_REQUEST=$(GITHIB_PULL_REQUEST) \
 	--label GITHUB_BUILD_URL=$(GITHUB_SERVER_URL)/$(GITHUB_REPOSITORY)/actions/runs/$(GITHUB_RUN_ID) \
 	$(CI_DEV_DOCKER_WORKDIR) -f $(CURDIR)/build-support/docker/Dev.dockerfile
-#	@echo $(DOCKER_PASS) | docker login -u="$(DOCKER_USER)" --password-stdin
+	@echo $(DOCKER_PASS) | docker login -u="$(DOCKER_USER)" --password-stdin
 	@echo "Pushing dev image to: https://cloud.docker.com/u/$(CI_DEV_DOCKER_NAMESPACE)/repository/docker/$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME)"
 	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)
 ifeq ($(GITHUB_REF_NAME), main)
