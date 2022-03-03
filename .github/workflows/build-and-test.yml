@@ -252,6 +252,8 @@ jobs:
       - name: Docker build 
         working-directory: control-plane
         run: |
+          ls /pkg/bin/linux_amd64
+          ls
           unzip /pkg/bin/linux_amd64/consul-k8s_linux_amd64.zip
           make ci.dev-docker
 
