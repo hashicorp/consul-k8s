@@ -12,7 +12,7 @@ on:
       consul-k8s-image:
         required: false 
         type: string
-#       default: docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest
+        default: docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest
       additional-flags:
         required: false
         type: string
@@ -70,7 +70,7 @@ jobs:
         working-directory: ${{inputs.directory}}
         run: |
           gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir ${{ env.TEST_RESULTS}} ./... -- \
-          $${{ inputs.additional-flags }} \
+          ${{ inputs.additional-flags }} \
           -enable-enterprise \
           -enable-multi-cluster \
           -debug-directory=${{env.TEST_RESULTS}}/debug \
