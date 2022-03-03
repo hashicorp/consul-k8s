@@ -49,6 +49,7 @@ jobs:
     with:
       directory: hack/helm-reference-gen
       go-version: 1.17.2
+      CONSUL_LICENSE: ${{secrets.CONSUL_LICENSE}}
 
   unit-helm-gen:
     needs: [go-fmt-vet-helm-gen, validate-helm-gen]
@@ -129,6 +130,8 @@ jobs:
   test-enterprise-control-plane:
     needs: [lint-control-plane, go-fmt-vet-control-plane]
     runs-on: ubuntu-latest
+    env:
+      CONSUL_LICENSE: ${{secrets.CONSUL_LICENSE}}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -243,7 +246,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: consul-k8s_linux_amd64.zip
-          path: consul-k8s_linux_amd64.zip
+          path: control-plane/consul-k8s_linux_amd64.zip
 
       - name: Docker build 
         working-directory: control-plane
