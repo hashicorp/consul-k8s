@@ -16,6 +16,7 @@ on:
       additional-flags:
         required: false
         type: string
+        default: ""
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
@@ -69,7 +70,7 @@ jobs:
         working-directory: ${{inputs.directory}}
         run: |
           gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir ${{ env.TEST_RESULTS}} ./... -- \
-          $${ inputs.additional-flags }} \
+          $${{ inputs.additional-flags }} \
           -enable-enterprise \
           -enable-multi-cluster \
           -debug-directory=${{env.TEST_RESULTS}}/debug \

@@ -262,6 +262,7 @@ jobs:
     with:
       directory: acceptance
       go-version: 1.17.2
+      additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy
 
   acceptance:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
