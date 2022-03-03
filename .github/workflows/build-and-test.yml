@@ -49,7 +49,6 @@ jobs:
     with:
       directory: hack/helm-reference-gen
       go-version: 1.17.2
-      CONSUL_LICENSE: ${{secrets.CONSUL_LICENSE}}
 
   unit-helm-gen:
     needs: [go-fmt-vet-helm-gen, validate-helm-gen]
