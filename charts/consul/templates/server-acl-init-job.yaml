@@ -251,7 +251,7 @@ spec:
                 {{- end }}
 
                 {{- if .Values.controller.enabled }}
-                -enable-controller=true \
+                -controller=true \
                 {{- end }}
 
                 {{- if .Values.apiGateway.enabled }}

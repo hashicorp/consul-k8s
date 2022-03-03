@@ -291,7 +291,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-ingress-gateway-name=anothergw",
 				"-terminating-gateway-name=gw",
 				"-terminating-gateway-name=anothergw",
-				"-enable-controller",
+				"-controller",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -1092,7 +1092,7 @@ func TestRun_PoliciesAndBindingRulesForACLLoginNamespacesEnabled(t *testing.T) {
 	}{
 		{
 			TestName:    "Controller",
-			TokenFlags:  []string{"-enable-controller"},
+			TokenFlags:  []string{"-controller"},
 			PolicyNames: []string{"controller-policy"},
 			Roles:       []string{resourcePrefix + "-controller-acl-role"},
 			Namespace:   ns,

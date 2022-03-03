@@ -147,8 +147,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
 
-	c.flags.BoolVar(&c.flagEnableController, "enable-controller", false,
-		"Toggle for creating acl policies and rolebindings for the controller.")
+	c.flags.BoolVar(&c.flagEnableController, "controller", false,
+		"Toggle for configuring ACLs for the controller.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
