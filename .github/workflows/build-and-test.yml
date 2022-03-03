@@ -253,7 +253,7 @@ jobs:
         run: |
           pwd
           ls
-          unzip ${{steps.download.outputs.download-path}}/consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
+          unzip consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
           make ci.dev-docker
 
   acceptance-tproxy:
