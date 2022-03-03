@@ -85,7 +85,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.11.3"
+  image: "hashicorp/consul:1.11.4"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -431,12 +431,30 @@ global:
     createFederationSecret: false
 
     # The name of the primary datacenter.
-    primaryDatacenter: ""
+    # @type: string
+    primaryDatacenter: null
 
     # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`.
-    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"] 
+    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"]
     # @type: array<string>
     primaryGateways: []
+
+    # If you are setting `global.federation.enabled` to true and are in a secondary datacenter,
+    # set `k8sAuthMethodHost` to the address of the Kubernetes API server of the secondary datacenter.
+    # This address must be reachable from the Consul servers in the primary datacenter.
+    # This authmethod will be used to provision ACL tokens for Consul components and is different
+    # from the one used by the Consul Service Mesh.
+    # Please see the Kubernetes Auth Method documentation (https://consul.io/docs/acl/auth-methods/kubernetes).
+    #
+    # You could retrieve this value from your `kubeconfig` by running:
+    #
+    # ```shell-session
+    # $ kubectl config view \
+    #   -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
+    # ```
+    #
+    # @type: string
+    k8sAuthMethodHost: null
 
   # Configures metrics for Consul service mesh
   metrics:

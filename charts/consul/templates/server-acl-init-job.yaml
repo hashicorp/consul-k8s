@@ -185,8 +185,12 @@ spec:
                 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
                 -create-inject-token=true \
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
-                -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
+                -auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
                 {{- end }}
+                {{- end }}
+
+                {{- if .Values.global.federation.k8sAuthMethodHost }}
+                -auth-method-host={{ .Values.global.federation.k8sAuthMethodHost }} \
                 {{- end }}
 
                 {{- if .Values.meshGateway.enabled }}
