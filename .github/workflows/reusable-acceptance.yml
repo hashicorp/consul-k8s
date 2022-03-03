@@ -1,0 +1,77 @@
+name: reusable-acceptance
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        required: true
+        type: string
+      go-version:
+        required: true
+        type: string
+      consul-k8s-image:
+        required: false 
+        type: string
+#       default: docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest
+      additional-flags:
+        required: false
+        type: string
+# Environment variables can only be used at the step level
+env:
+  TEST_RESULTS: /tmp/test-results # path to where test results are saved
+  GOTESTSUM_VERSION: 1.6.4
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        parallelism: [3]
+        index: [0,1,2]
+
+    steps:      
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{inputs.go-version}}
+
+      - name: Setup go mod cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+# TODO: Clean this up
+#      - name: Install gotestsum
+#        run: |
+#          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+#          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+#          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+
+      - name: Install gosplitter
+        run: go get github.com/Songmu/gotesplit/cmd/gotesplit
+
+      - run: mkdir -p ${{env.TEST_RESULTS}}
+
+      - name: go mod download
+        working-directory: ${{inputs.directory}}
+        run: go mod download
+
+# TODO: do not run on forks
+      - name: Run acceptance tests 
+        working-directory: ${{inputs.directory}}
+        run: |
+          gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir ${{ env.TEST_RESULTS}} ./... -- \
+          $${ inputs.additional-flags }} \
+          -enable-enterprise \
+          -enable-multi-cluster \
+          -debug-directory=${{env.TEST_RESULTS}}/debug \
+          -consul-k8s-image=${{inputs.consul-k8s-image}}
+         
