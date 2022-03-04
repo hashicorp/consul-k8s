@@ -77,7 +77,7 @@ jobs:
           for pkg in ${{ matrix.test-package }}
           do
           #            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
-            if ! gotestsum --format=testname --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+            if ! gotestsum --format=testname -- $pkg -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
@@ -89,6 +89,6 @@ jobs:
               break
             fi
           done
-          gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
+          #          gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
           exit $exit_code
 
