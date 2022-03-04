@@ -35,9 +35,6 @@ jobs:
           - {runner: "2", test-packages: "example ingress-gateway mesh-gateway metrics"}
           - {runner: "3", test-packages: "partitions sync terminating-gateway vault"}
       fail-fast: true
-    env:
-      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_LICENSE }}
-      CONSUL_LICENSE: ${{ secrets.CONSUL_LICENSE }}
     steps:      
       - name: Checkout code
         uses: actions/checkout@v2
@@ -76,6 +73,7 @@ jobs:
       - name: Run acceptance tests ${{ matrix.runner }}
         working-directory: ${{ inputs.directory }}
         run: |
+          export CONSUL_ENT_LICENSE=${{ secrets.CONSUL_LICENSE }}
           exit_code=0
           echo "Running packages: ${{ matrix.test-packages }}"
           for pkg in $(echo ${{ matrix.test-packages }})
