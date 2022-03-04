@@ -1963,6 +1963,38 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# Vault bootstrap token
+
+@test "server/StatefulSet: vault bootstrap token is configured when secret provided" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+    --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.acls.bootstrapToken.secretName=vault/bootstrap-token' \
+    --set 'global.acls.bootstrapToken.secretKey=token' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that Vault annotations are set.
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token-config.hcl"]' | tee /dev/stderr)"
+  [ "${actual}" = "vault/bootstrap-token" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-bootstrap-token-config.hcl"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"vault/bootstrap-token\" -}}\nacl { tokens { initial_management = \"{{- .Data.data.token -}}\" }}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that path to Vault secret config is provided to the command.
+  local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/bootstrap-token-config.hcl"))' | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # Vault replication token
 
 @test "server/StatefulSet: vault replication token is configured when secret provided and createReplicationToken is false" {
