@@ -80,8 +80,7 @@ jobs:
           do
             fullpkg="github.com/hashicorp/consul-k8s/${{ inputs.directory }}/${pkg}"
             echo "Testing package: ${fullpkg}"
-            
-            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- ${fullpkg} -p 1 -timeout 2h -failfast \
+            if ! gotestsum --jsonfile=jsonfile-${pkg////-} -- ${fullpkg} -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
