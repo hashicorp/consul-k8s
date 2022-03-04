@@ -73,6 +73,13 @@ as well as the global.name setting.
           {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.vaultBootstrapTokenConfigTemplate" -}}
+|
+          {{ "{{" }}- with secret "{{ .Values.global.acls.bootstrapToken.secretName }}" -{{ "}}" }}
+          acl { tokens { initial_management = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.bootstrapToken.secretKey }} -{{ "}}" }}" }}
+          {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{/*
 Sets up the extra-from-values config file passed to consul and then uses sed to do any necessary
 substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The output file

@@ -81,6 +81,10 @@ spec:
         "vault.hashicorp.com/agent-inject-secret-replication-token-config.hcl": "{{ .Values.global.acls.replicationToken.secretName }}"
         "vault.hashicorp.com/agent-inject-template-replication-token-config.hcl":  {{ template "consul.vaultReplicationTokenConfigTemplate" . }}
         {{- end }}
+        {{- if (and .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
+        "vault.hashicorp.com/agent-inject-secret-bootstrap-token-config.hcl": "{{ .Values.global.acls.bootstrapToken.secretName }}"
+        "vault.hashicorp.com/agent-inject-template-bootstrap-token-config.hcl":  {{ template "consul.vaultBootstrapTokenConfigTemplate" . }}
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
@@ -286,14 +290,6 @@ spec:
                 {{- end }}
                 -client=0.0.0.0 \
                 -config-dir=/consul/config \
-                {{- /* Always include the extraVolumes at the end so that users can
-                    override other Consul settings. The last -config-dir takes
-                    precedence. */}}
-                {{- range .Values.server.extraVolumes }}
-                {{- if .load }}
-                -config-dir=/consul/userconfig/{{ .name }} \
-                {{- end }}
-                {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
                 -domain={{ .Values.global.domain }} \
@@ -332,6 +328,17 @@ spec:
                 {{- end }}
                 {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
                 $recursor_flags \
+                {{- end }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.bootstrapToken.secretName }}
+                -config-file=/vault/secrets/bootstrap-token-config.hcl \
+                {{- end }}
+                {{- /* Always include the extraVolumes at the end so that users can
+                      override other Consul settings. The last -config-dir takes
+                      precedence. */}}
+                {{- range .Values.server.extraVolumes }}
+                {{- if .load }}
+                -config-dir=/consul/userconfig/{{ .name }} \
+                {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -server
