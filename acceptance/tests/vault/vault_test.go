@@ -37,7 +37,9 @@ func TestVault(t *testing.T) {
 		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
+	bootstrapToken := configureBootstrapTokenVaultSecret(t, vaultClient)
+
+	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg, true)
 
 	configurePKICA(t, vaultClient)
 	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
@@ -53,10 +55,11 @@ func TestVault(t *testing.T) {
 		"connectInject.replicas": "1",
 		"controller.enabled":     "true",
 
-		"global.secretsBackend.vault.enabled":          "true",
-		"global.secretsBackend.vault.consulServerRole": "consul-server",
-		"global.secretsBackend.vault.consulClientRole": "consul-client",
-		"global.secretsBackend.vault.consulCARole":     "consul-ca",
+		"global.secretsBackend.vault.enabled":              "true",
+		"global.secretsBackend.vault.consulServerRole":     "consul-server",
+		"global.secretsBackend.vault.consulClientRole":     "consul-client",
+		"global.secretsBackend.vault.consulCARole":         "consul-ca",
+		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
@@ -65,10 +68,12 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 
-		"global.acls.manageSystemACLs":       "true",
-		"global.tls.enabled":                 "true",
-		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
-		"global.gossipEncryption.secretKey":  "gossip",
+		"global.acls.manageSystemACLs":          "true",
+		"global.acls.bootstrapToken.secretName": "consul/data/secret/bootstrap",
+		"global.acls.bootstrapToken.secretKey":  "token",
+		"global.tls.enabled":                    "true",
+		"global.gossipEncryption.secretName":    "consul/data/secret/gossip",
+		"global.gossipEncryption.secretKey":     "gossip",
 
 		"ingressGateways.enabled":               "true",
 		"ingressGateways.defaults.replicas":     "1",
@@ -99,6 +104,7 @@ func TestVault(t *testing.T) {
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
+	consulCluster.ACLToken = bootstrapToken
 	consulClient := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
