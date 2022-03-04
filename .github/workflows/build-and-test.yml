@@ -278,6 +278,8 @@ jobs:
       go-version: 1.17.2
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
       gotestsum-version: 1.6.4
+    secrets:
+      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 
   acceptance:
     needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
