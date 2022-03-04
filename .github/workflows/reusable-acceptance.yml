@@ -20,6 +20,10 @@ on:
       gotestsum-version:
         required: true
         type: string
+      kind-version:
+        required: false
+        type: string
+        default: "v1.22.4"
     secrets:
         CONSUL_ENT_LICENSE:
           required: true
@@ -70,7 +74,12 @@ jobs:
       - name: go mod download
         working-directory: ${{ inputs.directory }}
         run: go mod download
-          
+      
+      - name: Create kind clusters
+        run: |
+          kind create cluster --name dc1 --image kindest/node:${{ inputs.kind-version }}
+          kind create cluster --name dc2 --image kindest/node:${{ inputs.kind-version }}
+
       # We have to run the tests for each package separately so that we can
       # exit early if any test fails (-failfast only works within a single
       # package).
