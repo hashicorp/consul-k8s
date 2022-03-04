@@ -74,8 +74,7 @@ jobs:
         run: |
           exit_code=0
           echo "Running packages: ${{ matrix.test-packages }}"
-          IFS=' '
-          for pkg in "${{ matrix.test-package }}"
+          for pkg in $(echo ${{ matrix.test-packages }})
           do
             echo "Testing package: $pkg"
           #            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast k
