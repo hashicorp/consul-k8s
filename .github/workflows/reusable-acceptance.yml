@@ -3,20 +3,24 @@ name: reusable-acceptance
 on:
   workflow_call:
     inputs:
+      additional-flags:
+        required: false
+        type: string
+        default: ""
+      consul-k8s-image:
+        required: false 
+        type: string
+        default: docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest
       directory:
         required: true
         type: string
       go-version:
         required: true
         type: string
-      consul-k8s-image:
-        required: false 
+      test-packages:
+        required: true
         type: string
-        default: docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest
-      additional-flags:
-        required: false
-        type: string
-        default: ""
+
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
@@ -27,8 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        parallelism: [3]
-        index: [0,1,2]
+        include: # I am really sorry for this but I could not find a way to automatically split our tests into several runners. For now, split manually.
+          - {runner: "1", test-packages: "basic cli connect consul-dns controller example"}
+          - {runner: "2", test-packages: "fixtures ingress-gateway mesh-gateway metrics"}
+          - {runner: "3", test-packages: "partitions sync terminating-gateway vault"}
+      fail-fast: true
 
     steps:      
       - name: Checkout code
@@ -49,15 +56,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-# TODO: Clean this up
-#      - name: Install gotestsum
-#        run: |
-#          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
-#          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
-#          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
-
-      - name: Install gosplitter
-        run: go get github.com/Songmu/gotesplit/cmd/gotesplit
+      - name: Install gotestsum
+        run: |
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
 
       - run: mkdir -p ${{env.TEST_RESULTS}}
 
@@ -66,13 +69,28 @@ jobs:
         run: go mod download
 
 # TODO: do not run on forks
-      - name: Run acceptance tests 
+      - name: Run acceptance tests ${{matrix.runner}}
         working-directory: ${{inputs.directory}}
         run: |
-          gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir ${{ env.TEST_RESULTS}} ./... -- \
-          ${{ inputs.additional-flags }} \
-          -enable-enterprise \
-          -enable-multi-cluster \
-          -debug-directory=${{env.TEST_RESULTS}}/debug \
-          -consul-k8s-image=${{inputs.consul-k8s-image}}
-         
+          # We have to run the tests for each package separately so that we can
+          # exit early if any test fails (-failfast only works within a single
+          # package).
+          exit_code=0
+          echo "Running packages: ${{ matrix.test-packages }}"
+          for pkg in $pkgs
+          do
+            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+              ${{ inputs.additional-flags }} \
+              -enable-enterprise \
+              -enable-multi-cluster \
+              -debug-directory=${{ env.TEST_RESULTS}}/debug \
+              -consul-k8s-image=${{ inputs.consul-k8s-image }} 
+            then
+              echo "Tests in ${pkg} failed, aborting early"
+              exit_code=1
+              break
+            fi
+          done
+          gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
+          exit $exit_code
+
