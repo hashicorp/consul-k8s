@@ -35,7 +35,8 @@ jobs:
           - {runner: "2", test-packages: "example ingress-gateway mesh-gateway metrics"}
           - {runner: "3", test-packages: "partitions sync terminating-gateway vault"}
       fail-fast: true
-
+    env:
+      CONSUL_ENT_LICENSE: ${{secrets.CONSUL_LICENSE}}
     steps:      
       - name: Checkout code
         uses: actions/checkout@v2
