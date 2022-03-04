@@ -17,7 +17,7 @@ on:
       go-version:
         required: true
         type: string
-      gotestsum-verison:
+      gotestsum-version:
         required: true
         type: string
 
