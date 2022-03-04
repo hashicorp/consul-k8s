@@ -38,7 +38,8 @@ jobs:
           - {runner: "1", test-packages: "basic cli connect consul-dns controller"}
           - {runner: "2", test-packages: "example ingress-gateway mesh-gateway metrics"}
           - {runner: "3", test-packages: "partitions sync terminating-gateway vault"}
-      fail-fast: true
+#TODO: set back to true
+      fail-fast: false
     steps:      
       - name: Checkout code
         uses: actions/checkout@v2
