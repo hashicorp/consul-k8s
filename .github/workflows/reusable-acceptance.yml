@@ -64,19 +64,21 @@ jobs:
       - name: go mod download
         working-directory: ${{inputs.directory}}
         run: go mod download
-
+          
+      # We have to run the tests for each package separately so that we can
+      # exit early if any test fails (-failfast only works within a single
+      # package).
 # TODO: do not run on forks
       - name: Run acceptance tests ${{matrix.runner}}
         working-directory: ${{inputs.directory}}
         run: |
-          # We have to run the tests for each package separately so that we can
-          # exit early if any test fails (-failfast only works within a single
-          # package).
           exit_code=0
           echo "Running packages: ${{ matrix.test-packages }}"
-          for pkg in ${{ matrix.test-package }}
+          IFS=' '
+          for pkg in "${{ matrix.test-package }}"
           do
-          #            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+            echo "Testing package: $pkg"
+          #            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast k
             if ! gotestsum --format=testname -- $pkg -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
