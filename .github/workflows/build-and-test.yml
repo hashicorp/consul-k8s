@@ -49,14 +49,14 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
 
   unit-helm-gen:
     needs: [go-fmt-vet-helm-gen, validate-helm-gen]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
 
   unit-test-helm-templates:
     needs: [unit-helm-gen]
@@ -78,7 +78,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
    
-      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+      - run: go get -u github.com/hashicorp/lint-consul-retry 
+      - run: lint-consul-retry
       - name: Run lint
         working-directory: control-plane
         run: go run hack/lint-api-new-client/main.go
@@ -87,7 +88,7 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: control-plane
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
 
   test-control-plane:
     needs: [lint-control-plane, go-fmt-vet-control-plane]
@@ -99,7 +100,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -143,7 +144,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -176,15 +177,16 @@ jobs:
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
   build-distros:
+#TODO: Fix
    #needs: [test-control-plane, test-enterprise-control-plane]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - {go: "1.17.2", goos: "linux", goarch: "386"}
-          - {go: "1.17.5", goos: "linux", goarch: "amd64"}
-          - {go: "1.17.5", goos: "linux", goarch: "arm"}
-          - {go: "1.17.5", goos: "linux", goarch: "arm64"}
+          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "386"}
+          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "amd64"}
+          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "arm"}
+          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "arm64"}
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} build
@@ -215,27 +217,27 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory:  acceptance 
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }} 
 
   unit-acceptance-framework:
     needs: go-fmt-vet-acceptance
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: acceptance/framework
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
 
   go-fmt-vet-cli:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: cli 
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
 
   unit-cli:
     needs: go-fmt-vet-cli
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: cli 
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
 
   dev-upload-docker:
     needs: build-distros
@@ -266,7 +268,7 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
     with:
       directory: acceptance/tests
-      go-version: 1.17.2
+      go-version: ${{ env.GO_VERSION }}
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
 
   acceptance:
