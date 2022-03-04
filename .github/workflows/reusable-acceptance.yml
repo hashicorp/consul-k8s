@@ -17,9 +17,6 @@ on:
       go-version:
         required: true
         type: string
-      test-packages:
-        required: true
-        type: string
 
 # Environment variables can only be used at the step level
 env:
