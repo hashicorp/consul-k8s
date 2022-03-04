@@ -12,6 +12,7 @@ env:
   CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
   CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.6.4
+  GO_VERSION: 1.17.2
 
 # TODO: upload tests somewhere. An artifact?
 # TODO: prevent running some things on forks?
@@ -27,7 +28,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -74,9 +75,13 @@ jobs:
   lint-control-plane:
     runs-on: ubuntu-latest
     steps:
-      - name: TODO
-        run:
-         echo "Filler"
+      - name: Checkout code
+        uses: actions/checkout@v2
+   
+      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+      - name: Run lint
+        working-directory: control-plane
+        run: go run hack/lint-api-new-client/main.go
 
   go-fmt-vet-control-plane:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
