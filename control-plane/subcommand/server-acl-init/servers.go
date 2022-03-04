@@ -20,31 +20,40 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
 
 	if bootstrapToken == "" {
+		c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
+
 		var err error
 		bootstrapToken, err = c.bootstrapACLs(firstServerAddr, scheme, bootTokenSecretName)
 		if err != nil {
 			return "", err
 		}
+	} else {
+		c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
 	}
 
-	// Override our original client with a new one that has the bootstrap token
-	// set.
-	consulClient, err := consul.NewClient(&api.Config{
-		Address: firstServerAddr,
-		Scheme:  scheme,
-		Token:   bootstrapToken,
-		TLSConfig: api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
-	}
+	// We should only create and set server tokens when servers are running within this cluster.
+	if c.flagSetServerTokens {
+		c.log.Info("Setting Consul server tokens")
 
-	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(consulClient, serverAddresses, bootstrapToken, scheme); err != nil {
-		return "", err
+		// Override our original client with a new one that has the bootstrap token
+		// set.
+		consulClient, err := consul.NewClient(&api.Config{
+			Address: firstServerAddr,
+			Scheme:  scheme,
+			Token:   bootstrapToken,
+			TLSConfig: api.TLSConfig{
+				Address: c.flagConsulTLSServerName,
+				CAFile:  c.flagConsulCACert,
+			},
+		})
+		if err != nil {
+			return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
+		}
+
+		// Create new tokens for each server and apply them.
+		if err = c.setServerTokens(consulClient, serverAddresses, bootstrapToken, scheme); err != nil {
+			return "", err
+		}
 	}
 	return bootstrapToken, nil
 }
