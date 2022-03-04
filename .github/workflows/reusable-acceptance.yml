@@ -24,8 +24,7 @@ on:
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  CONSUL_LICENSE: ${{ secrets.CONSUL_LICENSE }} 
-  CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_LICENSE }} 
+  CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }} 
 
 jobs:
   a:

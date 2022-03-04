@@ -12,7 +12,7 @@ on:
 
 
 jobs:
-  execute:
+  a:
     runs-on: ubuntu-latest
 
     steps:      
