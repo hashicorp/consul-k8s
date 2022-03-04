@@ -31,8 +31,8 @@ jobs:
     strategy:
       matrix:
         include: # I am really sorry for this but I could not find a way to automatically split our tests into several runners. For now, split manually.
-          - {runner: "1", test-packages: "basic cli connect consul-dns controller example"}
-          - {runner: "2", test-packages: "fixtures ingress-gateway mesh-gateway metrics"}
+          - {runner: "1", test-packages: "basic cli connect consul-dns controller"}
+          - {runner: "2", test-packages: "example ingress-gateway mesh-gateway metrics"}
           - {runner: "3", test-packages: "partitions sync terminating-gateway vault"}
       fail-fast: true
 
@@ -79,16 +79,12 @@ jobs:
           for pkg in $(echo ${{ matrix.test-packages }})
           do
             echo "Testing package: ${pkg}"
-              pwd
-              ls
-              cd ${pkg}
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} --packages="./..." -- -p 1 -timeout 2h -failfast \
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- ${pkg} -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
               -debug-directory=${{ env.TEST_RESULTS }}/debug \
               -consul-k8s-image=${{ inputs.consul-k8s-image }} 
-            cd ..
             then
               echo "Tests in ${pkg} failed, aborting early"
               exit_code=1
