@@ -76,10 +76,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-   
-      - run: go get -u github.com/hashicorp/lint-consul-retry 
-      - run:  echo "$GOPATH/bin" >> $GITHUB_PATH
-      - run: lint-consul-retry
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.2
+
+      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+
       - name: Run lint
         working-directory: control-plane
         run: go run hack/lint-api-new-client/main.go
@@ -264,7 +268,9 @@ jobs:
           make ci.dev-docker
 
   acceptance-tproxy:
-    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+#TODO: Fix
+    #needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+    needs: dev-upload-docker
     uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
     with:
       directory: acceptance/tests
