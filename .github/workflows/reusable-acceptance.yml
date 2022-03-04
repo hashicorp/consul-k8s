@@ -24,7 +24,7 @@ env:
   GOTESTSUM_VERSION: 1.6.4
 
 jobs:
-  execute:
+  a:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -74,9 +74,10 @@ jobs:
           # package).
           exit_code=0
           echo "Running packages: ${{ matrix.test-packages }}"
-          for pkg in $pkgs
+          for pkg in ${{ matrix.test-package }}
           do
-            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+          #            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+            if ! gotestsum --format=testname --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
