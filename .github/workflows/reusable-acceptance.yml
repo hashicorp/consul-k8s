@@ -41,7 +41,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{inputs.go-version}}
+          go-version: ${{ inputs.go-version }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -55,34 +55,33 @@ jobs:
 
       - name: Install gotestsum
         run: |
-          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
-          sudo tar -C /usr/local/bin -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
-          rm gotestsum_${{env.GOTESTSUM_VERSION}}_linux_amd64.tar.gz
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{ env.GOTESTSUM_VERSION }}/gotestsum_${{ env.GOTESTSUM_VERSION }}_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_${{ env.GOTESTSUM_VERSION }}_linux_amd64.tar.gz
+          rm gotestsum_${{ env.GOTESTSUM_VERSION }}_linux_amd64.tar.gz
 
-      - run: mkdir -p ${{env.TEST_RESULTS}}
+      - run: mkdir -p ${{ env.TEST_RESULTS }}
 
       - name: go mod download
-        working-directory: ${{inputs.directory}}
+        working-directory: ${{ inputs.directory }}
         run: go mod download
           
       # We have to run the tests for each package separately so that we can
       # exit early if any test fails (-failfast only works within a single
       # package).
 # TODO: do not run on forks
-      - name: Run acceptance tests ${{matrix.runner}}
-        working-directory: ${{inputs.directory}}
+      - name: Run acceptance tests ${{ matrix.runner }}
+        working-directory: ${{ inputs.directory }}
         run: |
           exit_code=0
           echo "Running packages: ${{ matrix.test-packages }}"
           for pkg in $(echo ${{ matrix.test-packages }})
           do
-            echo "Testing package: $pkg"
-          #            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast k
-            if ! gotestsum --format=testname -- $pkg -p 1 -timeout 2h -failfast \
+            echo "Testing package: ${pkg}"
+            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
-              -debug-directory=${{ env.TEST_RESULTS}}/debug \
+              -debug-directory=${{ env.TEST_RESULTS }}/debug \
               -consul-k8s-image=${{ inputs.consul-k8s-image }} 
             then
               echo "Tests in ${pkg} failed, aborting early"

@@ -11,8 +11,7 @@ env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
   CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
-  GOTESTSUM_VERSION: 1.6.4
-  GO_VERSION: 1.17.2
+  GOTESTSUM_VERSION: 1.6.4 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 # TODO: upload tests somewhere. An artifact?
 # TODO: prevent running some things on forks?
@@ -28,7 +27,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: 1.17.2
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -49,14 +48,14 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
 
   unit-helm-gen:
     needs: [go-fmt-vet-helm-gen, validate-helm-gen]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
 
   unit-test-helm-templates:
     needs: [unit-helm-gen]
@@ -88,7 +87,7 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: control-plane
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
 
   test-control-plane:
     needs: [lint-control-plane, go-fmt-vet-control-plane]
@@ -100,7 +99,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: 1.17.2
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -144,7 +143,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: 1.17.2
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -183,10 +182,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "386"}
-          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "amd64"}
-          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "arm"}
-          - {go: "${{ env.GO_VERSION }}", goos: "linux", goarch: "arm64"}
+          - {go: "1.17.2", goos: "linux", goarch: "386"}
+          - {go: "1.17.2", goos: "linux", goarch: "amd64"}
+          - {go: "1.17.2", goos: "linux", goarch: "arm"}
+          - {go: "1.17.2", goos: "linux", goarch: "arm64"}
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} build
@@ -217,27 +216,27 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory:  acceptance 
-      go-version: ${{ env.GO_VERSION }} 
+      go-version: 1.17.2 
 
   unit-acceptance-framework:
     needs: go-fmt-vet-acceptance
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: acceptance/framework
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
 
   go-fmt-vet-cli:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
     with:
       directory: cli 
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
 
   unit-cli:
     needs: go-fmt-vet-cli
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: cli 
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
 
   dev-upload-docker:
     needs: build-distros
@@ -268,7 +267,7 @@ jobs:
     uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
     with:
       directory: acceptance/tests
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.17.2
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
 
   acceptance:
