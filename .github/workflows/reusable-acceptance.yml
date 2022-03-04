@@ -78,8 +78,10 @@ jobs:
           echo "Running packages: ${{ matrix.test-packages }}"
           for pkg in $(echo ${{ matrix.test-packages }})
           do
-            echo "Testing package: ${pkg}"
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- ${pkg} -p 1 -timeout 2h -failfast \
+            fullpkg="github.com/hashicorp/consul-k8s/${{ inputs.directory }}/${pkg}"
+            echo "Testing package: ${fullpkg}"
+            
+            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- ${fullpkg} -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
