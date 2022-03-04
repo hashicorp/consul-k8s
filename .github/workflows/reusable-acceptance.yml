@@ -17,11 +17,13 @@ on:
       go-version:
         required: true
         type: string
+      gotestsum-verison:
+        required: true
+        type: string
 
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  GOTESTSUM_VERSION: 1.6.4
 
 jobs:
   a:
@@ -55,9 +57,9 @@ jobs:
 
       - name: Install gotestsum
         run: |
-          wget https://github.com/gotestyourself/gotestsum/releases/download/v${{ env.GOTESTSUM_VERSION }}/gotestsum_${{ env.GOTESTSUM_VERSION }}_linux_amd64.tar.gz
-          sudo tar -C /usr/local/bin -xzf gotestsum_${{ env.GOTESTSUM_VERSION }}_linux_amd64.tar.gz
-          rm gotestsum_${{ env.GOTESTSUM_VERSION }}_linux_amd64.tar.gz
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v"${{ inputs.gotestsum-version }}"/gotestsum_"${{ inputs.gotestsum-version }}"_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_"${{ inputs.gotestsum-version }}"_linux_amd64.tar.gz
+          rm gotestsum_"${{ inputs.gotestsum-version }}"_linux_amd64.tar.gz
 
       - run: mkdir -p ${{ env.TEST_RESULTS }}
 
@@ -77,7 +79,7 @@ jobs:
           for pkg in $(echo ${{ matrix.test-packages }})
           do
             echo "Testing package: ${pkg}"
-            if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} --packages="${pkg}" -- -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
