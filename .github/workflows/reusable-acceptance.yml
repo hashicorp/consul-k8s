@@ -39,9 +39,13 @@ jobs:
     strategy: 
       matrix:
         include: # I am really sorry for this but I could not find a way to automatically split our tests into several runners. For now, split manually.
-          - {runner: "1", test-packages: "basic cli connect consul-dns controller example"}
-          - {runner: "2", test-packages: "ingress-gateway mesh-gateway metrics partitions"}
-          - {runner: "3", test-packages: "sync terminating-gateway vault"}
+          - {runner: "1", test-packages: "basic connect"}
+          - {runner: "2", test-packages: "consul-dns controller example"}
+          - {runner: "3", test-packages: "example ingress-gateway mesh-gateway"}
+          - {runner: "4", test-packages: "mesh-gateway metrics"}
+          - {runner: "5", test-packages: "partitions sync"}
+          - {runner: "6", test-packages: "terminating-gateway vault"}
+
 #TODO: set back to true
       fail-fast: false
     steps:      
