@@ -26,17 +26,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Cluster represents a consul cluster object.
-type Cluster interface {
-	Create(t *testing.T)
-	Destroy(t *testing.T)
-	// Upgrade runs helm upgrade. It will merge the helm values from the
-	// initial install with helmValues. Any keys that were previously set
-	// will be overridden by the helmValues keys.
-	Upgrade(t *testing.T, helmValues map[string]string)
-	SetupConsulClient(t *testing.T, secure bool) *api.Client
-}
-
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul.
 type HelmCluster struct {
@@ -61,7 +50,6 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
-
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
