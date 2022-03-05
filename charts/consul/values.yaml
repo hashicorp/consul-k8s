@@ -105,7 +105,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: "hashicorp/consul-k8s-control-plane:0.41.0"
+  imageK8S: "hashicorp/consul-k8s-control-plane:0.41.1"
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -433,7 +433,7 @@ global:
     # The name of the primary datacenter.
     primaryDatacenter: ""
 
-    # A list of addresses of the primary mesh gateways in the form <ip>:<port>.
+    # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`.
     # (e.g. ["1.1.1.1:443", "2.3.4.5:443"] 
     # @type: array<string>
     primaryGateways: []
@@ -490,7 +490,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
   # @default: envoyproxy/envoy-alpine:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy-alpine:v1.20.1"
+  imageEnvoy: "envoyproxy/envoy-alpine:v1.20.2"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.

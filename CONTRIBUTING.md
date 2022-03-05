@@ -476,10 +476,10 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 
 ### Update consul-k8s Acceptance Tests
-1. Add a test resource to `test/acceptance/tests/fixtures/crds/ingressgateway.yaml`. Ideally it requires
+1. Add a test resource to `acceptance/tests/fixtures/crds/ingressgateway.yaml`. Ideally it requires
    no other resources. For example, I used a `tcp` service so it didn't require a `ServiceDefaults`
    resource to set its protocol to something else.
-1. Update `charts/consul/test/acceptance/tests/controller/controller_test.go` and `charts/consul/test/acceptance/tests/controller/controller_namespaces_test.go`.
+1. Update `acceptance/tests/controller/controller_test.go` and `acceptance/tests/controller/controller_namespaces_test.go`.
 1. Test locally, then submit a PR that uses your Docker image as `global.imageK8S`.
 
 ---
@@ -582,7 +582,7 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install python-yq
   ```
-* [Helm 3](https://helm.sh) (Helm 2 is not supported)
+* [Helm 3](https://helm.sh) (Currently, must use v3.6.3. Also, Helm 2 is not supported) 
   ```bash
   brew install kubernetes-helm
   ```
@@ -611,10 +611,14 @@ To run a specific test by name use the `--filter` flag:
     bats ./charts/consul/test/unit/<filename>.bats --filter "my test name"
 
 #### Acceptance Tests
-
+##### Pre-requisites 
+* [gox](https://github.com/mitchellh/gox) (v1.14+)
+  ```bash
+  brew install gox
+  ```
 To run the acceptance tests:
 
-    cd charts/consul/test/acceptance/tests
+    cd acceptance/tests
     go test ./... -p 1
     
 The above command will run all tests that can run against a single Kubernetes cluster,
@@ -791,14 +795,14 @@ If you are adding a feature that fits thematically with one of the existing test
 then you need to add your test cases to the existing test files.
 Otherwise, you will need to create a new test suite.
 
-We recommend to start by either copying the [example test](test/acceptance/tests/example/example_test.go)
-or the whole [example test suite](test/acceptance/tests/example),
+We recommend to start by either copying the [example test](acceptance/tests/example/example_test.go)
+or the whole [example test suite](acceptance/tests/example),
 depending on the test you need to add.
 
 #### Adding Test Suites
 
-To add a test suite, copy the [example test suite](test/acceptance/tests/example)
-and uncomment the code you need in the [`main_test.go`](test/acceptance/tests/example/main_test.go) file.
+To add a test suite, copy the [example test suite](acceptance/tests/example)
+and uncomment the code you need in the [`main_test.go`](acceptance/tests/example/main_test.go) file.
 
 At a minimum, this file needs to contain the following:
 
@@ -840,7 +844,7 @@ func TestMain(m *testing.M) {
 
 #### Example Test
 
-We recommend using the [example test](test/acceptance/tests/example/example_test.go)
+We recommend using the [example test](acceptance/tests/example/example_test.go)
 as a starting point for adding your tests.
 
 To write a test, you need access to the environment and context to run it against.
@@ -874,7 +878,7 @@ func TestExample(t *testing.T) {
 }
 ```
 
-Please see [mesh gateway tests](test/acceptance/tests/mesh-gateway/mesh_gateway_test.go)
+Please see [mesh gateway tests](acceptance/tests/mesh-gateway/mesh_gateway_test.go)
 for an example of how to use write a test that uses multiple contexts.
 
 #### Writing Assertions
@@ -953,12 +957,12 @@ To generate the docs and update the `helm.mdx` file:
    ```shell-session
    cd /path/to/consul-k8s
    ```
-1. Run `make gen-docs` using the path to your consul (not consul-k8s) repo:
+1. Run `make gen-helm-docs` using the path to your consul (not consul-k8s) repo:
    ```shell-session
-   make gen-docs consul=<path-to-consul-repo>
+   make gen-helm-docs consul=<path-to-consul-repo>
    # Examples:
-   # make gen-docs consul=/Users/my-name/code/hashicorp/consul
-   # make gen-docs consul=../consul
+   # make gen-helm-docs consul=/Users/my-name/code/hashicorp/consul
+   # make gen-helm-docs consul=../consul
    ```
 1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
 

@@ -18,25 +18,130 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test that Connect works in a default and a secure installation.
+// TestConnectInject tests that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
-	cases := []struct {
+	cases := map[string]struct {
+		clusterKind consul.ClusterKind
+		releaseName string
 		secure      bool
 		autoEncrypt bool
 	}{
-		{false, false},
-		{true, false},
-		{true, true},
+		"Helm install without secure or auto-encrypt": {
+			clusterKind: consul.Helm,
+			releaseName: helpers.RandomName(),
+		},
+		"Helm install with secure": {
+			clusterKind: consul.Helm,
+			releaseName: helpers.RandomName(),
+			secure:      true,
+		},
+		"Helm install with secure and auto-encrypt": {
+			clusterKind: consul.Helm,
+			releaseName: helpers.RandomName(),
+			secure:      true,
+			autoEncrypt: true,
+		},
+		"CLI install without secure or auto-encrypt": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+		},
+		"CLI install with secure": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+		},
+		"CLI install with secure and auto-encrypt": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+			autoEncrypt: true,
+		},
 	}
 
-	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			ConnectInjectConnectivityCheck(t, ctx, cfg, c.secure, c.autoEncrypt, false)
+			connHelper := ConnectHelper{
+				ClusterKind: c.clusterKind,
+				Secure:      c.secure,
+				AutoEncrypt: c.autoEncrypt,
+				ReleaseName: c.releaseName,
+				Ctx:         ctx,
+				Cfg:         cfg,
+			}
 
+			connHelper.Setup(t)
+
+			connHelper.Install(t)
+			connHelper.DeployClientAndServer(t)
+			if c.secure {
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
+			}
+			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionFailureWhenUnhealthy(t)
+		})
+	}
+}
+
+// TestConnectInjectOnUpgrade tests that Connect works before and after an
+// upgrade is performed on the cluster.
+func TestConnectInjectOnUpgrade(t *testing.T) {
+	cases := map[string]struct {
+		clusterKind      consul.ClusterKind
+		releaseName      string
+		initial, upgrade map[string]string
+	}{
+		"CLI upgrade changes nothing": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+		},
+		"CLI upgrade to enable ingressGateway": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			initial:     map[string]string{},
+			upgrade: map[string]string{
+				"ingressGateways.enabled":           "true",
+				"ingressGateways.defaults.replicas": "1",
+			},
+		},
+		"CLI upgrade to enable UI": {
+			clusterKind: consul.CLI,
+			releaseName: consul.CLIReleaseName,
+			initial:     map[string]string{},
+			upgrade: map[string]string{
+				"ui.enabled": "true",
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := suite.Config()
+			ctx := suite.Environment().DefaultContext(t)
+
+			connHelper := ConnectHelper{
+				ClusterKind: c.clusterKind,
+				HelmValues:  c.initial,
+				ReleaseName: c.releaseName,
+				Ctx:         ctx,
+				Cfg:         cfg,
+			}
+
+			connHelper.Setup(t)
+
+			connHelper.Install(t)
+			connHelper.DeployClientAndServer(t)
+			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionFailureWhenUnhealthy(t)
+
+			connHelper.HelmValues = c.upgrade
+
+			connHelper.Upgrade(t)
+			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}
 }
