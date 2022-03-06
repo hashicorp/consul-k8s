@@ -63,6 +63,19 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.rules | map(select(.resources[0] == "serviceaccounts")) | length' | tee /dev/stderr)
+  [ "${actual}" = "2" ]
+}
+
+#--------------------------------------------------------------------
+# manageSystemACLs.enabled
+
+@test "serverACLInit/Role: allows service accounts when manageSystemACLs.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-role.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "serviceaccounts")) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
 
