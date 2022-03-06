@@ -282,9 +282,15 @@ jobs:
       CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 
   acceptance:
-    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
-    runs-on: ubuntu-latest
-    steps:
-      - name: TODO
-        run:
-         echo "Filler"
+    #needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+    needs: dev-upload-docker
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
+    with:
+      directory: acceptance/tests
+      go-version: 1.17.2
+      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2"
+      gotestsum-version: 1.6.4
+    secrets:
+      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+
+

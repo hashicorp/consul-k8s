@@ -109,6 +109,6 @@ jobs:
               break
             fi
           done
-          #          gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
+            gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
           exit $exit_code
 
