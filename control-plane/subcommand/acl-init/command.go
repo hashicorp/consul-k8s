@@ -36,11 +36,12 @@ type Command struct {
 	k8s   *flags.K8SFlags
 	http  *flags.HTTPFlags
 
-	flagSecretName    string
-	flagInitType      string
-	flagNamespace     string
-	flagACLDir        string
-	flagTokenSinkFile string
+	flagSecretName        string
+	flagInitType          string
+	flagNamespace         string
+	flagPrimaryDatacenter string
+	flagACLDir            string
+	flagTokenSinkFile     string
 
 	flagACLAuthMethod string // Auth Method to use for ACLs.
 	flagLogLevel      string
@@ -73,6 +74,7 @@ func (c *Command) init() {
 
 	// Flags related to using consul login to fetch the ACL token.
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of Kubernetes namespace where the token Kubernetes secret is stored.")
+	c.flags.StringVar(&c.flagPrimaryDatacenter, "primary-datacenter", "", "Name of the primary datacenter when federation is enabled and the command is run in a secondary datacenter.")
 	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login with.")
 	c.flags.StringVar(&c.flagComponentName, "component-name", "",
 		"Name of the component to pass to ACL Login as metadata.")
@@ -153,7 +155,7 @@ func (c *Command) Run(args []string) int {
 		meta := map[string]string{
 			"component": c.flagComponentName,
 		}
-		err := common.ConsulLogin(c.consulClient, cfg, c.logger, c.bearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, "", "", meta)
+		err := common.ConsulLogin(c.consulClient, cfg, c.flagACLAuthMethod, c.flagPrimaryDatacenter, "", c.bearerTokenFile, "", c.flagTokenSinkFile, meta, c.logger)
 		if err != nil {
 			c.logger.Error("Consul login failed", "error", err)
 			return 1

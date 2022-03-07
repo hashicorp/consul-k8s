@@ -57,15 +57,6 @@ rules:
   - get
   - list
   - update
-{{- if .Values.global.acls.manageSystemACLs }}
-- apiGroups: [""]
-  resources:
-  - secrets
-  resourceNames:
-  - {{ template "consul.fullname" . }}-controller-acl-token
-  verbs:
-  - get
-{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
