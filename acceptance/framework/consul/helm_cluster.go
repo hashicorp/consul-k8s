@@ -41,6 +41,7 @@ type HelmCluster struct {
 	noCleanupOnFailure bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
+	isDeleted          bool
 }
 
 func NewHelmCluster(
@@ -115,6 +116,11 @@ func (h *HelmCluster) Create(t *testing.T) {
 }
 
 func (h *HelmCluster) Destroy(t *testing.T) {
+	// No need to delete the cluster if it was already deleted.
+	if h.isDeleted {
+		return
+	}
+
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
@@ -201,6 +207,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	}
+
+	// Prevent the cleanup function from running on a deleted cluster.
+	h.isDeleted = true
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {

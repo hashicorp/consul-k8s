@@ -44,6 +44,7 @@ type CLICluster struct {
 	noCleanupOnFailure bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
+	isDeleted          bool
 }
 
 // NewCLICluster creates a new Consul cluster struct which can be used to create
@@ -103,6 +104,7 @@ func NewCLICluster(
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
+		isDeleted:          false,
 	}
 }
 
@@ -174,6 +176,11 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 
 // Destroy uses the `consul-k8s uninstall` command to destroy a Consul cluster.
 func (c *CLICluster) Destroy(t *testing.T) {
+	// No need to delete the cluster if it was already deleted
+	if c.isDeleted {
+		return
+	}
+
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
@@ -192,6 +199,9 @@ func (c *CLICluster) Destroy(t *testing.T) {
 		c.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
+
+	// Prevent the cleanup function from running on a deleted cluster.
+	c.isDeleted = true
 }
 
 func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
