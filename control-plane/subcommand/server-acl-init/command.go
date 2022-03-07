@@ -42,7 +42,7 @@ type Command struct {
 
 	flagCreateClientToken bool
 
-	flagCreateSyncPolicy   bool
+	flagEnableCatalogSync  bool
 	flagSyncConsulNodeName string
 
 	flagEnableConnectInject bool
@@ -126,7 +126,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagCreateClientToken, "create-client-token", true,
 		"Toggle for creating a client agent token. Default is true.")
 
-	c.flags.BoolVar(&c.flagCreateSyncPolicy, "create-sync-policy", false,
+	c.flags.BoolVar(&c.flagEnableCatalogSync, "sync-catalog", false,
 		"Toggle for creating a catalog sync policy.")
 	c.flags.StringVar(&c.flagSyncConsulNodeName, "sync-consul-node-name", "k8s-sync",
 		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
@@ -481,7 +481,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateSyncPolicy {
+	if c.flagEnableCatalogSync {
 		syncRules, err := c.syncRules()
 		if err != nil {
 			c.log.Error("Error templating sync rules", "err", err)
@@ -499,9 +499,9 @@ func (c *Command) Run(args []string) int {
 			if !primary {
 				componentAuthMethodName = globalComponentAuthMethodName
 			}
-			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, globalToken, primary, componentAuthMethodName, serviceAccountName, consulClient)
+			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		} else {
-			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, localToken, primary, componentAuthMethodName, serviceAccountName, consulClient)
+			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())

@@ -1013,7 +1013,7 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-create-sync-policy",
+		"-sync-catalog",
 	}
 	firstRunArgs := append(commonArgs,
 		"-sync-consul-node-name=k8s-sync",
@@ -1122,7 +1122,7 @@ func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
-		"-create-sync-policy",
+		"-sync-catalog",
 	}
 	responseCode := cmd.Run(cmdArgs)
 
@@ -2159,7 +2159,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 		},
 		{
 			TestName:    "Sync Catalog",
-			TokenFlags:  []string{"-create-sync-policy"},
+			TokenFlags:  []string{"-sync-catalog"},
 			PolicyNames: []string{"sync-catalog-policy"},
 			Roles:       []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
@@ -2269,7 +2269,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 		},
 		{
 			TestName:         "Sync Catalog",
-			TokenFlags:       []string{"-create-sync-policy"},
+			TokenFlags:       []string{"-sync-catalog"},
 			PolicyNames:      []string{"sync-catalog-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
@@ -2378,7 +2378,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 		},
 		{
 			ComponentName: "sync-catalog",
-			TokenFlags:    []string{"-create-sync-policy"},
+			TokenFlags:    []string{"-sync-catalog"},
 			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
 	}
@@ -2471,7 +2471,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 		},
 		{
 			ComponentName:    "sync-catalog",
-			TokenFlags:       []string{"-create-sync-policy"},
+			TokenFlags:       []string{"-sync-catalog"},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			GlobalAuthMethod: false,
 		},

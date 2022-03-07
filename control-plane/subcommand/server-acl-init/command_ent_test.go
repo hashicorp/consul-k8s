@@ -287,7 +287,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-create-client-token",
 				"-allow-dns",
 				"-create-mesh-gateway-token",
-				"-create-sync-policy",
+				"-sync-catalog",
 				"-connect-inject",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
@@ -1073,7 +1073,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 		},
 		{
 			ComponentName: "sync-catalog",
-			TokenFlags:    []string{"-create-sync-policy"},
+			TokenFlags:    []string{"-sync-catalog"},
 			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
 			Namespace:     ns,
 			GlobalToken:   false,
@@ -1164,7 +1164,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 		},
 		{
 			ComponentName: "sync-catalog",
-			TokenFlags:    []string{"-create-sync-policy"},
+			TokenFlags:    []string{"-sync-catalog"},
 			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			Namespace:     ns,
 			GlobalToken:   true,

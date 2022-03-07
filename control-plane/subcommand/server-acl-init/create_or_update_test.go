@@ -20,10 +20,10 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	ui := cli.NewMockUi()
 	k8s := fake.NewSimpleClientset()
 	cmd := Command{
-		UI:                   ui,
-		clientset:            k8s,
-		log:                  hclog.NewNullLogger(),
-		flagCreateSyncPolicy: true,
+		UI:                    ui,
+		clientset:             k8s,
+		log:                   hclog.NewNullLogger(),
+		flagEnableCatalogSync: true,
 	}
 
 	// Start Consul.
