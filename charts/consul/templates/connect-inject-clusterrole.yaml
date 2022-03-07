@@ -41,11 +41,4 @@ rules:
   verbs:
   - use
 {{- end }}
-{{- if .Values.global.acls.manageSystemACLs }}
-- apiGroups: [ "" ]
-  resources:
-  - serviceaccounts
-  verbs:
-  - get
-{{- end }}
 {{- end }}

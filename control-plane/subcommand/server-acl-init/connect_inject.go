@@ -21,7 +21,7 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, aut
 
 	// Create the auth method template. This requires calls to the
 	// kubernetes environment.
-	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, c.withPrefix("connect-injector"), true)
+	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, true)
 	if err != nil {
 		return err
 	}
@@ -80,10 +80,10 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, aut
 // createAuthMethodTmpl sets up the auth method template based on the connect-injector's service account
 // jwt token. It is common for both the connect inject auth method and the component auth method
 // with the option to add namespace specific configuration to the auth method template via `useNS`.
-func (c *Command) createAuthMethodTmpl(authMethodName, serviceAccountName string, useNS bool) (api.ACLAuthMethod, error) {
+func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.ACLAuthMethod, error) {
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
-
+	serviceAccountName := c.withPrefix("authmethod")
 	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", serviceAccountName),
 		func() error {
 			var err error
