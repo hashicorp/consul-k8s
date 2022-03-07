@@ -45,9 +45,9 @@ type Command struct {
 	flagCreateSyncToken    bool
 	flagSyncConsulNodeName string
 
-	flagCreateInjectToken    bool
-	flagInjectAuthMethodHost string
-	flagBindingRuleSelector  string
+	flagCreateInjectToken   bool
+	flagAuthMethodHost      string
+	flagBindingRuleSelector string
 
 	flagCreateControllerPoliciesAndBindings bool
 
@@ -145,7 +145,7 @@ func (c *Command) init() {
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-token instead.")
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-token", false,
 		"Toggle for creating a connect inject auth method and an ACL token.")
-	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
+	c.flags.StringVar(&c.flagAuthMethodHost, "auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
 			"If not provided, the default cluster Kubernetes service will be used.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
@@ -378,11 +378,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	c.log.Info("Current datacenter", "datacenter", consulDC, "primaryDC", primaryDC)
-	isPrimary := consulDC == primaryDC
+	primary := consulDC == primaryDC
 
-	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && isPrimary {
+	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && primary {
 		// Partition token is local because only the Primary datacenter can have Admin Partitions.
-		err := c.createLocalACL("partitions", partitionRules, consulDC, isPrimary, consulClient)
+		err := c.createLocalACL("partitions", partitionRules, consulDC, primary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -440,11 +440,20 @@ func (c *Command) Run(args []string) int {
 
 	// Create the component auth method, this is the auth method that Consul components will use
 	// to issue an `ACL().Login()` against at startup, for local tokens.
-	componentAuthMethodName := c.withPrefix("k8s-component-auth-method")
-	err = c.configureComponentAuthMethod(consulClient, componentAuthMethodName)
+	localComponentAuthMethodName := c.withPrefix("k8s-component-auth-method")
+	err = c.configureLocalComponentAuthMethod(consulClient, localComponentAuthMethodName)
 	if err != nil {
 		c.log.Error(err.Error())
 		return 1
+	}
+
+	globalComponentAuthMethodName := fmt.Sprintf("%s-%s", localComponentAuthMethodName, consulDC)
+	if !primary && c.flagAuthMethodHost != "" {
+		err = c.configureGlobalComponentAuthMethod(consulClient, globalComponentAuthMethodName, primaryDC)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagCreateClientToken {
@@ -454,14 +463,14 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createLocalACL("client", agentRules, consulDC, isPrimary, consulClient)
+		err = c.createLocalACL("client", agentRules, consulDC, primary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
 	}
 
-	if c.createAnonymousPolicy(isPrimary) {
+	if c.createAnonymousPolicy(primary) {
 		// When the default partition is in a VM, the anonymous policy does not allow cross-partition
 		// DNS lookups. The anonymous policy in the default partition needs to be updated in order to
 		// support this use-case. Creating a separate anonymous token client that updates the anonymous
@@ -493,9 +502,9 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token needs to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, isPrimary, consulClient)
+			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, primary, consulClient)
 		} else {
-			err = c.createLocalACL("catalog-sync", syncRules, consulDC, isPrimary, consulClient)
+			err = c.createLocalACL("catalog-sync", syncRules, consulDC, primary, consulClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -521,9 +530,9 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token need to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("connect-inject", injectRules, consulDC, isPrimary, consulClient)
+			err = c.createGlobalACL("connect-inject", injectRules, consulDC, primary, consulClient)
 		} else {
-			err = c.createLocalACL("connect-inject", injectRules, consulDC, isPrimary, consulClient)
+			err = c.createLocalACL("connect-inject", injectRules, consulDC, primary, consulClient)
 		}
 
 		if err != nil {
@@ -535,9 +544,9 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateEntLicenseToken {
 		var err error
 		if c.flagEnablePartitions {
-			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, isPrimary, consulClient)
+			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, primary, consulClient)
 		} else {
-			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, isPrimary, consulClient)
+			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, primary, consulClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -546,7 +555,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateSnapshotAgentToken {
-		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, isPrimary, consulClient)
+		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, primary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -559,7 +568,7 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("Error templating api gateway rules", "err", err)
 			return 1
 		}
-		err = c.createLocalACL("api-gateway-controller", apigwRules, consulDC, isPrimary, consulClient)
+		err = c.createLocalACL("api-gateway-controller", apigwRules, consulDC, primary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -575,7 +584,7 @@ func (c *Command) Run(args []string) int {
 
 		// Mesh gateways require a global policy/token because they must
 		// discover services in other datacenters.
-		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, isPrimary, consulClient)
+		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, primary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -630,7 +639,7 @@ func (c *Command) Run(args []string) int {
 			// the words "ingress-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-ingress-gateway`.
 			tokenName := fmt.Sprintf("%s-ingress-gateway", name)
-			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, isPrimary, consulClient)
+			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, primary, consulClient)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -686,7 +695,7 @@ func (c *Command) Run(args []string) int {
 			// the words "ingress-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-terminating-gateway`.
 			tokenName := fmt.Sprintf("%s-terminating-gateway", name)
-			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, isPrimary, consulClient)
+			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, primary, consulClient)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -703,9 +712,9 @@ func (c *Command) Run(args []string) int {
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
 		if aclReplicationToken != "" {
-			err = c.createGlobalACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient, aclReplicationToken)
+			err = c.createGlobalACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient, aclReplicationToken)
 		} else {
-			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient)
+			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -726,7 +735,11 @@ func (c *Command) Run(args []string) int {
 		// Controller token must be global because config entry writes all
 		// go to the primary datacenter. This means secondary datacenters need
 		// a token that is known by the primary datacenters.
-		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, isPrimary, componentAuthMethodName, serviceAccountName, consulClient)
+		authMethodName := localComponentAuthMethodName
+		if !primary {
+			authMethodName = globalComponentAuthMethodName
+		}
+		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, primaryDC, globalToken, primary, authMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -734,6 +747,43 @@ func (c *Command) Run(args []string) int {
 	}
 	c.log.Info("server-acl-init completed successfully")
 	return 0
+}
+
+// configureGlobalComponentAuthMethod sets up an AuthMethod in the primary datacenter,
+// that the Consul components will use to issue global ACL tokens with.
+func (c *Command) configureGlobalComponentAuthMethod(consulClient *api.Client, authMethodName, primaryDC string) error {
+	// Create the auth method template. This requires calls to the kubernetes environment.
+	authMethod, err := c.createAuthMethodTmpl(authMethodName, false)
+	if err != nil {
+		return err
+	}
+	authMethod.TokenLocality = "global"
+	writeOptions := &api.WriteOptions{Datacenter: primaryDC}
+	return c.createAuthMethod(consulClient, &authMethod, writeOptions)
+}
+
+// configureLocalComponentAuthMethod sets up an AuthMethod in the same datacenter,
+// that the Consul components will use to issue local ACL tokens with.
+func (c *Command) configureLocalComponentAuthMethod(consulClient *api.Client, authMethodName string) error {
+	// Create the auth method template. This requires calls to the kubernetes environment.
+	authMethod, err := c.createAuthMethodTmpl(authMethodName, false)
+	if err != nil {
+		return err
+	}
+	return c.createAuthMethod(consulClient, &authMethod, &api.WriteOptions{})
+}
+
+// createAuthMethod creates the desired Authmethod.
+func (c *Command) createAuthMethod(consulClient *api.Client, authMethod *api.ACLAuthMethod, writeOptions *api.WriteOptions) error {
+	return c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethod.Name),
+		func() error {
+			var err error
+			// `AuthMethodCreate` will also be able to update an existing
+			// AuthMethod based on the name provided. This means that any
+			// configuration changes will correctly update the AuthMethod.
+			_, _, err = consulClient.ACL().AuthMethodCreate(authMethod, writeOptions)
+			return err
+		})
 }
 
 // getBootstrapToken returns the existing bootstrap token if there is one by
@@ -897,27 +947,9 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-// configureComponentAuthMethod sets up an AuthMethod that the Consul components will use to issue ACL logins with.
-func (c *Command) configureComponentAuthMethod(consulClient *api.Client, authMethodName string) error {
-	// Create the auth method template. This requires calls to the kubernetes environment.
-	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, false)
-	if err != nil {
-		return err
-	}
-	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
-		func() error {
-			var err error
-			// `AuthMethodCreate` will also be able to update an existing
-			// AuthMethod based on the name provided. This means that any
-			// configuration changes will correctly update the AuthMethod.
-			_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &api.WriteOptions{})
-			return err
-		})
-	return err
-}
-
 const consulDefaultNamespace = "default"
 const consulDefaultPartition = "default"
+const globalToken = true
 const synopsis = "Initialize ACLs on Consul servers and other components."
 const help = `
 Usage: consul-k8s-control-plane server-acl-init [options]

@@ -69,11 +69,11 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
-			w.Write([]byte(tokenReviewsResponse(serviceAccountName, k8sComponentNS)))
+			w.Write([]byte(TokenReviewsResponse(serviceAccountName, k8sComponentNS)))
 		}
 		if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", k8sComponentNS, serviceAccountName) &&
 			r.Method == "GET" {
-			w.Write([]byte(serviceAccountGetResponse(serviceAccountName, k8sComponentNS)))
+			w.Write([]byte(ServiceAccountGetResponse(serviceAccountName, k8sComponentNS)))
 		}
 	}))
 	t.Cleanup(k8sMockServer.Close)
@@ -149,11 +149,11 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
-			w.Write([]byte(tokenReviewsResponse(serviceName, k8sServiceNS)))
+			w.Write([]byte(TokenReviewsResponse(serviceName, k8sServiceNS)))
 		}
 		if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", k8sServiceNS, serviceName) &&
 			r.Method == "GET" {
-			w.Write([]byte(serviceAccountGetResponse(serviceName, k8sServiceNS)))
+			w.Write([]byte(ServiceAccountGetResponse(serviceName, k8sServiceNS)))
 		}
 	}))
 	t.Cleanup(k8sMockServer.Close)
@@ -196,7 +196,7 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	require.NoError(t, err)
 }
 
-func tokenReviewsResponse(name, ns string) string {
+func TokenReviewsResponse(name, ns string) string {
 	return fmt.Sprintf(`{
  "kind": "TokenReview",
  "apiVersion": "authentication.k8s.io/v1",
@@ -221,7 +221,7 @@ func tokenReviewsResponse(name, ns string) string {
 }`, ns, name, ns)
 }
 
-func serviceAccountGetResponse(name, ns string) string {
+func ServiceAccountGetResponse(name, ns string) string {
 	return fmt.Sprintf(`{
  "kind": "ServiceAccount",
  "apiVersion": "v1",

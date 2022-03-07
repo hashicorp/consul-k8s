@@ -57,20 +57,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "controller/Deployment: consul-logout preStop hook has partition when partitions are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml \
-      --set 'controller.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.adminPartitions.name=default' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("-partition=default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "controller/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -241,6 +227,35 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.name' | tee /dev/stderr)
   [ "${actual}" = "get-auto-encrypt-client-ca" ]
+}
+
+@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command when federation enabled in non-primary datacenter" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.datacenter=dc2' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
