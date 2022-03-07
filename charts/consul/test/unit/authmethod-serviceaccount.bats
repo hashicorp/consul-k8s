@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "componentAuthMethod/ServiceAccount: disabled by default" {
+@test "authMethod/ServiceAccount: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/component-authmethod-serviceaccount.yaml  \
+      -s templates/authmethod-serviceaccount.yaml  \
       .
 }
 
-@test "componentAuthMethod/ServiceAccount: enabled with global.acls.manageSystemACLs.enabled true" {
+@test "authMethod/ServiceAccount: enabled with global.acls.manageSystemACLs.enabled true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/component-authmethod-serviceaccount.yaml  \
+      -s templates/authmethod-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
@@ -22,10 +22,10 @@ load _helpers
 #--------------------------------------------------------------------
 # global.imagePullSecrets
 
-@test "componentAuthMethod/ServiceAccount: can set image pull secrets" {
+@test "authMethod/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/component-authmethod-serviceaccount.yaml  \
+      -s templates/authmethod-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \
