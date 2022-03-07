@@ -112,7 +112,7 @@ jobs:
           exit $exit_code
     
       - name: Upload tests
-      - uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v2
         with:
           name: gotestsum-report.xml
           path: ${{ env.TEST_RESULTS }}/gotestsum-report.xml
