@@ -33,8 +33,9 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"global.federation.enabled":                "true",
 		"global.federation.createFederationSecret": "true",
 
-		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -79,7 +80,9 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"server.extraVolumes[0].items[0].key":  "serverConfigJSON",
 		"server.extraVolumes[0].items[0].path": "config.json",
 
-		"connectInject.enabled": "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -164,8 +167,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"global.federation.enabled":                "true",
 				"global.federation.createFederationSecret": "true",
 
-				"connectInject.enabled": "true",
-				"controller.enabled":    "true",
+				"connectInject.enabled":  "true",
+				"connectInject.replicas": "1",
+				"controller.enabled":     "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -191,6 +195,19 @@ func TestMeshGatewaySecure(t *testing.T) {
 			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
+			var k8sAuthMethodHost string
+			// When running on kind, the kube API address in kubeconfig will have a localhost address
+			// which will not work from inside the container. That's why we need to use the endpoints address instead
+			// which will point the node IP.
+			if cfg.UseKind {
+				// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
+				kubernetesEndpoint, err := secondaryContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
+				require.NoError(t, err)
+				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			} else {
+				k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
+			}
+
 			// Create secondary cluster
 			secondaryHelmValues := map[string]string{
 				"global.datacenter": "dc2",
@@ -207,7 +224,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"global.acls.replicationToken.secretName": federationSecretName,
 				"global.acls.replicationToken.secretKey":  "replicationToken",
 
-				"global.federation.enabled": "true",
+				"global.federation.enabled":           "true",
+				"global.federation.k8sAuthMethodHost": k8sAuthMethodHost,
+				"global.federation.primaryDatacenter": "dc1",
 
 				"server.extraVolumes[0].type":          "secret",
 				"server.extraVolumes[0].name":          federationSecretName,
@@ -215,7 +234,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"server.extraVolumes[0].items[0].key":  "serverConfigJSON",
 				"server.extraVolumes[0].items[0].path": "config.json",
 
-				"connectInject.enabled": "true",
+				"connectInject.enabled":  "true",
+				"connectInject.replicas": "1",
+				"controller.enabled":     "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -248,9 +269,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 			// gateways.
 			logger.Log(t, "creating proxy-defaults config")
 			kustomizeDir := "../fixtures/bases/mesh-gateway"
-			k8s.KubectlApplyK(t, primaryContext.KubectlOptions(t), kustomizeDir)
+			k8s.KubectlApplyK(t, secondaryContext.KubectlOptions(t), kustomizeDir)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.KubectlDeleteK(t, primaryContext.KubectlOptions(t), kustomizeDir)
+				k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), kustomizeDir)
 			})
 
 			// Check that we can connect services over the mesh gateways
