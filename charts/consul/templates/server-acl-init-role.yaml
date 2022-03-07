@@ -23,7 +23,7 @@ rules:
   resources:
   - serviceaccounts
   resourceNames:
-  - {{ template "consul.fullname" . }}-authmethod
+  - {{ template "consul.fullname" . }}-auth-method
   verbs:
   - get
 {{- if .Values.global.enablePodSecurityPolicies }}

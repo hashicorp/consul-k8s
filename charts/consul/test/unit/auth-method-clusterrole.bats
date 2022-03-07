@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "authmethod/ClusterRole: disabled by default" {
+@test "auth-method/ClusterRole: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/authmethod-clusterrole.yaml  \
+      -s templates/auth-method-clusterrole.yaml  \
       .
 }
 
-@test "authmethod/ClusterRole: enabled with global.acls.manageSystemACLs true" {
+@test "auth-method/ClusterRole: enabled with global.acls.manageSystemACLs true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/authmethod-clusterrole.yaml  \
+      -s templates/auth-method-clusterrole.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)

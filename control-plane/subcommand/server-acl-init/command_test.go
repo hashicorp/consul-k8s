@@ -1013,7 +1013,7 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-create-sync-policy",
+		"-sync-catalog",
 	}
 	firstRunArgs := append(commonArgs,
 		"-sync-consul-node-name=k8s-sync",
@@ -1122,7 +1122,7 @@ func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
-		"-create-sync-policy",
+		"-sync-catalog",
 	}
 	responseCode := cmd.Run(cmdArgs)
 
@@ -2159,7 +2159,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 		},
 		{
 			TestName:    "Sync Catalog",
-			TokenFlags:  []string{"-create-sync-policy"},
+			TokenFlags:  []string{"-sync-catalog"},
 			PolicyNames: []string{"sync-catalog-policy"},
 			Roles:       []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
@@ -2269,7 +2269,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 		},
 		{
 			TestName:         "Sync Catalog",
-			TokenFlags:       []string{"-create-sync-policy"},
+			TokenFlags:       []string{"-sync-catalog"},
 			PolicyNames:      []string{"sync-catalog-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
@@ -2377,7 +2377,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 		},
 		{
 			ComponentName: "sync-catalog",
-			TokenFlags:    []string{"-create-sync-policy"},
+			TokenFlags:    []string{"-sync-catalog"},
 			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
 	}
@@ -2470,7 +2470,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 		},
 		{
 			ComponentName:    "sync-catalog",
-			TokenFlags:       []string{"-create-sync-policy"},
+			TokenFlags:       []string{"-sync-catalog"},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			GlobalAuthMethod: false,
 		},
@@ -2803,7 +2803,7 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace
 func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
-	serviceAccountName := resourcePrefix + "-authmethod"
+	serviceAccountName := resourcePrefix + "-auth-method"
 	sa, _ := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		// Create a service account that references two secrets.
@@ -2820,7 +2820,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 						Name: resourcePrefix + "-some-other-secret",
 					},
 					{
-						Name: resourcePrefix + "-authmethod",
+						Name: resourcePrefix + "-auth-method",
 					},
 				},
 			},
@@ -2835,7 +2835,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	require.NoError(t, err)
 
 	// Create a Kubernetes secret if it doesn't exist, otherwise update it
-	secretName := resourcePrefix + "-authmethod"
+	secretName := resourcePrefix + "-auth-method"
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   secretName,

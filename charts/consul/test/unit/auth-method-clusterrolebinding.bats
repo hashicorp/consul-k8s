@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "authmethod/ClusterRoleBinding: disabled by default" {
+@test "auth-method/ClusterRoleBinding: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/authmethod-clusterrolebinding.yaml  \
+      -s templates/auth-method-clusterrolebinding.yaml  \
       .
 }
 
-@test "authmethod/ClusterRoleBinding: enabled with global.acls.manageSystemACLs true" {
+@test "auth-method/ClusterRoleBinding: enabled with global.acls.manageSystemACLs true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/authmethod-clusterrolebinding.yaml  \
+      -s templates/auth-method-clusterrolebinding.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
