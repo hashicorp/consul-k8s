@@ -62,7 +62,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules | map(select(.resources[0] == "serviceaccounts")) | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 #--------------------------------------------------------------------
