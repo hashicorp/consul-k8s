@@ -2,6 +2,7 @@ package serveraclinit
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
@@ -124,8 +125,8 @@ func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.A
 	kubernetesHost := defaultKubernetesHost
 
 	// Check if custom auth method Host and CACert are provided
-	if c.flagInjectAuthMethodHost != "" {
-		kubernetesHost = c.flagInjectAuthMethodHost
+	if c.flagAuthMethodHost != "" {
+		kubernetesHost = c.flagAuthMethodHost
 	}
 
 	// Now we're ready to set up Consul's auth method.
