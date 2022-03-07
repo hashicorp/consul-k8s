@@ -112,6 +112,7 @@ jobs:
           exit $exit_code
     
       - name: Upload tests
+        if: always()
         uses: actions/upload-artifact@v2
         with:
           name: gotestsum-report.xml
