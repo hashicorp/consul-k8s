@@ -39,10 +39,11 @@ jobs:
     strategy: 
       matrix:
         include: # I am really sorry for this but I could not find a way to automatically split our tests into several runners. For now, split manually.
-          - {runner: "0", test-packages: "basic connect consul-dns"}
-          - {runner: "1", test-packages: "controller example ingress-gateway"}
-          - {runner: "2", test-packages: "mesh-gateway metrics"}
-          - {runner: "3", test-packages: "partitions sync terminating-gateway"}
+#TODO: Fix
+          # - {runner: "0", test-packages: "basic connect consul-dns"}
+          #- {runner: "1", test-packages: "controller example ingress-gateway"}
+          #- {runner: "2", test-packages: "mesh-gateway metrics"}
+          #- {runner: "3", test-packages: "partitions sync terminating-gateway"}
           - {runner: "4", test-packages: "vault"}
 
 #TODO: set back to true
@@ -108,12 +109,12 @@ jobs:
               break
             fi
           done
-            gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
+          gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
           exit $exit_code
     
       - name: Upload tests
         if: always()
         uses: actions/upload-artifact@v2
         with:
-          name: gotestsum-report.xml
+          name: ${{ matrix.packages }}-gotestsum-report.xml
           path: ${{ env.TEST_RESULTS }}/gotestsum-report.xml
