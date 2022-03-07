@@ -3,6 +3,9 @@ name: reusable-acceptance
 on:
   workflow_call:
     inputs:
+      name:
+        required: true
+        type: string
       additional-flags:
         required: false
         type: string
@@ -116,13 +119,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.test-packages }}-gotestsum-report.xml
+          name: ${{ inputs.name }}-${{ matrix.test-packages }}-gotestsum-report.xml
           path: ${{ env.TEST_RESULTS }}/gotestsum-report.xml
 
       - name: Upload debug (on failure) 
         if: failure()
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.test-packages }}-debug-info
+          name: ${{ inputs.name }}-${{ matrix.test-packages }}-debug-info
           path: ${{ env.TEST_RESULTS }}/debug
 

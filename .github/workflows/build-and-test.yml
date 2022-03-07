@@ -274,6 +274,7 @@ jobs:
     needs: dev-upload-docker
     uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
     with:
+      name: acceptance-tproxy
       directory: acceptance/tests
       go-version: 1.17.2
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
@@ -286,6 +287,7 @@ jobs:
     needs: dev-upload-docker
     uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
     with:
+      name: acceptance
       directory: acceptance/tests
       go-version: 1.17.2
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2"
