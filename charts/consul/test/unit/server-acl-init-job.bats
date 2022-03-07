@@ -1712,7 +1712,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-inject-auth-method-host"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1724,11 +1724,11 @@ load _helpers
       --set 'externalServers.k8sAuthMethodHost=foo.com' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-inject-auth-method-host"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: can provide custom auth method host" {
+@test "serverACLInit/Job: can provide custom auth method host for external servers" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
@@ -1739,7 +1739,24 @@ load _helpers
       --set 'externalServers.hosts[0]=foo.com' \
       --set 'externalServers.k8sAuthMethodHost=foo.com' \
       . | tee /dev/stderr|
-      yq '.spec.template.spec.containers[0].command | any(contains("-inject-auth-method-host=foo.com"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host=foo.com"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: can provide custom auth method host for federation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'global.federation.k8sAuthMethodHost=foo.com' \
+      --set 'meshGateway.enabled=true' \
+      . | tee /dev/stderr|
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host=foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

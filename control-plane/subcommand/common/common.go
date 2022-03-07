@@ -88,7 +88,7 @@ func ValidateUnprivilegedPort(flagName, flagValue string) error {
 
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
 // The logic of this is taken from the `consul login` command.
-func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTokenFile, authMethodName, tokenSinkFile, namespace string, serviceAccountName string, meta map[string]string) error {
+func ConsulLogin(client *api.Client, cfg *api.Config, authMethodName, datacenter, namespace, bearerTokenFile, serviceAccountName, tokenSinkFile string, meta map[string]string, log hclog.Logger) error {
 	// Read the bearerTokenFile.
 	data, err := ioutil.ReadFile(bearerTokenFile)
 	if err != nil {
@@ -105,7 +105,10 @@ func ConsulLogin(client *api.Client, cfg *api.Config, log hclog.Logger, bearerTo
 			BearerToken: bearerToken,
 			Meta:        meta,
 		}
-		tok, _, err := client.ACL().Login(req, &api.WriteOptions{Namespace: namespace})
+		// The datacenter flag will either have the value of the primary datacenter or "". In case of the latter,
+		// the token will be created in the datacenter of the installation. In case a global token is required,
+		// the token will be created in the primary datacenter.
+		tok, _, err := client.ACL().Login(req, &api.WriteOptions{Namespace: namespace, Datacenter: datacenter})
 		if err != nil {
 			log.Error("unable to login", "error", err)
 			return fmt.Errorf("error logging in: %s", err)

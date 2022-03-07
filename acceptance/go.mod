@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20211207212234-aea9efea5638
 	github.com/hashicorp/consul/api v1.12.0
 	github.com/hashicorp/consul/sdk v0.9.0
+	github.com/hashicorp/go-uuid v1.0.2
 	github.com/hashicorp/vault/api v1.2.0
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -49,7 +50,6 @@ require (
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.1 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
-	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

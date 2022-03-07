@@ -4,10 +4,14 @@ package serveraclinit
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -24,7 +28,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	consulDestNamespaces := []string{"default", "destination"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(tt)
+			k8s, testAgent := completeSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
@@ -152,7 +156,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(tt)
+			k8s, testAgent := completeSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
@@ -269,7 +273,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 	k8sNamespaceFlags := []string{"default", "other"}
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t)
+			k8s, testAgent := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
 			defer testAgent.Stop()
 			require := require.New(t)
@@ -583,7 +587,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
-			k8s, testAgent := completeEnterpriseSetup(tt)
+			k8s, testAgent := completeSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 
@@ -763,7 +767,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
-			k8s, testSvr := completeEnterpriseSetup(t)
+			k8s, testSvr := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
@@ -1019,7 +1023,7 @@ partition "default" {
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
-			k8s, testSvr := completeEnterpriseSetup(t)
+			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
 			setUpK8sServiceAccount(t, k8s, ns)
 			require := require.New(t)
@@ -1075,12 +1079,12 @@ partition "default" {
 	}
 }
 
-// Test creating the correct ACL policies and Binding Rules for components that use the auth method.
+// Test creating the correct ACL policies and Binding Rules for components in the primary datacenter.
 // The test works by running the command and then ensuring that:
 // * An ACLBindingRule exists which references the ACLRole.
 // * An ACLRole exists and has the correct PolicyName in it's ACLPolicyLinkRule list.
 // * The ACLPolicy exists.
-func TestRun_PoliciesAndBindingRulesForACLLoginNamespacesEnabled(t *testing.T) {
+func TestRun_PrimaryDatacenter_PoliciesAndBindingRulesForACLLogin_NamespacesEnabled(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -1113,7 +1117,9 @@ func TestRun_PoliciesAndBindingRulesForACLLoginNamespacesEnabled(t *testing.T) {
 			cmdArgs := append([]string{
 				"-timeout=500ms",
 				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + ns,
+				"-k8s-namespace=" + c.Namespace,
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace", c.Namespace,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 			}, c.TokenFlags...)
@@ -1152,7 +1158,7 @@ func TestRun_PoliciesAndBindingRulesForACLLoginNamespacesEnabled(t *testing.T) {
 				require.True(t, found)
 
 				// Check that there exists a BindingRule that references this Role.
-				rb, _, err := consul.ACL().BindingRuleList("release-name-"+componentAuthMethod, &api.QueryOptions{})
+				rb, _, err := consul.ACL().BindingRuleList(fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod), &api.QueryOptions{})
 				require.NoError(t, err)
 				require.NotNil(t, rb)
 				found = false
@@ -1168,16 +1174,255 @@ func TestRun_PoliciesAndBindingRulesForACLLoginNamespacesEnabled(t *testing.T) {
 	}
 }
 
-// Set up test consul agent and kubernetes cluster.
-func completeEnterpriseSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
-	k8s := fake.NewSimpleClientset()
+// Test creating the correct ACL policies and Binding Rules for components running in the secondary datacenter.
+// The test works by running the command and then ensuring that:
+// * An ACLBindingRule exists which references the ACLRole.
+// * An ACLRole exists and has the correct PolicyName in it's ACLPolicyLinkRule list.
+// * The ACLPolicy exists.
+func TestRun_SecondaryDatacenter_PoliciesAndBindingRulesForACLLogin_NamespacesEnabled(t *testing.T) {
+	t.Parallel()
 
-	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-		c.ACL.Enabled = true
-	})
-	require.NoError(t, err)
+	const (
+		secondaryDatacenter = "dc2"
+		primaryDatacenter   = "dc1"
+	)
+	cases := []struct {
+		TestName    string
+		TokenFlags  []string
+		PolicyNames []string
+		Roles       []string
+		Namespace   string
+	}{
+		{
+			TestName:    "Controller",
+			TokenFlags:  []string{"-create-controller-token"},
+			PolicyNames: []string{"controller-policy-" + secondaryDatacenter},
+			Roles:       []string{resourcePrefix + "-controller-acl-role-" + secondaryDatacenter},
+			Namespace:   ns,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.TestName, func(t *testing.T) {
+			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			tokenFile := common.WriteTempFile(t, bootToken)
+			k8s, consul, consulHTTPAddr, cleanup := mockReplicatedSetup(t, bootToken)
+			setUpK8sServiceAccount(t, k8s, ns)
+			defer cleanup()
 
-	return k8s, svr
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-federation",
+				"-timeout=1m",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + c.Namespace,
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace", c.Namespace,
+				"-auth-method-host=" + "https://my-kube.com",
+				"-acl-replication-token-file", tokenFile,
+				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
+				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			// Check that the Role exists + has correct Policy and is associated with a BindingRule.
+			for i := range c.Roles {
+				// Check that the Policy exists.
+				policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{Datacenter: primaryDatacenter})
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+
+				// Check that the Role exists.
+				role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{Datacenter: primaryDatacenter})
+				require.NoError(t, err)
+				require.NotNil(t, role)
+
+				// Check that the Role references the Policy.
+				found := false
+				for x := range role.Policies {
+					if role.Policies[x].Name == policy.Name {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+
+				// Check that there exists a BindingRule that references this Role.
+				rb, _, err := consul.ACL().BindingRuleList(fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, secondaryDatacenter), &api.QueryOptions{Datacenter: primaryDatacenter})
+				require.NoError(t, err)
+				require.NotNil(t, rb)
+				found = false
+				for x := range rb {
+					if rb[x].BindName == c.Roles[i] {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+			}
+		})
+	}
+}
+
+// Test that server-acl-init used the local auth method to create the desired token in the primary datacenter.
+// The test works by running the login command and then ensuring that the token
+// returned has the correct role for the component.
+func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		ComponentName string
+		TokenFlags    []string
+		Roles         []string
+		Namespace     string
+		GlobalToken   bool
+	}{}
+	for _, c := range cases {
+		t.Run(c.ComponentName, func(t *testing.T) {
+			authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
+			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
+
+			k8s, testSvr := completeSetup(t)
+			defer testSvr.Stop()
+			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
+
+			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("content-type", "application/json")
+				if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
+					w.Write([]byte(test.TokenReviewsResponse(serviceAccountName, c.Namespace)))
+				}
+				if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", c.Namespace, serviceAccountName) &&
+					r.Method == "GET" {
+					w.Write([]byte(test.ServiceAccountGetResponse(serviceAccountName, c.Namespace)))
+				}
+			}))
+			t.Cleanup(k8sMockServer.Close)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-timeout=500ms",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + c.Namespace,
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace", c.Namespace,
+				"-auth-method-host=" + k8sMockServer.URL,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			client, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(t, err)
+
+			tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+				AuthMethod:  authMethodName,
+				BearerToken: jwtToken,
+				Meta:        map[string]string{},
+			}, &api.WriteOptions{})
+			require.NoError(t, err)
+
+			require.Equal(t, len(tok.Roles), len(c.Roles))
+			for _, role := range tok.Roles {
+				require.Contains(t, c.Roles, role.Name)
+			}
+			require.Equal(t, !c.GlobalToken, tok.Local)
+		})
+	}
+}
+
+// Test that server-acl-init used the global auth method to create the desired token in the secondary datacenter.
+// The test works by running the login command and then ensuring that the token
+// returned has the correct role for the component.
+func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		ComponentName string
+		TokenFlags    []string
+		Roles         []string
+		Namespace     string
+		GlobalToken   bool
+	}{}
+	for _, c := range cases {
+		t.Run(c.ComponentName, func(t *testing.T) {
+			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			tokenFile := common.WriteTempFile(t, bootToken)
+			authMethodName := fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, "dc2")
+			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
+
+			k8s, _, consulHTTPAddr, cleanup := mockReplicatedSetup(t, bootToken)
+			defer cleanup()
+			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
+
+			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("content-type", "application/json")
+				if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
+					w.Write([]byte(test.TokenReviewsResponse(serviceAccountName, c.Namespace)))
+				}
+				if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", c.Namespace, serviceAccountName) &&
+					r.Method == "GET" {
+					w.Write([]byte(test.ServiceAccountGetResponse(serviceAccountName, c.Namespace)))
+				}
+			}))
+			t.Cleanup(k8sMockServer.Close)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-federation",
+				"-timeout=1m",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + c.Namespace,
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace", c.Namespace,
+				"-acl-replication-token-file", tokenFile,
+				"-auth-method-host=" + k8sMockServer.URL,
+				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
+				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			client, err := api.NewClient(&api.Config{
+				Address:    consulHTTPAddr,
+				Datacenter: "dc1",
+			})
+			require.NoError(t, err)
+
+			tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+				AuthMethod:  authMethodName,
+				BearerToken: jwtToken,
+				Meta:        map[string]string{},
+			}, &api.WriteOptions{})
+			require.NoError(t, err)
+
+			require.Equal(t, len(tok.Roles), len(c.Roles))
+			for _, role := range tok.Roles {
+				require.Contains(t, c.Roles, role.Name)
+			}
+			require.Equal(t, !c.GlobalToken, tok.Local)
+		})
+	}
 }
 
 // partitionedSetup is a helper function which creates a server and a consul agent that runs as
