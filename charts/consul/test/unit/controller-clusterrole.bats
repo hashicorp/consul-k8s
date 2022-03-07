@@ -43,17 +43,3 @@ load _helpers
       yq '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
-
-#--------------------------------------------------------------------
-# global.acls.manageSystemACLs
-
-@test "controller/ClusterRole: allows secret access with global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.rules | map(select(.resourceNames[0] == "RELEASE-NAME-consul-controller-acl-token")) | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
-}

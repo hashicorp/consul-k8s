@@ -9,8 +9,8 @@ executors:
       - image: docker.mirror.hashicorp.services/cimg/go:1.17.5
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
-      CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
+      CONSUL_VERSION: 1.11.4 # Consul's OSS version to use in tests
+      CONSUL_ENT_VERSION: 1.11.4+ent # Consul's enterprise version to use in tests
 
 control-plane-path: &control-plane-path control-plane
 cli-path: &cli-path cli
