@@ -172,8 +172,8 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 	var sa *corev1.ServiceAccount
 	retry.Run(t, func(r *retry.R) {
 		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
-		require.NoError(t, err)
-		require.Len(t, sa.Secrets, 1)
+		require.NoError(r, err)
+		require.Len(r, sa.Secrets, 1)
 	})
 
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
