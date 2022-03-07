@@ -758,7 +758,7 @@ func (c *Command) Run(args []string) int {
 // that the Consul components will use to issue global ACL tokens with.
 func (c *Command) configureGlobalComponentAuthMethod(consulClient *api.Client, authMethodName, primaryDC string) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
-	authMethod, err := c.createAuthMethodTmpl(authMethodName, c.withPrefix("component-authmethod"), false)
+	authMethod, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {
 		return err
 	}
@@ -771,7 +771,7 @@ func (c *Command) configureGlobalComponentAuthMethod(consulClient *api.Client, a
 // that the Consul components will use to issue local ACL tokens with.
 func (c *Command) configureLocalComponentAuthMethod(consulClient *api.Client, authMethodName string) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
-	authMethod, err := c.createAuthMethodTmpl(authMethodName, c.withPrefix("component-authmethod"), false)
+	authMethod, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {
 		return err
 	}
