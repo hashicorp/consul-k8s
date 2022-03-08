@@ -395,7 +395,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 
 ### Updating Helm chart
-1. In consul-helm, update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
+1. Update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
    using the updated `control-plane/config/webhook/manifests.v1beta1.yaml` and replacing `clientConfig.service.name/namespace`
    with the templated strings shown below to match the other webhooks.:
     ```yaml
