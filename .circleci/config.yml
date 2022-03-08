@@ -13,8 +13,12 @@ executors:
       CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
 
 control-plane-path: &control-plane-path control-plane
+cli-path: &cli-path cli
 acceptance-mod-path: &acceptance-mod-path acceptance
 acceptance-test-path: &acceptance-test-path acceptance/tests
+acceptance-framework-path: &acceptance-framework-path acceptance/framework
+charts-consul-path: &charts-consul-path charts/consul
+helm-gen-path: &helm-gen-path hack/helm-reference-gen
 gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
@@ -133,6 +137,112 @@ commands:
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
+  go-fmt-and-vet-control-plane:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
+
+      - run:
+          name: go mod download
+          working_directory: *control-plane-path
+          command: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
+          paths:
+            - "/home/circleci/go/pkg/mod"
+
+      # check go fmt output because it does not report non-zero when there are fmt changes
+      - run:
+          name: check go fmt
+          working_directory: *control-plane-path
+          command: |
+            files=$(go fmt ./...)
+            if [ -n "$files" ]; then
+              echo "The following file(s) do not conform to go fmt:"
+              echo "$files"
+              exit 1
+            fi
+      - run: cd control-plane && go vet ./...
+
+  lint-control-plane:
+    executor: go
+    steps:
+      - checkout
+      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+      - run:
+          name: run lint
+          working_directory: *control-plane-path
+          command: go run hack/lint-api-new-client/main.go
+
+  test-control-plane:
+    executor: go
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    parallelism: 1
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
+
+      # run go tests with gotestsum
+      - run:
+          name: run go tests
+          working_directory: *control-plane-path
+          command: |
+            # download and install the consul binary
+            wget https://releases.hashicorp.com/consul/"${CONSUL_VERSION}"/consul_"${CONSUL_VERSION}"_linux_amd64.zip && \
+                 unzip consul_"${CONSUL_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+                 rm consul_"${CONSUL_VERSION}"_linux_amd64.zip
+            PACKAGE_NAMES=$(go list ./...)
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  test-enterprise-control-plane:
+    executor: go
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    parallelism: 1
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
+
+      # run go tests with gotestsum
+      - run:
+          name: run enterprise go tests
+          working_directory: *control-plane-path
+          command: |
+            # download and install the consul binary
+            wget https://releases.hashicorp.com/consul/"${CONSUL_ENT_VERSION}"/consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip && \
+                 unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+                 rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
+            PACKAGE_NAMES=$(go list ./...)
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
   build-distro: # defines a parameterized job
     description: A job that will build the os/arch distro set by XC_OS and XC_ARCH
     parameters:
@@ -180,6 +290,192 @@ jobs:
           name: make ci.dev-docker
           working_directory: *control-plane-path
           command: make ci.dev-docker
+
+  unit-cli:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-cli-modcache-v2-{{ checksum "cli/go.mod" }}
+
+      - run:
+          name: go mod download
+          working_directory: *cli-path
+          command: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: consul-k8s-cli-modcache-v2-{{ checksum "cli/go.mod" }}
+          paths:
+            - "/home/circleci/go/pkg/mod"
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run tests
+          working_directory: *cli-path
+          command: |
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  go-fmt-and-vet-acceptance:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - "/home/circleci/go/pkg/mod"
+
+      # check go fmt output because it does not report non-zero when there are fmt changes
+      - run:
+          name: check go fmt
+          working_directory: *acceptance-mod-path
+          command: |
+            files=$(go fmt ./...)
+            if [ -n "$files" ]; then
+              echo "The following file(s) do not conform to go fmt:"
+              echo "$files"
+              exit 1
+            fi
+
+      - run:
+          name: go vet
+          working_directory: *acceptance-mod-path
+          command: go vet ./...
+
+  go-fmt-and-vet-helm-gen:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+
+      - run:
+          name: go mod download
+          working_directory: *helm-gen-path
+          command: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+          paths:
+            - "/home/circleci/go/pkg/mod"
+
+      # check go fmt output because it does not report non-zero when there are fmt changes
+      - run:
+          name: check go fmt
+          working_directory: *helm-gen-path
+          command: |
+            files=$(go fmt ./...)
+            if [ -n "$files" ]; then
+              echo "The following file(s) do not conform to go fmt:"
+              echo "$files"
+              exit 1
+            fi
+
+      - run:
+          name: go vet
+          working_directory: *helm-gen-path
+          command: go vet ./...
+
+  unit-acceptance-framework:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run tests
+          working_directory: *acceptance-framework-path
+          command: |
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  unit-helm-gen:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run tests
+          working_directory: *helm-gen-path
+          command: |
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  validate-helm-gen:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Validate helm gen
+          working_directory: *helm-gen-path
+          command: |
+            go run ./... -validate
+
+  unit-test-helm-templates:
+    docker:
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: Run Unit Tests
+          working_directory: charts/consul
+          command: bats --jobs 4 ./test/unit
 
   acceptance:
     environment:
@@ -576,19 +872,57 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-     # Build control plane binaries
+      # Fmt, vet, lint control plane and helm code
+      - go-fmt-and-vet-control-plane
+      - lint-control-plane
+      - go-fmt-and-vet-acceptance
+      - go-fmt-and-vet-helm-gen
+      # Unit test control plane
+      - test-control-plane:
+          requires:
+            - go-fmt-and-vet-control-plane
+            - lint-control-plane
+      - test-enterprise-control-plane:
+          filters:
+            branches:
+              # Forked pull requests have CIRCLE_BRANCH set to pull/XXX.
+              ignore: /pull\/[0-9]+/
+          requires:
+            - go-fmt-and-vet-control-plane
+            - lint-control-plane
+      # Unit test CLI
+      - unit-cli
+      # Unit tests for go modules in helm and bats tests for templates
+      - unit-acceptance-framework:
+          requires:
+            - go-fmt-and-vet-acceptance
+      - unit-helm-gen:
+          requires:
+            - go-fmt-and-vet-helm-gen
+      - validate-helm-gen
+      - unit-test-helm-templates
+      # Build control plane binaries
       - build-distro:
           OS: "freebsd linux windows"
           ARCH: "386"
           name: build-distros-386
+          requires:
+            - test-control-plane
+            - test-enterprise-control-plane
       - build-distro:
           OS: "darwin freebsd linux solaris windows"
           ARCH: "amd64"
           name: build-distros-amd64
+          requires:
+            - test-control-plane
+            - test-enterprise-control-plane
       - build-distro:
           OS: "linux"
           ARCH: "arm arm64"
           name: build-distros-arm-arm64
+          requires:
+            - test-control-plane
+            - test-enterprise-control-plane
       - dev-upload-docker:
           context: consul-ci
           requires:
@@ -597,9 +931,15 @@ workflows:
       - acceptance:
           requires:
             - dev-upload-docker
+            - unit-test-helm-templates
+            - unit-acceptance-framework
+            - unit-cli
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
+            - unit-test-helm-templates
+            - unit-acceptance-framework
+            - unit-cli
   nightly-acceptance-tests:
     triggers:
       - schedule:
