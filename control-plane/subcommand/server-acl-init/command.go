@@ -11,6 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
@@ -19,12 +24,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {
@@ -59,7 +58,7 @@ type Command struct {
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
-	flagCreateAPIGatewayToken bool
+	flagAPIGatewayController bool
 
 	// Flags to configure Consul connection.
 	flagServerAddresses     []string
@@ -157,7 +156,7 @@ func (c *Command) init() {
 		"Name of a terminating gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
-	c.flags.BoolVar(&c.flagCreateAPIGatewayToken, "create-api-gateway-token", false,
+	c.flags.BoolVar(&c.flagAPIGatewayController, "api-gateway-controller", false,
 		"Toggle for creating a token for the API Gateway controller integration.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
@@ -567,14 +566,14 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateAPIGatewayToken {
-		apigwRules, err := c.apiGatewayControllerRules()
+	if c.flagAPIGatewayController {
+		rules, err := c.apiGatewayControllerRules()
 		if err != nil {
 			c.log.Error("Error templating api gateway rules", "err", err)
 			return 1
 		}
-		err = c.createLocalACL("api-gateway-controller", apigwRules, consulDC, primary, consulClient)
-		if err != nil {
+		serviceAccountName := c.withPrefix("api-gateway-controller")
+		if err := c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

@@ -275,7 +275,7 @@ spec:
                 {{- end }}
 
                 {{- if .Values.apiGateway.enabled }}
-                -create-api-gateway-token=true \
+                -api-gateway-controller=true \
                 {{- end }}
 
                 {{- if .Values.global.enableConsulNamespaces }}

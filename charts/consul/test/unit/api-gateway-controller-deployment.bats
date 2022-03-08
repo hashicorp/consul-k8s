@@ -227,7 +227,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers | length == 2' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers | length == 3' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -250,7 +250,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "apiGateway/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
+@test "apiGateway/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml \
@@ -258,15 +258,31 @@ load _helpers
       --set 'apiGateway.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] ' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul logout"))' | tee /dev/stderr)
+  [ "${object}" = "true" ]
+}
 
-  local actual=$(echo $object |
-    yq 'any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+@test "apiGateway/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-    yq 'map(select(test("CONSUL_HTTP_TOKEN"))) | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
 }
 
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true" {
@@ -277,7 +293,7 @@ load _helpers
       --set 'apiGateway.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.name' | tee /dev/stderr)
@@ -286,6 +302,264 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: init container for copy consul is created when global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "copy-consul-bin")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("cp"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.volumeMounts[0] | any(contains("consul-bin"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: volumeMount for copy consul is created on container when global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[0] | any(contains("consul-bin"))' | tee /dev/stderr)
+
+  [ "${object}" = "true" ]
+}
+
+@test "apiGateway/Deployment: volume for copy consul is created when global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[0] | any(contains("consul-bin"))' | tee /dev/stderr)
+
+  [ "${object}" = "true" ]
+}
+
+@test "apiGateway/Deployment: auto-encrypt init container is created and is the first init-container when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "get-auto-encrypt-client-ca" ]
+}
+
+#--------------------------------------------------------------------
+# resources
+
+@test "apiGateway/Deployment: resources has default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "100Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "100m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "100Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "100m" ]
+}
+
+@test "apiGateway/Deployment: resources can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'apiGateway.resources.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# init container resources
+
+@test "apiGateway/Deployment: init container has default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "25Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "50m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "150Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
+}
+
+@test "apiGateway/Deployment: init container resources can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'apiGateway.initCopyConsulContainer.resources.requests.memory=memory' \
+      --set 'apiGateway.initCopyConsulContainer.resources.requests.cpu=cpu' \
+      --set 'apiGateway.initCopyConsulContainer.resources.limits.memory=memory2' \
+      --set 'apiGateway.initCopyConsulContainer.resources.limits.cpu=cpu2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
+  [ "${actual}" = "memory" ]
+
+  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
+  [ "${actual}" = "cpu" ]
+
+  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
+  [ "${actual}" = "memory2" ]
+
+  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = "cpu2" ]
 }
 
 #--------------------------------------------------------------------
