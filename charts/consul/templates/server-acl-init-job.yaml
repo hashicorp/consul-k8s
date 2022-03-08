@@ -169,7 +169,7 @@ spec:
                 {{- end }}
 
                 {{- if .Values.syncCatalog.enabled }}
-                -create-sync-token=true \
+                -sync-catalog=true \
                 {{- if .Values.syncCatalog.consulNodeName }}
                 -sync-consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
                 {{- end }}
