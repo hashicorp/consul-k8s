@@ -595,7 +595,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("logout"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[6]] | any(contains("logout"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -641,11 +641,11 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 }
@@ -666,20 +666,20 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.volumeMounts[2] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -710,20 +710,20 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.volumeMounts[2] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -744,20 +744,20 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+      yq '.volumeMounts[2] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1110,6 +1110,7 @@ EOF
 
   exp='consul-k8s-control-plane acl-init \
   -component-name=mesh-gateway \
+  -token-sink-file=/consul/service/acl-token \
   -acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method \
   -log-level=info \
   -log-json=false
@@ -1151,7 +1152,7 @@ service {
 EOF
 
 /consul-bin/consul services register \
-  -token-file=/consul/login/acl-token \
+  -token-file=/consul/service/acl-token \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]

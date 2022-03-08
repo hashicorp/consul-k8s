@@ -122,11 +122,16 @@ spec:
         {{- include "consul.getAutoEncryptClientCA" . | nindent 8 }}
         {{- end }}
         - name: mesh-gateway-init
+          image: {{ .Values.global.imageK8S }}
           env:
           - name: HOST_IP
             valueFrom:
               fieldRef:
                 fieldPath: status.hostIP
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
           {{- if .Values.global.tls.enabled }}
           - name: CONSUL_CACERT
             value: /consul/tls/ca/tls.crt
@@ -137,20 +142,6 @@ spec:
             {{- else }}
             value: http://$(HOST_IP):8500
             {{- end }}
-          image: {{ .Values.global.imageK8S }}
-          volumeMounts:
-          - mountPath: /consul/login
-            name: consul-data
-            readOnly: false
-          {{- if .Values.global.tls.enabled }}
-          {{- if .Values.global.tls.enableAutoEncrypt }}
-          - name: consul-auto-encrypt-ca-cert
-          {{- else }}
-          - name: consul-ca-cert
-          {{- end }}
-            mountPath: /consul/tls/ca
-            readOnly: true
-          {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -158,6 +149,7 @@ spec:
                 {{- if .Values.global.acls.manageSystemACLs }}
                 consul-k8s-control-plane acl-init \
                   -component-name=mesh-gateway \
+                  -token-sink-file=/consul/service/acl-token \
                   {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
                   -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
                   -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
@@ -244,9 +236,23 @@ spec:
 
                 /consul-bin/consul services register \
                   {{- if .Values.global.acls.manageSystemACLs }}
-                  -token-file=/consul/login/acl-token \
+                  -token-file=/consul/service/acl-token \
                   {{- end }}
                   /consul/service/service.hcl
+          volumeMounts:
+            - name: consul-service
+              mountPath: /consul/service
+            - name: consul-bin
+              mountPath: /consul-bin
+            {{- if .Values.global.tls.enabled }}
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
+            - name: consul-ca-cert
+            {{- end }}
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
           {{- if .Values.meshGateway.initServiceInitContainer.resources }}
           resources: {{ toYaml .Values.meshGateway.initServiceInitContainer.resources | nindent 12 }}
           {{- end }}
@@ -262,8 +268,8 @@ spec:
             {{- end }}
           {{- end }}
           volumeMounts:
-          - mountPath: /consul/login
-            name: consul-data
+          - mountPath: /consul/service
+            name: consul-service
             readOnly: true
           - name: consul-bin
             mountPath: /consul-bin
@@ -293,7 +299,7 @@ spec:
             {{- end }}
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_HTTP_TOKEN_FILE
-              value: /consul/login/acl-token
+              value: /consul/service/acl-token
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
@@ -341,7 +347,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-ec", "/consul-bin/consul logout -token-file=/consul/login/acl-token"]
+                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\"", "&&", "/bin/sh", "-ec", "/consul-bin/consul logout"]
 
         # consul-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
@@ -393,7 +399,7 @@ spec:
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
             {{- if .Values.global.acls.manageSystemACLs }}
-            - -token-file=/consul/login/acl-token
+            - -token-file=/consul/service/acl-token
             {{- end }}
       {{- if .Values.meshGateway.priorityClassName }}
       priorityClassName: {{ .Values.meshGateway.priorityClassName | quote }}
