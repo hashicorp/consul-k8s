@@ -493,7 +493,7 @@ func (c *Command) Run(args []string) int {
 
 		// If namespaces are enabled, the policy and token need to be global to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			// Create the catalog sync ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
+			// Create the catalog sync ACL Policy, Role and BindingRule.
 			// SyncCatalog token must be global when namespaces are enabled. This means secondary datacenters need
 			// a token that is known by the primary datacenters.
 			if !primary {
