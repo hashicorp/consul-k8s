@@ -42,15 +42,13 @@ jobs:
     strategy: 
       matrix:
         include: # I am really sorry for this but I could not find a way to automatically split our tests into several runners. For now, split manually.
-#TODO: Fix
-          # - {runner: "0", test-packages: "basic connect consul-dns"}
-          #- {runner: "1", test-packages: "controller example ingress-gateway"}
-          #- {runner: "2", test-packages: "mesh-gateway metrics"}
-          #- {runner: "3", test-packages: "partitions sync terminating-gateway"}
+          - {runner: "0", test-packages: "basic connect consul-dns"}
+          - {runner: "1", test-packages: "controller example ingress-gateway"}
+          - {runner: "2", test-packages: "mesh-gateway metrics"}
+          - {runner: "3", test-packages: "partitions sync terminating-gateway"}
           - {runner: "4", test-packages: "vault"}
 
-#TODO: set back to true
-      fail-fast: false
+      fail-fast: true
     steps:      
       - name: Checkout code
         uses: actions/checkout@v2
@@ -90,9 +88,9 @@ jobs:
       # We have to run the tests for each package separately so that we can
       # exit early if any test fails (-failfast only works within a single
       # package).
-# TODO: do not run on forks
       - name: Run acceptance tests ${{ matrix.runner }}
         working-directory: ${{ inputs.directory }}
+        if: github.repository_owner == 'hashicorp' # This prevents running on forks
         run: |
           exit_code=0
           echo "Running packages: ${{ matrix.test-packages }}"
@@ -128,4 +126,3 @@ jobs:
         with:
           name: ${{ inputs.name }}-${{ matrix.test-packages }}-debug-info
           path: ${{ env.TEST_RESULTS }}/debug
-
