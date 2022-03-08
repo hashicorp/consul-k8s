@@ -44,7 +44,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-token",
+				"-connect-inject",
 				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
@@ -172,7 +172,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-token",
+				"-connect-inject",
 				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
@@ -288,7 +288,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-allow-dns",
 				"-create-mesh-gateway-token",
 				"-create-sync-token",
-				"-create-inject-token",
+				"-connect-inject",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
 				"-ingress-gateway-name=gw",
@@ -333,7 +333,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anothergw-ingress-gateway-token",
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
-				"connect-inject-token",
+				"connect-inject-policy",
 				"controller-policy",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
@@ -377,7 +377,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anonymous-token-policy",
 				"client-token",
 				"catalog-sync-token",
-				"connect-inject-token",
+				"connect-inject-policy",
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
 				"enterprise-license-token",
@@ -599,7 +599,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-enable-partitions",
 				"-partition=default",
-				"-create-inject-token",
+				"-connect-inject",
 			}
 
 			// First run. NOTE: we don't assert anything here since we've
@@ -682,13 +682,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
 			LocalToken:  false,
 		},
-		"connect-inject-token": {
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
 		"enterprise-license token": {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -741,20 +734,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			PolicyNames: []string{"acl-replication-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
-			LocalToken:  false,
-		},
-		"inject token with namespaces (deprecated)": {
-			TokenFlags:  []string{"-create-inject-auth-method", "-enable-namespaces", "-create-inject-namespace-token"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		"inject token and namespaces": {
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  false,
 		},
 		"partitions token": {
@@ -1079,197 +1058,6 @@ partition "default" {
 	}
 }
 
-// Test creating the correct ACL policies and Binding Rules for components in the primary datacenter.
-// The test works by running the command and then ensuring that:
-// * An ACLBindingRule exists which references the ACLRole.
-// * An ACLRole exists and has the correct PolicyName in it's ACLPolicyLinkRule list.
-// * The ACLPolicy exists.
-func TestRun_PrimaryDatacenter_PoliciesAndBindingRulesForACLLogin_NamespacesEnabled(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		TestName    string
-		TokenFlags  []string
-		PolicyNames []string
-		Roles       []string
-		Namespace   string
-	}{
-		{
-			TestName:    "Controller",
-			TokenFlags:  []string{"-create-controller-token"},
-			PolicyNames: []string{"controller-policy"},
-			Roles:       []string{resourcePrefix + "-controller-acl-role"},
-			Namespace:   ns,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.TestName, func(t *testing.T) {
-			k8s, testSvr := completeSetup(t)
-			defer testSvr.Stop()
-			setUpK8sServiceAccount(t, k8s, ns)
-
-			// Run the command.
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-			cmdArgs := append([]string{
-				"-timeout=500ms",
-				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + c.Namespace,
-				"-enable-namespaces",
-				"-consul-inject-destination-namespace", c.Namespace,
-				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-			}, c.TokenFlags...)
-			cmd.init()
-			responseCode := cmd.Run(cmdArgs)
-			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-			consul, err := api.NewClient(&api.Config{
-				Namespace: ns,
-				Address:   testSvr.HTTPAddr,
-				Token:     bootToken,
-			})
-			require.NoError(t, err)
-
-			// Check that the Role exists + has correct Policy and is associated with a BindingRule.
-			for i := range c.Roles {
-				// Check that the Policy exists.
-				policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{})
-				require.NoError(t, err)
-				require.NotNil(t, policy)
-
-				// Check that the Role exists.
-				role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{})
-				require.NoError(t, err)
-				require.NotNil(t, role)
-
-				// Check that the Role references the Policy.
-				found := false
-				for x := range role.Policies {
-					if role.Policies[x].Name == policy.Name {
-						found = true
-						break
-					}
-				}
-				require.True(t, found)
-
-				// Check that there exists a BindingRule that references this Role.
-				rb, _, err := consul.ACL().BindingRuleList(fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod), &api.QueryOptions{})
-				require.NoError(t, err)
-				require.NotNil(t, rb)
-				found = false
-				for x := range rb {
-					if rb[x].BindName == c.Roles[i] {
-						found = true
-						break
-					}
-				}
-				require.True(t, found)
-			}
-		})
-	}
-}
-
-// Test creating the correct ACL policies and Binding Rules for components running in the secondary datacenter.
-// The test works by running the command and then ensuring that:
-// * An ACLBindingRule exists which references the ACLRole.
-// * An ACLRole exists and has the correct PolicyName in it's ACLPolicyLinkRule list.
-// * The ACLPolicy exists.
-func TestRun_SecondaryDatacenter_PoliciesAndBindingRulesForACLLogin_NamespacesEnabled(t *testing.T) {
-	t.Parallel()
-
-	const (
-		secondaryDatacenter = "dc2"
-		primaryDatacenter   = "dc1"
-	)
-	cases := []struct {
-		TestName    string
-		TokenFlags  []string
-		PolicyNames []string
-		Roles       []string
-		Namespace   string
-	}{
-		{
-			TestName:    "Controller",
-			TokenFlags:  []string{"-create-controller-token"},
-			PolicyNames: []string{"controller-policy-" + secondaryDatacenter},
-			Roles:       []string{resourcePrefix + "-controller-acl-role-" + secondaryDatacenter},
-			Namespace:   ns,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.TestName, func(t *testing.T) {
-			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-			tokenFile := common.WriteTempFile(t, bootToken)
-			k8s, consul, consulHTTPAddr, cleanup := mockReplicatedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s, ns)
-			defer cleanup()
-
-			// Run the command.
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-			cmdArgs := append([]string{
-				"-federation",
-				"-timeout=1m",
-				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + c.Namespace,
-				"-enable-namespaces",
-				"-consul-inject-destination-namespace", c.Namespace,
-				"-auth-method-host=" + "https://my-kube.com",
-				"-acl-replication-token-file", tokenFile,
-				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
-				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
-			}, c.TokenFlags...)
-			cmd.init()
-			responseCode := cmd.Run(cmdArgs)
-			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-
-			// Check that the Role exists + has correct Policy and is associated with a BindingRule.
-			for i := range c.Roles {
-				// Check that the Policy exists.
-				policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{Datacenter: primaryDatacenter})
-				require.NoError(t, err)
-				require.NotNil(t, policy)
-
-				// Check that the Role exists.
-				role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{Datacenter: primaryDatacenter})
-				require.NoError(t, err)
-				require.NotNil(t, role)
-
-				// Check that the Role references the Policy.
-				found := false
-				for x := range role.Policies {
-					if role.Policies[x].Name == policy.Name {
-						found = true
-						break
-					}
-				}
-				require.True(t, found)
-
-				// Check that there exists a BindingRule that references this Role.
-				rb, _, err := consul.ACL().BindingRuleList(fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, secondaryDatacenter), &api.QueryOptions{Datacenter: primaryDatacenter})
-				require.NoError(t, err)
-				require.NotNil(t, rb)
-				found = false
-				for x := range rb {
-					if rb[x].BindName == c.Roles[i] {
-						found = true
-						break
-					}
-				}
-				require.True(t, found)
-			}
-		})
-	}
-}
-
 // Test that server-acl-init used the local auth method to create the desired token in the primary datacenter.
 // The test works by running the login command and then ensuring that the token
 // returned has the correct role for the component.
@@ -1282,7 +1070,15 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 		Roles         []string
 		Namespace     string
 		GlobalToken   bool
-	}{}
+	}{
+		{
+			ComponentName: "connect-injector",
+			TokenFlags:    []string{"-connect-inject"},
+			Roles:         []string{resourcePrefix + "-connect-injector-acl-role"},
+			Namespace:     ns,
+			GlobalToken:   false,
+		},
+	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
 			authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
@@ -1313,6 +1109,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 			cmdArgs := append([]string{
 				"-timeout=500ms",
 				"-resource-prefix=" + resourcePrefix,
+				"-enable-namespaces",
 				"-k8s-namespace=" + c.Namespace,
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", c.Namespace,
@@ -1357,7 +1154,15 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 		Roles         []string
 		Namespace     string
 		GlobalToken   bool
-	}{}
+	}{
+		{
+			ComponentName: "connect-injector",
+			TokenFlags:    []string{"-connect-inject"},
+			Roles:         []string{resourcePrefix + "-connect-injector-acl-role-dc2"},
+			Namespace:     ns,
+			GlobalToken:   true,
+		},
+	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
@@ -1391,6 +1196,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 				"-federation",
 				"-timeout=1m",
 				"-resource-prefix=" + resourcePrefix,
+				"-enable-namespaces",
 				"-k8s-namespace=" + c.Namespace,
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", c.Namespace,

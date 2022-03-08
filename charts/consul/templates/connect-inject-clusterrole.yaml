@@ -43,13 +43,6 @@ rules:
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [""]
   resources:
-  - secrets
-  resourceNames:
-  - {{ template "consul.fullname" . }}-connect-inject-acl-token
-  verbs:
-  - get
-- apiGroups: [""]
-  resources:
     - serviceaccounts
   verbs:
     - get
