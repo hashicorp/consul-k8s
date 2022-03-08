@@ -1,21 +1,12 @@
 name: test-and-build 
 on:
   push:
-    tags:
-      - v*
-    branches:
-      - crt-build-and-tests 
-  pull_request:
 
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
   CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.6.4 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
-
-# TODO: upload tests somewhere. An artifact?
-# TODO: prevent running some things on forks?
-# TODO: fix caching. Maybe cache on the first job
 
 jobs:
   validate-helm-gen:
@@ -181,17 +172,15 @@ jobs:
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
   build-distros:
-#TODO: Fix
-   #needs: [test-control-plane, test-enterprise-control-plane]
+    needs: [test-control-plane, test-enterprise-control-plane]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-#TODO: fix
-          #          - {go: "1.17.2", goos: "linux", goarch: "386"}
+          - {go: "1.17.2", goos: "linux", goarch: "386"}
           - {go: "1.17.2", goos: "linux", goarch: "amd64"}
-            #- {go: "1.17.2", goos: "linux", goarch: "arm"}
-            #  - {go: "1.17.2", goos: "linux", goarch: "arm64"}
+          - {go: "1.17.2", goos: "linux", goarch: "arm"}
+          - {go: "1.17.2", goos: "linux", goarch: "arm64"}
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} build
@@ -244,55 +233,56 @@ jobs:
       directory: cli 
       go-version: 1.17.2
 
-  dev-upload-docker:
-    needs: build-distros
-    runs-on: ubuntu-latest
-
-    env: 
-      GITHUB_PULL_REQUEST: ${{github.event.pull_request.number}}
-      DOCKER_USER: ${{secrets.DOCKER_USER}}
-      DOCKER_PASS: ${{secrets.DOCKER_PASS}}
-    steps:
-      - uses: actions/checkout@v2
-
-      - run: mkdir -p control-plane/pkg/bin/linux_amd64
-
-      - uses: actions/download-artifact@v3
-        with:
-          name: consul-k8s_linux_amd64.zip
-          path: control-plane
-
-      - name: Docker build 
-        working-directory: control-plane
-        run: |
-          unzip consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
-          make ci.dev-docker
-
-  acceptance-tproxy:
-#TODO: Fix
-    #needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
-    needs: dev-upload-docker
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
-    with:
-      name: acceptance-tproxy
-      directory: acceptance/tests
-      go-version: 1.17.2
-      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
-      gotestsum-version: 1.6.4
-    secrets:
-      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
-
-  acceptance:
-    #needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
-    needs: dev-upload-docker
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
-    with:
-      name: acceptance
-      directory: acceptance/tests
-      go-version: 1.17.2
-      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2"
-      gotestsum-version: 1.6.4
-    secrets:
-      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+# Disabling for now until we get faster VMs to run acceptance tests
+#  dev-upload-docker:
+#    if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
+#    needs: build-distros
+#    runs-on: ubuntu-latest
+#
+#    env: 
+#      GITHUB_PULL_REQUEST: ${{github.event.pull_request.number}}
+#      DOCKER_USER: ${{secrets.DOCKER_USER}}
+#      DOCKER_PASS: ${{secrets.DOCKER_PASS}}
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - run: mkdir -p control-plane/pkg/bin/linux_amd64
+#
+#      - uses: actions/download-artifact@v3
+#        with:
+#          name: consul-k8s_linux_amd64.zip
+#          path: control-plane
+#
+#      - name: Docker build 
+#        working-directory: control-plane
+#        run: |
+#          unzip consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
+#          make ci.dev-docker
+#
+#  acceptance-tproxy:
+#    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+#    needs: dev-upload-docker
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
+#    with:
+#      name: acceptance-tproxy
+#      directory: acceptance/tests
+#      go-version: 1.17.2
+#      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
+#      gotestsum-version: 1.6.4
+#    secrets:
+#      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+#
+#  acceptance:
+#    #needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+#    needs: dev-upload-docker
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@crt-build-and-tests
+#    with:
+#      name: acceptance
+#      directory: acceptance/tests
+#      go-version: 1.17.2
+#      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2"
+#      gotestsum-version: 1.6.4
+#    secrets:
+#      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 
 
