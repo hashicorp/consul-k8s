@@ -194,7 +194,7 @@ spec:
                 {{- end }}
 
                 {{- if .Values.meshGateway.enabled }}
-                -create-mesh-gateway-token=true \
+                -mesh-gateway=true \
                 {{- end }}
 
                 {{- if .Values.ingressGateways.enabled }}
