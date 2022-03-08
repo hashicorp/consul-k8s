@@ -233,7 +233,8 @@ jobs:
       directory: cli 
       go-version: 1.17.2
 
-# Disabling for now until we get faster VMs to run acceptance tests
+# Disabling for now until we get faster VMs to run acceptance tests. Faster VMs for Github Actions are supposed
+# to be available in the summer of 2022. For now, run the dev-upload docker and acceptance tests in CircleCI
 #  dev-upload-docker:
 #    if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
 #    needs: build-distros
