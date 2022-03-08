@@ -42,7 +42,7 @@ type Command struct {
 
 	flagCreateClientToken bool
 
-	flagCreateSyncToken    bool
+	flagSyncCatalog        bool
 	flagSyncConsulNodeName string
 
 	flagConnectInject       bool
@@ -126,8 +126,8 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagCreateClientToken, "create-client-token", true,
 		"Toggle for creating a client agent token. Default is true.")
 
-	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
-		"Toggle for creating a catalog sync token.")
+	c.flags.BoolVar(&c.flagSyncCatalog, "sync-catalog", false,
+		"Toggle for creating a catalog sync policy.")
 	c.flags.StringVar(&c.flagSyncConsulNodeName, "sync-consul-node-name", "k8s-sync",
 		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
 			"via DNS, the name should only contain alpha-numerics and dashes.")
@@ -481,19 +481,27 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateSyncToken {
+	if c.flagSyncCatalog {
 		syncRules, err := c.syncRules()
 		if err != nil {
 			c.log.Error("Error templating sync rules", "err", err)
 			return 1
 		}
 
-		// If namespaces are enabled, the policy and token needs to be global
-		// to be allowed to create namespaces.
+		serviceAccountName := c.withPrefix("sync-catalog")
+		componentAuthMethodName := localComponentAuthMethodName
+
+		// If namespaces are enabled, the policy and token need to be global to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, primary, consulClient)
+			// Create the catalog sync ACL Policy, Role and BindingRule.
+			// SyncCatalog token must be global when namespaces are enabled. This means secondary datacenters need
+			// a token that is known by the primary datacenters.
+			if !primary {
+				componentAuthMethodName = globalComponentAuthMethodName
+			}
+			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		} else {
-			err = c.createLocalACL("catalog-sync", syncRules, consulDC, primary, consulClient)
+			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -522,7 +530,7 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token need to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
+			// Create the connect-inject ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
 			// ConnectInjector token must be global when namespaces are enabled. This means secondary datacenters need
 			// a token that is known by the primary datacenters.
 			if !primary {

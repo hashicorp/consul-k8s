@@ -287,7 +287,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-create-client-token",
 				"-allow-dns",
 				"-create-mesh-gateway-token",
-				"-create-sync-token",
+				"-sync-catalog",
 				"-connect-inject",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
@@ -325,7 +325,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			firstRunExpectedPolicies := []string{
 				"anonymous-token-policy",
 				"client-token",
-				"catalog-sync-token",
+				"sync-catalog-policy",
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
 				"enterprise-license-token",
@@ -376,7 +376,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			secondRunExpectedPolicies := []string{
 				"anonymous-token-policy",
 				"client-token",
-				"catalog-sync-token",
+				"sync-catalog-policy",
 				"connect-inject-policy",
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
@@ -674,13 +674,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-client-acl-token"},
 			LocalToken:  true,
-		},
-		"catalog-sync token": {
-			TokenFlags:  []string{"-create-sync-token"},
-			PolicyNames: []string{"catalog-sync-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
-			LocalToken:  false,
 		},
 		"enterprise-license token": {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
@@ -1078,6 +1071,13 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 			Namespace:     ns,
 			GlobalToken:   false,
 		},
+		{
+			ComponentName: "sync-catalog",
+			TokenFlags:    []string{"-sync-catalog"},
+			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
+			Namespace:     ns,
+			GlobalToken:   false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -1159,6 +1159,13 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 			ComponentName: "connect-injector",
 			TokenFlags:    []string{"-connect-inject"},
 			Roles:         []string{resourcePrefix + "-connect-injector-acl-role-dc2"},
+			Namespace:     ns,
+			GlobalToken:   true,
+		},
+		{
+			ComponentName: "sync-catalog",
+			TokenFlags:    []string{"-sync-catalog"},
+			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			Namespace:     ns,
 			GlobalToken:   true,
 		},

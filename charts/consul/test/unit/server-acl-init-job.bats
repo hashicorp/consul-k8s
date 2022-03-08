@@ -249,7 +249,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-sync-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-catalog"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -260,7 +260,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-sync-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-catalog"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
