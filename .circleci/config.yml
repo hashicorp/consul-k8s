@@ -601,15 +601,9 @@ workflows:
       - acceptance:
           requires:
             - dev-upload-docker
-            - unit-test-helm-templates
-            - unit-acceptance-framework
-            - unit-cli
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
-            - unit-test-helm-templates
-            - unit-acceptance-framework
-            - unit-cli
   nightly-acceptance-tests:
     triggers:
       - schedule:
