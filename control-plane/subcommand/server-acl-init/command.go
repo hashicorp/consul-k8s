@@ -45,7 +45,7 @@ type Command struct {
 	flagCreateSyncToken    bool
 	flagSyncConsulNodeName string
 
-	flagCreateInjectToken   bool
+	flagConnectInject       bool
 	flagAuthMethodHost      string
 	flagBindingRuleSelector string
 
@@ -132,19 +132,8 @@ func (c *Command) init() {
 		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
 			"via DNS, the name should only contain alpha-numerics and dashes.")
 
-	// Previously when this flag was set, -enable-namespaces and -create-inject-auth-method
-	// were always passed, so now we just look at those flags and ignore
-	// this flag. We keep the flag here though so there's no error if it's
-	// passed.
-	var unused bool
-	c.flags.BoolVar(&unused, "create-inject-namespace-token", false,
-		"Toggle for creating a connect injector token. Only required when namespaces are enabled. "+
-			"Deprecated: set -enable-namespaces and -create-inject-token instead.")
-
-	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-auth-method", false,
-		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-token instead.")
-	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-token", false,
-		"Toggle for creating a connect inject auth method and an ACL token.")
+	c.flags.BoolVar(&c.flagConnectInject, "connect-inject", false,
+		"Toggle for creating a connect inject auth method and policy.")
 	c.flags.StringVar(&c.flagAuthMethodHost, "auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
 			"If not provided, the default cluster Kubernetes service will be used.")
@@ -512,9 +501,9 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateInjectToken {
-		authMethodName := c.withPrefix("k8s-auth-method")
-		err := c.configureConnectInjectAuthMethod(consulClient, authMethodName)
+	if c.flagConnectInject {
+		connectAuthMethodName := c.withPrefix("k8s-auth-method")
+		err := c.configureConnectInjectAuthMethod(consulClient, connectAuthMethodName)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -527,14 +516,22 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
+		serviceAccountName := c.withPrefix("connect-injector")
+		componentAuthMethodName := localComponentAuthMethodName
+
 		// If namespaces are enabled, the policy and token need to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("connect-inject", injectRules, consulDC, primary, consulClient)
+			// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
+			// ConnectInjector token must be global when namespaces are enabled. This means secondary datacenters need
+			// a token that is known by the primary datacenters.
+			if !primary {
+				componentAuthMethodName = globalComponentAuthMethodName
+			}
+			err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		} else {
-			err = c.createLocalACL("connect-inject", injectRules, consulDC, primary, consulClient)
+			err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		}
-
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -739,7 +736,7 @@ func (c *Command) Run(args []string) int {
 		if !primary {
 			authMethodName = globalComponentAuthMethodName
 		}
-		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, primaryDC, globalToken, primary, authMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -905,7 +902,7 @@ func (c *Command) createAnonymousPolicy(isPrimary bool) bool {
 			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
-			(c.flagCreateInjectToken && c.flagFederation))
+			(c.flagConnectInject && c.flagFederation))
 }
 
 func (c *Command) validateFlags() error {
@@ -947,11 +944,13 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-const consulDefaultNamespace = "default"
-const consulDefaultPartition = "default"
-const globalToken = true
-const synopsis = "Initialize ACLs on Consul servers and other components."
-const help = `
+const (
+	consulDefaultNamespace = "default"
+	consulDefaultPartition = "default"
+	globalPolicy           = true
+	localPolicy            = false
+	synopsis               = "Initialize ACLs on Consul servers and other components."
+	help                   = `
 Usage: consul-k8s-control-plane server-acl-init [options]
 
   Bootstraps servers with ACLs and creates policies and ACL tokens for other
@@ -960,3 +959,4 @@ Usage: consul-k8s-control-plane server-acl-init [options]
   and safe to run multiple times.
 
 `
+)
