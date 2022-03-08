@@ -872,57 +872,14 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-      # Fmt, vet, lint control plane and helm code
-      - go-fmt-and-vet-control-plane
-      - lint-control-plane
-      - go-fmt-and-vet-acceptance
-      - go-fmt-and-vet-helm-gen
-      # Unit test control plane
-      - test-control-plane:
-          requires:
-            - go-fmt-and-vet-control-plane
-            - lint-control-plane
-      - test-enterprise-control-plane:
-          filters:
-            branches:
-              # Forked pull requests have CIRCLE_BRANCH set to pull/XXX.
-              ignore: /pull\/[0-9]+/
-          requires:
-            - go-fmt-and-vet-control-plane
-            - lint-control-plane
-      # Unit test CLI
-      - unit-cli
-      # Unit tests for go modules in helm and bats tests for templates
-      - unit-acceptance-framework:
-          requires:
-            - go-fmt-and-vet-acceptance
-      - unit-helm-gen:
-          requires:
-            - go-fmt-and-vet-helm-gen
-      - validate-helm-gen
-      - unit-test-helm-templates
-      # Build control plane binaries
-      - build-distro:
-          OS: "freebsd linux windows"
-          ARCH: "386"
-          name: build-distros-386
-          requires:
-            - test-control-plane
-            - test-enterprise-control-plane
+     # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
+     # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
+     # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
+     # be moved
       - build-distro:
           OS: "darwin freebsd linux solaris windows"
           ARCH: "amd64"
           name: build-distros-amd64
-          requires:
-            - test-control-plane
-            - test-enterprise-control-plane
-      - build-distro:
-          OS: "linux"
-          ARCH: "arm arm64"
-          name: build-distros-arm-arm64
-          requires:
-            - test-control-plane
-            - test-enterprise-control-plane
       - dev-upload-docker:
           context: consul-ci
           requires:
@@ -931,15 +888,9 @@ workflows:
       - acceptance:
           requires:
             - dev-upload-docker
-            - unit-test-helm-templates
-            - unit-acceptance-framework
-            - unit-cli
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
-            - unit-test-helm-templates
-            - unit-acceptance-framework
-            - unit-cli
   nightly-acceptance-tests:
     triggers:
       - schedule:
