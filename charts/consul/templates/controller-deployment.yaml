@@ -47,7 +47,7 @@ spec:
     spec:
       {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
-      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
       {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
       {{- end }}
       {{- if .Values.global.acls.manageSystemACLs }}
@@ -97,7 +97,7 @@ spec:
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
               -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
-              -log-json={{ .Values.global.logJSON }} \
+              -log-json={{ .Values.global.logJSON }}
         resources:
           requests:
             memory: "25Mi"

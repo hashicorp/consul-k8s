@@ -961,7 +961,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
@@ -1008,7 +1008,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
@@ -1051,7 +1051,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
@@ -1095,7 +1095,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
@@ -1140,7 +1140,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
@@ -1187,7 +1187,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
@@ -1230,7 +1230,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1274,7 +1274,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1319,7 +1319,7 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("create-inject-token"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
