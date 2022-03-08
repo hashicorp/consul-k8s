@@ -13,12 +13,8 @@ executors:
       CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
 
 control-plane-path: &control-plane-path control-plane
-cli-path: &cli-path cli
 acceptance-mod-path: &acceptance-mod-path acceptance
 acceptance-test-path: &acceptance-test-path acceptance/tests
-acceptance-framework-path: &acceptance-framework-path acceptance/framework
-charts-consul-path: &charts-consul-path charts/consul
-helm-gen-path: &helm-gen-path hack/helm-reference-gen
 gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
