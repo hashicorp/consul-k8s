@@ -83,11 +83,11 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, aut
 func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.ACLAuthMethod, error) {
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
-	saName := c.withPrefix("connect-injector")
-	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
+	serviceAccountName := c.withPrefix("auth-method")
+	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", serviceAccountName),
 		func() error {
 			var err error
-			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(c.ctx, saName, metav1.GetOptions{})
+			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(c.ctx, serviceAccountName, metav1.GetOptions{})
 			return err
 		})
 	if err != nil {
@@ -119,7 +119,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.A
 	// a secret of type ServiceAccountToken.
 	if saSecret == nil {
 		return api.ACLAuthMethod{},
-			fmt.Errorf("found no secret of type 'kubernetes.io/service-account-token' associated with the %s service account", saName)
+			fmt.Errorf("found no secret of type 'kubernetes.io/service-account-token' associated with the %s service account", serviceAccountName)
 	}
 
 	kubernetesHost := defaultKubernetesHost
