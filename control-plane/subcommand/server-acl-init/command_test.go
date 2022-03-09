@@ -2597,7 +2597,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			}
 			cmdArgs := append([]string{
 				"-federation",
-				"-timeout=1m",
+				"-timeout=2m",
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-acl-replication-token-file", tokenFile,
