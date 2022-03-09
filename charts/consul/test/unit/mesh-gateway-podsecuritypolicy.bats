@@ -45,3 +45,29 @@ load _helpers
       yq '.spec.hostNetwork' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "meshGateway/PodSecurityPolicy: hostPorts are allowed when setting hostPort" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-podsecuritypolicy.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'meshGateway.hostPort=9999' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":9999,"max":9999}]' ]
+}
+
+@test "meshGateway/PodSecurityPolicy: hostPorts are allowed when hostNetwork=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-podsecuritypolicy.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'meshGateway.hostNetwork=true' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":8443,"max":8443}]' ]
+}

@@ -49,9 +49,13 @@ spec:
   - min: 8502
     max: 8502
   {{- end }}
-  {{- if .Values.client.exposeGossipPorts }}
+  {{- if (or .Values.client.exposeGossipPorts .Values.client.hostNetwork) }}
   - min: 8301
     max: 8301
+  {{- end }}
+  {{- if .Values.client.hostNetwork }}
+  - min: 8600
+    max: 8600
   {{- end }}
   hostIPC: false
   hostPID: false
