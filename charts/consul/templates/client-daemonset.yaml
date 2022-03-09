@@ -9,6 +9,8 @@
 {{- if and .Values.global.federation.enabled .Values.global.adminPartitions.enabled }}{{ fail "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" }}{{ end }}
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+              
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -47,6 +49,7 @@ spec:
       annotations:
         {{- if .Values.global.secretsBackend.vault.enabled }}
         "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/role": "{{ .Values.global.secretsBackend.vault.consulClientRole }}"
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
@@ -123,9 +126,12 @@ spec:
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-client-config
+        - name: consul-data
+          emptyDir:
+            medium: "Memory"
         {{- if .Values.global.tls.enabled }}
-        {{- if not .Values.global.secretsBackend.vault.enabled }}
         - name: consul-ca-cert
+          {{- if not .Values.global.secretsBackend.vault.enabled }}
           secret:
             {{- if .Values.global.tls.caCert.secretName }}
             secretName: {{ .Values.global.tls.caCert.secretName }}
@@ -135,6 +141,13 @@ spec:
             items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
+          {{- else }}
+          emptyDir:
+            # We're using tmpfs here so that
+            # client certs are not written to disk
+            medium: "Memory"          
+          {{- end }}
+        {{- if not .Values.global.secretsBackend.vault.enabled }}
         {{ if not .Values.global.tls.enableAutoEncrypt }}
         - name: consul-ca-key
           secret:
@@ -176,7 +189,21 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.client.image }}"
+          {{- if .Values.global.acls.manageSystemACLs }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-ec"
+                  - |
+                    consul logout
+          {{- end }}
           env:
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_HTTP_TOKEN_FILE
+              value: "/consul/login/acl-token"
+            {{- end }}
             - name: ADVERTISE_IP
               valueFrom:
                 fieldRef:
@@ -339,6 +366,9 @@ spec:
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
+            - mountPath: /consul/login
+              name: consul-data
+              readOnly: true
             {{- if .Values.global.tls.enabled }}
             {{- if not .Values.global.secretsBackend.vault.enabled }}
             - name: consul-ca-cert
@@ -434,17 +464,58 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: client-acl-init
         image: {{ .Values.global.imageK8S }}
+        env:
+        - name: CONSUL_HTTP_ADDR
+          {{- if .Values.global.tls.enabled }}
+          value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
+          {{- else }}
+          value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
+          {{- end }}
+        {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
+        - name: CONSUL_CACERT
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          value: "/vault/secrets/serverca.crt" 
+          {{- else }}
+          value: "/consul/tls/ca/tls.crt"
+          {{- end }}
+        {{- end }}
         command:
           - "/bin/sh"
           - "-ec"
           - |
             consul-k8s-control-plane acl-init \
-              -secret-name="{{ template "consul.fullname" . }}-client-acl-token" \
-              -k8s-namespace={{ .Release.Namespace }} \
-              -init-type="client"
+              -component-name=client \
+              -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
+              {{- if .Values.global.adminPartitions.enabled }}
+              -partition={{ .Values.global.adminPartitions.name }} \
+              {{- end }}
+              -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
+              -log-json={{ .Values.global.logJSON }} \
+              -init-type="client" \
+              {{- if .Values.externalServers.enabled }}
+              {{- range .Values.externalServers.hosts }}
+              -server-address={{ quote . }} \
+              {{- end }}
+              -server-port={{ .Values.externalServers.httpsPort }} \
+              {{- if .Values.externalServers.tlsServerName }}
+                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+              {{- end }}
+              {{- else }}
+              {{- range $index := until (.Values.server.replicas | int) }}
+              -server-address="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
+              {{- end }}
+              {{- end }}
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig
+          - mountPath: /consul/login
+            name: consul-data
+            readOnly: false
+          {{- if (and (not .Values.global.secretsBackend.vault.enabled) (not .Values.externalServers.useSystemRoots)) }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: false
+          {{- end }}
         resources:
           requests:
             memory: "25Mi"

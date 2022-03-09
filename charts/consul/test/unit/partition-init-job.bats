@@ -91,7 +91,7 @@ load _helpers
   actual=$(echo $command | jq -r '. | any(contains("-use-https"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  actual=$(echo $command | jq -r '. | any(contains("-ca-file=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   actual=$(echo $command | jq -r '. | any(contains("-server-port=8501"))' | tee /dev/stderr)

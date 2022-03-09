@@ -48,7 +48,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
-{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
 {{- end -}}
 
 {{- define "consul.serverAdditionalDNSSANs" -}}

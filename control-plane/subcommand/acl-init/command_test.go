@@ -1,12 +1,15 @@
 package aclinit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -209,4 +212,132 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	tok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: string(tokenBytes)})
 	require.NoError(t, err)
 	require.Equal(t, "token created via login: {\"component\":\"foo\"}", tok.Description)
+}
+
+// TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile
+// executes the consul login path and validates the token is written to
+// acl-config.json and matches the token written to sink file.
+func TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile(t *testing.T) {
+	tokenFile := common.WriteTempFile(t, "")
+	bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
+	t.Cleanup(func() {
+		os.Remove(tokenFile)
+	})
+
+	k8s := fake.NewSimpleClientset()
+
+	// Start Consul server with ACLs enabled and default deny policy.
+	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.DefaultPolicy = "deny"
+		c.ACL.Tokens.InitialManagement = masterToken
+	})
+	require.NoError(t, err)
+	defer server.Stop()
+	server.WaitForLeader(t)
+	cfg := &api.Config{
+		Scheme:  "http",
+		Address: server.HTTPAddr,
+		Token:   masterToken,
+	}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+
+	// Set up the Component Auth Method, this pre-loads Consul with bindingrule,
+	// roles and an acl:write policy so we can issue an ACL.Login().
+	test.SetupK8sComponentAuthMethod(t, consulClient, "test-sa", "default")
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:              ui,
+		k8sClient:       k8s,
+		bearerTokenFile: bearerFile,
+	}
+
+	code := cmd.Run([]string{
+		"-token-sink-file", tokenFile,
+		"-acl-auth-method", componentAuthMethod,
+		"-component-name", "foo",
+		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+		"-init-type", "client",
+		"-acl-dir", "/tmp",
+	})
+	require.Equal(t, 0, code, ui.ErrorWriter.String())
+	// Validate the ACL Config file got written.
+	aclConfigBytes, err := ioutil.ReadFile("/tmp/acl-config.json")
+	require.NoError(t, err)
+	// Validate the Token Sink File got written.
+	sinkFileToken, err := ioutil.ReadFile(tokenFile)
+	require.NoError(t, err)
+	// Validate the Token Sink File Matches the ACL Cconfig Token by injecting
+	// the token secret into the template used by the ACL config file.
+	var buf bytes.Buffer
+	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
+	err = tpl.Execute(&buf, string(sinkFileToken))
+	require.NoError(t, err)
+	expectedAclConfig := buf.String()
+
+	require.Equal(t, expectedAclConfig, string(aclConfigBytes))
+}
+
+// TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile
+// executes the k8s secret path and validates the token is written to
+// acl-config.json and matches the token written to sink file.
+func TestRun_WithoutAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	tmpDir, err := ioutil.TempDir("", "")
+	require.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Set up k8s with the secret.
+	token := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	k8sNS := "default"
+	secretName := "secret-name"
+	k8s := fake.NewSimpleClientset()
+	_, err = k8s.CoreV1().Secrets(k8sNS).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   secretName,
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+			},
+			Data: map[string][]byte{
+				"token": []byte(token),
+			},
+		},
+		metav1.CreateOptions{})
+
+	require.NoError(err)
+
+	sinkFile := filepath.Join(tmpDir, "acl-token")
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: k8s,
+	}
+	code := cmd.Run([]string{
+		"-token-sink-file", sinkFile,
+		"-secret-name", secretName,
+		"-init-type", "client",
+		"-acl-dir", "/tmp",
+	})
+	// Validate the ACL Config file got written.
+	aclConfigBytes, err := ioutil.ReadFile("/tmp/acl-config.json")
+	require.NoError(err)
+	// Validate the Token Sink File got written.
+	require.Equal(0, code, ui.ErrorWriter.String())
+	sinkFileToken, err := ioutil.ReadFile(sinkFile)
+	require.NoError(err)
+	// Validate the Token Sink File Matches the ACL Cconfig Token by injecting
+	// the token secret into the template used by the ACL config file.
+	var buf bytes.Buffer
+	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
+	err = tpl.Execute(&buf, string(sinkFileToken))
+	require.NoError(err)
+	expectedAclConfig := buf.String()
+
+	require.Equal(expectedAclConfig, string(aclConfigBytes))
 }

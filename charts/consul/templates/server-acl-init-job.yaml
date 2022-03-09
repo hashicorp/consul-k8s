@@ -244,7 +244,7 @@ spec:
                 {{- end }}
 
                 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
-                -create-client-token=false \
+                -client=false \
                 {{- end }}
 
                 {{- if .Values.global.acls.createReplicationToken }}
