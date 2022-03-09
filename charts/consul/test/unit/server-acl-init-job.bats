@@ -1763,24 +1763,24 @@ load _helpers
 #--------------------------------------------------------------------
 # controller
 
-@test "serverACLInit/Job: -create-controller-token not set by default" {
+@test "serverACLInit/Job: -controller not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("create-controller-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("controller"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: -create-controller-token set when controller.enabled=true" {
+@test "serverACLInit/Job: -controller set when controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("create-controller-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("controller"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
