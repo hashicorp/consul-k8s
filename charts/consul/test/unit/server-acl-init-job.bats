@@ -297,7 +297,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-mesh-gateway-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-mesh-gateway"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -309,7 +309,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-create-mesh-gateway-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-mesh-gateway"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
