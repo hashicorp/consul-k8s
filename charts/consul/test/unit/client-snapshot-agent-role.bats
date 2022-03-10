@@ -53,31 +53,3 @@ load _helpers
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "podsecuritypolicies" ]
 }
-
-#--------------------------------------------------------------------
-# global.acls.manageSystemACLs
-
-@test "client/SnapshotAgentRole: allows secret access with global.bootsrapACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-role.yaml  \
-      --set 'client.snapshotAgent.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.rules[0].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
-}
-
-@test "client/SnapshotAgentRole: allows secret access with global.bootsrapACLs=true and global.enablePodSecurityPolicies=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-role.yaml  \
-      --set 'client.enabled=true' \
-      --set 'client.snapshotAgent.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enablePodSecurityPolicies=true' \
-      . | tee /dev/stderr |
-      yq -r '.rules[1].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
-}
