@@ -114,7 +114,9 @@ func (h *HelmCluster) Create(t *testing.T, args ...string) {
 	} else {
 		installArgs = args
 	}
-	h.helmOptions.ExtraArgs["install"] = installArgs
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"install": installArgs,
+	}
 
 	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 
@@ -138,7 +140,9 @@ func (h *HelmCluster) Destroy(t *testing.T, args ...string) {
 	} else {
 		uninstallArgs = args
 	}
-	h.helmOptions.ExtraArgs["uninstall"] = uninstallArgs
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"uninstall": uninstallArgs,
+	}
 
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
@@ -239,7 +243,9 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string, args .
 	} else {
 		upgradeArgs = args
 	}
-	h.helmOptions.ExtraArgs["upgrade"] = upgradeArgs
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"upgrade": upgradeArgs,
+	}
 
 	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
