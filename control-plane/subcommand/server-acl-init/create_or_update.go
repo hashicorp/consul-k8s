@@ -27,6 +27,8 @@ func (c *Command) createACLPolicyRoleAndBindingRule(componentName, rules, dc, pr
 		if !primary {
 			datacenters = append(datacenters, primaryDC)
 		}
+	} else if dc != "" {
+		datacenters = append(datacenters, dc)
 	}
 	policyTmpl := api.ACLPolicy{
 		Name:        policyName,
