@@ -307,3 +307,106 @@ load _helpers
   actual=$(echo $object | jq '.volumeMounts[] | select(.name == "consul-ca-cert")')
   [ "${actual}" = "" ]
 }
+
+@test "helper/consul.controlPlaneImage: allows override by imageK8S" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.imageK8S=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImage: allows override by imageK8s" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.imageK8s=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImageConnect: allows override by imageK8S" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.imageK8S=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image-connect"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImageConnect: allows override by imageK8s" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.imageK8s=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image-connect"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImageConnect: allows override by connectInject.image" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'connectInject.image=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image-connect"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImageSync: allows override by imageK8S" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.imageK8S=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image-sync"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImageSync: allows override by imageK8s" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.imageK8s=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image-sync"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+@test "helper/consul.controlPlaneImageSync: allows override by catalogSync.image" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'syncCatalog.image=override' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["consul-k8s-image-sync"]' | tee /dev/stderr)
+
+  [ "${actual}" = "override" ]
+}
+
+# These tests ensure that we use {{ template "consul.controlPlaneImage" . }} everywhere instead of
+# {{ .Values.imageK8S }} or {{ .Values.imageK8s }}.
+# You must use this helper because we want to support imageK8S for backwards compatibility.
+@test ".Values.imageK8S not used anywhere" {
+  cd `chart_dir`
+  local actual=$(grep -r 'imageK8S' templates/*.yaml | tee /dev/stderr )
+  [ "${actual}" = '' ]
+}
+
+@test ".Values.imageK8s not used anywhere" {
+  cd `chart_dir`
+  local actual=$(grep -r 'imageK8s' templates/*.yaml | tee /dev/stderr )
+  [ "${actual}" = '' ]
+}

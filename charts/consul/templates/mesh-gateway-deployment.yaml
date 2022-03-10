@@ -123,7 +123,7 @@ spec:
         {{- end }}
         # service-init registers the mesh gateway service.
         - name: service-init
-          image: {{ .Values.global.imageK8S }}
+          image: {{ template "consul.controlPlaneImage" . }}
           env:
             - name: HOST_IP
               valueFrom:
@@ -342,7 +342,7 @@ spec:
         # consul-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
         - name: consul-sidecar
-          image: {{ .Values.global.imageK8S }}
+          image: {{ template "consul.controlPlaneImage" . }}
           volumeMounts:
             - name: consul-service
               mountPath: /consul/service

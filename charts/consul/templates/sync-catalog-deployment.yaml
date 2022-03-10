@@ -71,7 +71,7 @@ spec:
       {{- end }}
       containers:
         - name: consul-sync-catalog
-          image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
+          image: {{ template "consul.controlPlaneImageSync" . }}
           env:
             - name: HOST_IP
               valueFrom:
@@ -216,7 +216,7 @@ spec:
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: sync-acl-init
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         command:
           - "/bin/sh"
           - "-ec"

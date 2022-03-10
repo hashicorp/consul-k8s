@@ -125,7 +125,7 @@ spec:
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: api-gateway-controller-acl-init
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         command:
           - "/bin/sh"
           - "-ec"

@@ -184,7 +184,7 @@ spec:
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: client-snapshot-agent-acl-init
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         command:
           - "/bin/sh"
           - "-ec"

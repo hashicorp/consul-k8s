@@ -11,6 +11,9 @@ metadata:
     release: {{ .Release.Name }}
   annotations:
     "helm.sh/hook": test-success
+    "consul-k8s-image": {{ template "consul.controlPlaneImage" . }}
+    "consul-k8s-image-connect": {{ template "consul.controlPlaneImageConnect" . }}
+    "consul-k8s-image-sync": {{ template "consul.controlPlaneImageSync" . }}
 spec:
   {{- if .Values.global.tls.enabled }}
   volumes:

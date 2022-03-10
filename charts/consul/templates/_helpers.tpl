@@ -152,7 +152,7 @@ This template is for an init container.
 */}}
 {{- define "consul.getAutoEncryptClientCA" -}}
 - name: get-auto-encrypt-client-ca
-  image: {{ .Values.global.imageK8S }}
+  image: {{ template "consul.controlPlaneImage" . }}
   command:
     - "/bin/sh"
     - "-ec"
@@ -212,4 +212,17 @@ Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
 {{- if or (eq "system" $name) (eq "universal" $name) (eq "consul" $name) (eq "operator" $name) (eq "root" $name) }}
 {{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
 {{- end }}
+{{- end -}}
+
+
+{{- define "consul.controlPlaneImage" -}}
+{{ .Values.global.imageK8S | default .Values.global.imageK8s }}
+{{- end -}}
+
+{{- define "consul.controlPlaneImageConnect" -}}
+{{ .Values.connectInject.image | default .Values.global.imageK8S | default .Values.global.imageK8s }}
+{{- end -}}
+
+{{- define "consul.controlPlaneImageSync" -}}
+{{ .Values.syncCatalog.image | default .Values.global.imageK8S | default .Values.global.imageK8s }}
 {{- end -}}

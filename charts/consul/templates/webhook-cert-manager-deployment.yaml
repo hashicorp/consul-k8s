@@ -42,7 +42,7 @@ spec:
             -config-file=/bootstrap/config/webhook-config.json \
             -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
             -deployment-namespace={{ .Release.Namespace }}
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         name: webhook-cert-manager
         resources:
           limits:

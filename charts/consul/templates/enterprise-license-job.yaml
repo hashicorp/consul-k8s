@@ -117,7 +117,7 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       initContainers:
       - name: ent-license-acl-init
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         command:
           - "/bin/sh"
           - "-ec"

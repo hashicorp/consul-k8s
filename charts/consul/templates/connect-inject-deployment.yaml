@@ -56,7 +56,7 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
       containers:
         - name: sidecar-injector
-          image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
+          image: {{ template "consul.controlPlaneImageConnect" . }}
           ports:
           - containerPort: 8080
             name: webhook-server
@@ -103,7 +103,7 @@ spec:
                 -default-inject={{ .Values.connectInject.default }} \
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \
                 -envoy-image="{{ .Values.global.imageEnvoy }}" \
-                -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
+                -consul-k8s-image="{{ template "consul.controlPlaneImageConnect" . }}" \
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
                 -listen=:8080 \
@@ -287,7 +287,7 @@ spec:
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: injector-acl-init
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         command:
           - "/bin/sh"
           - "-ec"

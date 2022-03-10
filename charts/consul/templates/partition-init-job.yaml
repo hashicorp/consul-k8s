@@ -48,7 +48,7 @@ spec:
       {{- end }}
       containers:
         - name: partition-init-job
-          image: {{ .Values.global.imageK8S }}
+          image: {{ template "consul.controlPlaneImage" . }}
           env:
             - name: NAMESPACE
               valueFrom:

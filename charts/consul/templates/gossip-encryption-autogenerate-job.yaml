@@ -39,7 +39,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: gossip-encryption-autogen
-          image: "{{ .Values.global.imageK8S }}"
+          image: {{ template "consul.controlPlaneImage" . }}
           command:
             - "/bin/sh"
             - "-ec"

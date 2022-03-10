@@ -93,7 +93,7 @@ spec:
       {{- end }}
       containers:
         - name: post-install-job
-          image: {{ .Values.global.imageK8S }}
+          image: {{ template "consul.controlPlaneImage" . }}
           env:
             - name: NAMESPACE
               valueFrom:

@@ -49,7 +49,7 @@ spec:
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: controller-acl-init
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         command:
           - "/bin/sh"
           - "-ec"
@@ -127,7 +127,7 @@ spec:
           {{- else }}
           value: http://$(HOST_IP):8500
           {{- end }}
-        image: {{ .Values.global.imageK8S }}
+        image: {{ template "consul.controlPlaneImage" . }}
         name: controller
         ports:
         - containerPort: 9443

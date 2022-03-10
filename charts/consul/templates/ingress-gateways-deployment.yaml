@@ -142,7 +142,7 @@ spec:
         {{- end }}
         # service-init registers the ingress gateway service.
         - name: service-init
-          image: {{ $root.Values.global.imageK8S }}
+          image: {{ template "consul.controlPlaneImage" $root }}
           env:
             - name: HOST_IP
               valueFrom:
@@ -403,7 +403,7 @@ spec:
         # consul-sidecar ensures the ingress gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
         - name: consul-sidecar
-          image: {{ $root.Values.global.imageK8S }}
+          image: {{ template "consul.controlPlaneImage" $root }}
           volumeMounts:
             - name: consul-service
               mountPath: /consul/service
