@@ -54,7 +54,7 @@ type Command struct {
 
 	flagSnapshotAgent bool
 
-	flagCreateMeshGatewayToken  bool
+	flagMeshGateway             bool
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
@@ -126,13 +126,13 @@ func (c *Command) init() {
 		"Toggle for creating a client agent token. Default is true.")
 
 	c.flags.BoolVar(&c.flagSyncCatalog, "sync-catalog", false,
-		"Toggle for creating a catalog sync policy.")
+		"Toggle for configuring ACL login for sync catalog.")
 	c.flags.StringVar(&c.flagSyncConsulNodeName, "sync-consul-node-name", "k8s-sync",
 		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
 			"via DNS, the name should only contain alpha-numerics and dashes.")
 
 	c.flags.BoolVar(&c.flagConnectInject, "connect-inject", false,
-		"Toggle for creating a connect inject auth method and policy.")
+		"Toggle for configuring ACL login for Connect inject.")
 	c.flags.StringVar(&c.flagAuthMethodHost, "auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
 			"If not provided, the default cluster Kubernetes service will be used.")
@@ -140,14 +140,14 @@ func (c *Command) init() {
 		"Selector string for connectInject ACL Binding Rule.")
 
 	c.flags.BoolVar(&c.flagController, "controller", false,
-		"Toggle for configuring ACLs for the controller.")
+		"Toggle for configuring ACL login for the controller.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
 	c.flags.BoolVar(&c.flagSnapshotAgent, "snapshot-agent", false,
-		"[Enterprise Only] Toggle for creating a token for the Consul snapshot agent deployment.")
-	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
-		"Toggle for creating a token for a Connect mesh gateway.")
+		"[Enterprise Only] Toggle for configuring ACL login for the snapshot agent.")
+	c.flags.BoolVar(&c.flagMeshGateway, "mesh-gateway", false,
+		"Toggle for configuring ACL login for the mesh gateway.")
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagIngressGatewayNames), "ingress-gateway-name",
 		"Name of an ingress gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
@@ -157,7 +157,7 @@ func (c *Command) init() {
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
 	c.flags.BoolVar(&c.flagAPIGatewayController, "api-gateway-controller", false,
-		"Toggle for creating a token for the API Gateway controller integration.")
+		"Toggle for configuring ACL login for the API gateway controller.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
@@ -579,16 +579,21 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateMeshGatewayToken {
-		meshGatewayRules, err := c.meshGatewayRules()
+	if c.flagMeshGateway {
+		rules, err := c.meshGatewayRules()
 		if err != nil {
-			c.log.Error("Error templating dns rules", "err", err)
+			c.log.Error("Error templating mesh gateway rules", "err", err)
 			return 1
 		}
+		serviceAccountName := c.withPrefix("mesh-gateway")
 
 		// Mesh gateways require a global policy/token because they must
 		// discover services in other datacenters.
-		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, primary, consulClient)
+		authMethodName := localComponentAuthMethodName
+		if !primary {
+			authMethodName = globalComponentAuthMethodName
+		}
+		err = c.createACLPolicyRoleAndBindingRule("mesh-gateway", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1

@@ -32,18 +32,6 @@ load _helpers
   [ "${actual}" = "podsecuritypolicies" ]
 }
 
-@test "meshGateway/ClusterRole: rules for global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/mesh-gateway-clusterrole.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.rules[0].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
-}
-
 @test "meshGateway/ClusterRole: rules for meshGateway.wanAddress.source=Service" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -83,5 +71,5 @@ load _helpers
       --set 'meshGateway.wanAddress.source=Service' \
       . | tee /dev/stderr |
       yq -r '.rules | length' | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "2" ]
 }
