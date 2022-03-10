@@ -179,14 +179,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Snapshot agent token",
-			TokenFlags:  []string{"-create-snapshot-agent-token"},
-			PolicyNames: []string{"client-snapshot-agent-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token"},
@@ -389,14 +381,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Snapshot agent token",
-			TokenFlags:  []string{"-create-snapshot-agent-token"},
-			PolicyNames: []string{"client-snapshot-agent-token-dc2"},
-			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token-dc2"},
@@ -507,12 +491,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
-		},
-		{
-			TestName:    "Snapshot agent token",
-			TokenFlags:  []string{"-create-snapshot-agent-token"},
-			PolicyNames: []string{"client-snapshot-agent-token"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
 		},
 		{
 			TestName:    "Mesh gateway token",
@@ -2145,6 +2123,12 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			PolicyNames: []string{"api-gateway-controller-policy"},
 			Roles:       []string{resourcePrefix + "-api-gateway-controller-acl-role"},
 		},
+		{
+			TestName:    "Snapshot Agent",
+			TokenFlags:  []string{"-snapshot-agent"},
+			PolicyNames: []string{"snapshot-agent-policy"},
+			Roles:       []string{resourcePrefix + "-snapshot-agent-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2263,6 +2247,13 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName:         "Snapshot Agent",
+			TokenFlags:       []string{"-snapshot-agent"},
+			PolicyNames:      []string{"snapshot-agent-policy-" + secondaryDatacenter},
+			Roles:            []string{resourcePrefix + "-snapshot-agent-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2374,6 +2365,11 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			TokenFlags:    []string{"-api-gateway-controller"},
 			Roles:         []string{resourcePrefix + "-api-gateway-controller-acl-role"},
 		},
+		{
+			ComponentName: "snapshot-agent",
+			TokenFlags:    []string{"-snapshot-agent"},
+			Roles:         []string{resourcePrefix + "-snapshot-agent-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2472,6 +2468,12 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			ComponentName:    "api-gateway-controller",
 			TokenFlags:       []string{"-api-gateway-controller"},
 			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
+			GlobalAuthMethod: false,
+		},
+		{
+			ComponentName:    "snapshot-agent",
+			TokenFlags:       []string{"-snapshot-agent"},
+			Roles:            []string{resourcePrefix + "-snapshot-agent-acl-role-dc2"},
 			GlobalAuthMethod: false,
 		},
 	}

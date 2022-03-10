@@ -124,9 +124,9 @@ spec:
             {{- else }}
             - name: consul-ca-cert
             {{- end }}
-            {{- end }}
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"

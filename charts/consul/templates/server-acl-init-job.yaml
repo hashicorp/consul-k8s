@@ -240,7 +240,7 @@ spec:
                 {{- end }}
 
                 {{- if .Values.client.snapshotAgent.enabled }}
-                -create-snapshot-agent-token=true \
+                -snapshot-agent=true \
                 {{- end }}
 
                 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}

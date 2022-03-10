@@ -88,93 +88,189 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.acls.manageSystemACLs and snapshotAgent.configSecret
+# global.acls.manageSystemACLs
 
-@test "client/SnapshotAgentDeployment: no initContainer by default" {
+@test "clientSnapshotAgent/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("/bin/consul logout"))' | tee /dev/stderr)
+  [ "${object}" = "true" ]
+}
+
+@test "clientSnapshotAgent/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
-@test "client/SnapshotAgentDeployment: populates initContainer when global.acls.manageSystemACLs=true" {
+@test "clientSnapshotAgent/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers | length > 0' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[2].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "client/SnapshotAgentDeployment: no volumes by default" {
+@test "clientSnapshotAgent/Deployment: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-deployment.yaml  \
-      --set 'client.snapshotAgent.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "client/SnapshotAgentDeployment: populates volumes when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "snapshot-agent-acl-init" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
+      echo $actual
   [ "${actual}" = "true" ]
 }
 
-@test "client/SnapshotAgentDeployment: populates volumes when client.snapshotAgent.configSecret.secretName and client.snapshotAgent.configSecret secretKey are defined" {
+@test "clientSnapshotAgent/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'client.snapshotAgent.configSecret.secretName=secret' \
-      --set 'client.snapshotAgent.configSecret.secretKey=key' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "client/SnapshotAgentDeployment: no container volumeMounts by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-deployment.yaml  \
-      --set 'client.snapshotAgent.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "client/SnapshotAgentDeployment: populates container volumeMounts when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-deployment.yaml  \
-      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers[] | select(.name == "snapshot-agent-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "client/SnapshotAgentDeployment: populates container volumeMounts when client.snapshotAgent.configSecret.secretName and client.snapshotAgent.configSecret secretKey are defined" {
+@test "clientSnapshotAgent/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'client.snapshotAgent.configSecret.secretName=secret' \
-      --set 'client.snapshotAgent.configSecret.secretKey=key' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers[] | select(.name == "snapshot-agent-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "clientSnapshotAgent/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "snapshot-agent-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "clientSnapshotAgent/Deployment: auto-encrypt init container is created and is the first init-container when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "get-auto-encrypt-client-ca" ]
 }
 
 #--------------------------------------------------------------------
@@ -370,15 +466,9 @@ load _helpers
       --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL")' | tee /dev/stderr)
 
-  exp='cat <<EOF > /etc/ssl/certs/custom-ca.pem
------BEGIN CERTIFICATE-----
-MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL
-EOF
-exec /bin/consul snapshot agent \'
-
-  [ "${actual}" = "${exp}" ]
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
