@@ -295,7 +295,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-ingress-gateway-name=anothergw",
 				"-terminating-gateway-name=gw",
 				"-terminating-gateway-name=anothergw",
-				"-create-controller-token",
+				"-controller",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
