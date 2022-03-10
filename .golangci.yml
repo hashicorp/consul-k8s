@@ -3,6 +3,7 @@ linters:
   enable:
     - gofmt
     - godot
+    - govet
     # TODO: re-enable things as we have main cleaned up vs the defaults
     #- stylecheck
     #- goconst
