@@ -200,12 +200,26 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	primaryConsulCluster := consul.NewHelmCluster(t, primaryConsulHelmValues, primaryCtx, cfg, consulReleaseName)
 	primaryConsulCluster.Create(t)
 
+	var k8sAuthMethodHost string
+	// When running on kind, the kube API address in kubeconfig will have a localhost address
+	// which will not work from inside the container. That's why we need to use the endpoints address instead
+	// which will point the node IP.
+	if cfg.UseKind {
+		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
+		kubernetesEndpoint, err := secondaryCtx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
+		require.NoError(t, err)
+		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+	} else {
+		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryCtx.KubectlOptions(t))
+	}
+
 	// Get the address of the mesh gateway.
 	primaryMeshGWAddress := meshGatewayAddress(t, cfg, primaryCtx, consulReleaseName)
 	secondaryConsulHelmValues := map[string]string{
 		"global.datacenter": "dc2",
 
 		"global.federation.enabled":            "true",
+		"global.federation.k8sAuthMethodHost":  k8sAuthMethodHost,
 		"global.federation.primaryDatacenter":  "dc1",
 		"global.federation.primaryGateways[0]": primaryMeshGWAddress,
 
