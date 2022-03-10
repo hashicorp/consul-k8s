@@ -9,22 +9,18 @@ import (
 // TestInstallAfterFailedInstall exercises the install command after a failed
 // install. This scenario tests this issue: https://github.com/hashicorp/consul-k8s/issues/1005
 func TestInstallAfterFailedInstall(t *testing.T) {
-	t.Skip("This is stuck on a pending install for now. I'd like to get it failing.")
+	t.Skip()
 
 	// Install Consul in a way that will fail.
 	{
-		// This config will work until we implement some precheck for valid CA Certs.
 		helmValues := map[string]string{
-			"server.replicas":              "1",
-			"global.tls.enabled":           "true",
-			"global.tls.caCert.secretName": "asdf",
-			"global.tls.caCert.secretKey":  "asdf",
+			"server.replicas": "1",
 		}
 		ctx := suite.Environment().DefaultContext(t)
 		cfg := suite.Config()
 
 		cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
-		cluster.Create(t)
+		cluster.Create(t, "-timeout", "1s")
 	}
 
 	// Try to install Consul again.
@@ -43,22 +39,18 @@ func TestInstallAfterFailedInstall(t *testing.T) {
 // TestUpgradeAfterFailedInstall exercises the upgrade command after a failed
 // install. This scenario tests this issue: https://github.com/hashicorp/consul-k8s/issues/1005
 func TestUpgradeAfterFailedInstall(t *testing.T) {
-	t.Skip("This is stuck on a pending install for now. I'd like to get it failing.")
+	t.Skip()
 
 	// Install Consul in a way that will fail.
 	{
-		// This config will work until we implement some precheck for valid CA Certs.
 		helmValues := map[string]string{
-			"server.replicas":              "1",
-			"global.tls.enabled":           "true",
-			"global.tls.caCert.secretName": "asdf",
-			"global.tls.caCert.secretKey":  "asdf",
+			"server.replicas": "1",
 		}
 		ctx := suite.Environment().DefaultContext(t)
 		cfg := suite.Config()
 
 		cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
-		cluster.Create(t)
+		cluster.Create(t, "-timeout", "1s")
 
 		// Try to upgrade Consul.
 		helmValues = map[string]string{
