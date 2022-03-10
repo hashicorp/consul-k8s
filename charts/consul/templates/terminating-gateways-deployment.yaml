@@ -97,6 +97,9 @@ spec:
         - name: consul-service
           emptyDir:
             medium: "Memory"
+        - name: consul-data
+          emptyDir:
+            medium: "Memory"
         {{- range (default $defaults.extraVolumes .extraVolumes) }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -185,8 +188,10 @@ spec:
             - |
                 {{- if $root.Values.global.acls.manageSystemACLs }}
                 consul-k8s-control-plane acl-init \
-                  -secret-name="{{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway-acl-token" \
-                  -k8s-namespace={{ $root.Release.Namespace }} \
+                  -acl-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
+                  {{- if $root.Values.global.adminPartitions.enabled }}
+                  -partition={{ $root.Values.global.adminPartitions.name }} \
+                  {{- end }}
                   -token-sink-file=/consul/service/acl-token
                 {{- end }}
 
@@ -227,6 +232,9 @@ spec:
               mountPath: /consul/service
             - name: consul-bin
               mountPath: /consul-bin
+            - mountPath: /consul/login
+              name: consul-data
+              readOnly: false
             {{- if $root.Values.global.tls.enabled }}
             {{- if $root.Values.global.tls.enableAutoEncrypt }}
             - name: consul-auto-encrypt-ca-cert
@@ -252,6 +260,9 @@ spec:
           volumeMounts:
           - name: consul-bin
             mountPath: /consul-bin
+          - mountPath: /consul/login
+            name: consul-data
+            readOnly: true
           {{- if $root.Values.global.tls.enabled }}
           {{- if $root.Values.global.tls.enableAutoEncrypt }}
           - name: consul-auto-encrypt-ca-cert
@@ -280,12 +291,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             {{- if $root.Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_HTTP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway-acl-token"
-                  key: "token"
-            {{- end}}
+            - name: CONSUL_HTTP_TOKEN_FILE
+              value: "/consul/login/acl-token"
+            {{- end }}
             {{- if $root.Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: https://$(HOST_IP):8501
@@ -345,6 +353,10 @@ spec:
                       -partition={{ $root.Values.global.adminPartitions.name }} \
                       {{- end }}
                       -id="${POD_NAME}"
+                  {{- if $root.Values.global.acls.manageSystemACLs }}
+                  - |
+                    consul-k8s-control-plane consul-logout
+                  {{- end}}
 
         # consul-sidecar ensures the terminating gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.

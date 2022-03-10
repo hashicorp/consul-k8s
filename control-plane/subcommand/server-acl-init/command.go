@@ -653,58 +653,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if len(c.flagTerminatingGatewayNames) > 0 {
-		// Create a token for each terminating gateway name. Each gateway needs a
-		// separate token because users may need to attach different policies
-		// to each gateway token depending on what the services it represents
-		for _, name := range c.flagTerminatingGatewayNames {
-			if name == "" {
-				c.log.Error("Terminating gateway names cannot be empty")
-				return 1
-			}
-
-			// Parse optional namespace. This does not protect against a user
-			// that provides a namespace with namespaces not enabled.
-			var namespace string
-			if c.flagEnableNamespaces {
-				parts := strings.SplitN(strings.TrimSpace(name), ".", 2)
-				if len(parts) > 1 {
-					// Name and namespace were provided
-					name = parts[0]
-
-					// Use default namespace if provided flag is of the
-					// form "name."
-					if parts[1] != "" {
-						namespace = parts[1]
-					} else {
-						namespace = consulDefaultNamespace
-					}
-				} else {
-					// Use the default Consul namespace
-					namespace = consulDefaultNamespace
-				}
-			} else if strings.ContainsAny(name, ".") {
-				c.log.Error("Gateway names shouldn't include a namespace if Consul namespaces aren't enabled",
-					"gateway-name", name)
-				return 1
-			}
-
-			// Define the gateway rules
-			terminatingGatewayRules, err := c.terminatingGatewayRules(name, namespace)
-			if err != nil {
-				c.log.Error("Error templating terminating gateway rules", "gateway-name", name,
-					"namespace", namespace, "err", err)
-				return 1
-			}
-
-			// The names in the Helm chart are specified by users and so may not contain
-			// the words "ingress-gateway". We need to create unique names for tokens
-			// across all gateway types and so must suffix with `-terminating-gateway`.
-			tokenName := fmt.Sprintf("%s-terminating-gateway", name)
-			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, primary, consulClient)
-			if err != nil {
-				c.log.Error(err.Error())
-				return 1
-			}
+		err := c.configureGateway("terminating", c.flagTerminatingGatewayNames,
+			localComponentAuthMethodName, c.terminatingGatewayRules, consulDC,
+			primaryDC, primary, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
 		}
 	}
 
@@ -789,6 +743,72 @@ func (c *Command) createAuthMethod(consulClient *api.Client, authMethod *api.ACL
 			_, _, err = consulClient.ACL().AuthMethodCreate(authMethod, writeOptions)
 			return err
 		})
+}
+
+type gatewayRulesGenerator func(name, namespace string) (string, error)
+
+func (c *Command) configureGateway(gatewayType string, gatewayNames []string,
+	authMethodName string, ruleGenerator gatewayRulesGenerator, consulDC string,
+	primaryDC string, primary bool, consulClient *api.Client) error {
+	// Create a token for each gateway name. Each gateway needs a
+	// separate token because users may need to attach different policies
+	// to each gateway token depending on what the services it represents
+	for _, name := range gatewayNames {
+		if name == "" {
+			errMessage := fmt.Sprintf("%s gateway names cannot be empty",
+				strings.Title(strings.ToLower(gatewayType)))
+			c.log.Error(errMessage)
+			return errors.New(errMessage)
+		}
+
+		// Parse optional namespace, erroring if a user
+		// provides a namespace when not enabling namespaces.
+		var namespace string
+		if c.flagEnableNamespaces {
+			parts := strings.SplitN(strings.TrimSpace(name), ".", 2)
+			if len(parts) > 1 {
+				// Name and namespace were provided
+				name = parts[0]
+
+				// Use default namespace if provided flag is of the
+				// form "name."
+				if parts[1] != "" {
+					namespace = parts[1]
+				} else {
+					namespace = consulDefaultNamespace
+				}
+			} else {
+				// Use the default Consul namespace
+				namespace = consulDefaultNamespace
+			}
+		} else if strings.ContainsAny(name, ".") {
+			errMessage := "Gateway names shouldn't include a namespace if Consul namespaces aren't enabled"
+			c.log.Error(errMessage, "gateway-name", name)
+			return errors.New(errMessage)
+		}
+
+		// Define the gateway rules
+		rules, err := ruleGenerator(name, namespace)
+		if err != nil {
+
+			errMessage := fmt.Sprintf("Error templating %s gateway rules",
+				gatewayType)
+			c.log.Error(errMessage, "gateway-name", name,
+				"namespace", namespace, "err", err)
+			return errors.New(errMessage)
+		}
+
+		// The names in the Helm chart are specified by users and so may not contain
+		// the words "ingress-gateway" or "terminating-gateway". We need to create unique names for tokens
+		// across all gateway types and so must suffix with either `-ingress-gateway` of `-terminating-gateway`.
+		serviceAccountName := fmt.Sprintf("%s-%s-gateway", name, gatewayType)
+		err = c.createACLPolicyRoleAndBindingRule(serviceAccountName, rules, consulDC, primaryDC, true, primary, authMethodName, serviceAccountName, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 // getBootstrapToken returns the existing bootstrap token if there is one by
