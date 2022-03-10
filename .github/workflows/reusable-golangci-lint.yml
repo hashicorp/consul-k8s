@@ -1,4 +1,4 @@
-name: go-fmt-and-vet 
+name: golangci-lint
 
 on:
   workflow_call:
@@ -37,16 +37,8 @@ jobs:
         working-directory: ${{inputs.directory}}
         run: go mod download
 
-      - name: check go fmt
-        working-directory: ${{inputs.directory}}
-        run: |
-          files=$(go fmt ./...)
-          if [ -n "$files" ]; then
-            echo "The following file(s) do not conform to go fmt:"
-            echo "$files"
-            exit 1
-          fi
-
-      - name: go vet 
-        working-directory: ${{inputs.directory}}
-        run: go vet ./...
+      - name: golangci-lint-${{inputs.directory}}
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.41.1
+          working-directory: ${inputs.directory}
