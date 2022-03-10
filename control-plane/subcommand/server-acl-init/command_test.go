@@ -16,6 +16,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,18 +33,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/freeport"
-	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/go-discover"
-	"github.com/hashicorp/go-hclog"
-
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 var ns = "default"
@@ -186,14 +184,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
-			LocalToken:  true,
-		},
-		{
-			TestName:    "API gateway token",
-			TokenFlags:  []string{"-create-api-gateway-token"},
-			PolicyNames: []string{"api-gateway-controller-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 			LocalToken:  true,
 		},
 		{
@@ -407,14 +397,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "API Gateway token",
-			TokenFlags:  []string{"-create-api-gateway-token"},
-			PolicyNames: []string{"api-gateway-controller-token-dc2"},
-			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token-dc2"},
@@ -531,12 +513,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
-		},
-		{
-			TestName:    "API Gateway token",
-			TokenFlags:  []string{"-create-api-gateway-token"},
-			PolicyNames: []string{"api-gateway-controller-token"},
-			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 		},
 		{
 			TestName:    "Mesh gateway token",
@@ -2163,6 +2139,12 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			PolicyNames: []string{"sync-catalog-policy"},
 			Roles:       []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
+		{
+			TestName:    "API Gateway Controller",
+			TokenFlags:  []string{"-api-gateway-controller"},
+			PolicyNames: []string{"api-gateway-controller-policy"},
+			Roles:       []string{resourcePrefix + "-api-gateway-controller-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2274,6 +2256,13 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName:         "API Gateway Controller",
+			TokenFlags:       []string{"-api-gateway-controller"},
+			PolicyNames:      []string{"api-gateway-controller-policy-" + secondaryDatacenter},
+			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2380,6 +2369,11 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			TokenFlags:    []string{"-sync-catalog"},
 			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
+		{
+			ComponentName: "api-gateway-controller",
+			TokenFlags:    []string{"-api-gateway-controller"},
+			Roles:         []string{resourcePrefix + "-api-gateway-controller-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2472,6 +2466,12 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			ComponentName:    "sync-catalog",
 			TokenFlags:       []string{"-sync-catalog"},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
+			GlobalAuthMethod: false,
+		},
+		{
+			ComponentName:    "api-gateway-controller",
+			TokenFlags:       []string{"-api-gateway-controller"},
+			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
 			GlobalAuthMethod: false,
 		},
 	}
