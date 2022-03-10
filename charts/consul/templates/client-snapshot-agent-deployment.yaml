@@ -229,7 +229,7 @@ spec:
               {{- if .Values.global.adminPartitions.enabled }}
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
-              -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
+              -log-level={{ default .Values.global.logLevel }} \
               -log-json={{ .Values.global.logJSON }}
         resources:
           requests:
