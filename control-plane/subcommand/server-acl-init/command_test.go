@@ -2574,7 +2574,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-client-acl-role-dc2"},
 			GlobalAuthMethod: false,
 			GlobalToken:      false,
-		}
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
