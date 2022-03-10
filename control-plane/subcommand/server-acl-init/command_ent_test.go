@@ -289,7 +289,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-create-mesh-gateway-token",
 				"-sync-catalog",
 				"-connect-inject",
-				"-create-snapshot-agent-token",
+				"-snapshot-agent",
 				"-create-enterprise-license-token",
 				"-ingress-gateway-name=gw",
 				"-ingress-gateway-name=anothergw",
@@ -327,7 +327,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"client-token",
 				"sync-catalog-policy",
 				"mesh-gateway-token",
-				"client-snapshot-agent-token",
+				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"gw-ingress-gateway-token",
 				"anothergw-ingress-gateway-token",
@@ -379,7 +379,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"sync-catalog-policy",
 				"connect-inject-policy",
 				"mesh-gateway-token",
-				"client-snapshot-agent-token",
+				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"cross-namespace-policy",
 				"gw-ingress-gateway-token",
@@ -411,11 +411,11 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				require.True(ok, "Did not find policy %s", expected)
 
 				switch expected {
-				case "connect-inject-token":
+				case "connect-inject-policy":
 					// The connect inject token doesn't have namespace config,
 					// but does change to operator:write from an empty string.
 					require.Contains(actRules, "policy = \"write\"")
-				case "client-snapshot-agent-token", "enterprise-license-token":
+				case "snapshot-agent-policy", "enterprise-license-token":
 					// The snapshot agent and enterprise license tokens shouldn't change.
 					require.NotContains(actRules, "namespace")
 					require.Contains(actRules, "acl = \"write\"")
@@ -680,13 +680,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			PolicyNames: []string{"enterprise-license-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
-			LocalToken:  true,
-		},
-		"client-snapshot-agent token": {
-			TokenFlags:  []string{"-create-snapshot-agent-token"},
-			PolicyNames: []string{"client-snapshot-agent-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
 			LocalToken:  true,
 		},
 		"mesh-gateway token": {
