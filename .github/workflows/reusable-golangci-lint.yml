@@ -14,7 +14,7 @@ on:
         type: string
 
 jobs:
-  a:
+  job:
     runs-on: ubuntu-latest
 
     steps:      
