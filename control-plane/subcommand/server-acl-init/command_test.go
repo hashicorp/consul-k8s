@@ -2147,7 +2147,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 	}{
 		{
 			TestName:    "Controller",
-			TokenFlags:  []string{"-create-controller-token"},
+			TokenFlags:  []string{"-controller"},
 			PolicyNames: []string{"controller-policy"},
 			Roles:       []string{resourcePrefix + "-controller-acl-role"},
 		},
@@ -2255,7 +2255,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 	}{
 		{
 			TestName:         "Controller",
-			TokenFlags:       []string{"-create-controller-token"},
+			TokenFlags:       []string{"-controller"},
 			PolicyNames:      []string{"controller-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-controller-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: true,
@@ -2365,7 +2365,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 	}{
 		{
 			ComponentName: "controller",
-			TokenFlags:    []string{"-create-controller-token"},
+			TokenFlags:    []string{"-controller"},
 			Roles:         []string{resourcePrefix + "-controller-acl-role"},
 			GlobalToken:   false,
 		},
@@ -2456,7 +2456,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 	}{
 		{
 			ComponentName:    "controller",
-			TokenFlags:       []string{"-create-controller-token"},
+			TokenFlags:       []string{"-controller"},
 			Roles:            []string{resourcePrefix + "-controller-acl-role-dc2"},
 			GlobalAuthMethod: true,
 			GlobalToken:      true,
