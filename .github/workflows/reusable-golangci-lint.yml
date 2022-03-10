@@ -1,0 +1,29 @@
+name: golangci-lint
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        required: true
+        type: string
+      go-version:
+        required: true
+        type: string
+      args:
+        required: false
+        type: string
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+
+    steps:      
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: golangci-lint-${{inputs.directory}}
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.41.1
+          working-directory: ${{inputs.directory}}
+          args: ${{inputs.args}}
