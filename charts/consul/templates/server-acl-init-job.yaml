@@ -271,7 +271,7 @@ spec:
                 {{- end }}
 
                 {{- if .Values.controller.enabled }}
-                -create-controller-token=true \
+                -controller=true \
                 {{- end }}
 
                 {{- if .Values.apiGateway.enabled }}

@@ -49,7 +49,7 @@ type Command struct {
 	flagAuthMethodHost      string
 	flagBindingRuleSelector string
 
-	flagCreateControllerPoliciesAndBindings bool
+	flagController bool
 
 	flagCreateEntLicenseToken bool
 
@@ -140,8 +140,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
 
-	c.flags.BoolVar(&c.flagCreateControllerPoliciesAndBindings, "create-controller-token", false,
-		"Toggle for creating acl policies and rolebindings for the controller.")
+	c.flags.BoolVar(&c.flagController, "controller", false,
+		"Toggle for configuring ACLs for the controller.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
@@ -727,7 +727,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateControllerPoliciesAndBindings {
+	if c.flagController {
 		rules, err := c.controllerRules()
 		if err != nil {
 			c.log.Error("Error templating controller token rules", "err", err)
