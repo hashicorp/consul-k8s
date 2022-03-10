@@ -37,7 +37,7 @@ env:
   CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }} 
 
 jobs:
-  a:
+  job:
     runs-on: ubuntu-latest
     strategy: 
       matrix:
