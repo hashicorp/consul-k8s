@@ -52,7 +52,7 @@ type Command struct {
 
 	flagCreateEntLicenseToken bool
 
-	flagCreateSnapshotAgentToken bool
+	flagSnapshotAgent bool
 
 	flagCreateMeshGatewayToken  bool
 	flagIngressGatewayNames     []string
@@ -144,7 +144,7 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
-	c.flags.BoolVar(&c.flagCreateSnapshotAgentToken, "create-snapshot-agent-token", false,
+	c.flags.BoolVar(&c.flagSnapshotAgent, "snapshot-agent", false,
 		"[Enterprise Only] Toggle for creating a token for the Consul snapshot agent deployment.")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway.")
@@ -558,9 +558,9 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateSnapshotAgentToken {
-		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, primary, consulClient)
-		if err != nil {
+	if c.flagSnapshotAgent {
+		serviceAccountName := c.withPrefix("snapshot-agent")
+		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
