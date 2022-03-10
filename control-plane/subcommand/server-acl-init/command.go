@@ -72,8 +72,9 @@ type Command struct {
 	flagACLReplicationTokenFile   string
 
 	// Flags to support partitions.
-	flagEnablePartitions bool   // true if Admin Partitions are enabled
-	flagPartitionName    string // name of the Admin Partition
+	flagEnablePartitions   bool   // true if Admin Partitions are enabled
+	flagPartitionName      string // name of the Admin Partition
+	flagPartitionTokenFile string
 
 	// Flags to support namespaces.
 	flagEnableNamespaces                 bool   // Use namespacing on all components
@@ -174,6 +175,8 @@ func (c *Command) init() {
 		"[Enterprise Only] Enables Admin Partitions")
 	c.flags.StringVar(&c.flagPartitionName, "partition", "",
 		"[Enterprise Only] Name of the Admin Partition")
+	c.flags.StringVar(&c.flagPartitionTokenFile, "partition-token-file", "",
+		"[Enterprise Only] Path to file containing ACL token to be used in non-default partitions.")
 
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
@@ -249,34 +252,35 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
+
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
-		// Load the ACL replication token from file.
-		tokenBytes, err := ioutil.ReadFile(c.flagACLReplicationTokenFile)
+		var err error
+		aclReplicationToken, err = loadTokenFromFile(c.flagACLReplicationTokenFile)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to read ACL replication token from file %q: %s", c.flagACLReplicationTokenFile, err))
+			c.UI.Error(err.Error())
 			return 1
 		}
-		if len(tokenBytes) == 0 {
-			c.UI.Error(fmt.Sprintf("ACL replication token file %q is empty", c.flagACLReplicationTokenFile))
+	}
+
+	var partitionToken string
+	if c.flagPartitionTokenFile != "" {
+		var err error
+		partitionToken, err = loadTokenFromFile(c.flagPartitionTokenFile)
+		if err != nil {
+			c.UI.Error(err.Error())
 			return 1
 		}
-		aclReplicationToken = strings.TrimSpace(string(tokenBytes))
 	}
 
 	var providedBootstrapToken string
 	if c.flagBootstrapTokenFile != "" {
-		// Load the bootstrap token from file.
-		tokenBytes, err := ioutil.ReadFile(c.flagBootstrapTokenFile)
+		var err error
+		providedBootstrapToken, err = loadTokenFromFile(c.flagBootstrapTokenFile)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to read bootstrap token from file %q: %s", c.flagBootstrapTokenFile, err))
+			c.UI.Error(err.Error())
 			return 1
 		}
-		if len(tokenBytes) == 0 {
-			c.UI.Error(fmt.Sprintf("Bootstrap token file %q is empty", c.flagBootstrapTokenFile))
-			return 1
-		}
-		providedBootstrapToken = strings.TrimSpace(string(tokenBytes))
 	}
 
 	var cancel context.CancelFunc
@@ -370,7 +374,11 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && primary {
 		// Partition token is local because only the Primary datacenter can have Admin Partitions.
-		err := c.createLocalACL("partitions", partitionRules, consulDC, primary, consulClient)
+		if c.flagPartitionTokenFile != "" {
+			err = c.createACLWithSecretID("partitions", partitionRules, consulDC, primary, consulClient, partitionToken, true)
+		} else {
+			err = c.createLocalACL("partitions", partitionRules, consulDC, primary, consulClient)
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -722,7 +730,7 @@ func (c *Command) Run(args []string) int {
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
 		if aclReplicationToken != "" {
-			err = c.createGlobalACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient, aclReplicationToken)
+			err = c.createACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient, aclReplicationToken, false)
 		} else {
 			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient)
 		}
@@ -955,6 +963,18 @@ func (c *Command) validateFlags() error {
 		return errors.New("-enable-partitions must be 'true' if -partition is set")
 	}
 	return nil
+}
+
+func loadTokenFromFile(tokenFile string) (string, error) {
+	// Load the bootstrap token from file.
+	tokenBytes, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
+		return "", fmt.Errorf("unable to read token from file %q: %s", tokenFile, err)
+	}
+	if len(tokenBytes) == 0 {
+		return "", fmt.Errorf("token file %q is empty", tokenFile)
+	}
+	return strings.TrimSpace(string(tokenBytes)), nil
 }
 
 const (

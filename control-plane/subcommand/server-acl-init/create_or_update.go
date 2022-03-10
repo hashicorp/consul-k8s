@@ -200,9 +200,9 @@ func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, consul
 	return c.createACL(name, rules, false, dc, isPrimary, consulClient, "")
 }
 
-// createGlobalACLWithSecretID creates a global policy and acl token with provided secret ID.
-func (c *Command) createGlobalACLWithSecretID(name, rules, dc string, isPrimary bool, consulClient *api.Client, secretID string) error {
-	return c.createACL(name, rules, false, dc, isPrimary, consulClient, secretID)
+// createACLWithSecretID creates a global policy and acl token with provided secret ID.
+func (c *Command) createACLWithSecretID(name, rules, dc string, isPrimary bool, consulClient *api.Client, secretID string, local bool) error {
+	return c.createACL(name, rules, local, dc, isPrimary, consulClient, secretID)
 }
 
 // createACL creates a policy with rules and name. If localToken is true then

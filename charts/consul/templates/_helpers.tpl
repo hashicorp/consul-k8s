@@ -173,12 +173,11 @@ This template is for an init container.
         {{- if .Values.externalServers.tlsServerName }}
         -tls-server-name={{ .Values.externalServers.tlsServerName }} \
         {{- end }}
-        {{- if not .Values.externalServers.useSystemRoots }}
-        -ca-file=/consul/tls/ca/tls.crt
-        {{- end }}
         {{- else }}
         -server-addr={{ template "consul.fullname" . }}-server \
         -server-port=8501 \
+        {{- end }}
+        {{- if or (not .Values.externalServers.enabled) (and .Values.externalServers.enabled (not .Values.externalServers.useSystemRoots)) }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
         -ca-file=/vault/secrets/serverca.crt
         {{- else }}

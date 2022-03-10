@@ -59,11 +59,11 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			Flags:  []string{"-acl-replication-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
-			ExpErr: "Unable to read ACL replication token from file \"/notexist\": open /notexist: no such file or directory",
+			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 		{
 			Flags:  []string{"-bootstrap-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
-			ExpErr: "Unable to read bootstrap token from file \"/notexist\": open /notexist: no such file or directory",
+			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 		{
 			Flags: []string{

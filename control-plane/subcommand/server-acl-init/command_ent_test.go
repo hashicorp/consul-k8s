@@ -5,8 +5,10 @@ package serveraclinit
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -1218,6 +1221,72 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 			})
 		})
 	}
+}
+
+// Test that the partition token can be created when it's provided with a file.
+func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
+	defer testSvr.Stop()
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	partitionToken := "123e4567-e89b-12d3-a456-426614174000"
+	partitionTokenFile, err := ioutil.TempFile("", "partitiontoken")
+	require.NoError(t, err)
+	defer os.Remove(partitionTokenFile.Name())
+
+	partitionTokenFile.WriteString(partitionToken)
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-enable-partitions",
+		"-partition=default",
+		"-partition-token-file", partitionTokenFile.Name(),
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Check that this token is created.
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   partitionToken,
+	})
+	require.NoError(t, err)
+	token, _, err := consul.ACL().TokenReadSelf(nil)
+	require.NoError(t, err)
+
+	for _, policyLink := range token.Policies {
+		policy := policyExists(t, policyLink.Name, consul)
+		require.Equal(t, policy.Datacenters, []string{"dc1"})
+
+		// Test that the token was not created as a Kubernetes Secret.
+		_, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-partitions-acl-token", metav1.GetOptions{})
+		require.True(t, k8serrors.IsNotFound(err))
+	}
+
+	// Test that if the same command is run again, it doesn't error.
+	t.Run(t.Name()+"-retried", func(t *testing.T) {
+		ui = cli.NewMockUi()
+		cmd = Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+		responseCode = cmd.Run(cmdArgs)
+		require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+	})
 }
 
 // partitionedSetup is a helper function which creates a server and a consul agent that runs as

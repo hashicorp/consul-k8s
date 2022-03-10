@@ -38,10 +38,12 @@ global:
     # must be installed in the default partition. Creation of Admin Partitions is only supported during installation.
     # Admin Partitions cannot be installed via a Helm upgrade operation. Only Helm installs are supported.
     enabled: false
+
     # The name of the Admin Partition. The partition name cannot be modified once the partition has been installed.
     # Changing the partition name would require an un-install and a re-install with the updated name.
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
+
     # Partition service properties.
     service:
       type: LoadBalancer
@@ -155,20 +157,31 @@ global:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
       # To discover the service account name of the Consul client, run
       #     ```shell-session
-      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> charts/consul
+      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> hashicorp/consul
       #     ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
       # A Vault role to allow Kubernetes job that manages ACLs for this Helm chart (`server-acl-init`)
-      # to read and update Vault secrets for the Consul's bootstrap and replication tokens.
+      # to read and update Vault secrets for the Consul's bootstrap, replication or partition tokens.
       # This role must be bound the `server-acl-init`'s service account.
       # To discover the service account name of the `server-acl-init` job, run
       #     ```shell-session
-      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml <release-name> charts/consul
+      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml \
+      #           --set global.acls.manageSystemACLs=true <release-name> hashicorp/consul
       #     ```
       # and check the name of `metadata.name`.
       manageSystemACLsRole: ""
+
+      # [Enterprise Only] A Vault role to allow Kubernetes job that creates a Consul partition for this Helm chart (`partition-init`)
+      # to read Vault secret for the partition ACL token.
+      # This role must be bound the `partition-init`'s service account.
+      # To discover the service account name of the `partition-init` job, run with Helm values for the client cluster:
+      #     ```shell-session
+      #     $ helm template --show-only templates/partition-init-serviceaccount.yaml -f client-cluster-values.yaml <release-name> hashicorp/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      adminPartitionsRole: ""
 
       # This value defines additional annotations for
       # Vault agent on any pods where it'll be running.
@@ -395,6 +408,18 @@ global:
       # The name of the Kubernetes secret or the path of the secret in Vault.
       secretName: null
       # The key of the Kubernetes or Vault secret.
+      secretKey: null
+
+    # partitionToken references a Vault secret containing the ACL token to be used in non-default partitions.
+    # This value should only be provided in the default partition and only when setting
+    # `global.secretsBackend.vault.enabled` to true.
+    # We will use the value of the secret stored in Vault to create an ACL token in Consul with the value of the
+    # secret as the secretID for the token.
+    # In non-default, partitions set this secret as the `bootstrapToken`.
+    partitionToken:
+      # The name of the path of the secret in Vault.
+      secretName: null
+      # The key of the Vault secret.
       secretKey: null
 
   # [Enterprise Only] This value refers to a Kubernetes secret that you have created
