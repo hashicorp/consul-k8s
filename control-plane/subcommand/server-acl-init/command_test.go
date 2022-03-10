@@ -179,14 +179,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Mesh gateway token",
-			TokenFlags:  []string{"-create-mesh-gateway-token"},
-			PolicyNames: []string{"mesh-gateway-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
-			LocalToken:  false,
-		},
-		{
 			TestName: "Ingress gateway tokens",
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
@@ -381,14 +373,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Mesh gateway token",
-			TokenFlags:  []string{"-create-mesh-gateway-token"},
-			PolicyNames: []string{"mesh-gateway-token-dc2"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
-			LocalToken:  false,
-		},
-		{
 			TestName: "Ingress gateway tokens",
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
@@ -491,12 +475,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
-		},
-		{
-			TestName:    "Mesh gateway token",
-			TokenFlags:  []string{"-create-mesh-gateway-token"},
-			PolicyNames: []string{"mesh-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
 		},
 		{
 			TestName: "Ingress gateway tokens",
@@ -1906,8 +1884,9 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 		"-server-port", strings.Split(secondaryAddr, ":")[1],
 		"-resource-prefix=" + resourcePrefix,
 		"-acl-replication-token-file", tokenFile,
+		"-auth-method-host=" + "https://my-kube.com",
 		"-create-client-token",
-		"-create-mesh-gateway-token",
+		"-mesh-gateway",
 	}
 	responseCode := secondaryCmd.Run(secondaryCmdArgs)
 	require.Equal(t, 0, responseCode, secondaryUI.ErrorWriter.String())
@@ -1929,8 +1908,8 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	// Test that the mesh-gateway policy was created. This is a global policy
 	// so replication has to have worked for it to exist.
 	retry.Run(t, func(r *retry.R) {
-		p := policyExists(r, "mesh-gateway-token-dc2", secondaryConsulClient)
-		require.Len(r, p.Datacenters, 0)
+		p := policyExists(r, "mesh-gateway-policy-dc2", secondaryConsulClient)
+		require.Len(r, p.Datacenters, 2)
 	})
 }
 
@@ -2129,6 +2108,12 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			PolicyNames: []string{"snapshot-agent-policy"},
 			Roles:       []string{resourcePrefix + "-snapshot-agent-acl-role"},
 		},
+		{
+			TestName:    "Mesh Gateway",
+			TokenFlags:  []string{"-mesh-gateway"},
+			PolicyNames: []string{"mesh-gateway-policy"},
+			Roles:       []string{resourcePrefix + "-mesh-gateway-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2254,6 +2239,13 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-snapshot-agent-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName:         "Mesh Gateway",
+			TokenFlags:       []string{"-mesh-gateway"},
+			PolicyNames:      []string{"mesh-gateway-policy-" + secondaryDatacenter},
+			Roles:            []string{resourcePrefix + "-mesh-gateway-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2359,16 +2351,25 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			ComponentName: "sync-catalog",
 			TokenFlags:    []string{"-sync-catalog"},
 			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
+			GlobalToken:   false,
 		},
 		{
 			ComponentName: "api-gateway-controller",
 			TokenFlags:    []string{"-api-gateway-controller"},
 			Roles:         []string{resourcePrefix + "-api-gateway-controller-acl-role"},
+			GlobalToken:   false,
 		},
 		{
 			ComponentName: "snapshot-agent",
 			TokenFlags:    []string{"-snapshot-agent"},
 			Roles:         []string{resourcePrefix + "-snapshot-agent-acl-role"},
+			GlobalToken:   false,
+		},
+		{
+			ComponentName: "mesh-gateway",
+			TokenFlags:    []string{"-mesh-gateway"},
+			Roles:         []string{resourcePrefix + "-mesh-gateway-acl-role"},
+			GlobalToken:   false,
 		},
 	}
 	for _, c := range cases {
@@ -2463,18 +2464,28 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			TokenFlags:       []string{"-sync-catalog"},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			GlobalAuthMethod: false,
+			GlobalToken:      false,
 		},
 		{
 			ComponentName:    "api-gateway-controller",
 			TokenFlags:       []string{"-api-gateway-controller"},
 			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
 			GlobalAuthMethod: false,
+			GlobalToken:      false,
 		},
 		{
 			ComponentName:    "snapshot-agent",
 			TokenFlags:       []string{"-snapshot-agent"},
 			Roles:            []string{resourcePrefix + "-snapshot-agent-acl-role-dc2"},
 			GlobalAuthMethod: false,
+			GlobalToken:      false,
+		},
+		{
+			ComponentName:    "mesh-gateway",
+			TokenFlags:       []string{"-mesh-gateway"},
+			Roles:            []string{resourcePrefix + "-mesh-gateway-acl-role-dc2"},
+			GlobalAuthMethod: true,
+			GlobalToken:      true,
 		},
 	}
 	for _, c := range cases {
