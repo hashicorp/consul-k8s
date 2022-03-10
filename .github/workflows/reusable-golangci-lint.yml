@@ -9,6 +9,9 @@ on:
       go-version:
         required: true
         type: string
+      args:
+        required: false
+        type: string
 
 jobs:
   a:
@@ -23,3 +26,4 @@ jobs:
         with:
           version: v1.41.1
           working-directory: ${{inputs.directory}}
+          args: ${{inputs.args}}
