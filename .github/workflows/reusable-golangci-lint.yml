@@ -18,27 +18,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       
-      - name: Setup go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{inputs.go-version}}
-
-      - name: Setup go mod cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: go mod download
-        working-directory: ${{inputs.directory}}
-        run: go mod download
-
       - name: golangci-lint-${{inputs.directory}}
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.41.1
-          working-directory: ${inputs.directory}
+          working-directory: ${{inputs.directory}}
