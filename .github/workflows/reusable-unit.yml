@@ -16,7 +16,7 @@ env:
   GOTESTSUM_VERSION: 1.6.4
 
 jobs:
-  a:
+  job:
     runs-on: ubuntu-latest
 
     steps:      
