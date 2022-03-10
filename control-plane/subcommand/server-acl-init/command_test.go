@@ -164,7 +164,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 	}{
 		{
 			TestName:    "Client token",
-			TokenFlags:  []string{"-create-client-token"},
+			TokenFlags:  []string{"-client"},
 			PolicyNames: []string{"client-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-client-acl-token"},
@@ -358,7 +358,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 	}{
 		{
 			TestName:    "Client token",
-			TokenFlags:  []string{"-create-client-token"},
+			TokenFlags:  []string{"-client"},
 			PolicyNames: []string{"client-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
 			SecretNames: []string{resourcePrefix + "-client-acl-token"},
@@ -466,7 +466,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 	}{
 		{
 			TestName:    "Client token",
-			TokenFlags:  []string{"-create-client-token"},
+			TokenFlags:  []string{"-client"},
 			PolicyNames: []string{"client-token"},
 			SecretNames: []string{resourcePrefix + "-client-acl-token"},
 		},
@@ -1773,7 +1773,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		"-server-port=" + serverURL.Port(),
 		"-bootstrap-token-file=" + tokenFile,
 		"-set-server-tokens=false",
-		"-create-client-token=false", // disable client token, so there are fewer calls
+		"-client=false", // disable client token, so there are fewer calls
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -1885,7 +1885,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 		"-resource-prefix=" + resourcePrefix,
 		"-acl-replication-token-file", tokenFile,
 		"-auth-method-host=" + "https://my-kube.com",
-		"-create-client-token",
+		"-client",
 		"-mesh-gateway",
 	}
 	responseCode := secondaryCmd.Run(secondaryCmdArgs)
