@@ -10,6 +10,7 @@
 {{- if and .Values.global.federation.enabled .Values.global.adminPartitions.enabled }}{{ fail "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" }}{{ end }}
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -491,6 +492,19 @@ spec:
               -log-level={{ default .Values.global.logLevel .Values.client.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
               -init-type="client" \
+              {{- if .Values.externalServers.enabled }}
+              {{- range .Values.externalServers.hosts }}
+              -server-address={{ quote . }} \
+              {{- end }}
+              -server-port={{ .Values.externalServers.httpsPort }} \
+              {{- if .Values.externalServers.tlsServerName }}
+                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+              {{- end }}
+              {{- else }}
+              {{- range $index := until (.Values.server.replicas | int) }}
+              -server-address="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
+              {{- end }}
+              {{- end }}
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig

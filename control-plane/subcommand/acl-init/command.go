@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
@@ -50,11 +51,18 @@ type Command struct {
 	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
 	flagComponentName string // Name of the component to be used as metadata to ACL Login.
 
+	// Flags to configure Consul connection
+	flagServerAddresses []string
+	flagServerPort      uint
+	flagConsulCACert    string
+	flagUseHTTPS        bool
+
 	k8sClient kubernetes.Interface
 
-	once   sync.Once
-	help   string
-	logger hclog.Logger
+	once      sync.Once
+	help      string
+	logger    hclog.Logger
+	providers map[string]discover.Provider
 
 	ctx          context.Context
 	consulClient *api.Client
@@ -78,6 +86,14 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login with.")
 	c.flags.StringVar(&c.flagComponentName, "component-name", "",
 		"Name of the component to pass to ACL Login as metadata.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
+			"At least one value is required.")
+	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
+	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
+		"Path to the PEM-encoded CA certificate of the Consul cluster.")
+	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
+		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -147,6 +163,26 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		cfg := api.DefaultConfig()
 		c.http.MergeOntoConfig(cfg)
+
+		if len(c.flagServerAddresses) > 0 {
+			serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.logger)
+			if err != nil {
+				c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+				return 1
+			}
+
+			scheme := "http"
+			if c.flagUseHTTPS {
+				scheme = "https"
+			}
+			// For all of the next operations we'll need a Consul client.
+			serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
+			c.http.MergeOntoConfig(&api.Config{
+				Address: serverAddr,
+				Scheme:  scheme,
+			})
+		}
+
 		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
 			c.logger.Error("Unable to get client connection", "error", err)

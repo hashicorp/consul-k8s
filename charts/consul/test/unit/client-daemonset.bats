@@ -114,6 +114,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'client.join[0]=1.1.1.1' \
       --set 'client.join[1]=2.2.2.2' \
       . | tee /dev/stderr |
@@ -132,6 +133,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'client.join[0]=provider=my-cloud config=val' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command')
@@ -1296,6 +1298,86 @@ local actual=$(echo $object |
 
   local actual=$(echo $object |
       yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: fail when externalServers is enabled but the externalServers.hosts is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      .
+  echo "status:$status"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
+}
+@test "client/DaemonSet: server-address flag is set to the replica addresses when externalServers.hosts are not provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: server-address flag is set with hosts when externalServers.hosts are provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=foo'  \
+      --set 'externalServers.hosts[1]=bar'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"foo\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"bar\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: tls-server-name flag is set when externalServers.tlsServerName is provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      --set 'externalServers.tlsServerName=foo'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: tls-server-name flag is not set when externalServers.tlsServerName is not provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
