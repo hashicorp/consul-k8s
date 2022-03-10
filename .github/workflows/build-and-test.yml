@@ -35,14 +35,14 @@ jobs:
         run: |
           go run ./... -validate
 
-  go-fmt-vet-helm-gen:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
+  golangci-lint-helm-gen:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
       go-version: 1.17.2
 
   unit-helm-gen:
-    needs: [go-fmt-vet-helm-gen, validate-helm-gen]
+    needs: [golangci-lint-helm-gen, validate-helm-gen]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: hack/helm-reference-gen
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
-      options: --user root
+      options: --user 1001
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -79,14 +79,14 @@ jobs:
         working-directory: control-plane
         run: go run hack/lint-api-new-client/main.go
 
-  go-fmt-vet-control-plane:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
+  golangci-lint-control-plane:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@crt-build-and-tests
     with:
       directory: control-plane
       go-version: 1.17.2
 
   test-control-plane:
-    needs: [lint-control-plane, go-fmt-vet-control-plane]
+    needs: [lint-control-plane, golangci-lint-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -116,7 +116,7 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Run go tests 
+      - name: Download consul 
         working-directory: control-plane 
         run: |
             mkdir -p $HOME/bin
@@ -124,11 +124,16 @@ jobs:
               unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
               rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
+
+      - name: Run go tests
+        working-directory: control-plane
+        run: |
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
   test-enterprise-control-plane:
-    needs: [lint-control-plane, go-fmt-vet-control-plane]
+    if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
+    needs: [lint-control-plane, golangci-lint-control-plane]
     runs-on: ubuntu-latest
     env:
       CONSUL_LICENSE: ${{secrets.CONSUL_LICENSE}}
@@ -160,7 +165,7 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Run go tests 
+      - name: Download consul 
         working-directory: control-plane 
         run: |
             mkdir -p $HOME/bin
@@ -168,6 +173,10 @@ jobs:
               unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
               rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
+
+      - name: Run go tests
+        working-directory: control-plane
+        run: |
             PACKAGE_NAMES=$(go list ./...)
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
@@ -207,27 +216,27 @@ jobs:
           name: consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: control-plane/consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
-  go-fmt-vet-acceptance:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
+  golangci-lint-acceptance:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@crt-build-and-tests
     with:
       directory:  acceptance 
       go-version: 1.17.2 
 
   unit-acceptance-framework:
-    needs: go-fmt-vet-acceptance
+    needs: golangci-lint-acceptance
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: acceptance/framework
       go-version: 1.17.2
 
-  go-fmt-vet-cli:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-go-fmt-vet.yml@crt-build-and-tests
+  golangci-lint-cli:
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@crt-build-and-tests
     with:
       directory: cli 
       go-version: 1.17.2
 
   unit-cli:
-    needs: go-fmt-vet-cli
+    needs: golangci-lint-cli
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@crt-build-and-tests
     with:
       directory: cli 
@@ -258,7 +267,7 @@ jobs:
 #        working-directory: control-plane
 #        run: |
 #          unzip consul-k8s_linux_amd64.zip -d ./pkg/bin/linux_amd64
-#          make ci.dev-docker
+#          make ci.dev-docker-github
 #
 #  acceptance-tproxy:
 #    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
