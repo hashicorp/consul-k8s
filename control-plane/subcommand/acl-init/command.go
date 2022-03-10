@@ -155,7 +155,7 @@ func (c *Command) Run(args []string) int {
 		meta := map[string]string{
 			"component": c.flagComponentName,
 		}
-		err := common.ConsulLogin(c.consulClient, cfg, c.flagACLAuthMethod, c.flagPrimaryDatacenter, "", c.bearerTokenFile, "", c.flagTokenSinkFile, meta, c.logger)
+		_, err := common.ConsulLogin(c.consulClient, cfg, c.flagACLAuthMethod, c.flagPrimaryDatacenter, "", c.bearerTokenFile, "", c.flagTokenSinkFile, meta, c.logger)
 		if err != nil {
 			c.logger.Error("Consul login failed", "error", err)
 			return 1
