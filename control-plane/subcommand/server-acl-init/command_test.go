@@ -1894,9 +1894,9 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	// Test that replication was successful.
 	retry.Run(t, func(r *retry.R) {
 		replicationStatus, _, err := secondaryConsulClient.ACL().Replication(nil)
-		require.NoError(t, err)
-		require.True(t, replicationStatus.Enabled)
-		require.Greater(t, replicationStatus.ReplicatedIndex, uint64(0))
+		require.NoError(r, err)
+		require.True(r, replicationStatus.Enabled)
+		require.Greater(r, replicationStatus.ReplicatedIndex, uint64(0))
 	})
 
 	// Test that the client policy was created.
@@ -2280,45 +2280,47 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 				datacenter = primaryDatacenter
 			}
 
-			// Check that the Role exists + has correct Policy and is associated with a BindingRule.
-			for i := range c.Roles {
-				// Check that the Policy exists.
-				policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{Datacenter: primaryDatacenter})
-				require.NoError(t, err)
-				require.NotNil(t, policy)
+			retry.Run(t, func(r *retry.R) {
+				// Check that the Role exists + has correct Policy and is associated with a BindingRule.
+				for i := range c.Roles {
+					// Check that the Policy exists.
+					policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{Datacenter: primaryDatacenter})
+					require.NoError(r, err)
+					require.NotNil(r, policy)
 
-				// Check that the Role exists.
-				role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{Datacenter: datacenter})
-				require.NoError(t, err)
-				require.NotNil(t, role)
+					// Check that the Role exists.
+					role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{Datacenter: datacenter})
+					require.NoError(r, err)
+					require.NotNil(r, role)
 
-				// Check that the Role references the Policy.
-				found := false
-				for j := range role.Policies {
-					if role.Policies[j].Name == policy.Name {
-						found = true
-						break
+					// Check that the Role references the Policy.
+					found := false
+					for j := range role.Policies {
+						if role.Policies[j].Name == policy.Name {
+							found = true
+							break
+						}
 					}
-				}
-				require.True(t, found)
+					require.True(r, found)
 
-				// Check that there exists a BindingRule that references this Role.
-				authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
-				if c.GlobalAuthMethod {
-					authMethodName = fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, secondaryDatacenter)
-				}
-				rb, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{Datacenter: datacenter})
-				require.NoError(t, err)
-				require.NotNil(t, rb)
-				found = false
-				for j := range rb {
-					if rb[j].BindName == c.Roles[i] {
-						found = true
-						break
+					// Check that there exists a BindingRule that references this Role.
+					authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
+					if c.GlobalAuthMethod {
+						authMethodName = fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, secondaryDatacenter)
 					}
+					rb, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{Datacenter: datacenter})
+					require.NoError(r, err)
+					require.NotNil(r, rb)
+					found = false
+					for j := range rb {
+						if rb[j].BindName == c.Roles[i] {
+							found = true
+							break
+						}
+					}
+					require.True(r, found)
 				}
-				require.True(t, found)
-			}
+			})
 		})
 	}
 }
@@ -2544,18 +2546,20 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-				AuthMethod:  authMethodName,
-				BearerToken: jwtToken,
-				Meta:        map[string]string{},
-			}, &api.WriteOptions{})
-			require.NoError(t, err)
+			retry.Run(t, func(r *retry.R) {
+				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+					AuthMethod:  authMethodName,
+					BearerToken: jwtToken,
+					Meta:        map[string]string{},
+				}, &api.WriteOptions{})
+				require.NoError(r, err)
 
-			require.Equal(t, len(tok.Roles), len(c.Roles))
-			for _, role := range tok.Roles {
-				require.Contains(t, c.Roles, role.Name)
-			}
-			require.Equal(t, !c.GlobalToken, tok.Local)
+				require.Equal(r, len(tok.Roles), len(c.Roles))
+				for _, role := range tok.Roles {
+					require.Contains(r, c.Roles, role.Name)
+				}
+				require.Equal(r, !c.GlobalToken, tok.Local)
+			})
 		})
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1208,18 +1209,20 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 			})
 			require.NoError(t, err)
 
-			tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-				AuthMethod:  authMethodName,
-				BearerToken: jwtToken,
-				Meta:        map[string]string{},
-			}, &api.WriteOptions{})
-			require.NoError(t, err)
+			retry.Run(t, func(r *retry.R) {
+				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+					AuthMethod:  authMethodName,
+					BearerToken: jwtToken,
+					Meta:        map[string]string{},
+				}, &api.WriteOptions{})
+				require.NoError(r, err)
 
-			require.Equal(t, len(tok.Roles), len(c.Roles))
-			for _, role := range tok.Roles {
-				require.Contains(t, c.Roles, role.Name)
-			}
-			require.Equal(t, !c.GlobalToken, tok.Local)
+				require.Equal(r, len(tok.Roles), len(c.Roles))
+				for _, role := range tok.Roles {
+					require.Contains(r, c.Roles, role.Name)
+				}
+				require.Equal(r, !c.GlobalToken, tok.Local)
+			})
 		})
 	}
 }
