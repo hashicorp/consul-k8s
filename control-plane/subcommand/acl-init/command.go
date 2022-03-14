@@ -177,10 +177,8 @@ func (c *Command) Run(args []string) int {
 			}
 			// For all of the next operations we'll need a Consul client.
 			serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-			c.http.MergeOntoConfig(&api.Config{
-				Address: serverAddr,
-				Scheme:  scheme,
-			})
+			cfg.Address = serverAddr
+			cfg.Scheme = scheme
 		}
 
 		c.consulClient, err = consul.NewClient(cfg)

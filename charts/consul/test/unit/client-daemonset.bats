@@ -1355,6 +1355,7 @@ local actual=$(echo $object |
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true'  \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=computer'  \

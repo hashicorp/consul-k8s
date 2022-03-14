@@ -479,10 +479,16 @@ spec:
           value: "/consul/tls/ca/tls.crt"
           {{- end }}
         {{- end }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         command:
           - "/bin/sh"
           - "-ec"
           - |
+            CONSUL_FULLNAME="{{template "consul.fullname" . }}"
+
             consul-k8s-control-plane acl-init \
               -component-name=client \
               -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
@@ -491,20 +497,19 @@ spec:
               {{- end }}
               -log-level={{ default .Values.global.logLevel .Values.client.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
-              -init-type="client" \
               {{- if .Values.externalServers.enabled }}
+              {{- if .Values.global.tls.enabled }}
+              -use-https \
+              {{- end }}
               {{- range .Values.externalServers.hosts }}
               -server-address={{ quote . }} \
               {{- end }}
               -server-port={{ .Values.externalServers.httpsPort }} \
               {{- if .Values.externalServers.tlsServerName }}
-                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
-              {{- end }}
-              {{- else }}
-              {{- range $index := until (.Values.server.replicas | int) }}
-              -server-address="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
+              -tls-server-name={{ .Values.externalServers.tlsServerName }} \
               {{- end }}
               {{- end }}
+              -init-type="client"
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig
