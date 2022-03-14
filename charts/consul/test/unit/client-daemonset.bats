@@ -1313,23 +1313,6 @@ local actual=$(echo $object |
   [ "$status" -eq 1 ]
   [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
 }
-@test "client/DaemonSet: server-address flag is set to the replica addresses when externalServers.hosts are not provided" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
 
 @test "client/DaemonSet: server-address flag is set with hosts when externalServers.hosts are provided" {
   cd `chart_dir`
@@ -1380,6 +1363,82 @@ local actual=$(echo $object |
 
   local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: use-https flag is not set when global.tls.enabled is not provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: use-https flag is set when global.tls.enabled is provided and externalServers.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: use-https flag is not set when global.tls.enabled is not provided and externalServers.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: server-port flag is not set when externalServer.enabled is false" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=false'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: server-port flag is set when externalServer.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
