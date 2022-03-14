@@ -1953,3 +1953,17 @@ rollingUpdate:
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
 }
+
+#--------------------------------------------------------------------
+# global.imageK8s
+
+@test "client/DaemonSet: errors on global.imageK8s" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.imageK8s=something' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" ]]
+}
