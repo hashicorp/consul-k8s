@@ -190,12 +190,11 @@ func (c *Command) Run(args []string) int {
 		meta := map[string]string{
 			"component": c.flagComponentName,
 		}
-		token, err := common.ConsulLogin(c.consulClient, cfg, c.flagACLAuthMethod, c.flagPrimaryDatacenter, "", c.bearerTokenFile, "", c.flagTokenSinkFile, meta, c.logger)
+		secret, err = common.ConsulLogin(c.consulClient, cfg, c.flagACLAuthMethod, c.flagPrimaryDatacenter, "", c.bearerTokenFile, "", c.flagTokenSinkFile, meta, c.logger)
 		if err != nil {
 			c.logger.Error("Consul login failed", "error", err)
 			return 1
 		}
-		secret = token.SecretID
 		c.logger.Info("Successfully read ACL token from the server")
 	} else {
 		// Use k8s secret to obtain token

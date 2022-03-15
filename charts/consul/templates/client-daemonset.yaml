@@ -472,16 +472,10 @@ spec:
           value: "/consul/tls/ca/tls.crt"
           {{- end }}
         {{- end }}
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
         command:
           - "/bin/sh"
           - "-ec"
           - |
-            CONSUL_FULLNAME="{{template "consul.fullname" . }}"
-
             consul-k8s-control-plane acl-init \
               -component-name=client \
               -acl-auth-method="{{ template "consul.fullname" . }}-k8s-component-auth-method" \
