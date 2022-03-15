@@ -99,25 +99,25 @@ load _helpers
   [[ "$output" =~ "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" ]]
 }
 
-@test "serverACLInit/Job: does not set -create-client-token=false when client is enabled (the default)" {
+@test "serverACLInit/Job: does not set -client=false when client is enabled (the default)" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command[2] | contains("-create-client-token=false")' |
+      yq '.spec.template.spec.containers[0].command[2] | contains("-client=false")' |
       tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: sets -create-client-token=false when client is disabled" {
+@test "serverACLInit/Job: sets -client=false when client is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command[2] | contains("-create-client-token=false")' |
+      yq '.spec.template.spec.containers[0].command[2] | contains("-client=false")' |
       tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

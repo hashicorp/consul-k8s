@@ -86,10 +86,10 @@ spec:
                 {{- if .Values.global.tls.enabled }}
                 -use-https \
                 {{- if not .Values.externalServers.useSystemRoots }}
-                -consul-ca-cert=/consul/tls/ca/tls.crt \
+                -ca-file=/consul/tls/ca/tls.crt \
                 {{- end }}
                 {{- if .Values.externalServers.tlsServerName }}
-                -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
                 {{- end }}
                 {{- end }}
                 -partition-name={{ .Values.global.adminPartitions.name }}

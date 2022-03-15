@@ -28,11 +28,9 @@ type Command struct {
 	flagPartitionName string
 
 	// Flags to configure Consul connection
-	flagServerAddresses     []string
-	flagServerPort          uint
-	flagConsulCACert        string
-	flagConsulTLSServerName string
-	flagUseHTTPS            bool
+	flagServerAddresses []string
+	flagServerPort      uint
+	flagUseHTTPS        bool
 
 	flagLogLevel string
 	flagLogJSON  bool
@@ -60,10 +58,6 @@ func (c *Command) init() {
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
 			"At least one value is required.")
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
-	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
-		"Path to the PEM-encoded CA certificate of the Consul cluster.")
-	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
-		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
@@ -134,14 +128,11 @@ func (c *Command) Run(args []string) int {
 	}
 	// For all of the next operations we'll need a Consul client.
 	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	consulClient, err := consul.NewClient(&api.Config{
-		Address: serverAddr,
-		Scheme:  scheme,
-		TLSConfig: api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		},
-	})
+	cfg := api.DefaultConfig()
+	cfg.Address = serverAddr
+	cfg.Scheme = scheme
+	c.http.MergeOntoConfig(cfg)
+	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1

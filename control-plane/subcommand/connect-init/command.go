@@ -123,7 +123,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
-		err = common.ConsulLogin(consulClient, cfg, c.flagACLAuthMethod, "", c.flagAuthMethodNamespace, c.flagBearerTokenFile, c.flagServiceAccountName, c.flagACLTokenSink, loginMeta, c.logger)
+		_, err = common.ConsulLogin(consulClient, cfg, c.flagACLAuthMethod, "", c.flagAuthMethodNamespace, c.flagBearerTokenFile, c.flagServiceAccountName, c.flagACLTokenSink, loginMeta, c.logger)
 		if err != nil {
 			c.logger.Error("unable to complete login", "error", err)
 			return 1
