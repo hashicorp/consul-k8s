@@ -39,7 +39,7 @@ type Command struct {
 
 	flagSetServerTokens bool
 
-	flagCreateClientToken bool
+	flagClient bool
 
 	flagSyncCatalog        bool
 	flagSyncConsulNodeName string
@@ -122,7 +122,7 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
-	c.flags.BoolVar(&c.flagCreateClientToken, "create-client-token", true,
+	c.flags.BoolVar(&c.flagClient, "client", true,
 		"Toggle for creating a client agent token. Default is true.")
 
 	c.flags.BoolVar(&c.flagSyncCatalog, "sync-catalog", false,
@@ -444,14 +444,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateClientToken {
+	if c.flagClient {
 		agentRules, err := c.agentRules()
 		if err != nil {
 			c.log.Error("Error templating client agent rules", "err", err)
 			return 1
 		}
 
-		err = c.createLocalACL("client", agentRules, consulDC, primary, consulClient)
+		serviceAccountName := c.withPrefix("client")
+		err = c.createACLPolicyRoleAndBindingRule("client", agentRules, consulDC, primaryDC, false, primary, localComponentAuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
