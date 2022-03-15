@@ -25,7 +25,7 @@ path "consul/data/secret/%s" {
 }`
 
 	enterpriseLicensePolicy = `
-path "consul/data/secret/enterprise-license" {
+path "consul/data/secret/license" {
   capabilities = ["read"]
 }`
 
@@ -109,10 +109,10 @@ func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 			"license": cfg.EnterpriseLicense,
 		},
 	}
-	_, err := vaultClient.Logical().Write("consul/data/secret/enterprise-license", params)
+	_, err := vaultClient.Logical().Write("consul/data/secret/license", params)
 	require.NoError(t, err)
 
-	err = vaultClient.Sys().PutPolicy("enterprise-license", enterpriseLicensePolicy)
+	err = vaultClient.Sys().PutPolicy("license", enterpriseLicensePolicy)
 	require.NoError(t, err)
 }
 

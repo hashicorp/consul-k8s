@@ -113,7 +113,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	commonServerPolicies := "gossip"
 	if cfg.EnableEnterprise {
-		commonServerPolicies += ",enterprise-license"
+		commonServerPolicies += ",license"
 	}
 	primaryServerPolicies := commonServerPolicies + ",connect-ca-dc1,server-cert-dc1,bootstrap-token"
 	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", primaryServerPolicies)
@@ -200,7 +200,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterprise-license"
+		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
 		primaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 
@@ -277,7 +277,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterprise-license"
+		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
 		secondaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 

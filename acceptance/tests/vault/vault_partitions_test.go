@@ -108,7 +108,7 @@ func TestVault_Partitions(t *testing.T) {
 	configureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 	configureACLTokenVaultSecret(t, vaultClient, "partition")
 
-	serverPolicies := "gossip,enterprise-license,connect-ca-dc1,server-cert-dc1,bootstrap-token"
+	serverPolicies := "gossip,license,connect-ca-dc1,server-cert-dc1,bootstrap-token"
 	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
 	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
 	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,partition-token")
@@ -149,7 +149,7 @@ func TestVault_Partitions(t *testing.T) {
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
 
-		"global.enterpriseLicense.secretName": "consul/data/secret/enterprise-license",
+		"global.enterpriseLicense.secretName": "consul/data/secret/license",
 		"global.enterpriseLicense.secretKey":  "license",
 	}
 

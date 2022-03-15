@@ -41,7 +41,7 @@ func TestVault(t *testing.T) {
 
 	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
 	if cfg.EnableEnterprise {
-		serverPolicies += ",enterprise-license"
+		serverPolicies += ",license"
 	}
 	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
 	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
@@ -101,7 +101,7 @@ func TestVault(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterprise-license"
+		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
 		consulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 
