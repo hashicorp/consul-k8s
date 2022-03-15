@@ -88,6 +88,9 @@ load _helpers
     yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
     yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
