@@ -1282,6 +1282,10 @@ func TestRun_NoLeader(t *testing.T) {
 			"/v1/acl/role",
 		},
 		{
+			"GET",
+			"/v1/acl/binding-rules",
+		},
+		{
 			"PUT",
 			"/v1/acl/binding-rule",
 		},
@@ -1512,6 +1516,10 @@ func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 			"/v1/acl/role",
 		},
 		{
+			"GET",
+			"/v1/acl/binding-rules",
+		},
+		{
 			"PUT",
 			"/v1/acl/binding-rule",
 		},
@@ -1673,6 +1681,10 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 				{
 					"PUT",
 					"/v1/acl/role",
+				},
+				{
+					"GET",
+					"/v1/acl/binding-rules",
 				},
 				{
 					"PUT",
