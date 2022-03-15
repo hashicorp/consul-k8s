@@ -633,14 +633,14 @@ load _helpers
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
   [ "${actual}" = "true" ]
 
   # Check that no (secret) volumes are not attached
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -684,7 +684,7 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -800,9 +800,6 @@ load _helpers
   local object=$(helm template \
     -s templates/server-acl-init-job.yaml  \
     --set 'global.acls.manageSystemACLs=true' \
-    --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
-    --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -829,11 +826,11 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
   [ "${actual}" = "true" ]
 }
 
@@ -842,9 +839,6 @@ load _helpers
   local object=$(helm template \
     -s templates/server-acl-init-job.yaml  \
     --set 'global.acls.manageSystemACLs=true' \
-    --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
-    --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -880,14 +874,60 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication and bootstrap token flags are set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# Partition token in Vault
+
+@test "serverACLInit/Job: vault partition token can be provided" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-acl-init-job.yaml  \
+    --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+    --set 'global.acls.bootstrapToken.secretName=/vault/boot' \
+    --set 'global.acls.bootstrapToken.secretKey=token' \
+    --set 'global.acls.partitionToken.secretName=/vault/secret' \
+    --set 'global.acls.partitionToken.secretKey=token' \
+    --set 'global.adminPartitions.enabled=true' \
+    --set "global.adminPartitions.name=default" \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that the role is set.
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  [ "${actual}" = "acl-role" ]
+
+  # Check Vault secret annotations.
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-partition-token"')
+  [ "${actual}" = "/vault/secret" ]
+
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-partition-token"')
+  local expected=$'{{- with secret \"/vault/secret\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
+  local actual=$(echo $object | jq -r '.spec.volumes')
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
+  [ "${actual}" = "null" ]
+
+  # Check that the replication token flag is set to the path of the Vault secret.
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-partition-token-file=/vault/secrets/partition-token"))')
   [ "${actual}" = "true" ]
 }
 
