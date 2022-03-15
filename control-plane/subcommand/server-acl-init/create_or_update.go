@@ -1,7 +1,6 @@
 package serveraclinit
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -51,11 +50,7 @@ func (c *Command) createACLPolicyRoleAndBindingRule(componentName, rules, dc, pr
 	apl = append(apl, ap)
 
 	// Add the ACLRole and ACLBindingRule.
-	err = c.addRoleAndBindingRule(client, serviceAccountName, authMethodName, apl, global, primary, primaryDC, dc)
-	if err != nil {
-		return err
-	}
-	return err
+	return c.addRoleAndBindingRule(client, serviceAccountName, authMethodName, apl, global, primary, primaryDC, dc)
 }
 
 // addRoleAndBindingRule adds an ACLRole and ACLBindingRule which reference the authMethod.
@@ -80,7 +75,7 @@ func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName s
 	}
 
 	// Create the ACLBindingRule, this ties the Policies defined in the Role to the authMethod via serviceaccount.
-	abr := api.ACLBindingRule{
+	abr := &api.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  authMethodName,
 		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
@@ -91,11 +86,7 @@ func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName s
 	if global && dc != primaryDC {
 		writeOptions.Datacenter = primaryDC
 	}
-	return c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
-		func() error {
-			_, _, err := client.ACL().BindingRuleCreate(&abr, writeOptions)
-			return err
-		})
+	return c.createOrUpdateBindingRule(client, authMethodName, abr, &api.QueryOptions{}, writeOptions)
 }
 
 // updateOrCreateACLRole will query to see if existing role is in place and update them
@@ -127,25 +118,29 @@ func (c *Command) updateOrCreateACLRole(client *api.Client, role *api.ACLRole) e
 	return err
 }
 
-// updateOrCreateBindingRule will query to see if existing binding rules are in place and update them
+// createConnectBindingRule will query to see if existing binding rules are in place and update them
 // or create them if they do not yet exist.
-func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName string, abr *api.ACLBindingRule, skipNamespacing bool) error {
+func (c *Command) createConnectBindingRule(client *api.Client, authMethodName string, abr *api.ACLBindingRule) error {
 	// Binding rule list api call query options.
 	queryOptions := api.QueryOptions{}
 
 	// If namespaces and mirroring are enabled, this is not necessary because
 	// the binding rule will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
-	if !skipNamespacing && c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
+	if c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
 		abr.Namespace = c.flagConsulInjectDestinationNamespace
 		queryOptions.Namespace = c.flagConsulInjectDestinationNamespace
 	}
 
+	return c.createOrUpdateBindingRule(client, authMethodName, abr, &queryOptions, nil)
+}
+
+func (c *Command) createOrUpdateBindingRule(client *api.Client, authMethodName string, abr *api.ACLBindingRule, queryOptions *api.QueryOptions, writeOptions *api.WriteOptions) error {
 	var existingRules []*api.ACLBindingRule
 	err := c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
 		func() error {
 			var err error
-			existingRules, _, err = client.ACL().BindingRuleList(authMethodName, &queryOptions)
+			existingRules, _, err = client.ACL().BindingRuleList(authMethodName, queryOptions)
 			return err
 		})
 	if err != nil {
@@ -167,21 +162,28 @@ func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName s
 
 		// This will only happen if there are existing policies
 		// for this auth method, but none that match the binding
-		// rule set up here in the bootstrap method.
+		// rule set up here in the bootstrap method. Hence the
+		// new binding rule must be created as it belongs to the
+		// same auth method.
 		if abr.ID == "" {
-			return errors.New("unable to find a matching ACL binding rule to update")
+			c.log.Info("unable to find a matching ACL binding rule to update. creating ACL binding rule.")
+			err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
+				func() error {
+					_, _, err := client.ACL().BindingRuleCreate(abr, writeOptions)
+					return err
+				})
+		} else {
+			err = c.untilSucceeds(fmt.Sprintf("updating acl binding rule for %s", authMethodName),
+				func() error {
+					_, _, err := client.ACL().BindingRuleUpdate(abr, writeOptions)
+					return err
+				})
 		}
-
-		err = c.untilSucceeds(fmt.Sprintf("updating acl binding rule for %s", authMethodName),
-			func() error {
-				_, _, err := client.ACL().BindingRuleUpdate(abr, nil)
-				return err
-			})
 	} else {
 		// Otherwise create the binding rule
 		err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
 			func() error {
-				_, _, err := client.ACL().BindingRuleCreate(abr, nil)
+				_, _, err := client.ACL().BindingRuleCreate(abr, writeOptions)
 				return err
 			})
 	}
