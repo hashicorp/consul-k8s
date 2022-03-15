@@ -74,7 +74,7 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, aut
 		BindName:    "${serviceaccount.name}",
 		Selector:    c.flagBindingRuleSelector,
 	}
-	return c.updateOrCreateBindingRule(consulClient, authMethodName, &abr, false)
+	return c.createConnectBindingRule(consulClient, authMethodName, &abr)
 }
 
 // createAuthMethodTmpl sets up the auth method template based on the connect-injector's service account
