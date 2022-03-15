@@ -163,14 +163,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		LocalToken  bool
 	}{
 		{
-			TestName:    "Client token",
-			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -357,14 +349,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		LocalToken  bool
 	}{
 		{
-			TestName:    "Client token",
-			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token-dc2"},
-			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token-dc2"},
@@ -464,12 +448,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		PolicyNames []string
 		SecretNames []string
 	}{
-		{
-			TestName:    "Client token",
-			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
-		},
 		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
@@ -1194,8 +1172,27 @@ func TestRun_NoLeader(t *testing.T) {
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		case "/v1/acl/tokens":
 			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/token":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/agent/token/agent":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/policy":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/auth-method":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/role":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/role/name/":
+			w.WriteHeader(404)
+		case "/v1/acl/role/name/release-name-consul-client-acl-role":
+			w.WriteHeader(404)
+		case "/v1/acl/binding-rules":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/binding-rule":
+			fmt.Fprintln(w, `{}`)
 		default:
-			fmt.Fprintln(w, "{}")
+			w.WriteHeader(500)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
 		}
 	}))
 	defer consulServer.Close()
@@ -1277,8 +1274,16 @@ func TestRun_NoLeader(t *testing.T) {
 			"/v1/acl/policy",
 		},
 		{
+			"GET",
+			"/v1/acl/role/name/release-name-consul-client-acl-role",
+		},
+		{
 			"PUT",
-			"/v1/acl/token",
+			"/v1/acl/role",
+		},
+		{
+			"PUT",
+			"/v1/acl/binding-rule",
 		},
 	}, consulAPICalls)
 }
@@ -1380,8 +1385,8 @@ func TestConsulDatacenterList(t *testing.T) {
 	}
 }
 
-// Test that if creating client tokens fails at first, we retry.
-func TestRun_ClientTokensRetry(t *testing.T) {
+// Test that if creating client policy and binding rule fails at first, we retry.
+func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 	t.Parallel()
 	k8s := fake.NewSimpleClientset()
 	setUpK8sServiceAccount(t, k8s, ns)
@@ -1416,8 +1421,27 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		case "/v1/acl/tokens":
 			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/token":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/bootstrap":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/agent/token/agent":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/auth-method":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/role":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/role/name/":
+			w.WriteHeader(404)
+		case "/v1/acl/role/name/release-name-consul-client-acl-role":
+			w.WriteHeader(404)
+		case "/v1/acl/binding-rules":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/binding-rule":
+			fmt.Fprintln(w, `{}`)
 		default:
-			fmt.Fprintln(w, "{}")
+			w.WriteHeader(500)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
 		}
 	}))
 	defer consulServer.Close()
@@ -1480,8 +1504,16 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			"/v1/acl/policy",
 		},
 		{
+			"GET",
+			"/v1/acl/role/name/release-name-consul-client-acl-role",
+		},
+		{
 			"PUT",
-			"/v1/acl/token",
+			"/v1/acl/role",
+		},
+		{
+			"PUT",
+			"/v1/acl/binding-rule",
 		},
 	}, consulAPICalls)
 }
@@ -1517,9 +1549,25 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 					fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 				case "/v1/acl/tokens":
 					fmt.Fprintln(w, `[]`)
+				case "/v1/acl/token":
+					fmt.Fprintln(w, `{}`)
+				case "/v1/acl/policy":
+					fmt.Fprintln(w, `{}`)
+				case "/v1/agent/token/acl_agent_token":
+					fmt.Fprintln(w, `{}`)
+				case "/v1/acl/auth-method":
+					fmt.Fprintln(w, `{}`)
+				case "/v1/acl/role/name/release-name-consul-client-acl-role":
+					w.WriteHeader(404)
+				case "/v1/acl/role":
+					fmt.Fprintln(w, `{}`)
+				case "/v1/acl/binding-rules":
+					fmt.Fprintln(w, `[]`)
+				case "/v1/acl/binding-rule":
+					fmt.Fprintln(w, `{}`)
 				default:
-					// Send an empty JSON response with code 200 to all calls.
-					fmt.Fprintln(w, "{}")
+					w.WriteHeader(500)
+					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
 				}
 			}))
 			defer consulServer.Close()
@@ -1603,6 +1651,10 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 					"/v1/agent/token/agent",
 				},
 				{
+					"PUT",
+					"/v1/agent/token/acl_agent_token",
+				},
+				{
 					"GET",
 					"/v1/agent/self",
 				},
@@ -1615,8 +1667,16 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 					"/v1/acl/policy",
 				},
 				{
+					"GET",
+					"/v1/acl/role/name/release-name-consul-client-acl-role",
+				},
+				{
 					"PUT",
-					"/v1/acl/token",
+					"/v1/acl/role",
+				},
+				{
+					"PUT",
+					"/v1/acl/binding-rule",
 				},
 			}, consulAPICalls)
 		})
@@ -1773,7 +1833,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		"-server-port=" + serverURL.Port(),
 		"-bootstrap-token-file=" + tokenFile,
 		"-set-server-tokens=false",
-		"-create-client-token=false", // disable client token, so there are fewer calls
+		"-client=false", // disable client token, so there are fewer calls
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -1885,7 +1945,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 		"-resource-prefix=" + resourcePrefix,
 		"-acl-replication-token-file", tokenFile,
 		"-auth-method-host=" + "https://my-kube.com",
-		"-create-client-token",
+		"-client",
 		"-mesh-gateway",
 	}
 	responseCode := secondaryCmd.Run(secondaryCmdArgs)
@@ -1901,7 +1961,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 
 	// Test that the client policy was created.
 	retry.Run(t, func(r *retry.R) {
-		p := policyExists(r, "client-token-dc2", secondaryConsulClient)
+		p := policyExists(r, "client-policy-dc2", secondaryConsulClient)
 		require.Equal(r, []string{"dc2"}, p.Datacenters)
 	})
 
@@ -1909,7 +1969,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	// so replication has to have worked for it to exist.
 	retry.Run(t, func(r *retry.R) {
 		p := policyExists(r, "mesh-gateway-policy-dc2", secondaryConsulClient)
-		require.Len(r, p.Datacenters, 2)
+		require.Len(r, p.Datacenters, 0)
 	})
 }
 
@@ -2114,6 +2174,12 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			PolicyNames: []string{"mesh-gateway-policy"},
 			Roles:       []string{resourcePrefix + "-mesh-gateway-acl-role"},
 		},
+		{
+			TestName:    "Client",
+			TokenFlags:  []string{"-client"},
+			PolicyNames: []string{"client-policy"},
+			Roles:       []string{resourcePrefix + "-client-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2180,6 +2246,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 				}
 				require.True(t, found)
 			}
+
 		})
 	}
 }
@@ -2245,6 +2312,13 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			PolicyNames:      []string{"mesh-gateway-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-mesh-gateway-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: true,
+		},
+		{
+			TestName:         "Client",
+			TokenFlags:       []string{"-client"},
+			PolicyNames:      []string{"client-policy-" + secondaryDatacenter},
+			Roles:            []string{resourcePrefix + "-client-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
 		},
 	}
 	for _, c := range cases {
@@ -2373,6 +2447,12 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			Roles:         []string{resourcePrefix + "-mesh-gateway-acl-role"},
 			GlobalToken:   false,
 		},
+		{
+			ComponentName: "client",
+			TokenFlags:    []string{"-client"},
+			Roles:         []string{resourcePrefix + "-client-acl-role"},
+			GlobalToken:   false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2488,6 +2568,13 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-mesh-gateway-acl-role-dc2"},
 			GlobalAuthMethod: true,
 			GlobalToken:      true,
+		},
+		{
+			ComponentName:    "client",
+			TokenFlags:       []string{"-client"},
+			Roles:            []string{resourcePrefix + "-client-acl-role-dc2"},
+			GlobalAuthMethod: false,
+			GlobalToken:      false,
 		},
 	}
 	for _, c := range cases {
