@@ -130,8 +130,8 @@ spec:
           emptyDir:
             medium: "Memory"
         {{- if .Values.global.tls.enabled }}
+        {{- if not .Values.global.secretsBackend.vault.enabled }}
         - name: consul-ca-cert
-          {{- if not .Values.global.secretsBackend.vault.enabled }}
           secret:
             {{- if .Values.global.tls.caCert.secretName }}
             secretName: {{ .Values.global.tls.caCert.secretName }}
@@ -141,7 +141,7 @@ spec:
             items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
-          {{- end }}
+        {{- end }}
         {{- if (and (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}
         - name: consul-ca-key
           secret:

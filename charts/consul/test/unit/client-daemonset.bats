@@ -2235,7 +2235,7 @@ rollingUpdate:
 
   local actual=$(echo $object |
     yq -r '.volumes[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  [ "${actual}" = "" ]
 
   local actual=$(echo $object |
     yq -r '.volumes[] | select(.name == "consul-ca-key") | length > 0' | tee /dev/stderr)
