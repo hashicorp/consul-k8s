@@ -141,11 +141,6 @@ spec:
             items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
-          {{- else }}
-          emptyDir:
-            # We're using tmpfs here so that
-            # client certs are not written to disk
-            medium: "Memory"          
           {{- end }}
         {{- if (and (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}
         - name: consul-ca-key

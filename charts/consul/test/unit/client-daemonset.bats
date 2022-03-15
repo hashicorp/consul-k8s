@@ -2346,27 +2346,6 @@ rollingUpdate:
     [ "${actual}" = "/vault/secrets/serverca.crt" ]
 }
 
-@test "client/DaemonSet: vault ca cert volume is mounted as tmpfs" {
-  cd `chart_dir`
-  local spec=$(helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=foo' \
-      --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.serverCert.secretName=pki_int/issue/test' \
-      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $spec | jq -r '.volumes[] | select(.name=="consul-ca-cert") | .emptyDir.medium' | tee /dev/stderr)
-  [ "${actual}" = "Memory" ]
-
-}
-
 @test "client/DaemonSet: Vault does not add consul ca cert volumeMount to acl-init init container when ACLs are enabled" {
   cd `chart_dir`
   local object=$(helm template \
