@@ -16,8 +16,8 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
-	// annotationService is the name of the service to proxy. This defaults
-	// to the name of the first container.
+	// annotationService is the name of the service to proxy.
+	// This defaults to the name of the Kubernetes service associated with the pod.
 	annotationService = "consul.hashicorp.com/connect-service"
 
 	// annotationPort is the name or value of the port to proxy incoming
