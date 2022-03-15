@@ -72,8 +72,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg, true)
-
 	// Configure Vault Kubernetes auth method for the secondary datacenter.
 	{
 		// Create auth method service account and ClusterRoleBinding. The Vault server
@@ -113,15 +111,29 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-dc2", k8sAuthMethodHost, authMethodRBACName, ns)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "dc2", cfg, false)
+	commonServerPolicies := "gossip"
+	if cfg.EnableEnterprise {
+		commonServerPolicies += ",license"
+	}
+	primaryServerPolicies := commonServerPolicies + ",connect-ca-dc1,server-cert-dc1,bootstrap-token"
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", primaryServerPolicies)
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,replication-token")
+	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+
+	secondaryServerPolicies := commonServerPolicies + ",connect-ca-dc2,server-cert-dc2,replication-token"
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server", secondaryServerPolicies)
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "client", "gossip")
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server-acl-init", "replication-token")
+	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-dc2")
 
 	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
 	configurePKICA(t, vaultClient)
 	primaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
 	secondaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
 
-	bootstrapToken := configureBootstrapTokenVaultSecret(t, vaultClient)
-	replicationToken := configureReplicationTokenVaultSecret(t, vaultClient)
+	bootstrapToken := configureACLTokenVaultSecret(t, vaultClient, "bootstrap")
+	replicationToken := configureACLTokenVaultSecret(t, vaultClient, "replication")
 
 	// Create the Vault Policy for the Connect CA in both datacenters.
 	createConnectCAPolicy(t, vaultClient, "dc1")
@@ -131,10 +143,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// secondary cluster.
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
-	vaultCASecret, err := primaryCtx.KubernetesClient(t).CoreV1().Secrets(primaryCtx.KubectlOptions(t).Namespace).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
+	vaultCASecret, err := primaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
 	vaultCASecret.ResourceVersion = ""
 	require.NoError(t, err)
-	_, err = secondaryCtx.KubernetesClient(t).CoreV1().Secrets(secondaryCtx.KubectlOptions(t).Namespace).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
+	_, err = secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
@@ -176,8 +188,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Vault config.
 		"global.secretsBackend.vault.enabled":                       "true",
-		"global.secretsBackend.vault.consulServerRole":              "consul-server",
-		"global.secretsBackend.vault.consulClientRole":              "consul-client",
+		"global.secretsBackend.vault.consulServerRole":              "server",
+		"global.secretsBackend.vault.consulClientRole":              "client",
 		"global.secretsBackend.vault.consulCARole":                  "consul-ca",
 		"global.secretsBackend.vault.manageSystemACLsRole":          "server-acl-init",
 		"global.secretsBackend.vault.ca.secretName":                 vaultCASecretName,
@@ -188,8 +200,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
-		primaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
+		primaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 
 	if cfg.UseKind {
@@ -250,8 +262,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Vault config.
 		"global.secretsBackend.vault.enabled":                       "true",
-		"global.secretsBackend.vault.consulServerRole":              "consul-server",
-		"global.secretsBackend.vault.consulClientRole":              "consul-client",
+		"global.secretsBackend.vault.consulServerRole":              "server",
+		"global.secretsBackend.vault.consulClientRole":              "client",
 		"global.secretsBackend.vault.consulCARole":                  "consul-ca",
 		"global.secretsBackend.vault.manageSystemACLsRole":          "server-acl-init",
 		"global.secretsBackend.vault.ca.secretName":                 vaultCASecretName,
@@ -265,8 +277,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
-		secondaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
+		secondaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 
 	if cfg.UseKind {

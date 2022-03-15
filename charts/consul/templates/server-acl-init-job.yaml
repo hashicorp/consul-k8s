@@ -47,6 +47,12 @@ spec:
         "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
         {{- end }}
         {{- end }}
+        {{- if .Values.global.acls.partitionToken.secretName }}
+        {{- with .Values.global.acls.partitionToken }}
+        "vault.hashicorp.com/agent-inject-secret-partition-token": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-partition-token": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.global.tls.enabled }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
@@ -268,6 +274,9 @@ spec:
                 {{- else }}
                 -acl-replication-token-file=/consul/acl/tokens/acl-replication-token \
                 {{- end }}
+                {{- end }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.partitionToken.secretName }}
+                -partition-token-file=/vault/secrets/partition-token \
                 {{- end }}
 
                 {{- if .Values.controller.enabled }}
