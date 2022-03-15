@@ -182,6 +182,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 	log.Info("Checking that the ACL token exists when reading it in the stale consistency mode")
 	// Use raft timeout and polling interval to determine the number of retries.
 	numTokenReadRetries := uint64(raftReplicationTimeout.Milliseconds() / tokenReadPollingInterval.Milliseconds())
+	var aclLoginToken *api.ACLToken
 	err = backoff.Retry(func() error {
 		_, _, err = client.ACL().TokenReadSelf(&api.QueryOptions{AllowStale: true, Token: token.SecretID})
 		if err != nil {
