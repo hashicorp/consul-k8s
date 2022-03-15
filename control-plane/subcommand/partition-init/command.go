@@ -30,7 +30,6 @@ type Command struct {
 	// Flags to configure Consul connection
 	flagServerAddresses []string
 	flagServerPort      uint
-	flagConsulCACert    string
 	flagUseHTTPS        bool
 
 	flagLogLevel string
@@ -59,8 +58,6 @@ func (c *Command) init() {
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
 			"At least one value is required.")
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
-	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
-		"Path to the PEM-encoded CA certificate of the Consul cluster.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
