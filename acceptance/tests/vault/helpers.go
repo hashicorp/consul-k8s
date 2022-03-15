@@ -19,18 +19,13 @@ path "consul/data/secret/gossip" {
   capabilities = ["read"]
 }`
 
-	bootstrapTokenPolicy = `
-path "consul/data/secret/bootstrap" {
-  capabilities = ["read"]
-}`
-
-	replicationTokenPolicy = `
-path "consul/data/secret/replication" {
+	tokenPolicyTemplate = `
+path "consul/data/secret/%s" {
   capabilities = ["read"]
 }`
 
 	enterpriseLicensePolicy = `
-path "consul/data/secret/enterpriselicense" {
+path "consul/data/secret/license" {
   capabilities = ["read"]
 }`
 
@@ -85,7 +80,7 @@ func generateGossipSecret() (string, error) {
 func configureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
 	// Create the Vault Policy for the gossip key.
 	logger.Log(t, "Creating gossip policy")
-	err := vaultClient.Sys().PutPolicy("consul-gossip", gossipPolicy)
+	err := vaultClient.Sys().PutPolicy("gossip", gossipPolicy)
 	require.NoError(t, err)
 
 	// Generate the gossip secret.
@@ -111,88 +106,49 @@ func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 	logger.Log(t, "Creating the Enterprise License secret")
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
-			"enterpriselicense": cfg.EnterpriseLicense,
+			"license": cfg.EnterpriseLicense,
 		},
 	}
-	_, err := vaultClient.Logical().Write("consul/data/secret/enterpriselicense", params)
+	_, err := vaultClient.Logical().Write("consul/data/secret/license", params)
 	require.NoError(t, err)
 
-	// Create the Vault Policy for the consul-enterpriselicense.
-	err = vaultClient.Sys().PutPolicy("consul-enterpriselicense", enterpriseLicensePolicy)
+	err = vaultClient.Sys().PutPolicy("license", enterpriseLicensePolicy)
 	require.NoError(t, err)
 }
 
-// configureKubernetesAuthRoles configures roles for the Kubernetes auth method
+// configureKubernetesAuthRole configures a role for the component for the Kubernetes auth method
 // that will be used by the test Helm chart installation.
-func configureKubernetesAuthRoles(
-	t *testing.T,
-	vaultClient *vapi.Client,
-	consulReleaseName, ns, authPath, datacenter string,
-	cfg *config.TestConfig,
-	isPrimary bool,
-) {
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
-	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
-	sharedPolicies := "consul-gossip"
-	if cfg.EnableEnterprise {
-		sharedPolicies += ",consul-enterpriselicense"
-	}
+func configureKubernetesAuthRole(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, authPath, component, policies string) {
+	componentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, component)
 
-	// Create the Auth Roles for consul-server and consul-client.
+	// Create the Auth Roles for the component.
 	// Auth roles bind policies to Kubernetes service accounts, which
 	// then enables the Vault agent init container to call 'vault login'
 	// with the Kubernetes auth method to obtain a Vault token.
 	// Please see https://www.vaultproject.io/docs/auth/kubernetes#configuration
 	// for more details.
-	logger.Log(t, "Creating the consul-server and consul-client roles")
+	logger.Logf(t, "Creating the %q", componentServiceAccountName)
 	params := map[string]interface{}{
-		"bound_service_account_names":      consulClientServiceAccountName,
-		"bound_service_account_namespaces": ns,
-		"policies":                         sharedPolicies,
-		"ttl":                              "24h",
-	}
-	_, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-client", authPath), params)
-	require.NoError(t, err)
-
-	// Both primary and secondary datacenters need access to the replication token, but
-	// only the primary needs to be able to read the bootstrap token.
-	policies := fmt.Sprintf(sharedPolicies+",connect-ca-%s,consul-server-%s,consul-replication-token", datacenter, datacenter)
-	if isPrimary {
-		policies += ",consul-bootstrap-token"
-	}
-	params = map[string]interface{}{
-		"bound_service_account_names":      consulServerServiceAccountName,
+		"bound_service_account_names":      componentServiceAccountName,
 		"bound_service_account_namespaces": ns,
 		"policies":                         policies,
 		"ttl":                              "24h",
 	}
-	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-server", authPath), params)
+	_, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/%s", authPath, component), params)
 	require.NoError(t, err)
+}
 
+// configureKubernetesAuthRole configures a role that allows all service accounts within the installation
+// namespace access to the Consul server CA.
+func configureConsulCAKubernetesAuthRole(t *testing.T, vaultClient *vapi.Client, ns, authPath string) {
 	// Create the CA role that all components will use to fetch the Server CA certs.
-	params = map[string]interface{}{
+	params := map[string]interface{}{
 		"bound_service_account_names":      "*",
 		"bound_service_account_namespaces": ns,
 		"policies":                         "consul-ca",
 		"ttl":                              "24h",
 	}
-	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-ca", authPath), params)
-	require.NoError(t, err)
-
-	logger.Log(t, "Creating kubernetes auth role for the server-acl-init job")
-	policies = "consul-replication-token"
-	if isPrimary {
-		policies += ",consul-bootstrap-token"
-	}
-	serverACLInitSAName := fmt.Sprintf("%s-consul-server-acl-init", consulReleaseName)
-	params = map[string]interface{}{
-		"bound_service_account_names":      serverACLInitSAName,
-		"bound_service_account_namespaces": ns,
-		"policies":                         policies,
-		"ttl":                              "24h",
-	}
-
-	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/server-acl-init", authPath), params)
+	_, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/role/consul-ca", authPath), params)
 	require.NoError(t, err)
 }
 
@@ -227,7 +183,7 @@ func configurePKICertificates(t *testing.T, vaultClient *vapi.Client, consulRele
 		"max_ttl":            "1h",
 	}
 
-	pkiRoleName := fmt.Sprintf("consul-server-%s", datacenter)
+	pkiRoleName := fmt.Sprintf("server-cert-%s", datacenter)
 
 	_, err := vaultClient.Logical().Write(fmt.Sprintf("pki/roles/%s", pkiRoleName), params)
 	require.NoError(t, err)
@@ -245,12 +201,14 @@ path %q {
 	return certificateIssuePath
 }
 
-// configureReplicationTokenVaultSecret generates a replication token secret ID,
+// configureACLTokenVaultSecret generates a token secret ID for a given name,
 // stores it in vault as a secret and configures a policy to access it.
-func configureReplicationTokenVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
-	// Create the Vault Policy for the replication token.
-	logger.Log(t, "Creating replication token policy")
-	err := vaultClient.Sys().PutPolicy("consul-replication-token", replicationTokenPolicy)
+func configureACLTokenVaultSecret(t *testing.T, vaultClient *vapi.Client, tokenName string) string {
+	// Create the Vault Policy for the token.
+	logger.Logf(t, "Creating %s token policy", tokenName)
+	policyName := fmt.Sprintf("%s-token", tokenName)
+	tokenPolicy := fmt.Sprintf(tokenPolicyTemplate, tokenName)
+	err := vaultClient.Sys().PutPolicy(policyName, tokenPolicy)
 	require.NoError(t, err)
 
 	// Generate the token secret.
@@ -258,38 +216,13 @@ func configureReplicationTokenVaultSecret(t *testing.T, vaultClient *vapi.Client
 	require.NoError(t, err)
 
 	// Create the replication token secret.
-	logger.Log(t, "Creating the replication token secret")
+	logger.Logf(t, "Creating the %s token secret", tokenName)
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
 			"token": token,
 		},
 	}
-	_, err = vaultClient.Logical().Write("consul/data/secret/replication", params)
-	require.NoError(t, err)
-
-	return token
-}
-
-// configureBootstrapTokenVaultSecret generates the bootstrap token secret ID,
-// stores it in vault as a secret and configures a policy to access it.
-func configureBootstrapTokenVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
-	// Create the Vault Policy for the bootstrap token.
-	logger.Log(t, "Creating bootstrap token policy")
-	err := vaultClient.Sys().PutPolicy("consul-bootstrap-token", bootstrapTokenPolicy)
-	require.NoError(t, err)
-
-	// Generate the token secret.
-	token, err := uuid.GenerateUUID()
-	require.NoError(t, err)
-
-	// Create the replication token secret.
-	logger.Log(t, "Creating the bootstrap token secret")
-	params := map[string]interface{}{
-		"data": map[string]interface{}{
-			"token": token,
-		},
-	}
-	_, err = vaultClient.Logical().Write("consul/data/secret/bootstrap", params)
+	_, err = vaultClient.Logical().Write(fmt.Sprintf("consul/data/secret/%s", tokenName), params)
 	require.NoError(t, err)
 
 	return token

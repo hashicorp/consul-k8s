@@ -37,9 +37,16 @@ func TestVault(t *testing.T) {
 		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
-	bootstrapToken := configureBootstrapTokenVaultSecret(t, vaultClient)
+	bootstrapToken := configureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg, true)
+	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
+	if cfg.EnableEnterprise {
+		serverPolicies += ",license"
+	}
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
+	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token")
+	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
 	configurePKICA(t, vaultClient)
 	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
@@ -56,8 +63,8 @@ func TestVault(t *testing.T) {
 		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulServerRole":     "consul-server",
-		"global.secretsBackend.vault.consulClientRole":     "consul-client",
+		"global.secretsBackend.vault.consulServerRole":     "server",
+		"global.secretsBackend.vault.consulClientRole":     "client",
 		"global.secretsBackend.vault.consulCARole":         "consul-ca",
 		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
 
@@ -94,8 +101,8 @@ func TestVault(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
-		consulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
+		consulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 
 	logger.Log(t, "Installing Consul")
