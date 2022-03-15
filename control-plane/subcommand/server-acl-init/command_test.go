@@ -1385,8 +1385,8 @@ func TestConsulDatacenterList(t *testing.T) {
 	}
 }
 
-// Test that if creating client tokens fails at first, we retry.
-func TestRun_ClientTokensRetry(t *testing.T) {
+// Test that if creating client policy and binding rule fails at first, we retry.
+func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 	t.Parallel()
 	k8s := fake.NewSimpleClientset()
 	setUpK8sServiceAccount(t, k8s, ns)

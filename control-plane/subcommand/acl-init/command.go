@@ -175,7 +175,7 @@ func (c *Command) Run(args []string) int {
 			if c.flagUseHTTPS {
 				scheme = "https"
 			}
-			// For all of the next operations we'll need a Consul client.
+
 			serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
 			cfg.Address = serverAddr
 			cfg.Scheme = scheme
@@ -207,7 +207,6 @@ func (c *Command) Run(args []string) int {
 			secret, err = c.getSecret(c.flagSecretName)
 			if err != nil {
 				c.logger.Error("Error getting Kubernetes secret: ", "error", err)
-				//			c.UI.Error(fmt.Sprintf("Error getting Kubernetes secret: %s", err))
 			}
 			if err == nil {
 				c.logger.Info("Successfully read Kubernetes secret")

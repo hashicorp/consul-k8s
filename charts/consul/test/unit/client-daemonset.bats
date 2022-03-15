@@ -1281,11 +1281,33 @@ local actual=$(echo $object |
   [ "${actual}" = "false" ]
 }
 
-@test "client/DaemonSet: Adds consul ca cert volumeMount to acl-init init container when ACLs are enabled" {
+@test "client/DaemonSet: Adds consul ca cert volumeMount to acl-init init container when ACLs and tls are enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-ca-cert" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: Does not add consul ca cert volumeMount to acl-init init container when tls is not enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=false' \
       . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
 
   local actual=$(echo $object |
@@ -1396,13 +1418,14 @@ local actual=$(echo $object |
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: use-https flag is not set when global.tls.enabled is not provided and externalServers.enabled is true" {
+@test "client/DaemonSet: use-https flag is not set when global.tls.enabled is enabled but externalServers.enabled is false" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'externalServers.enabled=true'  \
+      --set 'externalServers.enabled=false'  \
       --set 'server.enabled=false' \
+      --set 'global.tls.enabled=true' \
       --set 'externalServers.hosts[0]=computer'  \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
@@ -1411,7 +1434,7 @@ local actual=$(echo $object |
   [ "${actual}" = "false" ]
 }
 
-@test "client/DaemonSet: server-port flag is not set when externalServer.enabled is false" {
+@test "client/DaemonSet: server-port flag is not set when externalServers.enabled is false" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
@@ -1426,7 +1449,7 @@ local actual=$(echo $object |
   [ "${actual}" = "false" ]
 }
 
-@test "client/DaemonSet: server-port flag is set when externalServer.enabled is true" {
+@test "client/DaemonSet: server-port flag is set when externalServers.enabled is true" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \

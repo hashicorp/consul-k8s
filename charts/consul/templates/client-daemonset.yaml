@@ -147,8 +147,7 @@ spec:
             # client certs are not written to disk
             medium: "Memory"          
           {{- end }}
-        {{- if not .Values.global.secretsBackend.vault.enabled }}
-        {{ if not .Values.global.tls.enableAutoEncrypt }}
+        {{- if (and (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}
         - name: consul-ca-key
           secret:
             {{- if .Values.global.tls.caKey.secretName }}
@@ -164,7 +163,6 @@ spec:
             # We're using tmpfs here so that
             # client certs are not written to disk
             medium: "Memory"
-        {{- end }}
         {{- end }}
         {{- end }}
         {{- range .Values.client.extraVolumes }}

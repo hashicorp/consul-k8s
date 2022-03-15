@@ -217,11 +217,14 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 // TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile
 // executes the consul login path and validates the token is written to
 // acl-config.json and matches the token written to sink file.
-func TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile(t *testing.T) {
+func TestRun_WithAclAuthMethodDefined_WritesConfigJson_WithTokenMatchingSinkFile(t *testing.T) {
 	tokenFile := common.WriteTempFile(t, "")
 	bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
+	tmpDir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		os.Remove(tokenFile)
+		os.RemoveAll(tmpDir)
 	})
 
 	k8s := fake.NewSimpleClientset()
@@ -262,11 +265,11 @@ func TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile(t
 		"-component-name", "foo",
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-init-type", "client",
-		"-acl-dir", "/tmp",
+		"-acl-dir", tmpDir,
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 	// Validate the ACL Config file got written.
-	aclConfigBytes, err := ioutil.ReadFile("/tmp/acl-config.json")
+	aclConfigBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/acl-config.json", tmpDir))
 	require.NoError(t, err)
 	// Validate the Token Sink File got written.
 	sinkFileToken, err := ioutil.ReadFile(tokenFile)
@@ -285,12 +288,15 @@ func TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile(t
 // TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile
 // executes the k8s secret path and validates the token is written to
 // acl-config.json and matches the token written to sink file.
-func TestRun_WithoutAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile(t *testing.T) {
+func TestRun_WithoutAclAuthMethodDefined_WritesConfigJsonWithTokenMatchingSinkFile(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	tmpDir, err := ioutil.TempDir("", "")
 	require.NoError(err)
-	defer os.RemoveAll(tmpDir)
+
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDir)
+	})
 
 	// Set up k8s with the secret.
 	token := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
@@ -322,10 +328,10 @@ func TestRun_WithoutAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFil
 		"-token-sink-file", sinkFile,
 		"-secret-name", secretName,
 		"-init-type", "client",
-		"-acl-dir", "/tmp",
+		"-acl-dir", tmpDir,
 	})
 	// Validate the ACL Config file got written.
-	aclConfigBytes, err := ioutil.ReadFile("/tmp/acl-config.json")
+	aclConfigBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/acl-config.json", tmpDir))
 	require.NoError(err)
 	// Validate the Token Sink File got written.
 	require.Equal(0, code, ui.ErrorWriter.String())
