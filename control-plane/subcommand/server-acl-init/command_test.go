@@ -1969,7 +1969,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	// so replication has to have worked for it to exist.
 	retry.Run(t, func(r *retry.R) {
 		p := policyExists(r, "mesh-gateway-policy-dc2", secondaryConsulClient)
-		require.Len(r, p.Datacenters, 2)
+		require.Len(r, p.Datacenters, 0)
 	})
 }
 
