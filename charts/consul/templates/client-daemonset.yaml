@@ -231,13 +231,16 @@ spec:
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: https://localhost:8501
-            {{- if .Values.global.tls.enableAutoEncrypt }}
+              {{- if .Values.global.tls.enableAutoEncrypt }}
             - name: CONSUL_HTTP_SSL_VERIFY
               value: "false"
-            {{- else }}
+              {{- end }}
             - name: CONSUL_CACERT
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/serverca.crt
+              {{- else }}
               value: /consul/tls/ca/tls.crt
-            {{- end }}
+              {{- end }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.client | nindent 12 }}
           command:

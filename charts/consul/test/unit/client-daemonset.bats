@@ -841,6 +841,25 @@ load _helpers
     [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
+@test "client/DaemonSet: sets Consul environment variables when global.tls.enabled and global.secretsBackend.vault.enabled " {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+    [ "${actual}" = "/vault/secrets/serverca.crt" ]
+}
+
 @test "client/DaemonSet: sets verify_* flags to true by default when global.tls.enabled" {
   cd `chart_dir`
   local command=$(helm template \

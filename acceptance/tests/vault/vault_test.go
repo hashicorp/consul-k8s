@@ -1,6 +1,8 @@
 package vault
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -9,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticClientName = "static-client"
@@ -110,6 +113,20 @@ func TestVault(t *testing.T) {
 	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
 	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
+
+	// Validate that tls.crt is not set to the default value
+	logger.Log(t, "Validating that CONSUL_CACERT has been set correctly")
+	serverPod, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).Get(context.Background(), fmt.Sprintf("%s-consul-server-0", consulReleaseName), metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// Environment variables are buried in the pod spec
+	containerVars := serverPod.Spec.Containers[0].Env
+	for k := range containerVars {
+		if containerVars[k].Name == "CONSUL_CACERT" {
+			require.NotEqual(t, containerVars[k].Value, "/consul/tls/ca/tls.crt")
+			require.Equal(t, containerVars[k].Value, "/vault/secrets/serverca.crt")
+		}
+	}
 
 	if cfg.EnableEnterprise {
 		// Validate that the enterprise license is set correctly.
