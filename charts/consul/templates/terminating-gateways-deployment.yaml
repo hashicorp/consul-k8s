@@ -179,7 +179,7 @@ spec:
             - name: CONSUL_HTTP_ADDR
               value: http://$(HOST_IP):8500
             {{- end }}
-          command:
+          command:  
             - "/bin/sh"
             - "-ec"
             - |
