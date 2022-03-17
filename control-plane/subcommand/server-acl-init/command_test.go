@@ -2450,7 +2450,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			GlobalToken:   false,
 		},
 		{
-			ComponentName: "terminating gateway",
+			ComponentName: "terminating-gateway",
 			TokenFlags: []string{"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
 				"-terminating-gateway-name=another-gateway"},
@@ -2504,18 +2504,20 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-				AuthMethod:  authMethodName,
-				BearerToken: jwtToken,
-				Meta:        map[string]string{},
-			}, &api.WriteOptions{})
-			require.NoError(t, err)
+			if len(c.Roles) == 1 {
+				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+					AuthMethod:  authMethodName,
+					BearerToken: jwtToken,
+					Meta:        map[string]string{},
+				}, &api.WriteOptions{})
+				require.NoError(t, err)
 
-			require.Equal(t, len(tok.Roles), len(c.Roles))
-			for _, role := range tok.Roles {
-				require.Contains(t, c.Roles, role.Name)
+				require.Equal(t, len(tok.Roles), len(c.Roles))
+				for _, role := range tok.Roles {
+					require.Contains(t, c.Roles, role.Name)
+				}
+				require.Equal(t, !c.GlobalToken, tok.Local)
 			}
-			require.Equal(t, !c.GlobalToken, tok.Local)
 
 		})
 	}
