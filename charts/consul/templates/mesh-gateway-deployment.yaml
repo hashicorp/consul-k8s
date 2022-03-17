@@ -351,7 +351,9 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""
+                {{- if .Values.global.acls.manageSystemACLs }}
                 - "/consul-bin/consul logout"
+                {{- end}}
 
         # consul-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.

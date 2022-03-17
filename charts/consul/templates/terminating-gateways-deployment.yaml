@@ -351,8 +351,7 @@ spec:
                       {{- end }}
                       -id="${POD_NAME}"
                   {{- if $root.Values.global.acls.manageSystemACLs }}
-                  - |
-                    "/consul-bin/consul logout"
+                  - "/consul-bin/consul logout"
                   {{- end}}
 
         # consul-sidecar ensures the terminating gateway is always registered with

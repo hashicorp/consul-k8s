@@ -587,7 +587,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # manageSystemACLs
 
-@test "meshGateway/Deployment: consul logout preStop hook is added when ACLs are enabled" {
+@test "meshGateway/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
@@ -595,7 +595,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[6]] | any(contains("logout"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[3]] | any(contains("/consul-bin/consul logout"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
