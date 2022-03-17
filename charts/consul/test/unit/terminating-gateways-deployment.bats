@@ -48,6 +48,29 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "terminatingGateways/Deployment: Adds consul service volumeMount to gateway container" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | yq '.spec.template.spec.containers[0].volumeMounts[1]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-service" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/service" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # prerequisites
 

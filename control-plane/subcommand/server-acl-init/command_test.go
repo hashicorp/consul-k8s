@@ -2163,6 +2163,18 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 				resourcePrefix + "-gateway-terminating-gateway-acl-role",
 				resourcePrefix + "-another-gateway-terminating-gateway-acl-role"},
 		},
+		{
+			TestName: "Ingress Gateway",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy",
+				resourcePrefix + "-gateway-ingress-gateway-policy",
+				resourcePrefix + "-another-gateway-ingress-gateway-policy"},
+			Roles: []string{resourcePrefix + "-ingress-ingress-gateway-acl-role",
+				resourcePrefix + "-gateway-ingress-gateway-acl-role",
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2316,6 +2328,19 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 				resourcePrefix + "-another-gateway-terminating-gateway-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName: "Ingress Gateway",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-ingress-gateway-policy-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-ingress-gateway-policy-" + secondaryDatacenter},
+			Roles: []string{resourcePrefix + "-ingress-ingress-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-ingress-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2463,6 +2488,13 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "terminating-terminating-gateway"),
 			GlobalToken:        false,
 		},
+		{
+			ComponentName:      "ingress-gateway",
+			TokenFlags:         []string{"-ingress-gateway-name=ingress"},
+			Roles:              []string{resourcePrefix + "-ingress-ingress-gateway-acl-role"},
+			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "ingress-ingress-gateway"),
+			GlobalToken:        false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2523,6 +2555,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 				require.Contains(t, c.Roles, role.Name)
 			}
 			require.Equal(t, !c.GlobalToken, tok.Local)
+
 		})
 	}
 }
@@ -2604,6 +2637,14 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			GlobalAuthMethod:   false,
 			GlobalToken:        false,
 		},
+		{
+			ComponentName:      "ingress-gateway",
+			TokenFlags:         []string{"-ingress-gateway-name=ingress"},
+			Roles:              []string{resourcePrefix + "-ingress-ingress-gateway-acl-role-dc2"},
+			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "ingress-ingress-gateway"),
+			GlobalAuthMethod:   false,
+			GlobalToken:        false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2664,20 +2705,22 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			retry.Run(t, func(r *retry.R) {
-				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-					AuthMethod:  authMethodName,
-					BearerToken: jwtToken,
-					Meta:        map[string]string{},
-				}, &api.WriteOptions{})
-				require.NoError(r, err)
+			if len(c.Roles) == 1 {
+				retry.Run(t, func(r *retry.R) {
+					tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+						AuthMethod:  authMethodName,
+						BearerToken: jwtToken,
+						Meta:        map[string]string{},
+					}, &api.WriteOptions{})
+					require.NoError(r, err)
 
-				require.Equal(r, len(tok.Roles), len(c.Roles))
-				for _, role := range tok.Roles {
-					require.Contains(r, c.Roles, role.Name)
-				}
-				require.Equal(r, !c.GlobalToken, tok.Local)
-			})
+					require.Equal(r, len(tok.Roles), len(c.Roles))
+					for _, role := range tok.Roles {
+						require.Contains(r, c.Roles, role.Name)
+					}
+					require.Equal(r, !c.GlobalToken, tok.Local)
+				})
+			}
 		})
 	}
 }
