@@ -2515,6 +2515,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 				require.Contains(t, c.Roles, role.Name)
 			}
 			require.Equal(t, !c.GlobalToken, tok.Local)
+
 		})
 	}
 }
@@ -2664,20 +2665,22 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			retry.Run(t, func(r *retry.R) {
-				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-					AuthMethod:  authMethodName,
-					BearerToken: jwtToken,
-					Meta:        map[string]string{},
-				}, &api.WriteOptions{})
-				require.NoError(r, err)
+			if len(c.Roles) == 1 {
+				retry.Run(t, func(r *retry.R) {
+					tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+						AuthMethod:  authMethodName,
+						BearerToken: jwtToken,
+						Meta:        map[string]string{},
+					}, &api.WriteOptions{})
+					require.NoError(r, err)
 
-				require.Equal(r, len(tok.Roles), len(c.Roles))
-				for _, role := range tok.Roles {
-					require.Contains(r, c.Roles, role.Name)
-				}
-				require.Equal(r, !c.GlobalToken, tok.Local)
-			})
+					require.Equal(r, len(tok.Roles), len(c.Roles))
+					for _, role := range tok.Roles {
+						require.Contains(r, c.Roles, role.Name)
+					}
+					require.Equal(r, !c.GlobalToken, tok.Local)
+				})
+			}
 		})
 	}
 }
