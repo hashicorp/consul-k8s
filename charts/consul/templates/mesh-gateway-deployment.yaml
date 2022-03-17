@@ -347,7 +347,11 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\"", "&&", "/bin/sh", "-ec", "/consul-bin/consul logout"]
+                command: 
+                - "/bin/sh"
+                - "-ec"
+                - "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""
+                - "/consul-bin/consul logout"
 
         # consul-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.

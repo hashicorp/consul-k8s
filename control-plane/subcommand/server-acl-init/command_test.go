@@ -185,20 +185,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken: true,
 		},
 		{
-			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
-			LocalToken: true,
-		},
-		{
 			TestName:    "ACL replication token",
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
@@ -370,20 +356,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
 			LocalToken: true,
 		},
-		{
-			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token-dc2",
-				"gateway-terminating-gateway-token-dc2",
-				"another-gateway-terminating-gateway-token-dc2"},
-			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
-			LocalToken: true,
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -465,18 +437,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
 				resourcePrefix + "-gateway-ingress-gateway-acl-token",
 				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
-		},
-		{
-			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
 		},
 		{
 			TestName:    "ACL replication token",
@@ -1836,7 +1796,6 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-
 	responseCode := cmd.Run([]string{
 		"-timeout=500ms",
 		"-resource-prefix=" + resourcePrefix,
@@ -2192,6 +2151,18 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			PolicyNames: []string{"client-policy"},
 			Roles:       []string{resourcePrefix + "-client-acl-role"},
 		},
+		{
+			TestName: "Terminating Gateway",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-policy",
+				"gateway-terminating-gateway-policy",
+				"another-gateway-terminating-gateway-policy"},
+			Roles: []string{resourcePrefix + "-terminating-acl-role",
+				resourcePrefix + "-gateway-acl-role",
+				resourcePrefix + "-another-gateway-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2332,6 +2303,19 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-client-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName: "Terminating Gateway",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-policy-" + secondaryDatacenter,
+				"gateway-terminating-gateway-policy-" + secondaryDatacenter,
+				"another-gateway-terminating-gateway-policy-" + secondaryDatacenter},
+			Roles: []string{resourcePrefix + "-terminating-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2465,6 +2449,16 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			Roles:         []string{resourcePrefix + "-client-acl-role"},
 			GlobalToken:   false,
 		},
+		{
+			ComponentName: "terminating gateway",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			Roles: []string{resourcePrefix + "-terminating-acl-role",
+				resourcePrefix + "-gateway-acl-role",
+				resourcePrefix + "-another-gateway-acl-role"},
+			GlobalToken: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2522,6 +2516,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 				require.Contains(t, c.Roles, role.Name)
 			}
 			require.Equal(t, !c.GlobalToken, tok.Local)
+
 		})
 	}
 }
@@ -2588,6 +2583,17 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			GlobalAuthMethod: false,
 			GlobalToken:      false,
 		},
+		{
+			ComponentName: "terminating gateway",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			Roles: []string{resourcePrefix + "-terminating-acl-role-dc2",
+				resourcePrefix + "-gateway-acl-role-dc2",
+				resourcePrefix + "-another-gateway-acl-role-dc2"},
+			GlobalAuthMethod: false,
+			GlobalToken:      false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2645,20 +2651,22 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			retry.Run(t, func(r *retry.R) {
-				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-					AuthMethod:  authMethodName,
-					BearerToken: jwtToken,
-					Meta:        map[string]string{},
-				}, &api.WriteOptions{})
-				require.NoError(r, err)
+			if len(c.Roles) == 1 {
+				retry.Run(t, func(r *retry.R) {
+					tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+						AuthMethod:  authMethodName,
+						BearerToken: jwtToken,
+						Meta:        map[string]string{},
+					}, &api.WriteOptions{})
+					require.NoError(r, err)
 
-				require.Equal(r, len(tok.Roles), len(c.Roles))
-				for _, role := range tok.Roles {
-					require.Contains(r, c.Roles, role.Name)
-				}
-				require.Equal(r, !c.GlobalToken, tok.Local)
-			})
+					require.Equal(r, len(tok.Roles), len(c.Roles))
+					for _, role := range tok.Roles {
+						require.Contains(r, c.Roles, role.Name)
+					}
+					require.Equal(r, !c.GlobalToken, tok.Local)
+				})
+			}
 		})
 	}
 }

@@ -148,7 +148,7 @@ func updateTerminatingGatewayToken(t *testing.T, consulClient *api.Client, rules
 	require.NoError(t, err)
 	var termGwTokenID string
 	for _, token := range tokens {
-		if strings.Contains(token.Description, "terminating-gateway-terminating-gateway-token") {
+		if strings.Contains(token.Description, "token created via login: {\"component\":\"terminating-gateway\"}") {
 			termGwTokenID = token.AccessorID
 			break
 		}
