@@ -179,13 +179,13 @@ spec:
             - name: CONSUL_HTTP_ADDR
               value: http://$(HOST_IP):8500
             {{- end }}
-          command:
+          command:  
             - "/bin/sh"
             - "-ec"
             - |
                 {{- if $root.Values.global.acls.manageSystemACLs }}
                 consul-k8s-control-plane acl-init \
-                  -component-name=terminating-gateway \
+                  -component-name=terminating-gateway/{{ template "consul.fullname" $root }}-{{ .name }} \
                   -acl-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
                   {{- if $root.Values.global.adminPartitions.enabled }}
                   -partition={{ $root.Values.global.adminPartitions.name }} \
