@@ -817,7 +817,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 				namespace = consulDefaultNamespace
 			}
 		} else if strings.ContainsAny(name, ".") {
-			errMessage := "Gateway names shouldn't include a namespace if Consul namespaces aren't enabled"
+			errMessage := "gateway names shouldn't include a namespace if Consul namespaces aren't enabled"
 			c.log.Error(errMessage, "gateway-name", name)
 			return errors.New(errMessage)
 		}
