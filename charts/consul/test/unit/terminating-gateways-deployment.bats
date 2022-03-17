@@ -1156,11 +1156,12 @@ EOF
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'terminatingGateways.gateways[0].name=terminating' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "terminating-gateway-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s-control-plane acl-init \
-  -component-name=terminating-gateway \
+  -component-name=terminating-gateway/RELEASE-NAME-consul-terminating \
   -acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method \
   -token-sink-file=/consul/service/acl-token \
   -log-level=info \
@@ -1169,7 +1170,7 @@ EOF
 cat > /consul/service/service.hcl << EOF
 service {
   kind = "terminating-gateway"
-  name = "terminating-gateway"
+  name = "terminating"
   id = "${POD_NAME}"
   address = "${POD_IP}"
   port = 8443
