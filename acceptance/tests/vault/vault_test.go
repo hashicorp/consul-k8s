@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticClientName = "static-client"
@@ -68,7 +66,7 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 
-		"global.acls.manageSystemACLs":       "true",
+		"global.acls.manageSystemACLs":       "false",
 		"global.tls.enabled":                 "true",
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
@@ -114,19 +112,10 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
 
-	// Validate that tls.crt is not set to the default value
-	logger.Log(t, "Validating that CONSUL_CACERT has been set correctly")
-	serverPod, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).Get(context.Background(), fmt.Sprintf("%s-consul-server-0", consulReleaseName), metav1.GetOptions{})
+	// Validate that consul sever is running correctly and the consul members command works
+	membersOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "consul members")
 	require.NoError(t, err)
-
-	// Environment variables are buried in the pod spec
-	containerVars := serverPod.Spec.Containers[0].Env
-	for k := range containerVars {
-		if containerVars[k].Name == "CONSUL_CACERT" {
-			require.NotEqual(t, containerVars[k].Value, "/consul/tls/ca/tls.crt")
-			require.Equal(t, containerVars[k].Value, "/vault/secrets/serverca.crt")
-		}
-	}
+	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
 
 	if cfg.EnableEnterprise {
 		// Validate that the enterprise license is set correctly.

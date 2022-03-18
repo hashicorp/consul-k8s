@@ -234,11 +234,8 @@ spec:
             {{- if .Values.global.tls.enableAutoEncrypt }}
             - name: CONSUL_HTTP_SSL_VERIFY
               value: "false"
-            {{- end }}
-            - name: CONSUL_CACERT
-            {{- if .Values.global.secretsBackend.vault.enabled }}
-              value: /vault/secrets/serverca.crt
             {{- else }}
+            - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end }}
             {{- end }}
