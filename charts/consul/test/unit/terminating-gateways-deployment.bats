@@ -254,6 +254,20 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "terminatingGateways/Deployment: serviceAccountName is set properly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'terminatingGateways.defaults.consulNamespace=namespace' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway-terminating-gateway" ]
+}
+
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
