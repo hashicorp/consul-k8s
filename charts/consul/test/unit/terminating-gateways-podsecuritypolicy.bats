@@ -43,8 +43,8 @@ load _helpers
   [ "${actual}" = "false" ]
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1-terminating-gateway" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2-terminating-gateway" ]
 }

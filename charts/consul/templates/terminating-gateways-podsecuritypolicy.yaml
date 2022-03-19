@@ -4,7 +4,7 @@
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name:  {{ template "consul.fullname" $root }}-{{ .name }}
+  name:  {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
   namespace: {{ $root.Release.Namespace }}
   labels:
     app: {{ template "consul.name" $root }}
@@ -12,7 +12,7 @@ metadata:
     heritage: {{ $root.Release.Service }}
     release: {{ $root.Release.Name }}
     component: terminating-gateway
-    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
 spec:
   privileged: false
   # Required to prevent escalations to root.

@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway-terminating-gateway" ]
 }
 
 @test "terminatingGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -1406,10 +1406,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1-terminating-gateway" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2-terminating-gateway" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
