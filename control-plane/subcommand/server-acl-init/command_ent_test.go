@@ -333,8 +333,8 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"mesh-gateway-policy",
 				"snapshot-agent-policy",
 				"enterprise-license-token",
-				"gw-ingress-gateway-token",
-				"anothergw-ingress-gateway-token",
+				resourcePrefix + "gw-ingress-gateway-policy",
+				resourcePrefix + "anothergw-ingress-gateway-policy",
 				resourcePrefix + "-gw-terminating-gateway-policy",
 				resourcePrefix + "-anothergw-terminating-gateway-policy",
 				"connect-inject-policy",
@@ -386,8 +386,8 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"cross-namespace-policy",
-				"gw-ingress-gateway-token",
-				"anothergw-ingress-gateway-token",
+				resourcePrefix + "gw-ingress-gateway-policy",
+				resourcePrefix + "anothergw-ingress-gateway-policy",
 				resourcePrefix + "-gw-terminating-gateway-policy",
 				resourcePrefix + "-anothergw-terminating-gateway-policy",
 				"controller-policy",
@@ -679,19 +679,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 			LocalToken:  true,
 		},
-		"ingress gateway tokens": {
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
-				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
-			LocalToken: true,
-		},
 		"acl-replication token": {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
@@ -789,9 +776,9 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
 				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "ingress-ingress-gateway-policy",
+				resourcePrefix + "gateway-ingress-gateway-policy",
+				resourcePrefix + "another-gateway-ingress-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -838,9 +825,9 @@ partition "default" {
 			TokenFlags: []string{"-ingress-gateway-name=ingress.",
 				"-ingress-gateway-name=gateway.namespace1",
 				"-ingress-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy",
+				resourcePrefix + "-gateway-ingress-gateway-policy",
+				resourcePrefix + "-another-gateway-ingress-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {

@@ -171,20 +171,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName: "Ingress gateway tokens",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
-				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
-			LocalToken: true,
-		},
-		{
 			TestName:    "ACL replication token",
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
@@ -342,20 +328,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 			LocalToken:  true,
 		},
-		{
-			TestName: "Ingress gateway tokens",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
-				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token-dc2",
-				"gateway-ingress-gateway-token-dc2",
-				"another-gateway-ingress-gateway-token-dc2"},
-			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
-			LocalToken: true,
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -425,18 +397,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
-		},
-		{
-			TestName: "Ingress gateway tokens",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
-				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
 		},
 		{
 			TestName:    "ACL replication token",
@@ -2163,6 +2123,18 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 				resourcePrefix + "-gateway-terminating-gateway-acl-role",
 				resourcePrefix + "-another-gateway-terminating-gateway-acl-role"},
 		},
+		{
+			TestName: "Ingress Gateway",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy",
+				resourcePrefix + "-gateway-ingress-gateway-policy",
+				resourcePrefix + "-another-gateway-ingress-gateway-policy"},
+			Roles: []string{resourcePrefix + "-ingress-ingress-gateway-acl-role",
+				resourcePrefix + "-gateway-ingress-gateway-acl-role",
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2316,6 +2288,19 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 				resourcePrefix + "-another-gateway-terminating-gateway-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName: "Ingress Gateway",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-ingress-gateway-policy-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-ingress-gateway-policy-" + secondaryDatacenter},
+			Roles: []string{resourcePrefix + "-ingress-ingress-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-ingress-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2463,6 +2448,13 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "terminating-terminating-gateway"),
 			GlobalToken:        false,
 		},
+		{
+			ComponentName:      "ingress-gateway",
+			TokenFlags:         []string{"-ingress-gateway-name=ingress"},
+			Roles:              []string{resourcePrefix + "-ingress-ingress-gateway-acl-role"},
+			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "ingress-ingress-gateway"),
+			GlobalToken:        false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2601,6 +2593,14 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			TokenFlags:         []string{"-terminating-gateway-name=terminating"},
 			Roles:              []string{resourcePrefix + "-terminating-terminating-gateway-acl-role-dc2"},
 			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "terminating-terminating-gateway"),
+			GlobalAuthMethod:   false,
+			GlobalToken:        false,
+		},
+		{
+			ComponentName:      "ingress-gateway",
+			TokenFlags:         []string{"-ingress-gateway-name=ingress"},
+			Roles:              []string{resourcePrefix + "-ingress-ingress-gateway-acl-role-dc2"},
+			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "ingress-ingress-gateway"),
 			GlobalAuthMethod:   false,
 			GlobalToken:        false,
 		},

@@ -609,58 +609,19 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if len(c.flagIngressGatewayNames) > 0 {
-		// Create a token for each ingress gateway name. Each gateway needs a
-		// separate token because users may need to attach different policies
-		// to each gateway token depending on what the services it represents
-		for _, name := range c.flagIngressGatewayNames {
-			if name == "" {
-				c.log.Error("Ingress gateway names cannot be empty")
-				return 1
-			}
-
-			// Parse optional namespace, erroring if a user
-			// provides a namespace when not enabling namespaces.
-			var namespace string
-			if c.flagEnableNamespaces {
-				parts := strings.SplitN(strings.TrimSpace(name), ".", 2)
-				if len(parts) > 1 {
-					// Name and namespace were provided
-					name = parts[0]
-
-					// Use default namespace if provided flag is of the
-					// form "name."
-					if parts[1] != "" {
-						namespace = parts[1]
-					} else {
-						namespace = consulDefaultNamespace
-					}
-				} else {
-					// Use the default Consul namespace
-					namespace = consulDefaultNamespace
-				}
-			} else if strings.ContainsAny(name, ".") {
-				c.log.Error("Gateway names shouldn't include a namespace if Consul namespaces aren't enabled",
-					"gateway-name", name)
-				return 1
-			}
-
-			// Define the gateway rules
-			ingressGatewayRules, err := c.ingressGatewayRules(name, namespace)
-			if err != nil {
-				c.log.Error("Error templating ingress gateway rules", "gateway-name", name,
-					"namespace", namespace, "err", err)
-				return 1
-			}
-
-			// The names in the Helm chart are specified by users and so may not contain
-			// the words "ingress-gateway". We need to create unique names for tokens
-			// across all gateway types and so must suffix with `-ingress-gateway`.
-			tokenName := fmt.Sprintf("%s-ingress-gateway", name)
-			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, primary, consulClient)
-			if err != nil {
-				c.log.Error(err.Error())
-				return 1
-			}
+		params := ConfigureGatewayParams{
+			GatewayType:    "ingress",
+			GatewayNames:   c.flagIngressGatewayNames,
+			AuthMethodName: localComponentAuthMethodName,
+			RulesGenerator: c.ingressGatewayRules,
+			ConsulDC:       consulDC,
+			PrimaryDC:      primaryDC,
+			Primary:        primary,
+		}
+		err := c.configureGateway(params, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
 		}
 	}
 
