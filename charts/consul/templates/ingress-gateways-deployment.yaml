@@ -26,7 +26,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  name: {{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway
   namespace: {{ $root.Release.Namespace }}
   labels:
     app: {{ template "consul.name" $root }}
@@ -34,7 +34,7 @@ metadata:
     heritage: {{ $root.Release.Service }}
     release: {{ $root.Release.Name }}
     component: ingress-gateway
-    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway
 spec:
   replicas: {{ default $defaults.replicas .replicas }}
   selector:
@@ -44,7 +44,7 @@ spec:
       heritage: {{ $root.Release.Service }}
       release: {{ $root.Release.Name }}
       component: ingress-gateway
-      ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+      ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway
   template:
     metadata:
       labels:
@@ -53,7 +53,7 @@ spec:
         heritage: {{ $root.Release.Service }}
         release: {{ $root.Release.Name }}
         component: ingress-gateway
-        ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+        ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway
       annotations:
         {{- if (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
@@ -189,7 +189,7 @@ spec:
                   -log-level={{ $root.Values.global.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }} \
                   -k8s-namespace={{ $root.Release.Namespace }} \
-                  -name={{ template "consul.fullname" $root }}-{{ .name }} \
+                  -name={{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway \
                   -output-file=/tmp/address.txt
                 WAN_ADDR="$(cat /tmp/address.txt)"
                 {{- else }}
