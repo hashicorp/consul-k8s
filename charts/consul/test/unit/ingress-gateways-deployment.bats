@@ -60,6 +60,41 @@ load _helpers
   [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
 }
 
+@test "ingressGateways/Deployment: Adds consul service volumeMount to gateway container" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | yq '.spec.template.spec.containers[0].volumeMounts[1]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-service" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/service" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: serviceAccountName is set properly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'ingress.defaults.consulNamespace=namespace' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
+}
+
 #--------------------------------------------------------------------
 # prerequisites
 
