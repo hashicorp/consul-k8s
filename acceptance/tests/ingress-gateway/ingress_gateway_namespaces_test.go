@@ -160,7 +160,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 // the ingress gateway and the connect service are in different namespaces.
 // These tests currently only test non-secure and secure without auto-encrypt installations
 // because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
-// and non-auto-encrypt secure installations, so testing just one is enough.
+// // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
