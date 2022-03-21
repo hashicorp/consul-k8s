@@ -55,7 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ExportedServicesSpec defines the desired state of ExportedServices
+            description: ExportedServicesSpec defines the desired state of ExportedServices.
             properties:
               services:
                 description: Services is a list of services to be exported and the

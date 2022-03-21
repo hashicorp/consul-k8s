@@ -49,7 +49,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: IngressGatewaySpec defines the desired state of IngressGateway
+            description: IngressGatewaySpec defines the desired state of IngressGateway.
             properties:
               listeners:
                 description: Listeners declares what ports the ingress gateway should
@@ -58,25 +58,6 @@ spec:
                   description: IngressListener manages the configuration for a listener
                     on a specific port.
                   properties:
-                    tls:
-                      description: TLS config for this listener.
-                      properties:
-                        enabled:
-                          description: Indicates that TLS should be enabled for this
-                            gateway service.
-                          type: boolean
-                        sds:
-                          description: SDS allows configuring TLS certificate from
-                            an SDS service.
-                          properties:
-                            certResource:
-                              type: string
-                            clusterName:
-                              type: string
-                          type: object
-                      required:
-                      - enabled
-                      type: object
                     port:
                       description: Port declares the port on which the ingress gateway
                         should listen for traffic.
@@ -97,20 +78,6 @@ spec:
                         description: IngressService manages configuration for services
                           that are exposed to ingress traffic.
                         properties:
-                          tls:
-                            description: TLS allows specifying some TLS configuration
-                              per listener.
-                            properties:
-                              sds:
-                                description: SDS allows configuring TLS certificate
-                                  from an SDS service.
-                                properties:
-                                  certResource:
-                                    type: string
-                                  clusterName:
-                                    type: string
-                                type: object
-                            type: object
                           hosts:
                             description: "Hosts is a list of hostnames which should
                               be associated to this service on the defined listener.
@@ -195,8 +162,41 @@ spec:
                                   any existing header values of the same name.
                                 type: object
                             type: object
+                          tls:
+                            description: TLS allows specifying some TLS configuration
+                              per listener.
+                            properties:
+                              sds:
+                                description: SDS allows configuring TLS certificate
+                                  from an SDS service.
+                                properties:
+                                  certResource:
+                                    type: string
+                                  clusterName:
+                                    type: string
+                                type: object
+                            type: object
                         type: object
                       type: array
+                    tls:
+                      description: TLS config for this listener.
+                      properties:
+                        enabled:
+                          description: Indicates that TLS should be enabled for this
+                            gateway service.
+                          type: boolean
+                        sds:
+                          description: SDS allows configuring TLS certificate from
+                            an SDS service.
+                          properties:
+                            certResource:
+                              type: string
+                            clusterName:
+                              type: string
+                          type: object
+                      required:
+                      - enabled
+                      type: object
                   type: object
                 type: array
               tls:

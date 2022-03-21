@@ -55,7 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceSplitterSpec defines the desired state of ServiceSplitter
+            description: ServiceSplitterSpec defines the desired state of ServiceSplitter.
             properties:
               splits:
                 description: Splits defines how much traffic to send to which set

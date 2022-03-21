@@ -55,7 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceIntentionsSpec defines the desired state of ServiceIntentions
+            description: ServiceIntentionsSpec defines the desired state of ServiceIntentions.
             properties:
               destination:
                 description: Destination is the intention destination that will have

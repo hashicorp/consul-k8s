@@ -55,7 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceDefaultsSpec defines the desired state of ServiceDefaults
+            description: ServiceDefaultsSpec defines the desired state of ServiceDefaults.
             properties:
               expose:
                 description: Expose controls the default expose path configuration

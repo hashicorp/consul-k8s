@@ -55,7 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceResolverSpec defines the desired state of ServiceResolver
+            description: ServiceResolverSpec defines the desired state of ServiceResolver.
             properties:
               connectTimeout:
                 description: ConnectTimeout is the timeout for establishing new network

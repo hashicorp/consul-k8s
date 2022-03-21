@@ -49,7 +49,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceRouterSpec defines the desired state of ServiceRouter
+            description: ServiceRouterSpec defines the desired state of ServiceRouter.
             properties:
               routes:
                 description: Routes are the list of routes to consider when processing

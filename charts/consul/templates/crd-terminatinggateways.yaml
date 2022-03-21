@@ -56,14 +56,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway
+            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway.
             properties:
               services:
                 description: Services is a list of service names represented by the
                   terminating gateway.
                 items:
                   description: A LinkedService is a service represented by a terminating
-                    gateway
+                    gateway.
                   properties:
                     caFile:
                       description: CAFile is the optional path to a CA certificate

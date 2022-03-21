@@ -47,7 +47,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: MeshSpec defines the desired state of Mesh
+            description: MeshSpec defines the desired state of Mesh.
             properties:
               transparentProxy:
                 description: TransparentProxyMeshConfig controls configuration specific
