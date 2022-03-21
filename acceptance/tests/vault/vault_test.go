@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticClientName = "static-client"
@@ -66,7 +68,7 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 
-		"global.acls.manageSystemACLs":       "false",
+		"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
@@ -113,7 +115,12 @@ func TestVault(t *testing.T) {
 	require.Equal(t, caConfig.Provider, "vault")
 
 	// Validate that consul sever is running correctly and the consul members command works
-	membersOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "consul members")
+	tokenSecret, err := ctx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), fmt.Sprintf("%s-consul-bootstrap-acl-token", consulReleaseName), metav1.GetOptions{})
+	require.NoError(t, err)
+	token := string(tokenSecret.Data["token"])
+
+	membersOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", token))
+	logger.Log(t, "Members: ", membersOutput)
 	require.NoError(t, err)
 	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
 
