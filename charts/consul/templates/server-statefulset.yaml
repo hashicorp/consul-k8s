@@ -223,7 +223,11 @@ spec:
             - name: CONSUL_HTTP_ADDR
               value: https://localhost:8501
             - name: CONSUL_CACERT
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/serverca.crt
+              {{- else }}
               value: /consul/tls/ca/tls.crt
+              {{- end }}
             {{- end }}
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: CONSUL_LICENSE_PATH

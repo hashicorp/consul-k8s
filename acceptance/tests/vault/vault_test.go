@@ -1,14 +1,18 @@
 package vault
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticClientName = "static-client"
@@ -110,6 +114,17 @@ func TestVault(t *testing.T) {
 	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
 	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
+
+	// Validate that consul sever is running correctly and the consul members command works
+	tokenSecret, err := ctx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), fmt.Sprintf("%s-consul-bootstrap-acl-token", consulReleaseName), metav1.GetOptions{})
+	require.NoError(t, err)
+	token := string(tokenSecret.Data["token"])
+
+	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
+	membersOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, ctx.KubectlOptions(t), terratestLogger.Discard, "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", token))
+	logger.Logf(t, "Members: \n%s", membersOutput)
+	require.NoError(t, err)
+	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
 
 	if cfg.EnableEnterprise {
 		// Validate that the enterprise license is set correctly.
