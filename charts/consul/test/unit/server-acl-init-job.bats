@@ -1684,3 +1684,44 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-federation"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#---------------------------------------------------------------------
+# externalServers.aclInit.extraVolumes
+
+@test "serverACLInit/Job: adds extra secret volume" {
+  cd `chart_dir`
+
+  # Test that it defines it
+  local object=$(helm template \
+    -s templates/server-acl-init-job.yaml \
+    --set 'global.acls.manageSystemACLs=true' \
+    --set 'externalServers.aclInit.extraVolumes[0].type=secret' \
+    --set 'externalServers.aclInit.extraVolumes[0].name=foo' \
+    . | tee /dev/stderr |
+    yq -r '.spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq -r '.secret.name' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object |
+    yq -r '.secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  # Test that it mounts it
+  local object=$(helm template \
+    -s templates/server-acl-init-job.yaml \
+    --set 'global.acls.manageSystemACLs=true' \
+    --set 'externalServers.aclInit.extraVolumes[0].type=secret' \
+    --set 'externalServers.aclInit.extraVolumes[0].name=foo' \
+    . | tee /dev/stderr |
+    yq -r '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/userconfig/foo" ]
+}
