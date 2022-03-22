@@ -9,8 +9,6 @@ import (
 // TestInstallAfterFailedInstall exercises the install command after a failed
 // install. This scenario tests this issue: https://github.com/hashicorp/consul-k8s/issues/1005
 func TestInstallAfterFailedInstall(t *testing.T) {
-	t.Skip()
-
 	// Install Consul in a way that will fail.
 	{
 		helmValues := map[string]string{
