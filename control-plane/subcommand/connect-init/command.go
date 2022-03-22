@@ -123,11 +123,25 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
-		_, err = common.ConsulLogin(consulClient, cfg, c.flagACLAuthMethod, "", c.flagAuthMethodNamespace, c.flagBearerTokenFile, c.flagServiceAccountName, c.flagACLTokenSink, loginMeta, c.logger)
+		loginParams := common.LoginParams{
+			AuthMethod:      c.flagACLAuthMethod,
+			Namespace:       c.flagAuthMethodNamespace,
+			BearerTokenFile: c.flagBearerTokenFile,
+			TokenSinkFile:   c.flagACLTokenSink,
+			Meta:            loginMeta,
+		}
+		token, err := common.ConsulLogin(consulClient, loginParams, c.logger)
 		if err != nil {
+			if c.flagServiceAccountName == "default" {
+				c.logger.Warn("The service account name for this Pod is \"default\"." +
+					" In default installations this is not a supported service account name." +
+					" The service account name must match the name of the Kubernetes Service" +
+					" or the consul.hashicorp.com/connect-service annotation.")
+			}
 			c.logger.Error("unable to complete login", "error", err)
 			return 1
 		}
+		cfg.Token = token
 	}
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service

@@ -11,7 +11,6 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
@@ -86,71 +85,83 @@ func ValidateUnprivilegedPort(flagName, flagValue string) error {
 	return nil
 }
 
+// LoginParams are parameters used to log in to consul.
+type LoginParams struct {
+	// AuthMethod is the name of the auth method.
+	AuthMethod string
+	// Datacenter is the datacenter for the login request.
+	Datacenter string
+	// Namespace is the namespace for the login request.
+	Namespace string
+	// BearerTokenFile is the file where the bearer token is stored.
+	BearerTokenFile string
+	// TokenSinkFile is the file where to write the token received from Consul.
+	TokenSinkFile string
+	// Meta is the metadata to set on the token.
+	Meta map[string]string
+
+	// numRetries is only used in tests to make them run faster.
+	numRetries uint64
+}
+
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
 // The logic of this is taken from the `consul login` command.
-func ConsulLogin(client *api.Client, cfg *api.Config, authMethodName, datacenter, namespace, bearerTokenFile, serviceAccountName, tokenSinkFile string, meta map[string]string, log hclog.Logger) (string, error) {
+func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (string, error) {
 	// Read the bearerTokenFile.
-	data, err := ioutil.ReadFile(bearerTokenFile)
+	data, err := ioutil.ReadFile(params.BearerTokenFile)
 	if err != nil {
-		return "", fmt.Errorf("unable to read bearerTokenFile: %v, err: %v", bearerTokenFile, err)
+		return "", fmt.Errorf("unable to read bearer token file: %v, err: %v", params.BearerTokenFile, err)
 	}
 	bearerToken := strings.TrimSpace(string(data))
 	if bearerToken == "" {
-		return "", fmt.Errorf("no bearer token found in %s", bearerTokenFile)
+		return "", fmt.Errorf("no bearer token found in %q", params.BearerTokenFile)
 	}
+
+	if params.numRetries == 0 {
+		params.numRetries = numLoginRetries
+	}
+	var token *api.ACLToken
 	err = backoff.Retry(func() error {
 		// Do the login.
 		req := &api.ACLLoginParams{
-			AuthMethod:  authMethodName,
+			AuthMethod:  params.AuthMethod,
 			BearerToken: bearerToken,
-			Meta:        meta,
+			Meta:        params.Meta,
 		}
 		// The datacenter flag will either have the value of the primary datacenter or "". In case of the latter,
 		// the token will be created in the datacenter of the installation. In case a global token is required,
 		// the token will be created in the primary datacenter.
-		tok, _, err := client.ACL().Login(req, &api.WriteOptions{Namespace: namespace, Datacenter: datacenter})
+		token, _, err = client.ACL().Login(req, &api.WriteOptions{Namespace: params.Namespace, Datacenter: params.Datacenter})
 		if err != nil {
 			log.Error("unable to login", "error", err)
 			return fmt.Errorf("error logging in: %s", err)
 		}
-		if tokenSinkFile != "" {
+		if params.TokenSinkFile != "" {
 			// Write out the resultant token file.
 			// Must be 0644 because this is written by the consul-k8s user but needs
 			// to be readable by the consul user
-			if err := WriteFileWithPerms(tokenSinkFile, tok.SecretID, 0644); err != nil {
+			if err = WriteFileWithPerms(params.TokenSinkFile, token.SecretID, 0644); err != nil {
 				return fmt.Errorf("error writing token to file sink: %v", err)
 			}
 		}
 		return err
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), params.numRetries))
 	if err != nil {
-		if serviceAccountName == "default" {
-			log.Warn("The service account name for this Pod is \"default\"." +
-				" In default installations this is not a supported service account name." +
-				" The service account name must match the name of the Kubernetes Service" +
-				" or the consul.hashicorp.com/connect-service annotation.")
-		}
 		log.Error("Hit maximum retries for consul login", "error", err)
 		return "", err
 	}
-	// Now update the client so that it will read the ACL token we just fetched.
-	cfg.TokenFile = tokenSinkFile
-	client, err = consul.NewClient(cfg)
-	if err != nil {
-		log.Error("Unable to update client connection", "error", err)
-		return "", err
-	}
+
 	log.Info("Consul login complete")
 
 	// A workaround to check that the ACL token is replicated to other Consul servers.
 	//
-	// A consul client may reach out to a follower instead of a leader to resolve the token during the
-	// call to get services below. This is because clients talk to servers in the stale consistency mode
+	// A consul client may reach out to a follower instead of a leader to resolve the token for an API call
+	// with that token. This is because clients talk to servers in the stale consistency mode
 	// to decrease the load on the servers (see https://www.consul.io/docs/architecture/consensus#stale).
 	// In that case, it's possible that the token isn't replicated
 	// to that server instance yet. The client will then get an "ACL not found" error
-	// and subsequently cache this not found response. Then our call below
-	// to get services from the agent will keep hitting the same "ACL not found" error
+	// and subsequently cache this not found response. Then on any API call with the token,
+	// we will keep hitting the same "ACL not found" error
 	// until the cache entry expires (determined by the `acl_token_ttl` which defaults to 30 seconds).
 	// This is not great because it will delay app start up time by 30 seconds in most cases
 	// (if you are running 3 servers, then the probability of ending up on a follower is close to 2/3).
@@ -163,7 +174,7 @@ func ConsulLogin(client *api.Client, cfg *api.Config, authMethodName, datacenter
 	// Note though that this workaround does not eliminate this problem completely. It's still possible
 	// for this call and the next call to reach different servers and those servers to have different
 	// states from each other.
-	// For example, this call can reach a leader and succeed, while the call below can go to a follower
+	// For example, this call can reach a leader and succeed, while the next call can go to a follower
 	// that is still behind the leader and get an "ACL not found" error.
 	// However, this is a pretty unlikely case because
 	// clients have sticky connections to a server, and those connections get rebalanced only every 2-3min.
@@ -171,9 +182,8 @@ func ConsulLogin(client *api.Client, cfg *api.Config, authMethodName, datacenter
 	log.Info("Checking that the ACL token exists when reading it in the stale consistency mode")
 	// Use raft timeout and polling interval to determine the number of retries.
 	numTokenReadRetries := uint64(raftReplicationTimeout.Milliseconds() / tokenReadPollingInterval.Milliseconds())
-	var aclLoginToken *api.ACLToken
 	err = backoff.Retry(func() error {
-		aclLoginToken, _, err = client.ACL().TokenReadSelf(&api.QueryOptions{AllowStale: true})
+		_, _, err = client.ACL().TokenReadSelf(&api.QueryOptions{AllowStale: true, Token: token.SecretID})
 		if err != nil {
 			log.Error("Unable to read ACL token; retrying", "err", err)
 		}
@@ -185,7 +195,7 @@ func ConsulLogin(client *api.Client, cfg *api.Config, authMethodName, datacenter
 		return "", err
 	}
 	log.Info("Successfully read ACL token from the server")
-	return aclLoginToken.SecretID, nil
+	return token.SecretID, nil
 }
 
 // WriteFileWithPerms will write payload as the contents of the outputFile and set permissions after writing the contents. This function is necessary since using ioutil.WriteFile() alone will create the new file with the requested permissions prior to actually writing the file, so you can't set read-only permissions.

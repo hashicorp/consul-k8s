@@ -187,20 +187,26 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		meta := map[string]string{
-			"component": c.flagComponentName,
+		loginParams := common.LoginParams{
+			AuthMethod:      c.flagACLAuthMethod,
+			Datacenter:      c.flagPrimaryDatacenter,
+			BearerTokenFile: c.bearerTokenFile,
+			TokenSinkFile:   c.flagTokenSinkFile,
+			Meta: map[string]string{
+				"component": c.flagComponentName,
+			},
 		}
-		secret, err = common.ConsulLogin(c.consulClient, cfg, c.flagACLAuthMethod, c.flagPrimaryDatacenter, "", c.bearerTokenFile, "", c.flagTokenSinkFile, meta, c.logger)
+		secret, err = common.ConsulLogin(c.consulClient, loginParams, c.logger)
 		if err != nil {
 			c.logger.Error("Consul login failed", "error", err)
 			return 1
 		}
 		c.logger.Info("Successfully read ACL token from the server")
 	} else {
-		// Use k8s secret to obtain token
+		// Use k8s secret to obtain token.
 
 		// Check if the client secret exists yet
-		// If not, wait until it does
+		// If not, wait until it does.
 		for {
 			var err error
 			secret, err = c.getSecret(c.flagSecretName)
