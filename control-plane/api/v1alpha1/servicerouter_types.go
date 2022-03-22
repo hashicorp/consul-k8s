@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ const (
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="service-router"
 type ServiceRouter struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -39,14 +41,14 @@ type ServiceRouter struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceRouterList contains a list of ServiceRouter
+// ServiceRouterList contains a list of ServiceRouter.
 type ServiceRouterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceRouter `json:"items"`
 }
 
-// ServiceRouterSpec defines the desired state of ServiceRouter
+// ServiceRouterSpec defines the desired state of ServiceRouter.
 type ServiceRouterSpec struct {
 	// Routes are the list of routes to consider when processing L7 requests.
 	// The first route to match in the list is terminal and stops further
@@ -127,6 +129,9 @@ type ServiceRouteDestination struct {
 	// Namespace is the Consul namespace to resolve the service from instead of
 	// the current namespace. If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Consul partition to resolve the service from instead of
+	// the current partition. If empty the current partition is assumed.
+	Partition string `json:"partition,omitempty"`
 	// PrefixRewrite defines how to rewrite the HTTP request path before proxying
 	// it to its final destination.
 	// This requires that either match.http.pathPrefix or match.http.pathExact
@@ -141,6 +146,9 @@ type ServiceRouteDestination struct {
 	RetryOnConnectFailure bool `json:"retryOnConnectFailure,omitempty"`
 	// RetryOnStatusCodes is a flat list of http response status codes that are eligible for retry.
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
+	// Allow HTTP header manipulation to be configured.
+	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
+	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
 }
 
 func (in *ServiceRouter) ConsulMirroringNS() string {
@@ -240,17 +248,17 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *ServiceRouter) Validate(namespacesEnabled bool) error {
+func (in *ServiceRouter) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	for i, r := range in.Spec.Routes {
 		errs = append(errs, r.validate(path.Child("routes").Index(i))...)
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -261,14 +269,14 @@ func (in *ServiceRouter) Validate(namespacesEnabled bool) error {
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.routes[].destination to their default values if namespaces are enabled.
-func (in *ServiceRouter) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *ServiceRouter) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	// If namespaces are enabled we want to set the namespace fields to their
 	// defaults. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
-	if consulNamespacesEnabled {
+	if consulMeta.NamespacesEnabled {
 		// Default to the current namespace (i.e. the namespace of the config entry).
-		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulMeta.NamespacesEnabled, consulMeta.DestinationNamespace, consulMeta.Mirroring, consulMeta.Prefix)
 		for i, r := range in.Spec.Routes {
 			if r.Destination != nil {
 				if r.Destination.Namespace == "" {
@@ -324,22 +332,34 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		Service:               in.Service,
 		ServiceSubset:         in.ServiceSubset,
 		Namespace:             in.Namespace,
+		Partition:             in.Partition,
 		PrefixRewrite:         in.PrefixRewrite,
 		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,
 		RetryOnStatusCodes:    in.RetryOnStatusCodes,
+		RequestHeaders:        in.RequestHeaders.toConsul(),
+		ResponseHeaders:       in.ResponseHeaders.toConsul(),
 	}
 }
 
-func (in *ServiceRouter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+func (in *ServiceRouter) validateEnterprise(consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-	if !namespacesEnabled {
+	if !consulMeta.NamespacesEnabled {
 		for i, r := range in.Spec.Routes {
 			if r.Destination != nil {
 				if r.Destination.Namespace != "" {
 					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("namespace"), r.Destination.Namespace, `Consul Enterprise namespaces must be enabled to set destination.namespace`))
+				}
+			}
+		}
+	}
+	if !consulMeta.PartitionsEnabled {
+		for i, r := range in.Spec.Routes {
+			if r.Destination != nil {
+				if r.Destination.Partition != "" {
+					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("partition"), r.Destination.Partition, `Consul Enterprise partitions must be enabled to set destination.partition`))
 				}
 			}
 		}

@@ -15,19 +15,19 @@ data:
     [
     {{- if .Values.connectInject.enabled }}
       {
-        "name": "{{ template "consul.fullname" . }}-connect-injector-cfg",
+        "name": "{{ template "consul.fullname" . }}-connect-injector",
         "tlsAutoHosts": [
-          "{{ template "consul.fullname" . }}-connect-injector-svc",
-          "{{ template "consul.fullname" . }}-connect-injector-svc.{{ .Release.Namespace }}",
-          "{{ template "consul.fullname" . }}-connect-injector-svc.{{ .Release.Namespace }}.svc",
-          "{{ template "consul.fullname" . }}-connect-injector-svc.{{ .Release.Namespace }}.svc.cluster.local"
+          "{{ template "consul.fullname" . }}-connect-injector",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}.svc",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}.svc.cluster.local"
         ],
         "secretName": "{{ template "consul.fullname" . }}-connect-inject-webhook-cert",
         "secretNamespace": "{{ .Release.Namespace }}"
       }{{- if and .Values.controller.enabled }},{{- end }}{{- end }}
     {{- if and .Values.controller.enabled }}
       {
-        "name": "{{ template "consul.fullname" . }}-controller-mutating-webhook-configuration",
+        "name": "{{ template "consul.fullname" . }}-controller",
         "tlsAutoHosts": [
           "{{ template "consul.fullname" . }}-controller-webhook",
           "{{ template "consul.fullname" . }}-controller-webhook.{{ .Release.Namespace }}",

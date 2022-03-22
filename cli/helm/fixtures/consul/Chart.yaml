@@ -1,0 +1,5 @@
+# This is a mock Helm Chart.yaml file used for testing.
+apiVersion: v2
+name: Foo
+version: 0.1.0
+description: Mock Helm Chart for testing.

@@ -7,9 +7,11 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
 	cmdCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -128,10 +130,22 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	consulClient, err := c.httpFlags.APIClient()
+	cfg := api.DefaultConfig()
+	c.httpFlags.MergeOntoConfig(cfg)
+	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
 		setupLog.Error(err, "connecting to Consul agent")
 		return 1
+	}
+
+	partitionsEnabled := c.httpFlags.Partition() != ""
+	consulMeta := common.ConsulMeta{
+		PartitionsEnabled:    partitionsEnabled,
+		Partition:            c.httpFlags.Partition(),
+		NamespacesEnabled:    c.flagEnableNamespaces,
+		DestinationNamespace: c.flagConsulDestinationNamespace,
+		Mirroring:            c.flagEnableNSMirroring,
+		Prefix:               c.flagNSMirroringPrefix,
 	}
 
 	configEntryReconciler := &controller.ConfigEntryController{
@@ -177,6 +191,15 @@ func (c *Command) Run(args []string) int {
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.Mesh)
+		return 1
+	}
+	if err = (&controller.ExportedServicesController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ExportedServices),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.ExportedServices)
 		return 1
 	}
 	if err = (&controller.ServiceRouterController{
@@ -234,89 +257,72 @@ func (c *Command) Run(args []string) int {
 		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
 			&webhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
 			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
-				Client:                 mgr.GetClient(),
-				ConsulClient:           consulClient,
-				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
-				EnableConsulNamespaces: c.flagEnableNamespaces,
-				EnableNSMirroring:      c.flagEnableNSMirroring,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
 			&webhook.Admission{Handler: &v1alpha1.MeshWebhook{
-				Client:                 mgr.GetClient(),
-				ConsulClient:           consulClient,
-				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.Mesh),
-				EnableConsulNamespaces: c.flagEnableNamespaces,
-				EnableNSMirroring:      c.flagEnableNSMirroring,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.Mesh),
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
+			&webhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ExportedServices),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
 			&webhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.ServiceRouter),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceRouter),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
 			&webhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.ServiceSplitter),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceSplitter),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
 			&webhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
 			&webhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
 			&webhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
-				Client:                     mgr.GetClient(),
-				ConsulClient:               consulClient,
-				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.TerminatingGateway),
-				EnableConsulNamespaces:     c.flagEnableNamespaces,
-				EnableNSMirroring:          c.flagEnableNSMirroring,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				NSMirroringPrefix:          c.flagNSMirroringPrefix,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.TerminatingGateway),
+				ConsulMeta:   consulMeta,
 			}})
 	}
 	// +kubebuilder:scaffold:builder

@@ -10,27 +10,31 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/mitchellh/cli"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 var ns = "default"
@@ -189,6 +193,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
+			TestName:    "API gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
+			LocalToken:  true,
+		},
+		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token"},
@@ -315,6 +327,70 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 	}
 }
 
+func TestRun_ReplicationTokenPrimaryDC_WithProvidedSecretID(t *testing.T) {
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
+	defer testSvr.Stop()
+	require := require.New(t)
+
+	replicationToken := "123e4567-e89b-12d3-a456-426614174000"
+	replicationTokenFile, err := ioutil.TempFile("", "replicationtoken")
+	require.NoError(err)
+	defer os.Remove(replicationTokenFile.Name())
+
+	replicationTokenFile.WriteString(replicationToken)
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-create-acl-replication-token",
+		"-acl-replication-token-file", replicationTokenFile.Name(),
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that this token is created.
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   replicationToken,
+	})
+	require.NoError(err)
+	token, _, err := consul.ACL().TokenReadSelf(nil)
+	require.NoError(err)
+
+	for _, policyLink := range token.Policies {
+		policy := policyExists(t, policyLink.Name, consul)
+		require.Nil(policy.Datacenters)
+
+		// Test that the token was not created as a Kubernetes Secret.
+		_, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-acl-replication-acl-token", metav1.GetOptions{})
+		require.True(k8serrors.IsNotFound(err))
+	}
+
+	// Test that if the same command is run again, it doesn't error.
+	t.Run(t.Name()+"-retried", func(t *testing.T) {
+		ui = cli.NewMockUi()
+		cmd = Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+		responseCode = cmd.Run(cmdArgs)
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	})
+}
+
 // Test creating each token type when replication is enabled.
 func TestRun_TokensReplicatedDC(t *testing.T) {
 	t.Parallel()
@@ -357,6 +433,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			PolicyNames: []string{"client-snapshot-agent-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "API Gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 			LocalToken:  true,
 		},
 		{
@@ -504,6 +588,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+		},
+		{
+			TestName:    "API Gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 		},
 		{
 			TestName:    "Mesh gateway token",
@@ -1168,7 +1258,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -1284,6 +1374,8 @@ func TestRun_NoLeader(t *testing.T) {
 			numACLBootCalls++
 		case "/v1/agent/self":
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1341,6 +1433,10 @@ func TestRun_NoLeader(t *testing.T) {
 		{
 			"PUT",
 			"/v1/acl/policy",
+		},
+		{
+			"GET",
+			"/v1/acl/tokens",
 		},
 		{
 			"PUT",
@@ -1448,8 +1544,8 @@ func TestConsulDatacenterList(t *testing.T) {
 			require.NoError(t, err)
 
 			command := Command{
-				log:        hclog.New(hclog.DefaultOptions),
-				cmdTimeout: context.Background(),
+				log: hclog.New(hclog.DefaultOptions),
+				ctx: context.Background(),
 			}
 			actDC, actPrimaryDC, err := command.consulDatacenterList(consulClient)
 			if c.expErr != "" {
@@ -1496,6 +1592,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			numPolicyCalls++
 		case "/v1/agent/self":
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1531,6 +1629,10 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			"/v1/acl/policy",
 		},
 		{
+			"GET",
+			"/v1/acl/tokens",
+		},
+		{
 			"PUT",
 			"/v1/acl/token",
 		},
@@ -1558,8 +1660,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	}, consulAPICalls)
 }
 
-// Test if there is an old bootstrap Secret we assume the servers were
-// bootstrapped already and continue on to the next step.
+// Test if there is an old bootstrap Secret we still try to create and set
+// server tokens.
 func TestRun_AlreadyBootstrapped(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -1581,6 +1683,8 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/agent/self":
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
 		default:
 			// Send an empty JSON response with code 200 to all calls.
 			fmt.Fprintln(w, "{}")
@@ -1596,7 +1700,8 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: resourcePrefix + "-bootstrap-acl-token",
+				Name:   resourcePrefix + "-bootstrap-acl-token",
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte("old-token"),
@@ -1629,8 +1734,24 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
-		// We only expect the calls for creating client tokens
-		// and updating the server policy.
+		// We expect calls for updating the server policy, setting server tokens,
+		// and updating client policy.
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"GET",
+			"/v1/acl/tokens",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+		{
+			"PUT",
+			"/v1/agent/token/agent",
+		},
 		{
 			"GET",
 			"/v1/agent/self",
@@ -1641,13 +1762,84 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		},
 		{
 			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
 			"/v1/acl/token",
 		},
 	}, consulAPICalls)
+}
+
+// Test if there is an old bootstrap Secret and the server token exists
+// that we don't try and recreate the token.
+func TestRun_AlreadyBootstrapped_ServerTokenExists(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	// First set everything up with ACLs bootstrapped.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	setUpK8sServiceAccount(t, k8s, ns)
+	defer testAgent.Stop()
+	k8s.CoreV1().Secrets(ns).Create(context.Background(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-bootstrap-acl-token",
+		},
+		Data: map[string][]byte{
+			"token": []byte(bootToken),
+		},
+	}, metav1.CreateOptions{})
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testAgent.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+
+	// Create the server policy and token _before_ we run the command.
+	agentPolicyRules, err := cmd.agentRules()
+	require.NoError(err)
+	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        "agent-token",
+		Description: "Agent Token Policy",
+		Rules:       agentPolicyRules,
+	}, nil)
+	require.NoError(err)
+	_, _, err = consulClient.ACL().TokenCreate(&api.ACLToken{
+		Description: fmt.Sprintf("Server Token for %s", strings.Split(testAgent.HTTPAddr, ":")[0]),
+		Policies: []*api.ACLTokenPolicyLink{
+			{
+				Name: policy.Name,
+			},
+		},
+	}, nil)
+	require.NoError(err)
+
+	// Run the command.
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace", ns,
+		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
+		"-resource-prefix", resourcePrefix,
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that only one server token exists, i.e. it didn't create an
+	// extra token.
+	tokens, _, err := consulClient.ACL().TokenList(nil)
+	require.NoError(err)
+	count := 0
+	for _, token := range tokens {
+		if len(token.Policies) == 1 && token.Policies[0].Name == policy.Name {
+			count++
+		}
+	}
+	require.Equal(1, count)
 }
 
 // Test if there is a provided bootstrap we skip bootstrapping of the servers
@@ -2005,7 +2197,7 @@ func completeBootstrappedSetup(t *testing.T, masterToken string) (*fake.Clientse
 
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
-		c.ACL.Tokens.Master = masterToken
+		c.ACL.Tokens.InitialManagement = masterToken
 	})
 	require.NoError(t, err)
 	svr.WaitForActiveCARoot(t)
@@ -2050,7 +2242,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	primarySvr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		if bootToken != "" {
-			c.ACL.Tokens.Master = bootToken
+			c.ACL.Tokens.InitialManagement = bootToken
 		}
 	})
 	require.NoError(t, err)
@@ -2103,7 +2295,6 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		}
 	})
 	require.NoError(t, err)
-	secondarySvr.WaitForLeader(t)
 
 	// Our consul client will use the secondary dc.
 	clientToken := bootToken
@@ -2126,6 +2317,8 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	// WAN join primary to the secondary
 	err = consul.Agent().Join(secondarySvr.WANAddr, true)
 	require.NoError(t, err)
+
+	secondarySvr.WaitForLeader(t)
 
 	// Overwrite consul client, pointing it to the secondary DC
 	consul, err = api.NewClient(&api.Config{
@@ -2161,7 +2354,7 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace
 func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
-	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
+	serviceAccountName := resourcePrefix + "-connect-injector"
 	sa, _ := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		// Create a service account that references two secrets.
@@ -2178,7 +2371,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 						Name: resourcePrefix + "-some-other-secret",
 					},
 					{
-						Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+						Name: resourcePrefix + "-connect-injector",
 					},
 				},
 			},
@@ -2193,10 +2386,11 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	require.NoError(t, err)
 
 	// Create a Kubernetes secret if it doesn't exist, otherwise update it
-	secretName := resourcePrefix + "-connect-injector-authmethod-svc-account"
+	secretName := resourcePrefix + "-connect-injector"
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+			Name:   secretName,
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Data: map[string][]byte{
 			"ca.crt": caCertBytes,
@@ -2209,7 +2403,8 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	// Create the second secret of a different type
 	otherSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-some-other-secret",
+			Name:   resourcePrefix + "-some-other-secret",
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeDockercfg,

@@ -136,6 +136,7 @@ func (c *Command) Run(args []string) int {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-cert", c.flagNamePrefix),
 				Namespace: c.flagK8sNamespace,
+				Labels:    map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey: []byte(ca),
@@ -152,6 +153,7 @@ func (c *Command) Run(args []string) int {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-key", c.flagNamePrefix),
 				Namespace: c.flagK8sNamespace,
+				Labels:    map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSPrivateKeyKey: []byte(pk),
@@ -237,6 +239,7 @@ func (c *Command) Run(args []string) int {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: c.flagK8sNamespace,
 				Name:      fmt.Sprintf("%s-server-cert", c.flagNamePrefix),
+				Labels:    map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       []byte(serverCert),
@@ -253,6 +256,13 @@ func (c *Command) Run(args []string) int {
 			corev1.TLSCertKey:       []byte(serverCert),
 			corev1.TLSPrivateKeyKey: []byte(serverKey),
 		}
+
+		if serverCertSecret.ObjectMeta.Labels == nil {
+			serverCertSecret.ObjectMeta.Labels = map[string]string{common.CLILabelKey: common.CLILabelValue}
+		} else {
+			serverCertSecret.ObjectMeta.Labels[common.CLILabelKey] = common.CLILabelValue
+		}
+
 		c.log.Info("updating server certificate and private key secret")
 		_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Update(c.ctx, serverCertSecret, metav1.UpdateOptions{})
 		if err != nil {

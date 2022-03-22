@@ -21,8 +21,13 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const metricsServerShutdownTimeout = 5 * time.Second
-const envoyMetricsAddr = "http://127.0.0.1:19000/stats/prometheus"
+const (
+	metricsServerShutdownTimeout = 5 * time.Second
+	envoyMetricsAddr             = "http://127.0.0.1:19000/stats/prometheus"
+	// prometheusServiceMetricsSuccessKey is the key of the prometheus metric used to
+	// indicate if service metrics were scraped successfully.
+	prometheusServiceMetricsSuccessKey = "consul_merged_service_metrics_success"
+)
 
 type Command struct {
 	UI cli.Ui
@@ -240,27 +245,36 @@ func (c *Command) createMergedMetricsServer() *http.Server {
 	mergedMetricsServerAddr := fmt.Sprintf("127.0.0.1:%s", c.flagMergedMetricsPort)
 	server := &http.Server{Addr: mergedMetricsServerAddr, Handler: mux}
 
+	// http.Client satisfies the metricsGetter interface.
 	// The default http.Client timeout is indefinite, so adding a timeout makes
 	// sure that requests don't hang.
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
-	// http.Client satisfies the metricsGetter interface.
-	c.envoyMetricsGetter = client
-	c.serviceMetricsGetter = client
+
+	// During tests these may already be set to mocks.
+	if c.envoyMetricsGetter == nil {
+		c.envoyMetricsGetter = client
+	}
+	if c.serviceMetricsGetter == nil {
+		c.serviceMetricsGetter = client
+	}
 
 	return server
 }
 
 // mergedMetricsHandler has the logic to append both Envoy and service metrics
 // together, logging if it's unsuccessful at either.
+// If the Envoy scrape fails, we respond with a 500 code which follows the Prometheus
+// exporter guidelines. If the service scrape fails, we respond with a 200 so
+// that the Envoy metrics are still scraped.
+// We also include a metric line in each response indicating the success or
+// failure of the service metric scraping.
 func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) {
-
 	envoyMetrics, err := c.envoyMetricsGetter.Get(envoyMetricsAddr)
 	if err != nil {
-		// If there is an error scraping Envoy, we want the handler to return
-		// without writing anything to the response, and log the error.
-		c.logger.Error(fmt.Sprintf("Error scraping Envoy proxy metrics: %s", err.Error()))
+		c.logger.Error("Error scraping Envoy proxy metrics", "err", err)
+		http.Error(rw, fmt.Sprintf("Error scraping Envoy proxy metrics: %s", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -273,18 +287,22 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	}()
 	envoyMetricsBody, err := ioutil.ReadAll(envoyMetrics.Body)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Couldn't read Envoy proxy metrics: %s", err.Error()))
+		c.logger.Error("Could not read Envoy proxy metrics", "err", err)
+		http.Error(rw, fmt.Sprintf("Could not read Envoy proxy metrics: %s", err), http.StatusInternalServerError)
 		return
 	}
-	_, err = rw.Write(envoyMetricsBody)
-	if err != nil {
-		c.logger.Error(fmt.Sprintf("Error writing envoy metrics body: %s", err.Error()))
+	if non2xxCode(envoyMetrics.StatusCode) {
+		c.logger.Error("Received non-2xx status code scraping Envoy proxy metrics", "code", envoyMetrics.StatusCode, "response", string(envoyMetricsBody))
+		http.Error(rw, fmt.Sprintf("Received non-2xx status code scraping Envoy proxy metrics: %d: %s", envoyMetrics.StatusCode, string(envoyMetricsBody)), http.StatusInternalServerError)
+		return
 	}
+	writeResponse(rw, envoyMetricsBody, "envoy metrics", c.logger)
 
 	serviceMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
 	serviceMetrics, err := c.serviceMetricsGetter.Get(serviceMetricsAddr)
 	if err != nil {
-		c.logger.Warn(fmt.Sprintf("Error scraping service metrics: %s", err.Error()))
+		c.logger.Warn("Error scraping service metrics", "err", err)
+		writeResponse(rw, serviceMetricSuccess(false), "service metrics success", c.logger)
 		// Since we've already written the Envoy metrics to the response, we can
 		// return at this point if we were unable to get service metrics.
 		return
@@ -300,12 +318,25 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	}()
 	serviceMetricsBody, err := ioutil.ReadAll(serviceMetrics.Body)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Couldn't read service metrics: %s", err.Error()))
+		c.logger.Error("Could not read service metrics", "err", err)
+		writeResponse(rw, serviceMetricSuccess(false), "service metrics success", c.logger)
 		return
 	}
-	_, err = rw.Write(serviceMetricsBody)
+	if non2xxCode(serviceMetrics.StatusCode) {
+		c.logger.Error("Received non-2xx status code scraping service metrics", "code", serviceMetrics.StatusCode, "response", string(serviceMetricsBody))
+		writeResponse(rw, serviceMetricSuccess(false), "service metrics success", c.logger)
+		return
+	}
+	writeResponse(rw, serviceMetricsBody, "service metrics", c.logger)
+	writeResponse(rw, serviceMetricSuccess(true), "service metrics success", c.logger)
+}
+
+// writeResponse is a helper method to write resp to rw and log if there is an error writing.
+// respName is the name of this response that will be used in the error log.
+func writeResponse(rw http.ResponseWriter, resp []byte, respName string, logger hclog.Logger) {
+	_, err := rw.Write(resp)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Error writing service metrics body: %s", err.Error()))
+		logger.Error(fmt.Sprintf("Error writing %s: %s", respName, err.Error()))
 	}
 }
 
@@ -339,6 +370,21 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
+// non2xxCode returns true if code is not in the range of 200-299 inclusive.
+func non2xxCode(code int) bool {
+	return code < 200 || code >= 300
+}
+
+// serviceMetricSuccess returns a prometheus metric line indicating
+// the success of the metrics merging.
+func serviceMetricSuccess(success bool) []byte {
+	boolAsInt := 0
+	if success {
+		boolAsInt = 1
+	}
+	return []byte(fmt.Sprintf("%s %d\n", prometheusServiceMetricsSuccessKey, boolAsInt))
+}
+
 // parseConsulFlags creates Consul client command flags
 // from command's HTTP flags and returns them as an array of strings.
 func (c *Command) parseConsulFlags() []string {
@@ -352,7 +398,7 @@ func (c *Command) parseConsulFlags() []string {
 }
 
 // interrupt sends os.Interrupt signal to the command
-// so it can exit gracefully. This function is needed for tests
+// so it can exit gracefully. This function is needed for tests.
 func (c *Command) interrupt() {
 	c.sendSignal(syscall.SIGINT)
 }

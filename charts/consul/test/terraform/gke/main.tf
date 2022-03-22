@@ -10,7 +10,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.17."
+  version_prefix = "1.20."
 }
 
 resource "google_container_cluster" "cluster" {
@@ -24,12 +24,32 @@ resource "google_container_cluster" "cluster" {
   location           = var.zone
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
-
+  node_config {
+    tags         = ["consul-k8s-${random_id.suffix[count.index].dec}"]
+    machine_type = "e2-standard-4"
+  }
   pod_security_policy_config {
     enabled = true
   }
 
   resource_labels = var.labels
+}
+
+resource "google_compute_firewall" "firewall-rules" {
+  project     = var.project
+  name        = "consul-k8s-acceptance-firewall-${random_id.suffix[count.index].dec}"
+  network     = "default"
+  description = "Creates firewall rule allowing traffic from nodes and pods of the ${random_id.suffix[count.index == 0 ? 1 : 0].dec} Kubernetes cluster."
+
+  count = var.cluster_count > 1 ? var.cluster_count : 0
+
+  allow {
+    protocol = "all"
+  }
+
+  source_ranges = [google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr]
+  source_tags   = ["consul-k8s-${random_id.suffix[count.index == 0 ? 1 : 0].dec}"]
+  target_tags   = ["consul-k8s-${random_id.suffix[count.index].dec}"]
 }
 
 resource "null_resource" "kubectl" {

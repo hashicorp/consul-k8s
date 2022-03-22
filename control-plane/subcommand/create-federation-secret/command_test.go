@@ -213,7 +213,8 @@ func TestRun_ReplicationTokenMissingExpectedKey(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+				Name:   "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 		},
 		metav1.CreateOptions{})
@@ -391,7 +392,8 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 					context.Background(),
 					&v1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: c.resourcePrefix + "-acl-replication-acl-token",
+							Name:   c.resourcePrefix + "-acl-replication-acl-token",
+							Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 						},
 						Data: map[string][]byte{
 							common.ACLTokenSecretKey: []byte(replicationToken),
@@ -786,7 +788,8 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 			context.Background(),
 			&v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+					Name:   "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 				},
 				Data: map[string][]byte{
 					common.ACLTokenSecretKey: []byte(replicationToken),
@@ -941,7 +944,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 
 	// We need to reserve all 6 ports to avoid potential
 	// port collisions with other tests.
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	// Create fake k8s.

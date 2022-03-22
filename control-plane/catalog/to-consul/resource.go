@@ -35,14 +35,14 @@ type NodePortSyncType string
 
 const (
 	// Only sync NodePort services with a node's ExternalIP address.
-	// Doesn't sync if an ExternalIP doesn't exist
+	// Doesn't sync if an ExternalIP doesn't exist.
 	ExternalOnly NodePortSyncType = "ExternalOnly"
 
 	// Sync with an ExternalIP first, if it doesn't exist, use the
-	// node's InternalIP address instead
+	// node's InternalIP address instead.
 	ExternalFirst NodePortSyncType = "ExternalFirst"
 
-	// Sync NodePort services using
+	// Sync NodePort services using.
 	InternalOnly NodePortSyncType = "InternalOnly"
 )
 
@@ -52,6 +52,9 @@ type ServiceResource struct {
 	Log    hclog.Logger
 	Client kubernetes.Interface
 	Syncer Syncer
+
+	// Ctx is used to cancel processes kicked off by ServiceResource.
+	Ctx context.Context
 
 	// AllowK8sNamespacesSet is a set of k8s namespaces to explicitly allow for
 	// syncing. It supports the special character `*` which indicates that
@@ -143,11 +146,11 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(context.TODO(), options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(t.Ctx, options)
 			},
 		},
 		&apiv1.Service{},
@@ -191,7 +194,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
 			Endpoints(service.Namespace).
-			Get(context.TODO(), service.Name, metav1.GetOptions{})
+			Get(t.Ctx, service.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Log.Warn("error loading initial endpoints",
 				"key", key,
@@ -223,7 +226,7 @@ func (t *ServiceResource) Delete(key string, _ interface{}) error {
 
 // doDelete is a helper function for deletion.
 //
-// Precondition: assumes t.serviceLock is held
+// Precondition: assumes t.serviceLock is held.
 func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
 	t.Log.Debug("[doDelete] deleting service from serviceMap", "key", key)
@@ -242,7 +245,7 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 	t.Log.Info("starting runner for endpoints")
 	(&controller.Controller{
 		Log:      t.Log.Named("controller/endpoints"),
-		Resource: &serviceEndpointsResource{Service: t},
+		Resource: &serviceEndpointsResource{Service: t, Ctx: t.Ctx},
 	}).Run(ch)
 }
 
@@ -289,7 +292,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 // shouldTrackEndpoints returns true if the endpoints for the given key
 // should be tracked.
 //
-// Precondition: this requires the lock to be held
+// Precondition: this requires the lock to be held.
 func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 	// The service must be one we care about for us to watch the endpoints.
 	// We care about a service that exists in our service map (is enabled
@@ -431,10 +434,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	// Parse any additional tags
-	if tags, ok := svc.Annotations[annotationServiceTags]; ok {
-		for _, t := range strings.Split(tags, ",") {
-			baseService.Tags = append(baseService.Tags, strings.TrimSpace(t))
-		}
+	if rawTags, ok := svc.Annotations[annotationServiceTags]; ok {
+		baseService.Tags = append(baseService.Tags, parseTags(rawTags)...)
 	}
 
 	// Parse any additional meta
@@ -526,7 +527,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				}
 
 				// Look up the node's ip address by getting node info
-				node, err := t.Client.CoreV1().Nodes().Get(context.TODO(), *subsetAddr.NodeName, metav1.GetOptions{})
+				node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *subsetAddr.NodeName, metav1.GetOptions{})
 				if err != nil {
 					t.Log.Warn("error getting node info", "error", err)
 					continue
@@ -663,7 +664,7 @@ func (t *ServiceResource) registerServiceInstance(
 
 // sync calls the Syncer.Sync function from the generated registrations.
 //
-// Precondition: lock must be held
+// Precondition: lock must be held.
 func (t *ServiceResource) sync() {
 	// NOTE(mitchellh): This isn't the most efficient way to do this and
 	// the times that sync are called are also not the most efficient. All
@@ -683,6 +684,7 @@ func (t *ServiceResource) sync() {
 // to keep track of changing endpoints for registered services.
 type serviceEndpointsResource struct {
 	Service *ServiceResource
+	Ctx     context.Context
 }
 
 func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
@@ -695,13 +697,13 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
-					List(context.TODO(), options)
+					List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
-					Watch(context.TODO(), options)
+					Watch(t.Ctx, options)
 			},
 		},
 		&apiv1.Endpoints{},
@@ -768,4 +770,54 @@ func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) strin
 	}
 
 	return name
+}
+
+// parseTags parses the tags annotation into a slice of tags.
+// Tags are split on commas (except for escaped commas "\,").
+func parseTags(tagsAnno string) []string {
+
+	// This algorithm parses the tagsAnno string into a slice of strings.
+	// Ideally we'd just split on commas but since Consul tags support commas,
+	// we allow users to escape commas so they're included in the tag, e.g.
+	// the annotation "tag\,with\,commas,tag2" will become the tags:
+	// ["tag,with,commas", "tag2"].
+
+	var tags []string
+	// nextTag is built up char by char until we see a comma. Then we
+	// append it to tags.
+	var nextTag string
+
+	for _, runeChar := range tagsAnno {
+		runeStr := fmt.Sprintf("%c", runeChar)
+
+		// Not a comma, just append to nextTag.
+		if runeStr != "," {
+			nextTag += runeStr
+			continue
+		}
+
+		// Reached a comma but there's nothing in nextTag,
+		// skip. (e.g. "a,,b" => ["a", "b"])
+		if len(nextTag) == 0 {
+			continue
+		}
+
+		// Check if the comma was escaped comma, e.g. "a\,b".
+		if string(nextTag[len(nextTag)-1]) == `\` {
+			// Replace the backslash with a comma.
+			nextTag = nextTag[0:len(nextTag)-1] + ","
+			continue
+		}
+
+		// Non-escaped comma. We're ready to push nextTag onto tags and reset nextTag.
+		tags = append(tags, strings.TrimSpace(nextTag))
+		nextTag = ""
+	}
+
+	// We're done the loop but nextTag still contains the last tag.
+	if len(nextTag) > 0 {
+		tags = append(tags, strings.TrimSpace(nextTag))
+	}
+
+	return tags
 }

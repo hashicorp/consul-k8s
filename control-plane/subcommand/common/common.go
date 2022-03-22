@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -24,6 +26,11 @@ const (
 	// ACLTokenSecretKey is the key that we store the ACL tokens in when we
 	// create Kubernetes secrets.
 	ACLTokenSecretKey = "token"
+
+	// CLILabelKey and CLILabelValue are added to each secret on creation so the CLI knows
+	// which secrets to delete on an uninstall.
+	CLILabelKey   = "managed-by"
+	CLILabelValue = "consul-k8s"
 )
 
 // Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
@@ -114,4 +121,13 @@ func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 		return fmt.Errorf("unable to write file: %s", err)
 	}
 	return os.Chmod(outputFile, mode)
+}
+
+// GetResolvedServerAddresses resolves the Consul server address if it has been provided a provider else it returns the server addresses that were input to it.
+// It attempts to use go-discover iff there is a single server address, the value of which begins with "provider=", else it returns the server addresses as is.
+func GetResolvedServerAddresses(serverAddresses []string, providers map[string]discover.Provider, logger hclog.Logger) ([]string, error) {
+	if len(serverAddresses) != 1 || !strings.Contains(serverAddresses[0], "provider=") {
+		return serverAddresses, nil
+	}
+	return godiscover.ConsulServerAddresses(serverAddresses[0], providers, logger)
 }

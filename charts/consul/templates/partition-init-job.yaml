@@ -1,0 +1,103 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if (and .Values.global.adminPartitions.enabled (not $serverEnabled) (ne .Values.global.adminPartitions.name "default")) }}
+{{- template "consul.reservedNamesFailer" (list .Values.global.adminPartitions.name "global.adminPartitions.name") }}
+{{- if and (not .Values.externalServers.enabled) (ne .Values.global.adminPartitions.name "default") }}{{ fail "externalServers.enabled needs to be true and configured to create a non-default partition." }}{{ end -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-partition-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: partition-init
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-partition-init
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: partition-init
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-partition-init
+      {{- if .Values.global.tls.enabled }}
+      {{- if not .Values.externalServers.useSystemRoots }}
+      volumes:
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: partition-init-job
+          image: {{ .Values.global.imageK8S }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.bootstrapToken.secretName }}
+                  key: {{ .Values.global.acls.bootstrapToken.secretKey }}
+            {{- end }}
+          {{- if .Values.global.tls.enabled  }}
+          {{- if not .Values.externalServers.useSystemRoots }}
+          volumeMounts:
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+          {{- end }}
+          {{- end }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              consul-k8s-control-plane partition-init \
+                -log-level={{ .Values.global.logLevel }} \
+                -log-json={{ .Values.global.logJSON }} \
+
+                {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+                {{- range .Values.externalServers.hosts }}
+                -server-address={{ quote . }} \
+                {{- end }}
+                -server-port={{ .Values.externalServers.httpsPort }} \
+
+                {{- if .Values.global.tls.enabled }}
+                -use-https \
+                {{- if not .Values.externalServers.useSystemRoots }}
+                -consul-ca-cert=/consul/tls/ca/tls.crt \
+                {{- end }}
+                {{- if .Values.externalServers.tlsServerName }}
+                -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                {{- end }}
+                {{- end }}
+                -partition-name={{ .Values.global.adminPartitions.name }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+{{- end }}

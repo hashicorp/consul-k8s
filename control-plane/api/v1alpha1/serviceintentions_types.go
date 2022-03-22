@@ -29,6 +29,7 @@ func init() {
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="service-intentions"
 type ServiceIntentions struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -39,14 +40,14 @@ type ServiceIntentions struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceIntentionsList contains a list of ServiceIntentions
+// ServiceIntentionsList contains a list of ServiceIntentions.
 type ServiceIntentionsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceIntentions `json:"items"`
 }
 
-// ServiceIntentionsSpec defines the desired state of ServiceIntentions
+// ServiceIntentionsSpec defines the desired state of ServiceIntentions.
 type ServiceIntentionsSpec struct {
 	// Destination is the intention destination that will have the authorization granted to.
 	Destination Destination `json:"destination,omitempty"`
@@ -77,6 +78,8 @@ type SourceIntention struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace for the Name parameter.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Admin Partition for the Name parameter.
+	Partition string `json:"partition,omitempty"`
 	// Action is required for an L4 intention, and should be set to one of
 	// "allow" or "deny" for the action that should be taken if this intention matches a request.
 	Action IntentionAction `json:"action,omitempty"`
@@ -233,7 +236,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	return cmp.Equal(
 		in.ToConsul(""),
 		configEntry,
-		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
 		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),
@@ -247,7 +250,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	)
 }
 
-func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
+func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	if len(in.Spec.Sources) == 0 {
@@ -266,7 +269,8 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 		}
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.validatePartitions(consulMeta.PartitionsEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -277,14 +281,14 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.destination to their default values if namespaces are enabled.
-func (in *ServiceIntentions) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *ServiceIntentions) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	// If namespaces are enabled we want to set the destination namespace field to it's
 	// default. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
-	if consulNamespacesEnabled {
+	if consulMeta.NamespacesEnabled {
 		// Default to the current namespace (i.e. the namespace of the config entry).
-		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulMeta.NamespacesEnabled, consulMeta.DestinationNamespace, consulMeta.Mirroring, consulMeta.Prefix)
 		if in.Spec.Destination.Namespace == "" {
 			in.Spec.Destination.Namespace = namespace
 		}
@@ -306,6 +310,7 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 	return &capi.SourceIntention{
 		Name:        in.Name,
 		Namespace:   in.Namespace,
+		Partition:   in.Partition,
 		Action:      in.Action.toConsul(),
 		Permissions: in.Permissions.toConsul(),
 		Description: in.Description,
@@ -444,6 +449,19 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 		for i, source := range in.Spec.Sources {
 			if source.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `Consul Enterprise namespaces must be enabled to set source.namespace`))
+			}
+		}
+	}
+	return errs
+}
+
+func (in *ServiceIntentions) validatePartitions(partitionsEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !partitionsEnabled {
+		for i, source := range in.Spec.Sources {
+			if source.Partition != "" {
+				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
 			}
 		}
 	}

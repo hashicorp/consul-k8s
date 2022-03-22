@@ -51,6 +51,9 @@ type K8SSink struct {
 	// done if there are no changes.
 	SyncPeriod time.Duration
 
+	// Ctx is used to cancel the Sink.
+	Ctx context.Context
+
 	// lock gates concurrent access to all the maps.
 	lock sync.Mutex
 
@@ -79,7 +82,7 @@ type K8SSink struct {
 	triggerCh        chan struct{}
 }
 
-// SetServices implements Sink
+// SetServices implements Sink.
 func (s *K8SSink) SetServices(svcs map[string]string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -105,11 +108,11 @@ func (s *K8SSink) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return s.Client.CoreV1().Services(s.namespace()).List(context.TODO(), options)
+				return s.Client.CoreV1().Services(s.namespace()).List(s.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return s.Client.CoreV1().Services(s.namespace()).Watch(context.TODO(), options)
+				return s.Client.CoreV1().Services(s.namespace()).Watch(s.Ctx, options)
 			},
 		},
 		&apiv1.Service{},
@@ -207,7 +210,7 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 			return
 		case <-triggerCh:
 			// Coalesce to prevent lots of API calls during churn periods.
-			coalesce.Coalesce(context.TODO(),
+			coalesce.Coalesce(s.Ctx,
 				K8SQuietPeriod, K8SMaxPeriod,
 				func(ctx context.Context) {
 					select {
@@ -224,20 +227,20 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 
 		svcClient := s.Client.CoreV1().Services(s.namespace())
 		for _, name := range delete {
-			if err := svcClient.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+			if err := svcClient.Delete(s.Ctx, name, metav1.DeleteOptions{}); err != nil {
 				s.Log.Warn("error deleting service", "name", name, "error", err)
 			}
 		}
 
 		for _, svc := range update {
-			_, err := svcClient.Update(context.TODO(), svc, metav1.UpdateOptions{})
+			_, err := svcClient.Update(s.Ctx, svc, metav1.UpdateOptions{})
 			if err != nil {
 				s.Log.Warn("error updating service", "name", svc.Name, "error", err)
 			}
 		}
 
 		for _, svc := range create {
-			_, err := svcClient.Create(context.TODO(), svc, metav1.CreateOptions{})
+			_, err := svcClient.Create(s.Ctx, svc, metav1.CreateOptions{})
 			if err != nil {
 				s.Log.Warn("error creating service", "name", svc.Name, "error", err)
 			}

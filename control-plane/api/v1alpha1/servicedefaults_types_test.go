@@ -68,6 +68,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						Defaults: &Upstream{
 							Name:              "upstream-default",
 							Namespace:         "ns",
+							Partition:         "part",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
@@ -91,6 +92,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							{
 								Name:              "upstream-override-1",
 								Namespace:         "ns",
+								Partition:         "part",
 								EnvoyListenerJSON: `{"key": "value"}`,
 								EnvoyClusterJSON:  `{"key": "value"}`,
 								Protocol:          "http2",
@@ -113,6 +115,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							{
 								Name:              "upstream-default",
 								Namespace:         "ns",
+								Partition:         "part",
 								EnvoyListenerJSON: `{"key": "value"}`,
 								EnvoyClusterJSON:  `{"key": "value"}`,
 								Protocol:          "http2",
@@ -169,6 +172,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
 						Namespace:         "ns",
+						Partition:         "part",
 						EnvoyListenerJSON: `{"key": "value"}`,
 						EnvoyClusterJSON:  `{"key": "value"}`,
 						Protocol:          "http2",
@@ -190,6 +194,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						{
 							Name:              "upstream-override-1",
 							Namespace:         "ns",
+							Partition:         "part",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
@@ -210,6 +215,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						{
 							Name:              "upstream-default",
 							Namespace:         "ns",
+							Partition:         "part",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
@@ -555,8 +561,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 
 func TestServiceDefaults_Validate(t *testing.T) {
 	cases := map[string]struct {
-		input          *ServiceDefaults
-		expectedErrMsg string
+		input             *ServiceDefaults
+		partitionsEnabled bool
+		expectedErrMsg    string
 	}{
 		"valid": {
 			input: &ServiceDefaults{
@@ -583,7 +590,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			expectedErrMsg: "",
 		},
 		"protocol": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -591,10 +598,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Protocol: "foo",
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.protocol: Invalid value: "foo": must be one of "tcp", "http", "http2", "grpc"`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.protocol: Invalid value: "foo": must be one of "tcp", "http", "http2", "grpc"`,
 		},
 		"meshgateway.mode": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -604,10 +611,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none", ""`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none", ""`,
 		},
 		"expose.paths[].protocol": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -622,10 +629,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"`,
 		},
 		"expose.paths[].path": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -640,10 +647,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
 		},
 		"transparentProxy.outboundListenerPort": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -653,10 +660,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
 		"mode": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -664,10 +671,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Mode: proxyModeRef("transparent"),
 				},
 			},
-			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
+			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
 		},
 		"upstreamConfig.defaults.meshGateway": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -681,10 +688,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
 		},
 		"upstreamConfig.defaults.name": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -696,10 +703,26 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.name: Invalid value: "foobar": upstream.name for a default upstream must be ""`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.name: Invalid value: "foobar": upstream.name for a default upstream must be ""`,
+		},
+		"upstreamConfig.defaults.partition": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Partition: "upstream",
+						},
+					},
+				},
+			},
+			partitionsEnabled: false,
+			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
 		},
 		"upstreamConfig.overrides.meshGateway": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -716,10 +739,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
 		},
 		"upstreamConfig.overrides.name": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -733,10 +756,28 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].name: Invalid value: "": upstream.name for an override upstream cannot be ""`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].name: Invalid value: "": upstream.name for an override upstream cannot be ""`,
+		},
+		"upstreamConfig.overrides.partition": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								Name:      "service",
+								Partition: "upstream",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
 		},
 		"multi-error": {
-			&ServiceDefaults{
+			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
@@ -759,13 +800,13 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Mode: proxyModeRef("transparent"),
 				},
 			},
-			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: [spec.protocol: Invalid value: \"invalid\": must be one of \"tcp\", \"http\", \"http2\", \"grpc\", spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
+			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: [spec.protocol: Invalid value: \"invalid\": must be one of \"tcp\", \"http\", \"http2\", \"grpc\", spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
 		},
 	}
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(false)
+			err := testCase.input.Validate(common.ConsulMeta{})
 			if testCase.expectedErrMsg != "" {
 				require.EqualError(t, err, testCase.expectedErrMsg)
 			} else {

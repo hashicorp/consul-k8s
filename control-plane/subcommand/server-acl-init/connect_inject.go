@@ -1,7 +1,6 @@
 package serveraclinit
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -140,11 +139,11 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client) err
 func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod, error) {
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
-	saName := c.withPrefix("connect-injector-authmethod-svc-account")
+	saName := c.withPrefix("connect-injector")
 	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
-			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(context.TODO(), saName, metav1.GetOptions{})
+			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(c.ctx, saName, metav1.GetOptions{})
 			return err
 		})
 	if err != nil {
@@ -161,7 +160,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secretRef.Name),
 			func() error {
 				var err error
-				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
+				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretRef.Name, metav1.GetOptions{})
 				return err
 			})
 		if secret != nil && secret.Type == apiv1.SecretTypeServiceAccountToken {

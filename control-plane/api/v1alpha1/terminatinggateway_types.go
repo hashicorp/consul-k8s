@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ func init() {
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="terminating-gateway"
 type TerminatingGateway struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -39,20 +41,20 @@ type TerminatingGateway struct {
 
 // +kubebuilder:object:root=true
 
-// TerminatingGatewayList contains a list of TerminatingGateway
+// TerminatingGatewayList contains a list of TerminatingGateway.
 type TerminatingGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []TerminatingGateway `json:"items"`
 }
 
-// TerminatingGatewaySpec defines the desired state of TerminatingGateway
+// TerminatingGatewaySpec defines the desired state of TerminatingGateway.
 type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
 }
 
-// A LinkedService is a service represented by a terminating gateway
+// A LinkedService is a service represented by a terminating gateway.
 type LinkedService struct {
 	// The namespace the service is registered in.
 	Namespace string `json:"namespace,omitempty"`
@@ -173,10 +175,10 @@ func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {
+func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -184,7 +186,7 @@ func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {
 		errs = append(errs, v.validate(path.Child("services").Index(i))...)
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -195,14 +197,14 @@ func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.services to their default values if namespaces are enabled.
-func (in *TerminatingGateway) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *TerminatingGateway) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	// If namespaces are enabled we want to set the namespace fields to their
 	// defaults. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
-	if consulNamespacesEnabled {
+	if consulMeta.NamespacesEnabled {
 		// Default to the current namespace (i.e. the namespace of the config entry).
-		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulMeta.NamespacesEnabled, consulMeta.DestinationNamespace, consulMeta.Mirroring, consulMeta.Prefix)
 		for i, service := range in.Spec.Services {
 			if service.Namespace == "" {
 				in.Spec.Services[i].Namespace = namespace

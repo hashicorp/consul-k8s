@@ -262,6 +262,7 @@ func (c *Command) Run(args []string) int {
 				Log:                        c.logger.Named("to-consul/source"),
 				Client:                     c.clientset,
 				Syncer:                     syncer,
+				Ctx:                        ctx,
 				AllowK8sNamespacesSet:      allowSet,
 				DenyK8sNamespacesSet:       denySet,
 				ExplicitEnable:             !c.flagK8SDefault,
@@ -293,6 +294,7 @@ func (c *Command) Run(args []string) int {
 			Client:    c.clientset,
 			Namespace: c.flagK8SWriteNamespace,
 			Log:       c.logger.Named("to-k8s/sink"),
+			Ctx:       ctx,
 		}
 
 		source := &catalogtok8s.Source{
@@ -380,7 +382,7 @@ func (c *Command) Help() string {
 }
 
 // interrupt sends os.Interrupt signal to the command
-// so it can exit gracefully. This function is needed for tests
+// so it can exit gracefully. This function is needed for tests.
 func (c *Command) interrupt() {
 	c.sendSignal(syscall.SIGINT)
 }

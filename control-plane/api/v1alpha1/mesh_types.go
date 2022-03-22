@@ -34,14 +34,14 @@ type Mesh struct {
 
 //+kubebuilder:object:root=true
 
-// MeshList contains a list of Mesh
+// MeshList contains a list of Mesh.
 type MeshList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Mesh `json:"items"`
 }
 
-// MeshSpec defines the desired state of Mesh
+// MeshSpec defines the desired state of Mesh.
 type MeshSpec struct {
 	TransparentProxy TransparentProxyMeshConfig `json:"transparentProxy,omitempty"`
 }
@@ -150,13 +150,13 @@ func (in *Mesh) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.MeshConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.MeshConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *Mesh) Validate(_ bool) error {
+func (in *Mesh) Validate(_ common.ConsulMeta) error {
 	return nil
 }
 
 // DefaultNamespaceFields has no behaviour here as meshes have no namespace specific fields.
-func (in *Mesh) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *Mesh) DefaultNamespaceFields(_ common.ConsulMeta) {
 }

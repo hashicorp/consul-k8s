@@ -64,7 +64,7 @@ func TestRun_FlagsValidation(t *testing.T) {
 
 // Test that in the happy case scenario
 // we retrieve the CA from Consul and
-// write it to a file
+// write it to a file.
 func TestRun(t *testing.T) {
 	t.Parallel()
 	outputFile, err := ioutil.TempFile("", "ca")
@@ -139,7 +139,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		UI: ui,
 	}
 
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 
 	// Start the consul agent asynchronously
 	var a *testutil.TestServer
@@ -293,7 +293,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 }
 
 // Test that when using cloud auto-join
-// it uses the provider to get the address of the server
+// it uses the provider to get the address of the server.
 func TestRun_WithProvider(t *testing.T) {
 	t.Parallel()
 	outputFile, err := ioutil.TempFile("", "ca")

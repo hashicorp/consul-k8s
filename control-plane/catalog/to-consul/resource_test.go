@@ -102,7 +102,7 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	})
 }
 
-// Test that we can default disable
+// Test that we can default disable.
 func TestServiceResource_defaultDisable(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -128,7 +128,7 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	})
 }
 
-// Test that we can default disable but override
+// Test that we can default disable but override.
 func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -196,7 +196,7 @@ func TestServiceResource_changeSyncToFalse(t *testing.T) {
 }
 
 // Test that the k8s namespace is appended with a '-'
-// when AddK8SNamespaceSuffix is true
+// when AddK8SNamespaceSuffix is true.
 func TestServiceResource_addK8SNamespace(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -224,7 +224,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 }
 
 // Test k8s namespace suffix is appended
-// when the consul prefix is provided
+// when the consul prefix is provided.
 func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -281,7 +281,7 @@ func TestServiceResource_ConsulNodeName(t *testing.T) {
 }
 
 // Test k8s namespace suffix is not appended
-// when the service name annotation is provided
+// when the service name annotation is provided.
 func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -339,7 +339,7 @@ func TestServiceResource_externalIP(t *testing.T) {
 	})
 }
 
-// Test externalIP with Prefix
+// Test externalIP with Prefix.
 func TestServiceResource_externalIPPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -397,7 +397,7 @@ func TestServiceResource_lb(t *testing.T) {
 	})
 }
 
-// Test that the proper registrations are generated for a LoadBalancer with a prefix
+// Test that the proper registrations are generated for a LoadBalancer with a prefix.
 func TestServiceResource_lbPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -460,7 +460,7 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	})
 }
 
-// Test explicit name annotation
+// Test explicit name annotation.
 func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -487,7 +487,7 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	})
 }
 
-// Test default port and additional ports in the meta
+// Test default port and additional ports in the meta.
 func TestServiceResource_lbPort(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -519,7 +519,7 @@ func TestServiceResource_lbPort(t *testing.T) {
 	})
 }
 
-// Test default port works with override annotation
+// Test default port works with override annotation.
 func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -552,7 +552,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	})
 }
 
-// Test annotated tags
+// Test annotated tags.
 func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -566,7 +566,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
-	svc.Annotations[annotationServiceTags] = "one, two,three"
+	svc.Annotations[annotationServiceTags] = `one, leadingwhitespace,trailingwhitespace ,\,leadingcomma,trailingcomma\,,middle\,comma,,`
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
@@ -576,11 +576,11 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(r, []string{"k8s", "one", "two", "three"}, actual[0].Service.Tags)
+		require.Equal(r, []string{"k8s", "one", "leadingwhitespace", "trailingwhitespace", ",leadingcomma", "trailingcomma,", "middle,comma"}, actual[0].Service.Tags)
 	})
 }
 
-// Test annotated service meta
+// Test annotated service meta.
 func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -607,7 +607,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	})
 }
 
-// Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name
+// Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name.
 func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -701,7 +701,7 @@ func TestServiceResource_nodePort(t *testing.T) {
 	})
 }
 
-// Test node port works with prefix
+// Test node port works with prefix.
 func TestServiceResource_nodePortPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -922,7 +922,7 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 }
 
 // Test that the proper registrations are generated for a NodePort type
-// when preferring to sync external Node IPs over internal IPs
+// when preferring to sync external Node IPs over internal IPs.
 func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -1005,7 +1005,7 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	})
 }
 
-// Test clusterIP with prefix
+// Test clusterIP with prefix.
 func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -1188,7 +1188,7 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	})
 }
 
-// Test that the ClusterIP services are synced when watching all namespaces
+// Test that the ClusterIP services are synced when watching all namespaces.
 func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -1453,6 +1453,50 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	})
 }
 
+func TestParseTags(t *testing.T) {
+	cases := []struct {
+		tagsAnno string
+		exp      []string
+	}{
+		{
+			"tag",
+			[]string{"tag"},
+		},
+		{
+			",,removes,,empty,elems,,",
+			[]string{"removes", "empty", "elems"},
+		},
+		{
+			"removes , white  ,space ",
+			[]string{"removes", "white", "space"},
+		},
+		{
+			`\,leading,comma`,
+			[]string{",leading", "comma"},
+		},
+		{
+			`trailing,comma\,`,
+			[]string{"trailing", "comma,"},
+		},
+		{
+			`mid\,dle,com\,ma`,
+			[]string{"mid,dle", "com,ma"},
+		},
+		{
+			`\,\,multi\,\,,\,com\,\,ma`,
+			[]string{",,multi,,", ",com,,ma"},
+		},
+		{
+			`  every\,\,   ,  thing  `,
+			[]string{"every,,", "thing"},
+		},
+	}
+
+	for _, c := range cases {
+		require.Equal(t, c.exp, parseTags(c.tagsAnno))
+	}
+}
+
 // lbService returns a Kubernetes service of type LoadBalancer.
 func lbService(name, namespace, lbIP string) *apiv1.Service {
 	return &apiv1.Service{
@@ -1597,6 +1641,7 @@ func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceR
 		Log:                   hclog.Default(),
 		Client:                client,
 		Syncer:                syncer,
+		Ctx:                   context.Background(),
 		AllowK8sNamespacesSet: mapset.NewSet("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
 		ConsulNodeName:        ConsulSyncNodeName,

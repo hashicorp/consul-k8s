@@ -13,7 +13,7 @@ const (
 
 	// annotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
-	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
+	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
 	// annotationInjectMountVolumes is the key of the annotation that controls whether
@@ -22,8 +22,8 @@ const (
 	// to mount the volume on. It will be mounted at the path `/consul/connect-inject`
 	annotationInjectMountVolumes = "consul.hashicorp.com/connect-inject-mount-volume"
 
-	// annotationService is the name of the service to proxy. This defaults
-	// to the name of the first container.
+	// annotationService is the name of the service to proxy.
+	// This defaults to the name of the Kubernetes service associated with the pod.
 	annotationService = "consul.hashicorp.com/connect-service"
 
 	// annotationPort is the name or value of the port to proxy incoming
@@ -45,7 +45,7 @@ const (
 	annotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
 
 	// annotationTags is a list of tags to register with the service
-	// this is specified as a comma separated list e.g. abc,123
+	// this is specified as a comma separated list e.g. abc,123.
 	annotationTags = "consul.hashicorp.com/service-tags"
 
 	// annotationConnectTags is a list of tags to register with the service
@@ -59,7 +59,7 @@ const (
 
 	// annotationMeta is a list of metadata key/value pairs to add to the service
 	// registration. This is specified in the format `<key>:<value>`
-	// e.g. consul.hashicorp.com/service-meta-foo:bar
+	// e.g. consul.hashicorp.com/service-meta-foo:bar.
 	annotationMeta = "consul.hashicorp.com/service-meta-"
 
 	// annotationSyncPeriod controls the -sync-period flag passed to the
@@ -74,6 +74,12 @@ const (
 	annotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
+
+	// annotations for consul sidecar resource limits.
+	annotationConsulSidecarCPULimit      = "consul.hashicorp.com/consul-sidecar-cpu-limit"
+	annotationConsulSidecarCPURequest    = "consul.hashicorp.com/consul-sidecar-cpu-request"
+	annotationConsulSidecarMemoryLimit   = "consul.hashicorp.com/consul-sidecar-memory-limit"
+	annotationConsulSidecarMemoryRequest = "consul.hashicorp.com/consul-sidecar-memory-request"
 
 	// annotations for metrics to configure where Prometheus scrapes
 	// metrics from, whether to run a merged metrics endpoint on the consul
@@ -95,6 +101,12 @@ const (
 
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
+
+	// keyConsulDNS enables or disables Consul DNS for a given pod. It can also be set as a label
+	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
+	// with their own annotation.
+	// This annotation/label takes a boolean value (true/false).
+	keyConsulDNS = "consul.hashicorp.com/consul-dns"
 
 	// keyTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
 	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
@@ -121,6 +133,10 @@ const (
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/handler.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
+
+	// labelServiceIgnore is a label that can be added to a service to prevent it from being
+	// registered with Consul.
+	labelServiceIgnore = "consul.hashicorp.com/service-ignore"
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"

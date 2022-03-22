@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +32,8 @@ func TestRun_TokenSinkFile(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
+				Name:   secretName,
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),
@@ -72,7 +74,8 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
+				Name:   secretName,
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),
@@ -118,7 +121,8 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
+				Name:   secretName,
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),

@@ -13,6 +13,8 @@ spec:
     kind: ServiceDefaults
     listKind: ServiceDefaultsList
     plural: servicedefaults
+    shortNames:
+    - service-defaults
     singular: servicedefaults
   scope: Namespaced
   versions:
@@ -200,6 +202,10 @@ spec:
                         description: Namespace is only accepted within a service-defaults
                           config entry.
                         type: string
+                      partition:
+                        description: Partition is only accepted within a service-defaults
+                          config entry.
+                        type: string
                       passiveHealthCheck:
                         description: PassiveHealthCheck configuration determines how
                           upstream proxy instances will be monitored for removal from
@@ -286,6 +292,10 @@ spec:
                           type: string
                         namespace:
                           description: Namespace is only accepted within a service-defaults
+                            config entry.
+                          type: string
+                        partition:
+                          description: Partition is only accepted within a service-defaults
                             config entry.
                           type: string
                         passiveHealthCheck:

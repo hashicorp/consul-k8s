@@ -1,5 +1,6 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if (and (and .Values.global.tls.enabled .Values.global.enablePodSecurityPolicies) (not .Values.server.serverCert.secretName)) }}
+{{- if not .Values.global.secretsBackend.vault.enabled }}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -10,6 +11,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: tls-init
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation
@@ -36,5 +38,6 @@ spec:
   fsGroup:
     rule: 'RunAsAny'
   readOnlyRootFilesystem: false
+{{- end }}
 {{- end }}
 {{- end }}

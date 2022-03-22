@@ -1,0 +1,14 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ExportedServices
+metadata:
+  name: secondary
+spec:
+  services:
+  - name: mesh-gateway
+    namespace: default
+    consumers:
+    - partition: default
+  - name: static-server
+    namespace: default
+    consumers:
+    - partition: default

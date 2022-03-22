@@ -1,5 +1,6 @@
 {{- $clientEnabled := (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
+{{- template "consul.reservedNamesFailer" (list .Values.syncCatalog.consulNamespaces.consulDestinationNamespace "syncCatalog.consulNamespaces.consulDestinationNamespace") }}
 # The deployment for running the sync-catalog pod
 apiVersion: apps/v1
 kind: Deployment
@@ -11,6 +12,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: sync-catalog
 spec:
   replicas: 1
   selector:
@@ -31,6 +33,20 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        "vault.hashicorp.com/agent-init-first": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       {{- if .Values.global.tls.enabled }}

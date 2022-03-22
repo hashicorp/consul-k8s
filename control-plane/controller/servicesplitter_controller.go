@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ServiceSplitterReconciler reconciles a ServiceSplitter object
+// ServiceSplitterReconciler reconciles a ServiceSplitter object.
 type ServiceSplitterController struct {
 	client.Client
 	Log                   logr.Logger
@@ -36,7 +36,5 @@ func (r *ServiceSplitterController) UpdateStatus(ctx context.Context, obj client
 }
 
 func (r *ServiceSplitterController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceSplitter{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceSplitter{}, r)
 }

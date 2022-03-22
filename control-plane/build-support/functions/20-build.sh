@@ -242,7 +242,6 @@ function build_consul_local {
       CGO_ENABLED=0 gox \
          -os="${build_os}" \
          -arch="${build_arch}" \
-         -osarch="!darwin/arm !darwin/arm64" \
          -ldflags="${GOLDFLAGS}" \
          -parallel="${GOXPARALLEL:-"-1"}" \
          -output "pkg.bin.new/${extra_dir}{{.OS}}_{{.Arch}}/${bin_name}" \

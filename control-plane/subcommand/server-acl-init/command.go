@@ -11,12 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
@@ -25,6 +19,12 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {
@@ -57,18 +57,24 @@ type Command struct {
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
-	// Flags to configure Consul connection
+	flagCreateAPIGatewayToken bool
+
+	// Flags to configure Consul connection.
 	flagServerAddresses     []string
 	flagServerPort          uint
 	flagConsulCACert        string
 	flagConsulTLSServerName string
 	flagUseHTTPS            bool
 
-	// Flags for ACL replication
+	// Flags for ACL replication.
 	flagCreateACLReplicationToken bool
 	flagACLReplicationTokenFile   string
 
-	// Flags to support namespaces
+	// Flags to support partitions.
+	flagEnablePartitions bool   // true if Admin Partitions are enabled
+	flagPartitionName    string // name of the Admin Partition
+
+	// Flags to support namespaces.
 	flagEnableNamespaces                 bool   // Use namespacing on all components
 	flagConsulSyncDestinationNamespace   string // Consul namespace to register all catalog sync services into if not mirroring
 	flagEnableSyncK8SNSMirroring         bool   // Enables mirroring of k8s namespaces into Consul for catalog sync
@@ -77,7 +83,7 @@ type Command struct {
 	flagEnableInjectK8SNSMirroring       bool   // Enables mirroring of k8s namespaces into Consul for Connect inject
 	flagInjectK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring injected services
 
-	// Flag to support a custom bootstrap token
+	// Flag to support a custom bootstrap token.
 	flagBootstrapTokenFile string
 
 	flagLogLevel string
@@ -91,8 +97,8 @@ type Command struct {
 
 	clientset kubernetes.Interface
 
-	// cmdTimeout is cancelled when the command timeout is reached.
-	cmdTimeout    context.Context
+	// ctx is cancelled when the command timeout is reached.
+	ctx           context.Context
 	retryDuration time.Duration
 
 	// log
@@ -158,6 +164,8 @@ func (c *Command) init() {
 		"Name of a terminating gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
+	c.flags.BoolVar(&c.flagCreateAPIGatewayToken, "create-api-gateway-token", false,
+		"Toggle for creating a token for the API Gateway controller integration.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
@@ -169,6 +177,11 @@ func (c *Command) init() {
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
+
+	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
+		"[Enterprise Only] Enables Admin Partitions")
+	c.flags.StringVar(&c.flagPartitionName, "partition", "",
+		"[Enterprise Only] Name of the Admin Partition")
 
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
@@ -276,7 +289,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var cancel context.CancelFunc
-	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), c.flagTimeout)
+	c.ctx, cancel = context.WithTimeout(context.Background(), c.flagTimeout)
 	// The context will only ever be intentionally ended by the timeout.
 	defer cancel()
 
@@ -287,18 +300,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	serverAddresses := c.flagServerAddresses
-	// Check if the provided addresses contain a cloud-auto join string.
-	// If yes, call godiscover to discover addresses of the Consul servers.
-	if len(c.flagServerAddresses) == 1 && strings.Contains(c.flagServerAddresses[0], "provider=") {
-		var err error
-		serverAddresses, err = godiscover.ConsulServerAddresses(c.flagServerAddresses[0], c.providers, c.log)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
-			return 1
-		}
-	}
-
 	// The ClientSet might already be set if we're in a test.
 	if c.clientset == nil {
 		if err := c.configureKubeClient(); err != nil {
@@ -307,12 +308,16 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.log)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+		return 1
+	}
 	scheme := "http"
 	if c.flagUseHTTPS {
 		scheme = "https"
 	}
 
-	var updateServerPolicy bool
 	var bootstrapToken string
 
 	if c.flagBootstrapTokenFile != "" {
@@ -320,7 +325,7 @@ func (c *Command) Run(args []string) int {
 		// the provided token to create policies and tokens for the rest of the components.
 		c.log.Info("Bootstrap token is provided so skipping Consul server ACL bootstrapping")
 		bootstrapToken = providedBootstrapToken
-	} else if c.flagACLReplicationTokenFile != "" {
+	} else if c.flagACLReplicationTokenFile != "" && !c.flagCreateACLReplicationToken {
 		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
 		// since they will be performing replication.
 		// We can use the replication token as our bootstrap token because it
@@ -339,25 +344,19 @@ func (c *Command) Run(args []string) int {
 
 		if bootstrapToken != "" {
 			c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
-
-			// Mark that we should update the server ACL policy in case
-			// there are namespace related config changes. Because of the
-			// organization of the server token creation code, the policy
-			// otherwise won't be updated.
-			updateServerPolicy = true
 		} else {
 			c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-			bootstrapToken, err = c.bootstrapServers(serverAddresses, bootTokenSecretName, scheme)
-			if err != nil {
-				c.log.Error(err.Error())
-				return 1
-			}
+		}
+		bootstrapToken, err = c.bootstrapServers(serverAddresses, bootstrapToken, bootTokenSecretName, scheme)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
 		}
 	}
 
 	// For all of the next operations we'll need a Consul client.
 	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	consulClient, err := consul.NewClient(&api.Config{
+	clientConfig := &api.Config{
 		Address: serverAddr,
 		Scheme:  scheme,
 		Token:   bootstrapToken,
@@ -365,7 +364,12 @@ func (c *Command) Run(args []string) int {
 			Address: c.flagConsulTLSServerName,
 			CAFile:  c.flagConsulCACert,
 		},
-	})
+	}
+	if c.flagEnablePartitions {
+		clientConfig.Partition = c.flagPartitionName
+	}
+
+	consulClient, err := consul.NewClient(clientConfig)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
@@ -378,14 +382,11 @@ func (c *Command) Run(args []string) int {
 	c.log.Info("Current datacenter", "datacenter", consulDC, "primaryDC", primaryDC)
 	isPrimary := consulDC == primaryDC
 
-	// With the addition of namespaces, the ACL policies associated
-	// with the server tokens may need to be updated if Enterprise Consul
-	// users upgrade to 1.7+. This updates the policy if the bootstrap
-	// token had previously existed, which signals a potential config change.
-	if updateServerPolicy {
-		_, err = c.setServerPolicy(consulClient)
+	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && isPrimary {
+		// Partition token is local because only the Primary datacenter can have Admin Partitions.
+		err := c.createLocalACL("partitions", partitionRules, consulDC, isPrimary, consulClient)
 		if err != nil {
-			c.log.Error("Error updating the server ACL policy", "err", err)
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -397,12 +398,17 @@ func (c *Command) Run(args []string) int {
 	// connect inject) needs to reference this policy on namespace creation
 	// to finish the cross namespace permission setup.
 	if c.flagEnableNamespaces {
+		crossNamespaceRule, err := c.crossNamespaceRules()
+		if err != nil {
+			c.log.Error("Error templating cross namespace rules", "err", err)
+			return 1
+		}
 		policyTmpl := api.ACLPolicy{
 			Name:        "cross-namespace-policy",
 			Description: "Policy to allow permissions to cross Consul namespaces for k8s services",
-			Rules:       crossNamespaceRules,
+			Rules:       crossNamespaceRule,
 		}
-		err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+		err = c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
 			func() error {
 				return c.createOrUpdateACLPolicy(policyTmpl, consulClient)
 			})
@@ -449,7 +455,21 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.createAnonymousPolicy(isPrimary) {
-		err := c.configureAnonymousPolicy(consulClient)
+		// When the default partition is in a VM, the anonymous policy does not allow cross-partition
+		// DNS lookups. The anonymous policy in the default partition needs to be updated in order to
+		// support this use-case. Creating a separate anonymous token client that updates the anonymous
+		// policy and token in the default partition ensures this works.
+		anonTokenConfig := clientConfig
+		if c.flagEnablePartitions {
+			anonTokenConfig.Partition = consulDefaultPartition
+		}
+		anonTokenClient, err := consul.NewClient(anonTokenConfig)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+
+		err = c.configureAnonymousPolicy(anonTokenClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -505,7 +525,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateEntLicenseToken {
-		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, isPrimary, consulClient)
+		var err error
+		if c.flagEnablePartitions {
+			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, isPrimary, consulClient)
+		} else {
+			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, isPrimary, consulClient)
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -514,6 +539,19 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateSnapshotAgentToken {
 		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, isPrimary, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateAPIGatewayToken {
+		apigwRules, err := c.apiGatewayControllerRules()
+		if err != nil {
+			c.log.Error("Error templating api gateway rules", "err", err)
+			return 1
+		}
+		err = c.createLocalACL("api-gateway-controller", apigwRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -656,7 +694,11 @@ func (c *Command) Run(args []string) int {
 		}
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
-		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient)
+		if aclReplicationToken != "" {
+			err = c.createGlobalACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient, aclReplicationToken)
+		} else {
+			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient)
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -687,7 +729,7 @@ func (c *Command) Run(args []string) int {
 // reading the Kubernetes Secret with name secretName.
 // If there is no bootstrap token yet, then it returns an empty string (not an error).
 func (c *Command) getBootstrapToken(secretName string) (string, error) {
-	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return "", nil
@@ -729,7 +771,7 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 		select {
 		case <-time.After(c.retryDuration):
 			continue
-		case <-c.cmdTimeout.Done():
+		case <-c.ctx.Done():
 			return errors.New("reached command timeout")
 		}
 	}
@@ -835,10 +877,17 @@ func (c *Command) validateFlags() error {
 		)
 	}
 
+	if c.flagEnablePartitions && c.flagPartitionName == "" {
+		return errors.New("-partition must be set if -enable-partitions is true")
+	}
+	if !c.flagEnablePartitions && c.flagPartitionName != "" {
+		return errors.New("-enable-partitions must be 'true' if -partition is set")
+	}
 	return nil
 }
 
 const consulDefaultNamespace = "default"
+const consulDefaultPartition = "default"
 const synopsis = "Initialize ACLs on Consul servers and other components."
 const help = `
 Usage: consul-k8s-control-plane server-acl-init [options]

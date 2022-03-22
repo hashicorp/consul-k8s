@@ -1,9 +1,10 @@
+{{- if .Values.server.enterpriseLicense }}{{ fail "server.enterpriseLicense has been moved to global.enterpriseLicense" }}{{ end -}}
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey (not .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
+{{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey (not .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ template "consul.fullname" . }}-license
+  name: {{ template "consul.fullname" . }}-enterprise-license
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/managed-by: {{.Release.Service | quote }}
@@ -13,6 +14,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: license
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "100"
@@ -52,10 +54,14 @@ spec:
           image: "{{ default .Values.global.image .Values.server.image }}"
           env:
             - name: ENTERPRISE_LICENSE
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.server.enterpriseLicense.secretName }}
-                  key: {{ .Values.server.enterpriseLicense.secretKey }}
+                  name: {{ .Values.global.enterpriseLicense.secretName }}
+                  key: {{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
             - name: CONSUL_HTTP_ADDR
               {{- if .Values.global.tls.enabled }}
               value: https://{{ template "consul.fullname" . }}-server:8501

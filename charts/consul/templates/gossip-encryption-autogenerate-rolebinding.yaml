@@ -1,0 +1,23 @@
+{{- if .Values.global.gossipEncryption.autoGenerate }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gossip-encryption-autogenerate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+subjects:
+- kind: ServiceAccount
+  name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+{{- end }}

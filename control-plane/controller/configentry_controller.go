@@ -11,12 +11,16 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
+	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -244,6 +248,37 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// setupWithManager sets up the controller manager for the given resource
+// with our default options.
+func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler reconcile.Reconciler) error {
+	options := controller.Options{
+		// Taken from https://github.com/kubernetes/client-go/blob/master/util/workqueue/default_rate_limiters.go#L39
+		// and modified from a starting backoff of 5ms and max of 1000s to a
+		// starting backoff of 200ms and a max of 5s to better fit our most
+		// common error cases and performance characteristics.
+		//
+		// One common error case is that a config entry is applied that requires
+		// a protocol like http or grpc. Often the user will apply a new config
+		// entry to set the protocol in a minute or two. During this time, the
+		// default backoff could then be set up to 5m or more which means the
+		// original config entry takes a long time to re-sync.
+		//
+		// In terms of performance, Consul servers can handle tens of thousands
+		// of writes per second, so retrying at max every 5s isn't an issue and
+		// provides a better UX.
+		RateLimiter: workqueue.NewMaxOfRateLimiter(
+			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 5*time.Second),
+			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		),
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(resource).
+		WithOptions(options).
+		Complete(reconciler)
 }
 
 func (r *ConfigEntryController) consulNamespace(configEntry capi.ConfigEntry, namespace string, globalResource bool) string {

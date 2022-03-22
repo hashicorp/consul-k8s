@@ -1,4 +1,5 @@
 {{- if .Values.controller.enabled }}
+{{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +30,20 @@ spec:
         component: controller
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        "vault.hashicorp.com/agent-init-first": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+        {{- end }}
     spec:
       {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
@@ -64,6 +79,9 @@ spec:
             -log-json={{ .Values.global.logJSON }} \
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
             -datacenter={{ .Values.global.datacenter }} \
+            {{- if .Values.global.adminPartitions.enabled }}
+            -partition={{ .Values.global.adminPartitions.name }} \
+            {{- end }}
             -enable-leader-election \
             {{- if .Values.global.enableConsulNamespaces }}
             -enable-namespaces=true \

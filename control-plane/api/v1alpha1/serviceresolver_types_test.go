@@ -455,6 +455,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceResolver
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
 		"namespaces enabled: valid": {
@@ -476,6 +477,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: true,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"namespaces disabled: valid": {
@@ -495,6 +497,50 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			partitionsEnabled: false,
+			expectedErrMsgs:   nil,
+		},
+		"partitions enabled: valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
+						Namespace: "namespace-a",
+						Partition: "other",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service:   "baz",
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"partitions disabled: valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service: "bar",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service: "baz",
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"failover service, servicesubset, namespace, datacenters empty": {
@@ -662,6 +708,24 @@ func TestServiceResolver_Validate(t *testing.T) {
 				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.redirect.namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set redirect.namespace",
 			},
 		},
+		"partitions disabled: redirect partition specified": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Namespace: "namespace-a",
+						Partition: "other",
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.redirect.partition: Invalid value: \"other\": Consul Enterprise partitions must be enabled to set redirect.partition",
+			},
+		},
 		"namespaces disabled: single failover namespace specified": {
 			input: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -705,7 +769,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,7 @@ func init() {
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="service-defaults"
 type ServiceDefaults struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -37,14 +39,14 @@ type ServiceDefaults struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceDefaultsList contains a list of ServiceDefaults
+// ServiceDefaultsList contains a list of ServiceDefaults.
 type ServiceDefaultsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceDefaults `json:"items"`
 }
 
-// ServiceDefaultsSpec defines the desired state of ServiceDefaults
+// ServiceDefaultsSpec defines the desired state of ServiceDefaults.
 type ServiceDefaultsSpec struct {
 	// Protocol sets the protocol of the service. This is used by Connect proxies for
 	// things like observability features and to unlock usage of the
@@ -89,6 +91,8 @@ type Upstream struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is only accepted within a service-defaults config entry.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is only accepted within a service-defaults config entry.
+	Partition string `json:"partition,omitempty"`
 	// EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
 	// listener.
 	// Note: This escape hatch is NOT compatible with the discovery chain and
@@ -237,7 +241,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 
 // Validate validates the fields provided in the spec of the ServiceDefaults and
 // returns an error which lists all invalid fields in the resource spec.
-func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
+func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -254,7 +258,7 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"))...)
+	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 
 	if len(allErrs) > 0 {
@@ -266,16 +270,16 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
-func (in *Upstreams) validate(path *field.Path) field.ErrorList {
+func (in *Upstreams) validate(path *field.Path, partitionsEnabled bool) field.ErrorList {
 	if in == nil {
 		return nil
 	}
 	var errs field.ErrorList
-	if err := in.Defaults.validate(path.Child("defaults"), defaultUpstream); err != nil {
+	if err := in.Defaults.validate(path.Child("defaults"), defaultUpstream, partitionsEnabled); err != nil {
 		errs = append(errs, err...)
 	}
 	for i, override := range in.Overrides {
-		if err := override.validate(path.Child("overrides").Index(i), overrideUpstream); err != nil {
+		if err := override.validate(path.Child("overrides").Index(i), overrideUpstream, partitionsEnabled); err != nil {
 			errs = append(errs, err...)
 		}
 	}
@@ -294,7 +298,7 @@ func (in *Upstreams) toConsul() *capi.UpstreamConfiguration {
 	return upstreams
 }
 
-func (in *Upstream) validate(path *field.Path, kind string) field.ErrorList {
+func (in *Upstream) validate(path *field.Path, kind string, partitionsEnabled bool) field.ErrorList {
 	if in == nil {
 		return nil
 	}
@@ -309,6 +313,9 @@ func (in *Upstream) validate(path *field.Path, kind string) field.ErrorList {
 			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for an override upstream cannot be \"\""))
 		}
 	}
+	if !partitionsEnabled && in.Partition != "" {
+		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, "Consul Enterprise Admin Partitions must be enabled to set upstream.partition"))
+	}
 	if err := in.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		errs = append(errs, err)
 	}
@@ -322,6 +329,7 @@ func (in *Upstream) toConsul() *capi.UpstreamConfig {
 	return &capi.UpstreamConfig{
 		Name:               in.Name,
 		Namespace:          in.Namespace,
+		Partition:          in.Partition,
 		EnvoyListenerJSON:  in.EnvoyListenerJSON,
 		EnvoyClusterJSON:   in.EnvoyClusterJSON,
 		Protocol:           in.Protocol,
@@ -354,7 +362,7 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 }
 
 // DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.
-func (in *ServiceDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ServiceDefaults) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 // MatchesConsul returns true if entry has the same config as this struct.
@@ -364,7 +372,7 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(),
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(),
 		cmp.Comparer(transparentProxyConfigComparer))
 }
 
