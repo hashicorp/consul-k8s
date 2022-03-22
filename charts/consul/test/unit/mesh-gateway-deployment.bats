@@ -335,7 +335,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "envoyproxy/envoy-alpine:v1.18.4" ]
+  [ "${actual}" = "envoyproxy/envoy-alpine:v1.20.2" ]
 }
 
 @test "meshGateway/Deployment: setting meshGateway.imageEnvoy fails" {
@@ -423,6 +423,50 @@ key2: value2' \
       --set 'meshGateway.initCopyConsulContainer.resources.limits.cpu=cpu2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
+  [ "${actual}" = "memory" ]
+
+  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
+  [ "${actual}" = "cpu" ]
+
+  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
+  [ "${actual}" = "memory2" ]
+
+  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = "cpu2" ]
+}
+
+#--------------------------------------------------------------------
+# service-init container resources
+
+@test "meshGateway/Deployment: init service-init container has default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "50Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "50m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "50Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
+}
+
+@test "meshGateway/Deployment: init service-init container resources can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.initServiceInitContainer.resources.requests.memory=memory' \
+      --set 'meshGateway.initServiceInitContainer.resources.requests.cpu=cpu' \
+      --set 'meshGateway.initServiceInitContainer.resources.limits.memory=memory2' \
+      --set 'meshGateway.initServiceInitContainer.resources.limits.cpu=cpu2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
   [ "${actual}" = "memory" ]
@@ -1430,4 +1474,232 @@ EOF
       --set 'meshGateway.globalMode=something' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
+}
+
+#--------------------------------------------------------------------
+# partitions
+
+@test "meshGateway/Deployment: partitions options disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/Deployment: partition name set on initContainer with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].command | any(contains("partition = \"default\""))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: partition name set on container with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition=default"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: fails if namespaces are disabled and .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=false' \
+      --set 'meshGateway.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" ]]
+}
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "meshGateway/Deployment: vault CA is not configured by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/mesh-gateway-deployment.yaml  \
+    --set 'connectInject.enabled=true' \
+    --set 'meshGateway.enabled=true' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/mesh-gateway-deployment.yaml  \
+    --set 'connectInject.enabled=true' \
+    --set 'meshGateway.enabled=true' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/mesh-gateway-deployment.yaml  \
+    --set 'connectInject.enabled=true' \
+    --set 'meshGateway.enabled=true' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/Deployment: vault CA is configured when both secretName and secretKey are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/mesh-gateway-deployment.yaml  \
+    --set 'connectInject.enabled=true' \
+    --set 'meshGateway.enabled=true' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
+  [ "${actual}" = "ca" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
+  [ "${actual}" = "/vault/custom/tls.crt" ]
+}
+
+@test "meshGateway/Deployment: vault tls annotations are set when tls is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/cert/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/cert/ca" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
+  [ "${actual}" = "test" ]
+}
+
+#--------------------------------------------------------------------
+# Vault agent annotations
+
+@test "meshGateway/Deployment: no vault agent annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "meshGateway/Deployment: vault agent annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }

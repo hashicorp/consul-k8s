@@ -1,6 +1,35 @@
-# Contributing
+# Contributing to Consul on Kubernetes
 
-To build and install the control plane binary `consul-k8s` locally, Go version 1.11.4+ is required because this repository uses go modules and go 1.11.4 introduced changes to checksumming of modules to correct a symlink problem.
+1. [Contributing 101](#contributing-101)
+    1. [Building and running `consul-k8s-control-plane`](#building-and-running-consul-k8s-control-plane)
+    1. [Building and running the `consul-k8s` CLI](#building-and-running-the-consul-k8s-cli)
+    1. [Making changes to consul-k8s](#making-changes-to-consul-k8s)
+    1. [Running linters locally](#running-linters-locally)
+    1. [Rebasing contributions against main](#rebasing-contributions-against-main)
+1. [Creating a new CRD](#creating-a-new-crd)
+    1. [The Structs](#the-structs) 
+    1. [Spec Methods](#spec-methods)
+    1. [Spec Tests](#spec-tests)
+    1. [Controller](#controller)
+    1. [Webhook](#webhook)
+    1. [Update command.go](#update-commandgo)
+    1. [Generating YAML](#generating-yaml)
+    1. [Updating consul-helm](#updating-consul-helm)
+    1. [Testing a new CRD](#testing-a-new-crd)
+    1. [Update Consul K8s acceptance tests](#update-consul-k8s-acceptance-tests)
+1. [Adding a new ACL Token](#adding-a-new-acl-token)
+1. [Testing the Helm chart](#testing-the-helm-chart)
+    1. [Running the tests](#running-the-tests)
+    1. [Writing Unit tests](#writing-unit-tests)
+    1. [Writing Acceptance tests](#writing-acceptance-tests)
+1. [Helm Reference Docs](#helm-reference-docs)
+
+
+## Contributing 101
+
+### Building and running `consul-k8s-control-plane`
+
+To build and install the control plane binary `consul-k8s-control-plane` locally, Go version 1.17.0+ is required. 
 You will also need to install the Docker engine:
 
 - [Docker for Mac](https://docs.docker.com/engine/installation/mac/)
@@ -10,37 +39,25 @@ You will also need to install the Docker engine:
 Clone the repository:
 
 ```shell
-$ git clone https://github.com/hashicorp/consul-k8s.git
+git clone https://github.com/hashicorp/consul-k8s.git
 ```
 
-Change directories into the appropriate folder:
+Compile the `consul-k8s-control-plane` binary for your local machine:
 
 ```shell
-$ cd control-plane
+make control-plane-dev
 ```
 
-To compile the `consul-k8s` binary for your local machine:
-
-```shell
-$ make dev
-```
-
-This will compile the `consul-k8s` binary into `bin/consul-k8s` as
+This will compile the `consul-k8s-control-plane` binary into `control-plane/bin/consul-k8s-control-plane` as
 well as your `$GOPATH` and run the test suite.
 
-Or run the following to generate all binaries:
+Run the tests:
 
 ```shell
-$ make dist
+make control-plane-test
 ```
 
-If you just want to run the tests:
-
-```shell
-$ make test
-```
-
-Or to run a specific test in the suite:
+Run a specific test in the suite. Change directory into `control-plane`.
 
 ```shell
 go test ./... -run SomeTestFunction_name
@@ -49,8 +66,85 @@ go test ./... -run SomeTestFunction_name
 To create a docker image with your local changes:
 
 ```shell
-$ make dev-docker
+make control-plane-dev-docker
 ```
+
+To use your Docker image in a dev deployment of Consul K8s, push the image to Docker Hub or your own registry. Deploying from local images is not supported.
+
+```
+docker tag consul-k8s-control-plane-dev <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev
+docker push <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev
+```
+
+Create a `values.dev.yaml` file that includes the `global.imageK8S` flag to point to dev images you just pushed:
+
+```yaml
+global:
+  tls:
+    enabled: true
+  imageK8S: <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev
+server:
+  replicas: 1
+connectInject:
+  enabled: true
+ui:
+  enabled: true
+  service:
+    enabled: true
+controller:
+  enabled: true
+```
+
+Run a `helm install` from the project root directory to target your dev version of the Helm chart. 
+
+```shell
+helm install consul --create-namespace -n consul -f ./values.dev.yaml ./charts/consul
+```
+
+### Building and running the `consul-k8s` CLI
+
+Change directory into the `cli` folder where the golang code resides.
+
+```shell
+cd cli
+```
+
+Build the CLI binary using the following command
+
+```shell
+go build -o bin/consul-k8s
+```
+
+Run the CLI as follows
+
+```shell
+./bin/consul-k8s version
+consul-k8s 0.36.0-dev
+```
+
+### Making changes to consul-k8s
+
+The first step to making changes is to fork Consul K8s. Afterwards, the easiest way 
+to work on the fork is to set it as a remote of the Consul K8s project:
+
+1. Rename the existing remote's name: `git remote rename origin upstream`.
+1. Add your fork as a remote by running
+   `git remote add origin <github url of fork>`. For example:
+   `git remote add origin https://github.com/myusername/consul-k8s`.
+1. Checkout a feature branch: `git checkout -t -b new-feature`
+1. Make changes (i.e. `git commit -am 'message'`)
+1. Push changes to the fork when ready to submit PR:
+   `git push -u origin new-feature`
+
+>Note: If you make any changes to the code, run `gofmt -s -w` to automatically format the code according to Go standards.
+
+### Running linters locally
+[`golangci-lint`](https://golangci-lint.run/) is used in CI to enforce coding and style standards and help catch bugs ahead of time.
+The configuration that CI runs is stored in `.golangci.yml` at the top level of the repository.
+Please ensure your code passes by running `golangci-lint run` at the top level of the repository and addressing
+any issues prior to submitting a PR.
+
+Version 1.41.1 or higher of [`golangci-lint`](https://github.com/golangci/golangci-lint/releases/tag/v1.41.1) is currently required.
 
 ### Rebasing contributions against main
 
@@ -63,6 +157,8 @@ If the changes in your PR do not conflict with any of the existing code in the p
 automatic rebasing when the PR is accepted into the code. However, if there are conflicts (there will be
 a warning on the PR that reads "This branch cannot be rebased due to conflicts"), you will need to manually
 rebase the branch on main, fixing any conflicts along the way before the code can be merged.
+
+---
 
 ## Creating a new CRD
 
@@ -379,15 +475,98 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     }
     ```
 
-### Update consul-helm Acceptance Tests
-1. Add a test resource to `test/acceptance/tests/fixtures/crds/ingressgateway.yaml`. Ideally it requires
+### Update consul-k8s Acceptance Tests
+1. Add a test resource to `acceptance/tests/fixtures/crds/ingressgateway.yaml`. Ideally it requires
    no other resources. For example, I used a `tcp` service so it didn't require a `ServiceDefaults`
    resource to set its protocol to something else.
-1. Update `charts/consul/test/acceptance/tests/controller/controller_test.go` and `charts/consul/test/acceptance/tests/controller/controller_namespaces_test.go`.
+1. Update `acceptance/tests/controller/controller_test.go` and `acceptance/tests/controller/controller_namespaces_test.go`.
 1. Test locally, then submit a PR that uses your Docker image as `global.imageK8S`.
 
+---
 
-## Testing Helm Chart
+## Adding a new ACL Token
+
+Checklist for getting server-acl-init to generate a new ACL token. The examples in this checklist use
+a token named `foo`.
+
+### Control Plane
+
+* `control-plane/subcommand/server-acl-init/command.go`
+    * Add `flagCreateFooToken bool` to vars list
+    * Initialize flag in `init`
+
+      ```go
+      c.flags.BoolVar(&c.flagCreateFooToken, "create-foo-token", false,
+        "<docs for flag>")
+      ```
+    * Add `if` statement in `Run` to create your token (follow placement of other tokens).
+      You'll need to decide if you need a local token (use `createLocalACL()`) or a global token (use `createGlobalACL()`).
+      
+      ```go
+      if c.flagCreateFooToken {
+          err := c.createLocalACL("foo", fooRules, consulDC, isPrimary, consulClient)
+          if err != nil {
+              c.log.Error(err.Error())
+              return 1
+          }
+      }
+      ```
+* `control-plane/subcommand/server-acl-init/rules.go`
+    * Add a function that outputs your rules using a template
+      (if the rules don't need to be templated just use a `const string`):
+      ```go
+      func (c *Command) fooRules() (string, error) {
+      ```
+* `control-plane/subcommand/server-acl-init/rules_test.go`
+    * Add test following the pattern of other tests (`TestFooRules`)
+* `control-plane/subcommand/server-acl-init/command_test.go`
+    * Add test cases using your flag to the following tests:
+        * `TestRun_TokensPrimaryDC`
+        * `TestRun_TokensReplicatedDC`
+        * `TestRun_TokensWithProvidedBootstrapToken`
+
+### Helm
+
+* `charts/consul/templates/server-acl-init-job.yaml`
+    * Add conditional to set your flag:
+
+      ```yaml
+      {{- if .Values.foo.enabled }}
+      -create-foo-token=true \
+      {{- end }}
+* `charts/consul/test/unit/server-acl-init-job.bats`
+    * Test the conditional:
+
+      ```bash
+      #--------------------------------------------------------------------
+      # foo
+
+      @test "serverACLInit/Job: -create-foo-token not set by default" {
+        cd `chart_dir`
+        local actual=$(helm template \
+            -s templates/server-acl-init-job.yaml  \
+            --set 'global.acls.manageSystemACLs=true' \
+            . | tee /dev/stderr |
+            yq '.spec.template.spec.containers[0].command | any(contains("create-foo-token"))' | tee /dev/stderr)
+        [ "${actual}" = "false" ]
+      }
+
+      @test "serverACLInit/Job: -create-foo-token set when foo.enabled=true" {
+        cd `chart_dir`
+        local actual=$(helm template \
+            -s templates/server-acl-init-job.yaml  \
+            --set 'global.acls.manageSystemACLs=true' \
+            --set 'foo.enabled=true' \
+            . | tee /dev/stderr |
+            yq '.spec.template.spec.containers[0].command | any(contains("create-foo-token"))' | tee /dev/stderr)
+        [ "${actual}" = "true" ]
+      }
+      ```
+
+
+
+
+## Testing the Helm Chart
 The Helm chart ships with both unit and acceptance tests.
 
 The unit tests don't require any active Kubernetes cluster and complete
@@ -403,7 +582,7 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install python-yq
   ```
-* [Helm 3](https://helm.sh) (Helm 2 is not supported)
+* [Helm 3](https://helm.sh) (Currently, must use v3.6.3. Also, Helm 2 is not supported) 
   ```bash
   brew install kubernetes-helm
   ```
@@ -432,10 +611,14 @@ To run a specific test by name use the `--filter` flag:
     bats ./charts/consul/test/unit/<filename>.bats --filter "my test name"
 
 #### Acceptance Tests
-
+##### Pre-requisites 
+* [gox](https://github.com/mitchellh/gox) (v1.14+)
+  ```bash
+  brew install gox
+  ```
 To run the acceptance tests:
 
-    cd charts/consul/test/acceptance/tests
+    cd acceptance/tests
     go test ./... -p 1
     
 The above command will run all tests that can run against a single Kubernetes cluster,
@@ -612,14 +795,14 @@ If you are adding a feature that fits thematically with one of the existing test
 then you need to add your test cases to the existing test files.
 Otherwise, you will need to create a new test suite.
 
-We recommend to start by either copying the [example test](test/acceptance/tests/example/example_test.go)
-or the whole [example test suite](test/acceptance/tests/example),
+We recommend to start by either copying the [example test](acceptance/tests/example/example_test.go)
+or the whole [example test suite](acceptance/tests/example),
 depending on the test you need to add.
 
 #### Adding Test Suites
 
-To add a test suite, copy the [example test suite](test/acceptance/tests/example)
-and uncomment the code you need in the [`main_test.go`](test/acceptance/tests/example/main_test.go) file.
+To add a test suite, copy the [example test suite](acceptance/tests/example)
+and uncomment the code you need in the [`main_test.go`](acceptance/tests/example/main_test.go) file.
 
 At a minimum, this file needs to contain the following:
 
@@ -661,7 +844,7 @@ func TestMain(m *testing.M) {
 
 #### Example Test
 
-We recommend using the [example test](test/acceptance/tests/example/example_test.go)
+We recommend using the [example test](acceptance/tests/example/example_test.go)
 as a starting point for adding your tests.
 
 To write a test, you need access to the environment and context to run it against.
@@ -695,7 +878,7 @@ func TestExample(t *testing.T) {
 }
 ```
 
-Please see [mesh gateway tests](test/acceptance/tests/mesh-gateway/mesh_gateway_test.go)
+Please see [mesh gateway tests](acceptance/tests/mesh-gateway/mesh_gateway_test.go)
 for an example of how to use write a test that uses multiple contexts.
 
 #### Writing Assertions
@@ -754,32 +937,34 @@ Here are some things to consider before adding a test:
   For example, we don't expect acceptance tests to include all the permutations of the consul-k8s commands
   and their respective flags. Something like that should be tested in the consul-k8s repository.
 
+---
+
 ## Helm Reference Docs
  
-The helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
+The Helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
 generated from our `values.yaml` file.
 
 ### Generating Helm Reference Docs
  
 To generate the docs and update the `helm.mdx` file:
 
-1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub
+1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
 1. Clone your fork:
    ```shell-session
-   git clone https://github.com/your-username/consul.git
+   git clone https://github.com/<your-username>/consul.git
    ```
-1. Change directory into your `consul-helm` repo: 
+1. Change directory into your `consul-k8s` repo: 
    ```shell-session
-   cd /path/to/consul-helm
+   cd /path/to/consul-k8s
    ```
-1. Run `make gen-docs` using the path to your consul (not consul-helm) repo:
+1. Run `make gen-helm-docs` using the path to your consul (not consul-k8s) repo:
    ```shell-session
-   make gen-docs consul=<path-to-consul-repo>
+   make gen-helm-docs consul=<path-to-consul-repo>
    # Examples:
-   # make gen-docs consul=/Users/my-name/code/hashicorp/consul
-   # make gen-docs consul=../consul
+   # make gen-helm-docs consul=/Users/my-name/code/hashicorp/consul
+   # make gen-helm-docs consul=../consul
    ```
-1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-helm` pull request)
+1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
 
 ### values.yaml Annotations
 

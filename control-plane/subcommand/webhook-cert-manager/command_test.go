@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/webhook-cert-manager/mocks"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
@@ -276,7 +277,8 @@ func TestRun_SecretExists(t *testing.T) {
 
 	secretOne := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretOneName,
+			Name:   secretOneName,
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		StringData: map[string]string{
 			v1.TLSCertKey:       "cert-1",
@@ -286,7 +288,8 @@ func TestRun_SecretExists(t *testing.T) {
 	}
 	secretTwo := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretTwoName,
+			Name:   secretTwoName,
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		StringData: map[string]string{
 			v1.TLSCertKey:       "cert-2",
@@ -401,7 +404,8 @@ func TestRun_SecretUpdates(t *testing.T) {
 
 	secret1 := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretOne,
+			Name:   secretOne,
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		StringData: map[string]string{
 			v1.TLSCertKey:       "cert-1",
@@ -482,6 +486,105 @@ func TestRun_SecretUpdates(t *testing.T) {
 		require.NotEqual(r, secret1.Data[v1.TLSPrivateKeyKey], key)
 		require.Equal(r, deploymentName, secret1.OwnerReferences[0].Name)
 		require.Equal(r, uid, secret1.OwnerReferences[0].UID)
+	})
+}
+
+// Test that when the MutatingWebhookConfiguration is modified, that we correctly
+// reset it to the expected CA bundle.
+func TestRun_WebhookConfigModified(t *testing.T) {
+	t.Parallel()
+
+	deploymentName := "deployment"
+	deploymentNamespace := "deploy-ns"
+	webhook1ConfigName := "webhookOne"
+	webhook2ConfigName := "webhookTwo"
+	caBundle1 := []byte("bootstrapped-CA1")
+	caBundle2 := []byte("bootstrapped-CA2")
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: deploymentNamespace,
+			UID:       types.UID("this-is-a-uid"),
+		},
+	}
+
+	initialWebhook1Config := &admissionv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: webhook1ConfigName,
+		},
+		Webhooks: []admissionv1.MutatingWebhook{
+			{
+				Name: "webhook1-under-test",
+				ClientConfig: admissionv1.WebhookClientConfig{
+					CABundle: caBundle1,
+				},
+			},
+		},
+	}
+	initialWebhook2Config := &admissionv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: webhook2ConfigName,
+		},
+		Webhooks: []admissionv1.MutatingWebhook{
+			{
+				Name: "webhook2-under-test",
+				ClientConfig: admissionv1.WebhookClientConfig{
+					CABundle: caBundle2,
+				},
+			},
+		},
+	}
+
+	// The k8s cluster will start with the two webhook configs and the deployment.
+	k8s := fake.NewSimpleClientset(initialWebhook1Config, initialWebhook2Config, deployment)
+	ctx := context.Background()
+
+	// We don't want the certs to expire. This test is only checking if
+	// the MutatingWebhookConfiguration is modified that it gets reset.
+	certExpiry := 1 * time.Hour
+
+	// Start the command.
+	cmd := Command{
+		UI:         cli.NewMockUi(),
+		clientset:  k8s,
+		certExpiry: &certExpiry,
+	}
+
+	configFile := common.WriteTempFile(t, configFile)
+	exitCh := runCommandAsynchronously(&cmd, []string{
+		"-config-file", configFile,
+		"-deployment-name", deploymentName,
+		"-deployment-namespace", deploymentNamespace,
+	})
+	defer stopCommand(t, &cmd, exitCh)
+
+	// First, check that the mutatingwebhookconfiguration contents are updated when the cert-manager starts.
+	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		webhookConfig1, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhook1ConfigName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundle1)
+
+		webhookConfig2, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhook2ConfigName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfig2.Webhooks[0].ClientConfig.CABundle, caBundle2)
+	})
+
+	// Now, edit the mutatingwebhookconfigurations and reset the caBundle fields.
+	k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, initialWebhook1Config, metav1.UpdateOptions{})
+	k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, initialWebhook2Config, metav1.UpdateOptions{})
+
+	// Check that both mutatingwebhookconfigurations have their caBundle fields reset.
+	timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		webhookConfig1, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhook1ConfigName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundle1)
+
+		webhookConfig2, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhook2ConfigName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfig2.Webhooks[0].ClientConfig.CABundle, caBundle2)
 	})
 }
 

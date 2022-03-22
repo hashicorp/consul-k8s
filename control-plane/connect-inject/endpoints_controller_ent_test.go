@@ -1,4 +1,4 @@
-// +build enterprise
+//go:build enterprise
 
 package connectinject
 
@@ -308,7 +308,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					require.NoError(t, err)
 					require.EqualValues(t, 1, len(check))
 					// Ignoring Namespace because the response from ENT includes it and OSS does not.
-					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 					require.True(t, cmp.Equal(check[setup.expectedAgentHealthChecks[i].CheckID], setup.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 				}
 			}
@@ -1180,7 +1180,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
 						c.ACL.Enabled = true
-						c.ACL.Tokens.Master = adminToken
+						c.ACL.Tokens.InitialManagement = adminToken
 					}
 					c.NodeName = nodeName
 				})
@@ -1308,7 +1308,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						require.NoError(t, err)
 						require.EqualValues(t, 1, len(check))
 						// Ignoring Namespace because the response from ENT includes it and OSS does not.
-						var ignoredFields = []string{"Node", "Definition", "Namespace"}
+						var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 						require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 					}
 				}
@@ -1514,7 +1514,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
 						c.ACL.Enabled = true
-						c.ACL.Tokens.Master = adminToken
+						c.ACL.Tokens.InitialManagement = adminToken
 					}
 					c.NodeName = nodeName
 				})

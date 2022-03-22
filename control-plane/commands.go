@@ -10,7 +10,9 @@ import (
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
+	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
+	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
 	cmdServiceAddress "github.com/hashicorp/consul-k8s/control-plane/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
@@ -48,6 +50,10 @@ func init() {
 			return &cmdServerACLInit.Command{UI: ui}, nil
 		},
 
+		"partition-init": func() (cli.Command, error) {
+			return &cmdPartitionInit.Command{UI: ui}, nil
+		},
+
 		"sync-catalog": func() (cli.Command, error) {
 			return &cmdSyncCatalog.Command{UI: ui}, nil
 		},
@@ -82,6 +88,10 @@ func init() {
 
 		"tls-init": func() (cli.Command, error) {
 			return &cmdTLSInit.Command{UI: ui}, nil
+		},
+
+		"gossip-encryption-autogenerate": func() (cli.Command, error) {
+			return &cmdGossipEncryptionAutogenerate.Command{UI: ui}, nil
 		},
 	}
 }

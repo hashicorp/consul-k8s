@@ -1,0 +1,5 @@
+resources:
+  - ../../bases/static-server
+
+patchesStrategicMerge:
+  - patch.yaml

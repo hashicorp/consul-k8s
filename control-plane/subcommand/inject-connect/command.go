@@ -50,6 +50,8 @@ type Command struct {
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
 
+	flagEnablePartitions bool // Use Admin Partitions on all components
+
 	// Flags to support Consul namespaces
 	flagEnableNamespaces           bool   // Use namespacing on all components
 	flagConsulDestinationNamespace string // Consul namespace to register everything if not mirroring
@@ -75,10 +77,10 @@ type Command struct {
 	flagDefaultPrometheusScrapePath string
 
 	// Consul sidecar resource settings.
-	flagConsulSidecarCPULimit      string
-	flagConsulSidecarCPURequest    string
-	flagConsulSidecarMemoryLimit   string
-	flagConsulSidecarMemoryRequest string
+	flagDefaultConsulSidecarCPULimit      string
+	flagDefaultConsulSidecarCPURequest    string
+	flagDefaultConsulSidecarMemoryLimit   string
+	flagDefaultConsulSidecarMemoryRequest string
 
 	// Init container resource settings.
 	flagInitContainerCPULimit      string
@@ -89,6 +91,10 @@ type Command struct {
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
+
+	// Consul DNS flags.
+	flagEnableConsulDNS bool
+	flagResourcePrefix  string
 
 	flagEnableOpenShift bool
 
@@ -141,6 +147,8 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
+	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
+		"[Enterprise Only] Enables Admin Partitions.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -157,6 +165,10 @@ func (c *Command) init() {
 		"Enable transparent proxy mode for all Consul service mesh applications by default.")
 	c.flagSet.BoolVar(&c.flagTransparentProxyDefaultOverwriteProbes, "transparent-proxy-default-overwrite-probes", true,
 		"Overwrite Kubernetes probes to point to Envoy by default when in Transparent Proxy mode.")
+	c.flagSet.BoolVar(&c.flagEnableConsulDNS, "enable-consul-dns", false,
+		"Enables Consul DNS lookup for services in the mesh.")
+	c.flagSet.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
+		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
 	c.flagSet.BoolVar(&c.flagEnableOpenShift, "enable-openshift", false,
 		"Indicates that the command runs in an OpenShift cluster.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
@@ -185,10 +197,10 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagInitContainerMemoryLimit, "init-container-memory-limit", "150Mi", "Init container memory limit.")
 
 	// Consul sidecar resource setting flags.
-	c.flagSet.StringVar(&c.flagConsulSidecarCPURequest, "consul-sidecar-cpu-request", "20m", "Consul sidecar CPU request.")
-	c.flagSet.StringVar(&c.flagConsulSidecarCPULimit, "consul-sidecar-cpu-limit", "20m", "Consul sidecar CPU limit.")
-	c.flagSet.StringVar(&c.flagConsulSidecarMemoryRequest, "consul-sidecar-memory-request", "25Mi", "Consul sidecar memory request.")
-	c.flagSet.StringVar(&c.flagConsulSidecarMemoryLimit, "consul-sidecar-memory-limit", "50Mi", "Consul sidecar memory limit.")
+	c.flagSet.StringVar(&c.flagDefaultConsulSidecarCPURequest, "default-consul-sidecar-cpu-request", "20m", "Default consul sidecar CPU request.")
+	c.flagSet.StringVar(&c.flagDefaultConsulSidecarCPULimit, "default-consul-sidecar-cpu-limit", "20m", "Default consul sidecar CPU limit.")
+	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryRequest, "default-consul-sidecar-memory-request", "25Mi", "Default consul sidecar memory request.")
+	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryLimit, "default-consul-sidecar-memory-limit", "50Mi", "Default consul sidecar memory limit.")
 
 	c.http = &flags.HTTPFlags{}
 
@@ -225,6 +237,16 @@ func (c *Command) Run(args []string) int {
 	}
 	if c.flagDefaultProtocol != "" {
 		c.UI.Error("-default-protocol is no longer supported")
+		return 1
+	}
+
+	if c.flagEnablePartitions && c.http.Partition() == "" {
+		c.UI.Error("-partition-name must set if -enable-partitions is set to 'true'")
+		return 1
+	}
+
+	if c.http.Partition() != "" && !c.flagEnablePartitions {
+		c.UI.Error("-enable-partitions must be set to 'true' if -partition-name is set")
 		return 1
 	}
 
@@ -403,6 +425,7 @@ func (c *Command) Run(args []string) int {
 		DenyK8sNamespacesSet:       denyK8sNamespaces,
 		MetricsConfig:              metricsConfig,
 		ConsulClientCfg:            cfg,
+		EnableConsulPartitions:     c.flagEnablePartitions,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
@@ -430,35 +453,38 @@ func (c *Command) Run(args []string) int {
 
 	mgr.GetWebhookServer().Register("/mutate",
 		&webhook.Admission{Handler: &connectinject.Handler{
-			Clientset:                  c.clientset,
-			ConsulClient:               c.consulClient,
-			ImageConsul:                c.flagConsulImage,
-			ImageEnvoy:                 c.flagEnvoyImage,
-			EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
-			ImageConsulK8S:             c.flagConsulK8sImage,
-			RequireAnnotation:          !c.flagDefaultInject,
-			AuthMethod:                 c.flagACLAuthMethod,
-			ConsulCACert:               string(consulCACert),
-			DefaultProxyCPURequest:     sidecarProxyCPURequest,
-			DefaultProxyCPULimit:       sidecarProxyCPULimit,
-			DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
-			DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
-			MetricsConfig:              metricsConfig,
-			InitContainerResources:     initResources,
-			ConsulSidecarResources:     consulSidecarResources,
-			AllowK8sNamespacesSet:      allowK8sNamespaces,
-			DenyK8sNamespacesSet:       denyK8sNamespaces,
-			EnableNamespaces:           c.flagEnableNamespaces,
-			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
-			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
-			EnableOpenShift:            c.flagEnableOpenShift,
-			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
-			LogLevel:                   c.flagLogLevel,
-			LogJSON:                    c.flagLogJSON,
+			Clientset:                     c.clientset,
+			ConsulClient:                  c.consulClient,
+			ImageConsul:                   c.flagConsulImage,
+			ImageEnvoy:                    c.flagEnvoyImage,
+			EnvoyExtraArgs:                c.flagEnvoyExtraArgs,
+			ImageConsulK8S:                c.flagConsulK8sImage,
+			RequireAnnotation:             !c.flagDefaultInject,
+			AuthMethod:                    c.flagACLAuthMethod,
+			ConsulCACert:                  string(consulCACert),
+			DefaultProxyCPURequest:        sidecarProxyCPURequest,
+			DefaultProxyCPULimit:          sidecarProxyCPULimit,
+			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,
+			DefaultProxyMemoryLimit:       sidecarProxyMemoryLimit,
+			MetricsConfig:                 metricsConfig,
+			InitContainerResources:        initResources,
+			DefaultConsulSidecarResources: consulSidecarResources,
+			ConsulPartition:               c.http.Partition(),
+			AllowK8sNamespacesSet:         allowK8sNamespaces,
+			DenyK8sNamespacesSet:          denyK8sNamespaces,
+			EnableNamespaces:              c.flagEnableNamespaces,
+			ConsulDestinationNamespace:    c.flagConsulDestinationNamespace,
+			EnableK8SNSMirroring:          c.flagEnableK8SNSMirroring,
+			K8SNSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:       c.flagCrossNamespaceACLPolicy,
+			EnableTransparentProxy:        c.flagDefaultEnableTransparentProxy,
+			TProxyOverwriteProbes:         c.flagTransparentProxyDefaultOverwriteProbes,
+			EnableConsulDNS:               c.flagEnableConsulDNS,
+			ResourcePrefix:                c.flagResourcePrefix,
+			EnableOpenShift:               c.flagEnableOpenShift,
+			Log:                           ctrl.Log.WithName("handler").WithName("connect"),
+			LogLevel:                      c.flagLogLevel,
+			LogJSON:                       c.flagLogJSON,
 		}})
 
 	if err := mgr.Start(ctx); err != nil {
@@ -522,36 +548,36 @@ func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, 
 	var consulSidecarCPULimit, consulSidecarCPURequest, consulSidecarMemoryLimit, consulSidecarMemoryRequest resource.Quantity
 
 	// Parse and validate the Consul sidecar resources
-	consulSidecarCPURequest, err = resource.ParseQuantity(c.flagConsulSidecarCPURequest)
+	consulSidecarCPURequest, err = resource.ParseQuantity(c.flagDefaultConsulSidecarCPURequest)
 	if err != nil {
 		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-consul-sidecar-cpu-request '%s' is invalid: %s", c.flagConsulSidecarCPURequest, err)
+			fmt.Errorf("-default-consul-sidecar-cpu-request '%s' is invalid: %s", c.flagDefaultConsulSidecarCPURequest, err)
 	}
-	consulSidecarCPULimit, err = resource.ParseQuantity(c.flagConsulSidecarCPULimit)
+	consulSidecarCPULimit, err = resource.ParseQuantity(c.flagDefaultConsulSidecarCPULimit)
 	if err != nil {
 		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-consul-sidecar-cpu-limit '%s' is invalid: %s", c.flagConsulSidecarCPULimit, err)
+			fmt.Errorf("-default-consul-sidecar-cpu-limit '%s' is invalid: %s", c.flagDefaultConsulSidecarCPULimit, err)
 	}
 	if consulSidecarCPULimit.Value() != 0 && consulSidecarCPURequest.Cmp(consulSidecarCPULimit) > 0 {
 		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
-			"request must be <= limit: -consul-sidecar-cpu-request value of %q is greater than the -consul-sidecar-cpu-limit value of %q",
-			c.flagConsulSidecarCPURequest, c.flagConsulSidecarCPULimit)
+			"request must be <= limit: -default-consul-sidecar-cpu-request value of %q is greater than the -default-consul-sidecar-cpu-limit value of %q",
+			c.flagDefaultConsulSidecarCPURequest, c.flagDefaultConsulSidecarCPULimit)
 	}
 
-	consulSidecarMemoryRequest, err = resource.ParseQuantity(c.flagConsulSidecarMemoryRequest)
+	consulSidecarMemoryRequest, err = resource.ParseQuantity(c.flagDefaultConsulSidecarMemoryRequest)
 	if err != nil {
 		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-consul-sidecar-memory-request '%s' is invalid: %s", c.flagConsulSidecarMemoryRequest, err)
+			fmt.Errorf("-default-consul-sidecar-memory-request '%s' is invalid: %s", c.flagDefaultConsulSidecarMemoryRequest, err)
 	}
-	consulSidecarMemoryLimit, err = resource.ParseQuantity(c.flagConsulSidecarMemoryLimit)
+	consulSidecarMemoryLimit, err = resource.ParseQuantity(c.flagDefaultConsulSidecarMemoryLimit)
 	if err != nil {
 		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-consul-sidecar-memory-limit '%s' is invalid: %s", c.flagConsulSidecarMemoryLimit, err)
+			fmt.Errorf("-default-consul-sidecar-memory-limit '%s' is invalid: %s", c.flagDefaultConsulSidecarMemoryLimit, err)
 	}
 	if consulSidecarMemoryLimit.Value() != 0 && consulSidecarMemoryRequest.Cmp(consulSidecarMemoryLimit) > 0 {
 		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
-			"request must be <= limit: -consul-sidecar-memory-request value of %q is greater than the -consul-sidecar-memory-limit value of %q",
-			c.flagConsulSidecarMemoryRequest, c.flagConsulSidecarMemoryLimit)
+			"request must be <= limit: -default-consul-sidecar-memory-request value of %q is greater than the -default-consul-sidecar-memory-limit value of %q",
+			c.flagDefaultConsulSidecarMemoryRequest, c.flagDefaultConsulSidecarMemoryLimit)
 	}
 
 	// Put into corev1.ResourceRequirements form

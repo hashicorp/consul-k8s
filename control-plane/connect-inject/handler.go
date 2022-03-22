@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -60,6 +62,11 @@ type Handler struct {
 	// to use when communicating with Consul clients over HTTPS.
 	// If not set, will use HTTP.
 	ConsulCACert string
+
+	// ConsulPartition is the name of the Admin Partition that the controller
+	// is deployed in. It is an enterprise feature requiring Consul Enterprise 1.11+.
+	// Its value is an empty string if partitions aren't enabled.
+	ConsulPartition string
 
 	// EnableNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
@@ -118,7 +125,7 @@ type Handler struct {
 
 	// Resource settings for Consul sidecar. All of these fields
 	// will be populated by the defaults provided in the initial flags.
-	ConsulSidecarResources corev1.ResourceRequirements
+	DefaultConsulSidecarResources corev1.ResourceRequirements
 
 	// EnableTransparentProxy enables transparent proxy mode.
 	// This means that the injected init container will apply traffic redirection rules
@@ -128,6 +135,14 @@ type Handler struct {
 	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
 	// to point them to the Envoy proxy.
 	TProxyOverwriteProbes bool
+
+	// EnableConsulDNS enables traffic redirection so that DNS requests are directed to Consul
+	// from mesh services.
+	EnableConsulDNS bool
+
+	// ResourcePrefix is the prefix used for the installation which is used to determine the Service
+	// name of the Consul DNS service.
+	ResourcePrefix string
 
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow
@@ -141,6 +156,10 @@ type Handler struct {
 	LogJSON  bool
 
 	decoder *admission.Decoder
+}
+type multiPortInfo struct {
+	serviceIndex int
+	serviceName  string
 }
 
 // Handle is the admission.Handler implementation that actually handles the
@@ -184,7 +203,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
 
-	h.Log.Info("received pod", "name", pod.Name, "ns", pod.Namespace)
+	h.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
@@ -215,21 +234,91 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
-	// Add the init container that registers the service and sets up the Envoy configuration.
-	initContainer, err := h.containerInit(*ns, pod)
-	if err != nil {
-		h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
-	}
-	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+	// Get service names from the annotation. If theres 0-1 service names, it's a single port pod, otherwise it's multi
+	// port.
+	annotatedSvcNames := h.annotatedServiceNames(pod)
+	multiPort := len(annotatedSvcNames) > 1
 
-	// Add the Envoy sidecar.
-	envoySidecar, err := h.envoySidecar(*ns, pod)
-	if err != nil {
-		h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+	// For single port pods, add the single init container and envoy sidecar.
+	if !multiPort {
+		// Add the init container that registers the service and sets up the Envoy configuration.
+		initContainer, err := h.containerInit(*ns, pod, multiPortInfo{})
+		if err != nil {
+			h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
+		}
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+
+		// Add the Envoy sidecar.
+		envoySidecar, err := h.envoySidecar(*ns, pod, multiPortInfo{})
+		if err != nil {
+			h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+	} else {
+		// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
+		// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
+		// In a single port pod, the service account specified in the pod is sufficient for mounting the service account
+		// token to the pod. In a multi port pod, where multiple services are registered with Consul, we also require a
+		// service account per service. So, this will look for service accounts whose name matches the service and mount
+		// those tokens if not already specified via the pod's serviceAccountName.
+
+		h.Log.Info("processing multiport pod")
+		err := h.checkUnsupportedMultiPortCases(*ns, pod)
+		if err != nil {
+			h.Log.Error(err, "checking unsupported cases for multi port pods")
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		for i, svc := range annotatedSvcNames {
+			h.Log.Info(fmt.Sprintf("service: %s", svc))
+			if h.AuthMethod != "" {
+				if svc != "" && pod.Spec.ServiceAccountName != svc {
+					sa, err := h.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
+					if err != nil {
+						h.Log.Error(err, "couldn't get service accounts")
+						return admission.Errored(http.StatusInternalServerError, err)
+					}
+					if len(sa.Secrets) == 0 {
+						h.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
+						return admission.Errored(http.StatusInternalServerError, fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
+					}
+					saSecret := sa.Secrets[0].Name
+					h.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
+					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+						Name: fmt.Sprintf("%s-service-account", svc),
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: saSecret,
+							},
+						},
+					})
+				}
+			}
+
+			// This will get passed to the init and sidecar containers so they are configured correctly.
+			mpi := multiPortInfo{
+				serviceIndex: i,
+				serviceName:  svc,
+			}
+
+			// Add the init container that registers the service and sets up the Envoy configuration.
+			initContainer, err := h.containerInit(*ns, pod, mpi)
+			if err != nil {
+				h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
+			}
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+
+			// Add the Envoy sidecar.
+			envoySidecar, err := h.envoySidecar(*ns, pod, mpi)
+			if err != nil {
+				h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		}
 	}
-	pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 
 	// Now that the consul-sidecar no longer needs to re-register services periodically
 	// (that functionality lives in the endpoints-controller),
@@ -463,6 +552,7 @@ func (h *Handler) validatePod(pod corev1.Pod) error {
 }
 
 func portValue(pod corev1.Pod, value string) (int32, error) {
+	value = strings.Split(value, ",")[0]
 	// First search for the named port.
 	for _, c := range pod.Spec.Containers {
 		for _, p := range c.Ports {
@@ -477,7 +567,23 @@ func portValue(pod corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
-func findServiceAccountVolumeMount(pod corev1.Pod) (corev1.VolumeMount, error) {
+func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcName string) (corev1.VolumeMount, string, error) {
+	// In the case of a multiPort pod, there may be another service account
+	// token mounted as a different volume. Its name must be <svc>-serviceaccount.
+	// If not we'll fall back to the service account for the pod.
+	if multiPort {
+		for _, v := range pod.Spec.Volumes {
+			if v.Name == fmt.Sprintf("%s-service-account", multiPortSvcName) {
+				mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
+				return corev1.VolumeMount{
+					Name:      v.Name,
+					ReadOnly:  true,
+					MountPath: mountPath,
+				}, filepath.Join(mountPath, "token"), nil
+			}
+		}
+	}
+
 	// Find the volume mount that is mounted at the known
 	// service account token location
 	var volumeMount corev1.VolumeMount
@@ -492,10 +598,43 @@ func findServiceAccountVolumeMount(pod corev1.Pod) (corev1.VolumeMount, error) {
 
 	// Return an error if volumeMount is still empty
 	if (corev1.VolumeMount{}) == volumeMount {
-		return volumeMount, errors.New("unable to find service account token volumeMount")
+		return volumeMount, "", errors.New("unable to find service account token volumeMount")
 	}
 
-	return volumeMount, nil
+	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
+}
+
+func (h *Handler) annotatedServiceNames(pod corev1.Pod) []string {
+	var annotatedSvcNames []string
+	if anno, ok := pod.Annotations[annotationService]; ok {
+		annotatedSvcNames = strings.Split(anno, ",")
+	}
+	return annotatedSvcNames
+}
+
+func (h *Handler) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
+	tproxyEnabled, err := transparentProxyEnabled(ns, pod, h.EnableTransparentProxy)
+	if err != nil {
+		return fmt.Errorf("couldn't check if tproxy is enabled: %s", err)
+	}
+	metricsEnabled, err := h.MetricsConfig.enableMetrics(pod)
+	if err != nil {
+		return fmt.Errorf("couldn't check if metrics is enabled: %s", err)
+	}
+	metricsMergingEnabled, err := h.MetricsConfig.enableMetricsMerging(pod)
+	if err != nil {
+		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
+	}
+	if tproxyEnabled {
+		return fmt.Errorf("multi port services are not compatible with transparent proxy")
+	}
+	if metricsEnabled {
+		return fmt.Errorf("multi port services are not compatible with metrics")
+	}
+	if metricsMergingEnabled {
+		return fmt.Errorf("multi port services are not compatible with metrics merging")
+	}
+	return nil
 }
 
 func (h *Handler) InjectDecoder(d *admission.Decoder) error {

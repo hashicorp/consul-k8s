@@ -2,6 +2,8 @@ package connectinject
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -16,12 +18,17 @@ const (
 	envoyUserAndGroupID         = 5995
 	copyContainerUserAndGroupID = 5996
 	netAdminCapability          = "NET_ADMIN"
+	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {
 	ServiceName        string
 	ServiceAccountName string
 	AuthMethod         string
+	// ConsulPartition is the Consul admin partition to register the service
+	// and proxy in. An empty string indicates partitions are not
+	// enabled in Consul (necessary for OSS).
+	ConsulPartition string
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
@@ -62,6 +69,21 @@ type initContainerCommandData struct {
 	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
+
+	// ConsulDNSClusterIP is the IP of the Consul DNS Service.
+	ConsulDNSClusterIP string
+
+	// MultiPort determines whether this is a multi port Pod, which configures the init container to be specific to one
+	// of the services on the multi port Pod.
+	MultiPort bool
+
+	// EnvoyAdminPort configures the admin port of the Envoy sidecar. This will be unique per service in a multi port
+	// Pod.
+	EnvoyAdminPort int
+
+	// BearerTokenFile configures where the service account token can be found. This will be unique per service in a
+	// multi port Pod.
+	BearerTokenFile string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -94,17 +116,36 @@ func (h *Handler) initCopyContainer() corev1.Container {
 	return container
 }
 
-// containerInit returns the init container spec for registering the Consul
-// service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
+// containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
+// so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
+func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, h.EnableConsulDNS)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	var consulDNSClusterIP string
+	if dnsEnabled {
+		// If Consul DNS is enabled, we find the environment variable that has the value
+		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
+		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
+		consulDNSClusterIP = os.Getenv(h.constructDNSServiceHostName())
+		if consulDNSClusterIP == "" {
+			return corev1.Container{}, fmt.Errorf("environment variable %s is not found", h.constructDNSServiceHostName())
+		}
+	}
+
+	multiPort := mpi.serviceName != ""
+
 	data := initContainerCommandData{
 		AuthMethod:                 h.AuthMethod,
+		ConsulPartition:            h.ConsulPartition,
 		ConsulNamespace:            h.consulNamespace(namespace.Name),
 		NamespaceMirroringEnabled:  h.EnableK8SNSMirroring,
 		ConsulCACert:               h.ConsulCACert,
@@ -113,12 +154,42 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
+		ConsulDNSClusterIP:         consulDNSClusterIP,
 		EnvoyUID:                   envoyUserAndGroupID,
+		MultiPort:                  multiPort,
+		EnvoyAdminPort:             19000 + mpi.serviceIndex,
 	}
 
-	if data.AuthMethod != "" {
-		data.ServiceAccountName = pod.Spec.ServiceAccountName
+	// Create expected volume mounts
+	volMounts := []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: "/consul/connect-inject",
+		},
+	}
+
+	if multiPort {
+		data.ServiceName = mpi.serviceName
+	} else {
 		data.ServiceName = pod.Annotations[annotationService]
+	}
+	if h.AuthMethod != "" {
+		if multiPort {
+			// If multi port then we require that the service account name
+			// matches the service name.
+			data.ServiceAccountName = mpi.serviceName
+		} else {
+			data.ServiceAccountName = pod.Spec.ServiceAccountName
+		}
+		// Extract the service account token's volume mount
+		saTokenVolumeMount, bearerTokenFile, err := findServiceAccountVolumeMount(pod, multiPort, mpi.serviceName)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		data.BearerTokenFile = bearerTokenFile
+
+		// Append to volume mounts
+		volMounts = append(volMounts, saTokenVolumeMount)
 	}
 
 	// This determines how to configure the consul connect envoy command: what
@@ -138,25 +209,6 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		data.PrometheusBackendPort = mergedMetricsPort
 	}
 
-	// Create expected volume mounts
-	volMounts := []corev1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
-		},
-	}
-
-	if h.AuthMethod != "" {
-		// Extract the service account token's volume mount
-		saTokenVolumeMount, err := findServiceAccountVolumeMount(pod)
-		if err != nil {
-			return corev1.Container{}, err
-		}
-
-		// Append to volume mounts
-		volMounts = append(volMounts, saTokenVolumeMount)
-	}
-
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
@@ -166,8 +218,12 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		return corev1.Container{}, err
 	}
 
+	initContainerName := InjectInitContainerName
+	if multiPort {
+		initContainerName = fmt.Sprintf("%s-%s", InjectInitContainerName, mpi.serviceName)
+	}
 	container := corev1.Container{
-		Name:  InjectInitContainerName,
+		Name:  initContainerName,
 		Image: h.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
@@ -218,6 +274,15 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 	return container, nil
 }
 
+// constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
+// key of the env variable whose value is the cluster IP of the Consul DNS Service.
+// It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
+func (h *Handler) constructDNSServiceHostName() string {
+	upcaseResourcePrefix := strings.ToUpper(h.ResourcePrefix)
+	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
+	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
+}
+
 // transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
@@ -228,6 +293,22 @@ func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalE
 	}
 	// Next see if the namespace has been defaulted.
 	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Else fall back to the global default.
+	return globalEnabled, nil
+}
+
+// consulDNSEnabled returns true if Consul DNS should be enabled for this pod.
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
+// to read the pod's namespace label when it exists.
+func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+	// First check to see if the pod annotation exists to override the namespace or global settings.
+	if raw, ok := pod.Annotations[keyConsulDNS]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Next see if the namespace has been defaulted.
+	if raw, ok := namespace.Labels[keyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.
@@ -274,6 +355,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
+  -bearer-token-file={{ .BearerTokenFile }} \
+  {{- if .MultiPort }}
+  -acl-token-sink=/consul/connect-inject/acl-token-{{ .ServiceName }} \
+  {{- end }}
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
@@ -284,13 +369,27 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- end }}
   {{- end }}
+  {{- if .MultiPort }}
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
+  {{- if not .AuthMethod }}
+  -service-name="{{ .ServiceName }}" \
+  {{- end }}
+  {{- end }}
+  {{- if .ConsulPartition }}
+  -partition="{{ .ConsulPartition }}" \
+  {{- end }}
   {{- if .ConsulNamespace }}
   -consul-service-namespace="{{ .ConsulNamespace }}" \
   {{- end }}
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  {{- if .MultiPort }}
+  -proxy-id="$(cat /consul/connect-inject/proxyid-{{.ServiceName}})" \
+  {{- else }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  {{- end }}
   {{- if .PrometheusScrapePath }}
   -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
   {{- end }}
@@ -298,12 +397,23 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -prometheus-backend-port="{{ .PrometheusBackendPort }}" \
   {{- end }}
   {{- if .AuthMethod }}
+  {{- if .MultiPort }}
+  -token-file="/consul/connect-inject/acl-token-{{ .ServiceName }}" \
+  {{- else }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- end }}
+  {{- if .ConsulPartition }}
+  -partition="{{ .ConsulPartition }}" \
   {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+  {{- if .MultiPort }}
+  -admin-bind=127.0.0.1:{{ .EnvoyAdminPort }} \
+  {{- end }}
+  -bootstrap > {{ if .MultiPort }}/consul/connect-inject/envoy-bootstrap-{{.ServiceName}}.yaml{{ else }}/consul/connect-inject/envoy-bootstrap.yaml{{ end }}
+
 
 {{- if .EnableTransparentProxy }}
 {{- /* The newline below is intentional to allow extra space
@@ -314,8 +424,14 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
+  {{- if .ConsulPartition }}
+  -partition="{{ .ConsulPartition }}" \
+  {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- if .ConsulDNSClusterIP }}
+  -consul-dns-ip="{{ .ConsulDNSClusterIP }}" \
   {{- end }}
   {{- range .TProxyExcludeInboundPorts }}
   -exclude-inbound-port="{{ . }}" \

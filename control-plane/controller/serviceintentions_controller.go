@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ServiceIntentionsController reconciles a ServiceIntentions object
+// ServiceIntentionsController reconciles a ServiceIntentions object.
 type ServiceIntentionsController struct {
 	client.Client
 	Log                   logr.Logger
@@ -36,7 +36,5 @@ func (r *ServiceIntentionsController) UpdateStatus(ctx context.Context, obj clie
 }
 
 func (r *ServiceIntentionsController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceIntentions{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceIntentions{}, r)
 }

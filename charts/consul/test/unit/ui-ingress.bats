@@ -60,15 +60,7 @@ load _helpers
 }
 
 @test "ui/Ingress: exposes single port 80 when global.tls.enabled=false" {
-# todo: test for Kube versions < 1.19 when helm supports --kube-version flag (https://github.com/helm/helm/pull/9040)
-#  local actual=$(helm template \
-#      -s templates/ui-ingress.yaml  \
-#      --set 'ui.ingress.enabled=true' \
-#      --set 'global.tls.enabled=false' \
-#      --set 'ui.ingress.hosts[0].host=foo.com' \
-#      --kube-version "1.18" \
-#      . | tee /dev/stderr |
-#      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
      -s templates/ui-ingress.yaml  \
      --set 'ui.ingress.enabled=true' \
@@ -80,15 +72,7 @@ load _helpers
 }
 
 @test "ui/Ingress: exposes single port 443 when global.tls.enabled=true and global.tls.httpsOnly=true" {
-# todo: test for Kube versions < 1.19 when helm supports --kube-version flag (https://github.com/helm/helm/pull/9040)
-#  local actual=$(helm template \
-#      -s templates/ui-ingress.yaml  \
-#      --set 'ui.ingress.enabled=true' \
-#      --set 'global.tls.enabled=true' \
-#      --set 'ui.ingress.hosts[0].host=foo.com' \
-#      --kube-version "1.18" \
-#      . | tee /dev/stderr |
-#      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -100,16 +84,7 @@ load _helpers
 }
 
 @test "ui/Ingress: exposes the port 80 when global.tls.enabled=true and global.tls.httpsOnly=false" {
-# todo: test for Kube versions < 1.19 when helm supports --kube-version flag (https://github.com/helm/helm/pull/9040)
-#  local actual=$(helm template \
-#      -s templates/ui-ingress.yaml  \
-#      --set 'ui.ingress.enabled=true' \
-#      --set 'global.tls.enabled=true' \
-#      --set 'global.tls.httpsOnly=false' \
-#      --set 'ui.ingress.hosts[0].host=foo.com' \
-#      --kube-version "1.18" \
-#      . | tee /dev/stderr |
-#      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -122,16 +97,7 @@ load _helpers
 }
 
 @test "ui/Ingress: exposes the port 443 when global.tls.enabled=true and global.tls.httpsOnly=false" {
-# todo: test for Kube versions < 1.19 when helm supports --kube-version flag (https://github.com/helm/helm/pull/9040)
-#  local actual=$(helm template \
-#      -s templates/ui-ingress.yaml  \
-#      --set 'ui.ingress.enabled=true' \
-#      --set 'global.tls.enabled=true' \
-#      --set 'global.tls.httpsOnly=false' \
-#      --set 'ui.ingress.hosts[0].host=foo.com' \
-#      --kube-version "1.18" \
-#      . | tee /dev/stderr |
-#      yq -r '.spec.rules[0].http.paths[1].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -207,6 +173,7 @@ load _helpers
 # pathtype
 
 @test "ui/Ingress: default PathType Prefix" {
+  cd `chart_dir`
   local actual=$(helm template \
     -s templates/ui-ingress.yaml  \
     --set 'ui.ingress.enabled=true' \
@@ -218,6 +185,7 @@ load _helpers
 }
 
 @test "ui/Ingress: set PathType ImplementationSpecific" {
+  cd `chart_dir`
   local actual=$(helm template \
     -s templates/ui-ingress.yaml  \
     --set 'ui.ingress.enabled=true' \
@@ -227,4 +195,28 @@ load _helpers
     . | tee /dev/stderr |
     yq -r '.spec.rules[0].http.paths[0].pathType' | tee /dev/stderr)
   [ "${actual}" = "ImplementationSpecific" ]
+}
+
+#--------------------------------------------------------------------
+# ingressClassName
+
+@test "ui/Ingress: no ingressClassName by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+    -s templates/ui-ingress.yaml  \
+    --set 'ui.ingress.enabled=true' \
+    . | tee /dev/stderr |
+    yq -r '.spec.ingressClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "ui/Ingress: can set ingressClassName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+    -s templates/ui-ingress.yaml  \
+    --set 'ui.ingress.enabled=true' \
+    --set 'ui.ingress.ingressClassName=nginx' \
+    . | tee /dev/stderr |
+    yq -r '.spec.ingressClassName' | tee /dev/stderr)
+  [ "${actual}" = "nginx" ]
 }

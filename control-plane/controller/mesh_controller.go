@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// MeshController reconciles a Mesh object
+// MeshController reconciles a Mesh object.
 type MeshController struct {
 	client.Client
 	Log                   logr.Logger
@@ -36,7 +36,5 @@ func (r *MeshController) UpdateStatus(ctx context.Context, obj client.Object, op
 }
 
 func (r *MeshController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.Mesh{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.Mesh{}, r)
 }

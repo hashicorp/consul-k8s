@@ -52,7 +52,7 @@ type TransparentProxy struct {
 }
 
 // MeshGateway controls how Mesh Gateways are used for upstream Connect
-// services
+// services.
 type MeshGateway struct {
 	// Mode is the mode that should be used for the upstream connection.
 	// One of none, local, or remote.
@@ -60,6 +60,24 @@ type MeshGateway struct {
 }
 
 type ProxyMode string
+
+// HTTPHeaderModifiers is a set of rules for HTTP header modification that
+// should be performed by proxies as the request passes through them. It can
+// operate on either request or response headers depending on the context in
+// which it is used.
+type HTTPHeaderModifiers struct {
+	// Add is a set of name -> value pairs that should be appended to the request
+	// or response (i.e. allowing duplicates if the same header already exists).
+	Add map[string]string `json:"add,omitempty"`
+
+	// Set is a set of name -> value pairs that should be added to the request or
+	// response, overwriting any existing header values of the same name.
+	Set map[string]string `json:"set,omitempty"`
+
+	// Remove is the set of header names that should be stripped from the request
+	// or response.
+	Remove []string `json:"remove,omitempty"`
+}
 
 func (in MeshGateway) toConsul() capi.MeshGatewayConfig {
 	mode := capi.MeshGatewayMode(in.Mode)
@@ -145,6 +163,17 @@ func (in *ProxyMode) validate(path *field.Path) *field.Error {
 		return field.Invalid(path, in, "use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode")
 	}
 	return nil
+}
+
+func (in *HTTPHeaderModifiers) toConsul() *capi.HTTPHeaderModifiers {
+	if in == nil {
+		return nil
+	}
+	return &capi.HTTPHeaderModifiers{
+		Add:    in.Add,
+		Set:    in.Set,
+		Remove: in.Remove,
+	}
 }
 
 func notInSliceMessage(slice []string) string {

@@ -91,7 +91,7 @@ func TestRunSignalHandlingMetricsOnly(t *testing.T) {
 				UI: ui,
 			}
 
-			randomPorts := freeport.MustTake(1)
+			randomPorts := freeport.GetN(t, 1)
 			// Run async because we need to kill it when the test is over.
 			exitChan := runCommandAsynchronously(&cmd, []string{
 				"-enable-service-registration=false",
@@ -163,7 +163,7 @@ func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
 
 			require.NoError(t, err)
 
-			randomPorts := freeport.MustTake(1)
+			randomPorts := freeport.GetN(t, 1)
 			// Run async because we need to kill it when the test is over.
 			exitChan := runCommandAsynchronously(&cmd, []string{
 				"-service-config", configFile,
@@ -214,56 +214,94 @@ func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
 	}
 }
 
-type envoyMetrics struct {
+type mockEnvoyMetricsGetter struct {
+	respStatusCode int
 }
 
-func (em *envoyMetrics) Get(url string) (resp *http.Response, err error) {
+func (em *mockEnvoyMetricsGetter) Get(_ string) (resp *http.Response, err error) {
 	response := &http.Response{}
+	response.StatusCode = em.respStatusCode
 	response.Body = ioutil.NopCloser(bytes.NewReader([]byte("envoy metrics\n")))
 	return response, nil
 }
 
-type serviceMetrics struct {
-	url string
+// mockServiceMetricsGetter.
+type mockServiceMetricsGetter struct {
+	// reqURL is the last URL that was passed to Get(url)
+	reqURL string
+
+	// respStatusCode is the status code to use for the response.
+	respStatusCode int
 }
 
-func (sm *serviceMetrics) Get(url string) (resp *http.Response, err error) {
+func (sm *mockServiceMetricsGetter) Get(url string) (resp *http.Response, err error) {
+	// Record the URL that we were called with.
+	sm.reqURL = url
+
 	response := &http.Response{}
 	response.Body = ioutil.NopCloser(bytes.NewReader([]byte("service metrics\n")))
-	sm.url = url
+	response.StatusCode = sm.respStatusCode
+
 	return response, nil
 }
 
 func TestMergedMetricsServer(t *testing.T) {
 	cases := []struct {
-		name                    string
-		runEnvoyMetricsServer   bool
-		runServiceMetricsServer bool
-		expectedOutput          string
+		name                 string
+		envoyMetricsGetter   *mockEnvoyMetricsGetter
+		serviceMetricsGetter *mockServiceMetricsGetter
+		expectedStatusCode   int
+		expectedOutput       string
 	}{
 		{
-			name:                    "happy path: envoy and service metrics are merged",
-			runEnvoyMetricsServer:   true,
-			runServiceMetricsServer: true,
-			expectedOutput:          "envoy metrics\nservice metrics\n",
+			name: "happy path: envoy and service metrics are merged",
+			envoyMetricsGetter: &mockEnvoyMetricsGetter{
+				respStatusCode: 200,
+			},
+			serviceMetricsGetter: &mockServiceMetricsGetter{
+				respStatusCode: 200,
+			},
+			expectedStatusCode: 200,
+			expectedOutput:     "envoy metrics\nservice metrics\nconsul_merged_service_metrics_success 1\n",
 		},
 		{
-			name:                    "no service metrics",
-			runEnvoyMetricsServer:   true,
-			runServiceMetricsServer: false,
-			expectedOutput:          "envoy metrics\n",
+			name: "service metrics non-200",
+			envoyMetricsGetter: &mockEnvoyMetricsGetter{
+				respStatusCode: 200,
+			},
+			serviceMetricsGetter: &mockServiceMetricsGetter{
+				respStatusCode: 404,
+			},
+			expectedStatusCode: 200,
+			expectedOutput:     "envoy metrics\nconsul_merged_service_metrics_success 0\n",
 		},
 		{
-			name:                    "no envoy metrics",
-			runEnvoyMetricsServer:   false,
-			runServiceMetricsServer: true,
-			expectedOutput:          "",
+			name: "envoy metrics non-200",
+			envoyMetricsGetter: &mockEnvoyMetricsGetter{
+				respStatusCode: 404,
+			},
+			serviceMetricsGetter: &mockServiceMetricsGetter{
+				respStatusCode: 200,
+			},
+			expectedStatusCode: 500,
+			expectedOutput:     "Received non-2xx status code scraping Envoy proxy metrics: 404: envoy metrics\n\n",
+		},
+		{
+			name: "envoy and service metrics non-200",
+			envoyMetricsGetter: &mockEnvoyMetricsGetter{
+				respStatusCode: 500,
+			},
+			serviceMetricsGetter: &mockServiceMetricsGetter{
+				respStatusCode: 500,
+			},
+			expectedStatusCode: 500,
+			expectedOutput:     "Received non-2xx status code scraping Envoy proxy metrics: 500: envoy metrics\n\n",
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			randomPorts := freeport.MustTake(2)
+			randomPorts := freeport.GetN(t, 2)
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                       ui,
@@ -272,21 +310,11 @@ func TestMergedMetricsServer(t *testing.T) {
 				flagServiceMetricsPort:   fmt.Sprint(randomPorts[1]),
 				flagServiceMetricsPath:   "/metrics",
 				logger:                   hclog.Default(),
+				envoyMetricsGetter:       c.envoyMetricsGetter,
+				serviceMetricsGetter:     c.serviceMetricsGetter,
 			}
 
 			server := cmd.createMergedMetricsServer()
-
-			// Override the cmd's envoyMetricsGetter and serviceMetricsGetter
-			// with stubs.
-			em := &envoyMetrics{}
-			sm := &serviceMetrics{}
-			if c.runEnvoyMetricsServer {
-				cmd.envoyMetricsGetter = em
-			}
-			if c.runServiceMetricsServer {
-				cmd.serviceMetricsGetter = sm
-			}
-
 			go func() {
 				_ = server.ListenAndServe()
 			}()
@@ -304,8 +332,8 @@ func TestMergedMetricsServer(t *testing.T) {
 				// Verify the correct service metrics url was used. The service
 				// metrics endpoint is only called if the Envoy metrics endpoint
 				// call succeeds.
-				if c.runServiceMetricsServer && c.runEnvoyMetricsServer {
-					require.Equal(r, fmt.Sprintf("http://127.0.0.1:%d%s", randomPorts[1], "/metrics"), sm.url)
+				if c.envoyMetricsGetter.respStatusCode == 200 {
+					require.Equal(r, fmt.Sprintf("http://127.0.0.1:%d%s", randomPorts[1], "/metrics"), c.serviceMetricsGetter.reqURL)
 				}
 			})
 		})
@@ -457,7 +485,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 
 	// we need to reserve all 6 ports to avoid potential
 	// port collisions with other tests
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 
 	// Run async because we need to kill it when the test is over.
 	exitChan := runCommandAsynchronously(&cmd, []string{

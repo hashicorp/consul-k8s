@@ -9,6 +9,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: server
 {{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies) }}
 rules:
 {{- if .Values.global.enablePodSecurityPolicies }}

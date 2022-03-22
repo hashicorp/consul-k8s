@@ -19,6 +19,8 @@ spec:
     kind: ProxyDefaults
     listKind: ProxyDefaultsList
     plural: proxydefaults
+    shortNames:
+    - proxy-defaults
     singular: proxydefaults
   scope: Namespaced
   versions:

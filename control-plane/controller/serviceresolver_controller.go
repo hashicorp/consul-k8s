@@ -36,7 +36,5 @@ func (r *ServiceResolverController) UpdateStatus(ctx context.Context, obj client
 }
 
 func (r *ServiceResolverController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceResolver{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceResolver{}, r)
 }

@@ -157,8 +157,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	certCh := make(chan cert.MetaBundle)
-
 	// Create the certificate notifier so we can update certificates,
 	// then start all the background routines for updating certificates.
 	var notifiers []*cert.Notify
@@ -179,12 +177,13 @@ func (c *Command) Run(args []string) int {
 				Expiry: expiry,
 			}
 		}
+
+		certCh := make(chan cert.MetaBundle)
 		certNotify := &cert.Notify{Source: certSource, Ch: certCh, WebhookConfigName: config.Name, SecretName: config.SecretName, SecretNamespace: config.SecretNamespace}
 		notifiers = append(notifiers, certNotify)
 		go certNotify.Start(ctx)
+		go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 	}
-
-	go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 
 	// We define a signal handler for OS interrupts, and when an SIGINT or SIGTERM is received,
 	// we gracefully shut down, by first stopping our cert notifiers and then cancelling
@@ -250,6 +249,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 						UID:        deployment.UID,
 					},
 				},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       bundle.Cert,
@@ -278,6 +278,12 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 	// Don't update secret if the certificate and key are unchanged.
 	if bytes.Equal(certSecret.Data[corev1.TLSCertKey], bundle.Cert) && bytes.Equal(certSecret.Data[corev1.TLSPrivateKeyKey], bundle.Key) && c.webhookUpdated(ctx, bundle, clientset) {
 		return nil
+	}
+
+	if certSecret.ObjectMeta.Labels == nil {
+		certSecret.ObjectMeta.Labels = map[string]string{common.CLILabelKey: common.CLILabelValue}
+	} else {
+		certSecret.ObjectMeta.Labels[common.CLILabelKey] = common.CLILabelValue
 	}
 
 	certSecret.Data[corev1.TLSCertKey] = bundle.Cert
@@ -406,7 +412,7 @@ func (c *Command) Synopsis() string {
 }
 
 // interrupt sends os.Interrupt signal to the command
-// so it can exit gracefully. This function is needed for tests
+// so it can exit gracefully. This function is needed for tests.
 func (c *Command) interrupt() {
 	c.sendSignal(syscall.SIGINT)
 }

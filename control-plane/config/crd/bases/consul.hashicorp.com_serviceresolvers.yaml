@@ -13,6 +13,8 @@ spec:
     kind: ServiceResolver
     listKind: ServiceResolverList
     plural: serviceresolvers
+    shortNames:
+    - service-resolver
     singular: serviceresolver
   scope: Namespaced
   versions:
@@ -180,8 +182,14 @@ spec:
                       from instead of the current one.
                     type: string
                   namespace:
-                    description: Namespace is the namespace to resolve the service
-                      from instead of the current one.
+                    description: Namespace is the Consul namespace to resolve the
+                      service from instead of the current namespace. If empty the
+                      current namespace is assumed.
+                    type: string
+                  partition:
+                    description: Partition is the Consul partition to resolve the
+                      service from instead of the current partition. If empty the
+                      current partition is assumed.
                     type: string
                   service:
                     description: Service is a service to resolve instead of the current

@@ -67,6 +67,7 @@ type Command struct {
 
 	once sync.Once
 	help string
+	ctx  context.Context
 }
 
 func (c *Command) init() {
@@ -117,12 +118,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if c.ctx == nil {
+		c.ctx = context.Background()
+	}
+
 	// The initial secret struct. We will be filling in its data map
 	// as we continue.
 	federationSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-federation", c.flagResourcePrefix),
 			Namespace: c.flagK8sNamespace,
+			Labels:    map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Type: "Opaque",
 		Data: make(map[string][]byte),
@@ -239,10 +245,10 @@ func (c *Command) Run(args []string) int {
 
 	// Now create the Kubernetes secret.
 	logger.Info("Creating/updating Kubernetes secret", "name", federationSecret.ObjectMeta.Name, "ns", c.flagK8sNamespace)
-	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(context.TODO(), federationSecret, metav1.CreateOptions{})
+	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, federationSecret, metav1.CreateOptions{})
 	if k8serrors.IsAlreadyExists(err) {
 		logger.Info("Secret already exists, updating instead")
-		_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Update(context.TODO(), federationSecret, metav1.UpdateOptions{})
+		_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Update(c.ctx, federationSecret, metav1.UpdateOptions{})
 	}
 
 	if err != nil {
@@ -296,7 +302,7 @@ func (c *Command) replicationToken(logger hclog.Logger) ([]byte, error) {
 	// This will run forever but it's running as a Helm hook so Helm will timeout
 	// after a configurable time period.
 	err := backoff.Retry(func() error {
-		secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+		secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			logger.Warn("secret not yet created, retrying", "secret", secretName, "ns", c.flagK8sNamespace)
 			return errors.New("")

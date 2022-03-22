@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ProxyDefaultsController reconciles a ProxyDefaults object
+// ProxyDefaultsController reconciles a ProxyDefaults object.
 type ProxyDefaultsController struct {
 	client.Client
 	Log                   logr.Logger
@@ -36,7 +36,5 @@ func (r *ProxyDefaultsController) UpdateStatus(ctx context.Context, obj client.O
 }
 
 func (r *ProxyDefaultsController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ProxyDefaults{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ProxyDefaults{}, r)
 }

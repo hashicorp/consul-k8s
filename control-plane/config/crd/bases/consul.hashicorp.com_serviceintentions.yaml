@@ -13,6 +13,8 @@ spec:
     kind: ServiceIntentions
     listKind: ServiceIntentionsList
     plural: serviceintentions
+    shortNames:
+    - service-intentions
     singular: serviceintentions
   scope: Namespaced
   versions:
@@ -89,6 +91,9 @@ spec:
                       type: string
                     namespace:
                       description: Namespace is the namespace for the Name parameter.
+                      type: string
+                    partition:
+                      description: Partition is the Admin Partition for the Name parameter.
                       type: string
                     permissions:
                       description: Permissions is the list of all additional L7 attributes

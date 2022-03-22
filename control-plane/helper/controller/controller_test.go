@@ -22,7 +22,7 @@ func TestController_impl(t *testing.T) {
 	var _ cache.Controller = &Controller{}
 }
 
-// Test that data that exists before is synced
+// Test that data that exists before is synced.
 func TestController_initialData(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -46,7 +46,7 @@ func TestController_initialData(t *testing.T) {
 	require.Len(deleted, 0)
 }
 
-// Test that created data after starting is loaded
+// Test that created data after starting is loaded.
 func TestController_create(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)

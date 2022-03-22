@@ -35,6 +35,8 @@ type Command struct {
 
 	// retryDuration is how often we'll retry deletion.
 	retryDuration time.Duration
+
+	ctx context.Context
 }
 
 func (c *Command) init() {
@@ -82,9 +84,13 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
 		return 1
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	// The context will only ever be intentionally ended by the timeout.
-	defer cancel()
+
+	if c.ctx == nil {
+		var cancel context.CancelFunc
+		c.ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		// The context will only ever be intentionally ended by the timeout.
+		defer cancel()
+	}
 
 	// c.k8sclient might already be set in a test.
 	if c.k8sClient == nil {
@@ -110,7 +116,7 @@ func (c *Command) Run(args []string) int {
 	// Wait for job to complete.
 	logger.Info(fmt.Sprintf("waiting for job %q to complete successfully", jobName))
 	for {
-		job, err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Get(context.TODO(), jobName, metav1.GetOptions{})
+		job, err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Get(c.ctx, jobName, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			logger.Info(fmt.Sprintf("job %q does not exist, no need to delete", jobName))
 			return 0
@@ -139,7 +145,7 @@ func (c *Command) Run(args []string) int {
 		select {
 		case <-time.After(c.retryDuration):
 			continue
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			logger.Warn(fmt.Sprintf("timeout %q has been reached, exiting without deleting job", timeout))
 			return 1
 		}
@@ -149,7 +155,7 @@ func (c *Command) Run(args []string) int {
 	// ourselves.
 	logger.Info(fmt.Sprintf("job %q has succeeded, deleting", jobName))
 	propagationPolicy := metav1.DeletePropagationForeground
-	err = c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(context.TODO(), jobName, metav1.DeleteOptions{
+	err = c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(c.ctx, jobName, metav1.DeleteOptions{
 		// Needed so that the underlying pods are also deleted.
 		PropagationPolicy: &propagationPolicy,
 	})

@@ -11,7 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +29,7 @@ func TestZapLogger_InvalidLogLevel(t *testing.T) {
 	require.EqualError(t, err, "unknown log level \"invalid\": unrecognized level: \"invalid\"")
 }
 
-// ZapLogger should convert "trace" log level to "debug"
+// ZapLogger should convert "trace" log level to "debug".
 func TestZapLogger_TraceLogLevel(t *testing.T) {
 	_, err := ZapLogger("trace", false)
 	require.NoError(t, err)
@@ -166,6 +170,45 @@ func TestWriteFileWithPerms(t *testing.T) {
 	data, err := ioutil.ReadFile(randFileName)
 	require.NoError(t, err)
 	require.Equal(t, payload, string(data))
+}
+
+func TestGetResolvedServerAddresses(t *testing.T) {
+	cases := map[string]struct {
+		inputServerAddresses    []string
+		providerMap             func() map[string]discover.Provider
+		expectedServerAddresses []string
+	}{
+		"without providers and single address": {
+			inputServerAddresses: []string{"foo.bar"},
+			providerMap: func() map[string]discover.Provider {
+				return nil
+			},
+			expectedServerAddresses: []string{"foo.bar"},
+		},
+		"without providers and multiple addresses": {
+			inputServerAddresses: []string{"foo.bar", "hello.car"},
+			providerMap: func() map[string]discover.Provider {
+				return nil
+			},
+			expectedServerAddresses: []string{"foo.bar", "hello.car"},
+		},
+		"mock provider": {
+			inputServerAddresses: []string{"provider=mock"},
+			providerMap: func() map[string]discover.Provider {
+				provider := new(mocks.MockProvider)
+				provider.On("Addrs", mock.Anything, mock.Anything).Return([]string{"127.0.0.1", "foo.bar"}, nil)
+				providers := make(map[string]discover.Provider)
+				providers["mock"] = provider
+				return providers
+			},
+			expectedServerAddresses: []string{"127.0.0.1", "foo.bar"},
+		},
+	}
+	for _, testCase := range cases {
+		addresses, err := GetResolvedServerAddresses(testCase.inputServerAddresses, testCase.providerMap(), hclog.NewNullLogger())
+		require.NoError(t, err)
+		require.Equal(t, testCase.expectedServerAddresses, addresses)
+	}
 }
 
 // startMockServer starts an httptest server used to mock a Consul server's

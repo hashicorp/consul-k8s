@@ -5,7 +5,7 @@
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.13
+FROM alpine:3.15
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -50,7 +50,7 @@ RUN set -eux && \
     apkArch="$(apk --print-arch)" && \
     case "${apkArch}" in \
     aarch64) ARCH='arm64' ;; \
-    armhf) ARCH='armhfv6' ;; \
+    armhf) ARCH='arm' ;; \
     x86) ARCH='386' ;; \
     x86_64) ARCH='amd64' ;; \
     *) echo >&2 "error: unsupported architecture: ${apkArch} (see ${HASHICORP_RELEASES}/${NAME}/${VERSION}/)" && exit 1 ;; \

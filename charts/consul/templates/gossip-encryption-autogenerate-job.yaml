@@ -1,0 +1,60 @@
+{{- if .Values.global.gossipEncryption.autoGenerate }}
+{{- if (or .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+  {{ fail "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." }}
+{{ end }}
+# automatically generate encryption key for gossip protocol and save it in Kubernetes secret
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gossip-encryption-autogenerate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: gossip-encryption-autogenerate
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+      securityContext:
+        runAsNonRoot: true
+        runAsGroup: 1000 
+        runAsUser: 100 
+        fsGroup: 1000
+      containers:
+        - name: gossip-encryption-autogen
+          image: "{{ .Values.global.imageK8S }}"
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              consul-k8s-control-plane gossip-encryption-autogenerate \
+                -namespace={{ .Release.Namespace }} \
+                -secret-name={{ template "consul.fullname" . }}-gossip-encryption-key \
+                -secret-key="key" \
+                -log-level={{ .Values.global.logLevel }} \
+                -log-json={{ .Values.global.logJSON }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+{{- end }}

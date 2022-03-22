@@ -10,7 +10,42 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: server
 data:
+  {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
+  {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
+  {{- with .Values.global.secretsBackend.vault }}
+  connect-ca-config.json: |
+    {
+      "connect": [
+        {
+          "ca_config": [
+            {
+              "address": "{{ .connectCA.address }}",
+              {{- if and .ca.secretName .ca.secretKey }}
+              "ca_file": "/consul/vault-ca/tls.crt",
+              {{- end }}
+              "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              "root_pki_path": "{{ .connectCA.rootPKIPath }}",
+              "auth_method": {
+                "type": "kubernetes",
+                "mount_path": "{{ .connectCA.authMethodPath }}",
+                "params": {
+                  "role": "{{ .consulServerRole }}"
+                }
+              }
+            }
+          ],
+          "ca_provider": "vault"
+        }
+      ]
+    }
+  {{- if .connectCA.additionalConfig }}
+  additional-connect-ca-config.json: |
+{{ tpl .connectCA.additionalConfig $ | trimAll "\"" | indent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.acls.manageSystemACLs }}
@@ -27,7 +62,7 @@ data:
       }
     }
   {{- end }}
-  {{- if (and .Values.ui.enabled (or .Values.ui.metrics.enabled (and .Values.global.metrics.enabled (eq (.Values.ui.metrics.enabled | toString) "-")))) }}
+  {{- if (and .Values.ui.enabled (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString))))) }}
   ui-config.json: |-
     {
       "ui_config": {
@@ -43,4 +78,11 @@ data:
     {
       "enable_central_service_config": true
     }
+  {{- if .Values.global.federation.enabled }}
+  federation-config.json: |-
+    {
+      "primary_datacenter": "{{ .Values.global.federation.primaryDatacenter }}",
+      "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }}
+    }
+  {{- end }}
 {{- end }}

@@ -17,6 +17,7 @@ rules:
   - serviceresolvers
   - proxydefaults
   - meshes
+  - exportedservices
   - servicerouters
   - servicesplitters
   - serviceintentions
@@ -37,6 +38,7 @@ rules:
   - serviceresolvers/status
   - proxydefaults/status
   - meshes/status
+  - exportedservices/status
   - servicerouters/status
   - servicesplitters/status
   - serviceintentions/status

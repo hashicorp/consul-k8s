@@ -29,6 +29,49 @@ global:
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
+  # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.
+  # It additionally indicates that you are running Consul Enterprise v1.11+ with a valid Consul Enterprise
+  # license. Admin partitions enables deploying services across partitions, while sharing
+  # a set of Consul servers.
+  adminPartitions:
+    # If true, the Helm chart will enable Admin Partitions for the cluster. The clients in the server cluster
+    # must be installed in the default partition. Creation of Admin Partitions is only supported during installation.
+    # Admin Partitions cannot be installed via a Helm upgrade operation. Only Helm installs are supported.
+    enabled: false
+    # The name of the Admin Partition. The partition name cannot be modified once the partition has been installed.
+    # Changing the partition name would require an un-install and a re-install with the updated name.
+    # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
+    name: "default"
+    # Partition service properties.
+    service:
+      type: LoadBalancer
+      # Optionally set the nodePort value of the partition service if using a NodePort service.
+      # If not set and using a NodePort service, Kubernetes will automatically assign
+      # a port.
+      nodePort:
+
+        # RPC node port
+        # @type: integer
+        rpc: null
+
+        # Serf node port
+        # @type: integer
+        serf: null
+
+        # HTTPS node port
+        # @type: integer
+        https: null
+
+      # Annotations to apply to the partition service.
+      #
+      # ```yaml
+      # annotations: |
+      #   "annotation-key": "annotation-value"
+      # ```
+      #
+      # @type: string
+      annotations: null
+
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
   # version tag, otherwise you may inadvertently upgrade your Consul version.
@@ -42,7 +85,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.10.0"
+  image: "hashicorp/consul:1.11.3"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -62,7 +105,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: "hashicorp/consul-k8s-control-plane:0.33.0"
+  imageK8S: "hashicorp/consul-k8s-control-plane:0.41.1"
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -74,30 +117,156 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Configures which Kubernetes secret to retrieve Consul's
-  # gossip encryption key from (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)). If secretName or
-  # secretKey are not set, gossip encryption will not be enabled. The secret must
-  # be in the same namespace that Consul is installed into.
+  # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
+  # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
+  # and have necessary secrets, policies and roles created prior to installing Consul.
+  # See https://www.consul.io/docs/k8s/installation/vault for full instructions.
   #
-  # The secret can be created by running:
+  # The Vault cluster _must_ not have the Consul cluster installed by this Helm chart as its storage backend
+  # as that would cause a circular dependency.
+  # Vault can have Consul as its storage backend as long as that Consul cluster is not running on this Kubernetes cluster
+  # and is being managed separately from this Helm installation.
   #
-  # ```shell
+  # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
+  # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
+  # secretKey should be in the form of "key".
+  secretsBackend:
+    vault:
+      # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
+      enabled: false
+
+      # The Vault role for the Consul server.
+      # The role must be connected to the Consul server's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`
+      # - certificate issue path defined by `server.serverCert.secretName`
+      # - CA certificate defined by `global.tls.caCert.secretName`
+      # - replication token defined by `global.acls.replicationToken.secretName` if `global.federation.enabled` is `true`
+      # To discover the service account name of the Consul server, run
+      #     ```shell-session
+      #     $ helm template --show-only templates/server-serviceaccount.yaml <release-name> hashicorp/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulServerRole: ""
+
+      # The Vault role for the Consul client.
+      # The role must be connected to the Consul client's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul client, run
+      #     ```shell-session
+      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulClientRole: ""
+
+      # A Vault role to allow Kubernetes job that manages ACLs for this Helm chart (`server-acl-init`)
+      # to read and update Vault secrets for the Consul's bootstrap and replication tokens.
+      # This role must be bound the `server-acl-init`'s service account.
+      # To discover the service account name of the `server-acl-init` job, run
+      #     ```shell-session
+      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      manageSystemACLsRole: ""
+
+      # This value defines additional annotations for
+      # Vault agent on any pods where it'll be running.
+      # This should be formatted as a multi-line string.
+      #
+      # ```yaml
+      # annotations: |
+      #   "sample/annotation1": "foo"
+      #   "sample/annotation2": "bar"
+      # ```
+      #
+      # @type: string
+      agentAnnotations: null
+
+      # The Vault role for all Consul components to read the Consul's server's CA Certificate (unauthenticated).
+      # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
+      # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
+      # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
+      consulCARole: ""
+
+      # Configuration for Vault server CA certificate. This certificate will be mounted
+      # to any pod where Vault agent needs to run.
+      ca:
+        # secretName is the name of the Kubernetes secret that holds the Vault CA certificate.
+        # A Kubernetes secret must be in the same namespace that Consul is installed into.
+        secretName: ""
+        # secretKey is the key within the Kubernetes secret that holds the Vault CA certificate.
+        secretKey: ""
+
+      # Configuration for the Vault Connect CA provider.
+      # The provider will be configured to use the Vault Kubernetes auth method
+      # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
+      # to have permissions to the root and intermediate PKI paths.
+      # Please see https://www.consul.io/docs/connect/ca/vault#vault-acl-policies
+      # for information on how to configure the Vault policies.
+      connectCA:
+        # The address of the Vault server.
+        address: ""
+
+        # The mount path of the Kubernetes auth method in Vault.
+        authMethodPath: "kubernetes"
+
+        # The path to a PKI secrets engine for the root certificate.
+        # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
+        rootPKIPath: ""
+
+        # The path to a PKI secrets engine for the generated intermediate certificate.
+        # Please see https://www.consul.io/docs/connect/ca/vault#intermediatepkipath.
+        intermediatePKIPath: ""
+
+        # Additional Connect CA configuration in JSON format.
+        # Please see https://www.consul.io/docs/connect/ca/vault#common-ca-config-options
+        # for additional configuration options.
+        #
+        # Example:
+        #
+        # ```yaml
+        # additionalConfig: |
+        #   {
+        #     "connect": [{
+        #       "ca_config": [{
+        #            "leaf_cert_ttl": "36h"
+        #         }]
+        #     }]
+        #   }
+        # ```
+        additionalConfig: |
+          {}
+
+  # Configures Consul's gossip encryption key.
+  # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
+  # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
+  # The recommended method is to automatically generate the key.
+  # To automatically generate and set a gossip encryption key, set autoGenerate to true.
+  # Values for secretName and secretKey should not be set if autoGenerate is true.
+  # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
+  # a key, saving this as a Kubernetes secret or Vault secret path and key.
+  # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" component of the secretName path as required by
+  # the Vault KV-2 secrets engine [see example].
+  #
+  # ```shell-session
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
   #
-  # To reference, use:
-  #
-  # ```yaml
-  # global:
-  #   gossipEncryption:
-  #     secretName: consul-gossip-encryption-key
-  #     secretKey: key
+  # Vault CLI Example:
+  # ```shell-session
+  # $ vault kv put consul/secrets/gossip key=$(consul keygen)
   # ```
+  # `gossipEncryption.secretName="consul/data/secrets/gossip"`
+  # `gossipEncryption.secretKey="key"`
+
   gossipEncryption:
-    # secretName is the name of the Kubernetes secret that holds the gossip
-    # encryption key. The secret must be in the same namespace that Consul is installed into.
+    # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
+    autoGenerate: false
+    # secretName is the name of the Kubernetes secret or Vault secret path that holds the gossip
+    # encryption key. A Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: ""
-    # secretKey is the key within the Kubernetes secret that holds the gossip
+    # secretKey is the key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
 
@@ -145,15 +314,19 @@ global:
     # both clients and servers and to only accept HTTPS connections.
     httpsOnly: true
 
-    # A Kubernetes secret containing the certificate of the CA to use for
-    # TLS communication within the Consul cluster. If you have generated the CA yourself
-    # with the consul CLI, you could use the following command to create the secret
+    # A secret containing the certificate of the CA to use for TLS communication within the Consul cluster.
+    # If you have generated the CA yourself with the consul CLI, you could use the following command to create the secret
     # in Kubernetes:
     #
-    # ```bash
-    # kubectl create secret generic consul-ca-cert \
+    # ```shell-session
+    # $ kubectl create secret generic consul-ca-cert \
     #     --from-file='tls.crt=./consul-agent-ca.pem'
     # ```
+    # If you are using Vault as a secrets backend with TLS, `caCert.secretName` must be provided and should reference
+    # the CA path for your PKI secrets engine. This should be of the form `pki/cert/ca` where `pki` is the mount point of your PKI secrets engine.
+    # A read policy must be created and associated with the CA cert path for `global.tls.caCert.secretName`.
+    # This will be consumed by the `global.secretsBackend.vault.consulCARole` role by all Consul components.
+    # When using Vault the secretKey is not used.
     caCert:
       # The name of the Kubernetes secret.
       secretName: null
@@ -165,8 +338,8 @@ global:
     # with the consul CLI, you could use the following command to create the secret
     # in Kubernetes:
     #
-    # ```bash
-    # kubectl create secret generic consul-ca-key \
+    # ```shell-session
+    # $ kubectl create secret generic consul-ca-key \
     #     --from-file='tls.key=./consul-agent-ca-key.pem'
     # ```
     #
@@ -219,10 +392,25 @@ global:
     # and create ACL tokens and policies.
     # This value is ignored if `bootstrapToken` is also set.
     replicationToken:
-      # The name of the Kubernetes secret.
+      # The name of the Kubernetes secret or the path of the secret in Vault.
       secretName: null
-      # The key of the Kubernetes secret.
+      # The key of the Kubernetes or Vault secret.
       secretKey: null
+
+  # [Enterprise Only] This value refers to a Kubernetes secret that you have created
+  # that contains your enterprise license. It is required if you are using an
+  # enterprise binary. Defining it here applies it to your cluster once a leader
+  # has been elected. If you are not using an enterprise image or if you plan to
+  # introduce the license key via another route, then set these fields to null.
+  # Note: the job to apply license runs on both Helm installs and upgrades.
+  enterpriseLicense:
+    # secretName is the name of the Kubernetes secret or Vault secret path that holds the enterprise license.
+    # A Kubernetes secret must be in the same namespace that Consul is installed into.
+    secretName: null
+    # secretKey is the key within the Kubernetes secret or Vault secret key that holds the enterprise license.
+    secretKey: null
+    # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
+    enableLicenseAutoload: true
 
   # Configure federation.
   federation:
@@ -241,6 +429,14 @@ global:
     # `<global.name>-federation` (if setting `global.name`), otherwise
     # `<helm-release-name>-consul-federation`.
     createFederationSecret: false
+
+    # The name of the primary datacenter.
+    primaryDatacenter: ""
+
+    # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`.
+    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"] 
+    # @type: array<string>
+    primaryGateways: []
 
   # Configures metrics for Consul service mesh
   metrics:
@@ -270,9 +466,18 @@ global:
 
   # For connect-injected pods, the consul sidecar is responsible for metrics merging. For ingress/mesh/terminating
   # gateways, it additionally ensures the Consul services are always registered with their local Consul client.
-  # @recurse: false
   # @type: map
   consulSidecarContainer:
+    # Set default resources for consul sidecar. If null, that resource won't
+    # be set.
+    # These settings can be overridden on a per-pod basis via these annotations:
+    #
+    # - `consul.hashicorp.com/consul-sidecar-cpu-limit`
+    # - `consul.hashicorp.com/consul-sidecar-cpu-request`
+    # - `consul.hashicorp.com/consul-sidecar-memory-limit`
+    # - `consul.hashicorp.com/consul-sidecar-memory-request`
+    # @recurse: false
+    # @type: map
     resources:
       requests:
         memory: "25Mi"
@@ -285,7 +490,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
   # @default: envoyproxy/envoy-alpine:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy-alpine:v1.18.4"
+  imageEnvoy: "envoyproxy/envoy-alpine:v1.20.2"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -326,25 +531,11 @@ server:
   # @type: int
   bootstrapExpect: null
 
-  # [Enterprise Only] This value refers to a Kubernetes secret that you have created
-  # that contains your enterprise license. It is required if you are using an
-  # enterprise binary. Defining it here applies it to your cluster once a leader
-  # has been elected. If you are not using an enterprise image or if you plan to
-  # introduce the license key via another route, then set these fields to null.
-  # Note: the job to apply license runs on both Helm installs and upgrades.
-  enterpriseLicense:
-    # The name of the Kubernetes secret that holds the enterprise license.
-    # The secret must be in the same namespace that Consul is installed into.
-    secretName: null
-    # The key within the Kubernetes secret that holds the enterprise license.
-    secretKey: null
-    # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
-    enableLicenseAutoload: true
-
-  # A Kubernetes secret containing a certificate & key for the server agents to use
+  # A secret containing a certificate & key for the server agents to use
   # for TLS communication within the Consul cluster. Cert needs to be provided with
   # additional DNS name SANs so that it will work within the Kubernetes cluster:
   #
+  # Kubernetes Secrets backend:
   # ```bash
   # consul tls cert create -server -days=730 -domain=consul -ca=consul-agent-ca.pem \
   #     -key=consul-agent-ca-key.pem -dc={{datacenter}} \
@@ -356,8 +547,7 @@ server:
   #     -additional-dnsname="server.{{datacenter}}.{{domain}}"
   # ```
   #
-  # If you have generated the
-  # server-cert yourself with the consul CLI, you could use the following command
+  # If you have generated the server-cert yourself with the consul CLI, you could use the following command
   # to create the secret in Kubernetes:
   #
   # ```bash
@@ -365,8 +555,16 @@ server:
   #     --from-file='tls.crt=./dc1-server-consul-0.pem'
   #     --from-file='tls.key=./dc1-server-consul-0-key.pem'
   # ```
+  #
+  # Vault Secrets backend:
+  # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
+  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`. 
+  # Please see the following guide for steps to generate a compatible certificate:
+  # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
+  # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
+  # must be provided.
   serverCert:
-    # The name of the Kubernetes secret.
+    # The name of the Kubernetes secret or Vault secret path containing the PEM encoded server certificate.
     secretName: null
 
   # Exposes the servers' gossip and RPC ports as hostPorts. To enable a client
@@ -404,6 +602,8 @@ server:
   # storage classes, the PersistentVolumeClaims would need to be manually created.
   # A `null` value will use the Kubernetes cluster's default StorageClass. If a default
   # StorageClass does not exist, you will need to create one.
+  # See https://www.consul.io/docs/install/performance#read-write-tuning for considerations around choosing a
+  # performant storage class.
   # @type: string
   storageClass: null
 
@@ -519,7 +719,7 @@ server:
   #
   # This can also be set using Helm's `--set` flag using the following syntax:
   #
-  # ```shell
+  # ```shell-session
   # --set 'server.extraConfig="{"log_level": "DEBUG"}"'
   # ```
   extraConfig: |
@@ -552,6 +752,19 @@ server:
   #
   # @type: array<map>
   extraVolumes: []
+
+  # A list of sidecar containers.
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  # @type: array<map>
+  extraContainers: []
 
   # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for server pods. It defaults to allowing only a single server pod on each node, which
@@ -713,8 +926,8 @@ externalServers:
   #
   # You could retrieve this value from your `kubeconfig` by running:
   #
-  # ```shell
-  # kubectl config view \
+  # ```shell-session
+  # $ kubectl config view \
   #   -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
   # ```
   #
@@ -848,7 +1061,7 @@ client:
   #
   # This can also be set using Helm's `--set` flag using the following syntax:
   #
-  # ```shell
+  # ```shell-session
   # --set 'client.extraConfig="{"log_level": "DEBUG"}"'
   # ```
   extraConfig: |
@@ -881,6 +1094,19 @@ client:
   #
   # @type: array<map>
   extraVolumes: []
+
+  # A list of sidecar containers.
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  # @type: array<map>
+  extraContainers: []
 
   # Toleration Settings for Client pods
   # This should be a multi-line string matching the Toleration array
@@ -1058,6 +1284,12 @@ dns:
   # @type: boolean
   enabled: "-"
 
+  # If true, services using Consul Connect will use Consul DNS
+  # for default DNS resolution. The DNS lookups fall back to the nameserver IPs
+  # listed in /etc/resolv.conf if not found in Consul.
+  # @type: boolean
+  enableRedirection: false
+
   # Used to control the type of service created. For
   # example, setting this to "LoadBalancer" will create an external load
   # balancer (for supported K8S installations)
@@ -1152,6 +1384,9 @@ ui:
     # @type: boolean
     enabled: false
 
+    # Optionally set the ingressClassName.
+    ingressClassName: ""
+
     # pathType override - see: https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
     pathType: Prefix
 
@@ -1208,6 +1443,11 @@ ui:
     # This value is only used if `ui.enabled` is set to true.
     # @type: string
     baseURL: http://prometheus-server
+
+  # Corresponds to https://www.consul.io/docs/agent/options#ui_config_dashboard_url_templates configuration.
+  dashboardURLTemplates:
+    # Sets https://www.consul.io/docs/agent/options#ui_config_dashboard_url_templates_service.
+    service: ""
 
 # Configure the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul
@@ -1556,10 +1796,15 @@ connectInject:
   # This setting can be safely disabled by setting to "Ignore".
   failurePolicy: "Fail"
 
-  # Selector for restricting the webhook to only
-  # specific namespaces. This should be set to a multiline string.
+  # Selector for restricting the webhook to only specific namespaces. 
+  # Use with `connectInject.default: true` to automatically inject all pods in namespaces that match the selector. This should be set to a multiline string.
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
   # for more details.
+  #
+  # By default, we exclude the kube-system namespace since usually users won't
+  # want those pods injected and also the local-path-storage namespace so that
+  # Kind (Kubernetes In Docker) can provision Pods used to create PVCs.
+  # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
   #
@@ -1569,7 +1814,11 @@ connectInject:
   #     namespace-label: label-value
   # ```
   # @type: string
-  namespaceSelector: null
+  namespaceSelector: |
+    matchExpressions:
+      - key: "kubernetes.io/metadata.name"
+        operator: "NotIn"
+        values: ["kube-system","local-path-storage"]
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
@@ -1940,6 +2189,18 @@ meshGateway:
         memory: "150Mi"
         cpu: "50m"
 
+  # Resource settings for the `service-init` init container.
+  # @recurse: false
+  # @type: map
+  initServiceInitContainer:
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+
   # By default, we set an anti-affinity so that two gateway pods won't be
   # on the same node. NOTE: Gateways require that Consul client agents are
   # also running on the nodes alongside each gateway pod.
@@ -2094,6 +2355,9 @@ ingressGateways:
     # Optional priorityClassName.
     priorityClassName: ""
 
+    # Amount of seconds to wait for graceful termination before killing the pod.
+    terminationGracePeriodSeconds: 10
+
     # Annotations to apply to the ingress gateway deployment. Annotations defined
     # here will be applied to all ingress gateway deployments in addition to any
     # annotations defined for a specific gateway in `ingressGateways.gateways`.
@@ -2244,6 +2508,149 @@ terminatingGateways:
   # @type: array<map>
   gateways:
     - name: terminating-gateway
+
+# Configuration settings for the Consul API Gateway integration
+apiGateway:
+  # When true the helm chart will install the Consul API Gateway controller
+  enabled: false
+
+  # Image to use for the api-gateway-controller pods and gateway instances
+  # @type: string
+  image: null
+
+  # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: info
+
+  # Configuration settings for the optional GatewayClass installed by consul-k8s (enabled by default)
+  managedGatewayClass:
+    # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
+    enabled: true
+
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for gateway pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+
+    # This value defines the type of service created for gateways (e.g. LoadBalancer, ClusterIP)
+    serviceType: LoadBalancer
+
+    # This value toggles if the gateway ports should be mapped to host ports
+    useHostPorts: false
+
+    # Configuration settings for annotations to be copied from the Gateway to other child resources.
+    copyAnnotations:
+      # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.
+      #
+      # Example:
+      #
+      # ```yaml
+      # service: |
+      # - external-dns.alpha.kubernetes.io/hostname
+      # ```
+      #
+      # @type: string
+      service: null
+
+  # [Enterprise Only] These settings manage the API Gateway's interaction with
+  # Consul namespaces (requires consul-ent v1.7+).
+  # Also, `global.enableConsulNamespaces` must be true.
+  consulNamespaces:
+    # Name of the Consul namespace to register all
+    # k8s services into. If the Consul namespace does not already exist,
+    # it will be created. This will be ignored if `mirroringK8S` is true.
+    consulDestinationNamespace: "default"
+
+    # If true, k8s services will be registered into a Consul namespace
+    # of the same name as their k8s namespace, optionally prefixed if
+    # `mirroringK8SPrefix` is set below. If the Consul namespace does not
+    # already exist, it will be created. Turning this on overrides the
+    # `consulDestinationNamespace` setting.
+    # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
+    mirroringK8S: false
+
+    # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
+    # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+    # service in the k8s `staging` namespace will be registered into the
+    # `k8s-staging` Consul namespace.
+    mirroringK8SPrefix: ""
+
+  # Configuration for the ServiceAccount created for the api-gateway component
+  serviceAccount:
+    # This value defines additional annotations for the client service account. This should be formatted as a multi-line
+    # string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
+  # Configuration for the api-gateway controller component
+  controller:
+    # This value sets the number of controller replicas to deploy.
+    replicas: 1
+
+    # Annotations to apply to the api-gateway-controller pods.
+    #
+    # ```yaml
+    # annotations: |
+    #   "annotation-key": "annotation-value"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
+    # This value references an existing
+    # Kubernetes `priorityClassName` (https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
+    # that can be assigned to api-gateway-controller pods.
+    priorityClassName: ""
+
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for api-gateway-controller pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+
+    # Configuration for the Service created for the api-gateway-controller
+    service:
+      # Annotations to apply to the api-gateway-controller service.
+      #
+      # ```yaml
+      # annotations: |
+      #   "annotation-key": "annotation-value"
+      # ```
+      #
+      # @type: string
+      annotations: null
+
+# Configuration settings for the webhook-cert-manager
+# `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.
+webhookCertManager:
+
+  # Toleration Settings
+  # This should be a multi-line string matching the Toleration array
+  # in a PodSpec.
+  # @type: string
+  tolerations: null
 
 # Configures a demo Prometheus installation.
 prometheus:
