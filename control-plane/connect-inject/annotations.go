@@ -19,7 +19,7 @@ const (
 	// annotationInjectMountVolumes is the key of the annotation that controls whether
 	// the data volume that connect inject uses to store data including the Consul ACL token
 	// is mounted to other containers in the pod. It is a comma-separated list of container names
-	// to mount the volume on. It will be mounted at the path `/consul/connect-inject`
+	// to mount the volume on. It will be mounted at the path `/consul/connect-inject`.
 	annotationInjectMountVolumes = "consul.hashicorp.com/connect-inject-mount-volume"
 
 	// annotationService is the name of the service to proxy.
