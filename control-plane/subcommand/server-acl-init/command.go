@@ -768,7 +768,7 @@ type gatewayRulesGenerator func(name, namespace string) (string, error)
 
 // ConfigureGatewayParams are parameters used to configure Ingress and Terminating Gateways.
 type ConfigureGatewayParams struct {
-	//GatewayType specifies whether it is an ingress or terminating gateway
+	// GatewayType specifies whether it is an ingress or terminating gateway.
 	GatewayType string
 	//GatewayNames is the collection of gateways that have been specified.
 	GatewayNames []string
