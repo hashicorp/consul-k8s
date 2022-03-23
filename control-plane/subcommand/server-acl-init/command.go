@@ -826,7 +826,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 		rules, err := gatewayParams.RulesGenerator(name, namespace)
 		if err != nil {
 
-			errMessage := fmt.Sprintf("Error templating %s gateway rules",
+			errMessage := fmt.Sprintf("error templating %s gateway rules",
 				gatewayParams.GatewayType)
 			c.log.Error(errMessage, "gateway-name", name,
 				"namespace", namespace, "err", err)
