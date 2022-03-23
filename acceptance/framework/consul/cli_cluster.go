@@ -30,6 +30,8 @@ const (
 	CLIReleaseName = "consul"
 )
 
+var cliDefaultArgs = []string{"-timeout", "15m"}
+
 // CLICluster.
 type CLICluster struct {
 	ctx                environment.TestContext
@@ -108,7 +110,7 @@ func NewCLICluster(
 
 // Create uses the `consul-k8s install` command to create a Consul cluster. The command itself will fail if there are
 // prior installations of Consul in the cluster so it is sufficient to run the install command without a pre-check.
-func (c *CLICluster) Create(t *testing.T) {
+func (c *CLICluster) Create(t *testing.T, args ...string) {
 	t.Helper()
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
@@ -118,15 +120,14 @@ func (c *CLICluster) Create(t *testing.T) {
 	})
 
 	// Set the args for running the install command.
-	args := []string{"install"}
+	if len(args) == 0 {
+		args = cliDefaultArgs
+	}
+	args = append([]string{"install"}, args...)
 	args = c.setKube(args)
-
 	for k, v := range c.values {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
-
-	// Match the timeout for the helm tests.
-	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
 	out, err := c.runCLI(args)
@@ -140,7 +141,7 @@ func (c *CLICluster) Create(t *testing.T) {
 }
 
 // Upgrade uses the `consul-k8s upgrade` command to upgrade a Consul cluster.
-func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
+func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string, args ...string) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
@@ -150,16 +151,15 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	}
 
 	// Set the args for running the upgrade command.
-	args := []string{"upgrade"}
+	if len(args) == 0 {
+		args = cliDefaultArgs
+	}
+	args = append([]string{"upgrade"}, args...)
 	args = c.setKube(args)
-
 	helpers.MergeMaps(c.helmOptions.SetValues, helmValues)
 	for k, v := range c.helmOptions.SetValues {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
-
-	// Match the timeout for the helm tests.
-	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
 	out, err := c.runCLI(args)
@@ -173,13 +173,16 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 }
 
 // Destroy uses the `consul-k8s uninstall` command to destroy a Consul cluster.
-func (c *CLICluster) Destroy(t *testing.T) {
+func (c *CLICluster) Destroy(t *testing.T, args ...string) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
 
 	// Set the args for running the uninstall command.
-	args := []string{"uninstall"}
+	if len(args) == 0 {
+		args = cliDefaultArgs
+	}
+	args = append([]string{"uninstall"}, args...)
 	args = c.setKube(args)
 	args = append(args, "-auto-approve", "-wipe-data")
 

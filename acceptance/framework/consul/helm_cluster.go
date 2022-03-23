@@ -26,6 +26,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Wait up to 15 min for K8s resources to be in a ready state. Increasing
+// this from the default of 5 min could help with flakiness in environments
+// like AKS where volumes take a long time to mount.
+var helmDefaultArgs = []string{"--timeout", "15m"}
+
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul.
 type HelmCluster struct {
@@ -73,18 +78,10 @@ func NewHelmCluster(
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
-	// Wait up to 15 min for K8s resources to be in a ready state. Increasing
-	// this from the default of 5 min could help with flakiness in environments
-	// like AKS where volumes take a long time to mount.
-	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m"},
-	}
-
 	opts := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: ctx.KubectlOptions(t),
 		Logger:         logger,
-		ExtraArgs:      extraArgs,
 	}
 	return &HelmCluster{
 		ctx:                ctx,
@@ -97,7 +94,7 @@ func NewHelmCluster(
 	}
 }
 
-func (h *HelmCluster) Create(t *testing.T) {
+func (h *HelmCluster) Create(t *testing.T, args ...string) {
 	t.Helper()
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
@@ -109,15 +106,37 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Fail if there are any existing installations of the Helm chart.
 	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
 
+	// Set install arguments if provided, otherwise default.
+	var installArgs []string
+	if len(args) == 0 {
+		installArgs = helmDefaultArgs
+	} else {
+		installArgs = args
+	}
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"install": installArgs,
+	}
+
 	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
-func (h *HelmCluster) Destroy(t *testing.T) {
+func (h *HelmCluster) Destroy(t *testing.T, args ...string) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
+
+	// Set uninstall arguments if provided, otherwise default.
+	var uninstallArgs []string
+	if len(args) == 0 {
+		uninstallArgs = helmDefaultArgs
+	} else {
+		uninstallArgs = args
+	}
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"uninstall": uninstallArgs,
+	}
 
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
@@ -203,10 +222,22 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 }
 
-func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
+func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string, args ...string) {
 	t.Helper()
 
 	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
+
+	// Set upgrade args if provided, otherwise default.
+	var upgradeArgs []string
+	if len(args) == 0 {
+		upgradeArgs = helmDefaultArgs
+	} else {
+		upgradeArgs = args
+	}
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"upgrade": upgradeArgs,
+	}
+
 	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
