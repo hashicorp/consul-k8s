@@ -39,6 +39,83 @@ load _helpers
       .
 }
 
+@test "client/SnapshotAgentDeployment: when client.snapshotAgent.configSecret.secretKey!=null and client.snapshotAgent.configSecret.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.configSecret.secretName=' \
+      --set 'client.snapshotAgent.configSecret.secretKey=bar' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "client.snapshotAgent.configSecret.secretKey and secretName must both be specified." ]]
+}
+
+@test "client/SnapshotAgentDeployment: when client.snapshotAgent.configSecret.secretName!=null and client.snapshotAgent.configSecret.secretKey=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/client-snapshot-agent-deployment.yaml  \
+        --set 'client.snapshotAgent.configSecret.secretName=foo' \
+        --set 'client.snapshotAgent.configSecret.secretKey=' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "client.snapshotAgent.configSecret.secretKey and secretName must both be specified." ]]
+}
+
+@test "client/SnapshotAgentDeployment: adds volume for snapshot agent config secret when secret is configured" {
+  cd `chart_dir`
+  local vol=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "snapshot-config")' | tee /dev/stderr)
+  local actual
+  actual=$(echo $vol | jq -r '. .name' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-config' ]
+
+  actual=$(echo $vol | jq -r '. .secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = 'a/b/c/d' ]
+
+  actual=$(echo $vol | jq -r '. .secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-agent-config' ]
+
+  actual=$(echo $vol | jq -r '. .secret.items[0].path' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-config.json' ]
+}
+
+@test "client/SnapshotAgentDeployment: adds volume mount to snapshot container for snapshot agent config secret when secret is configured" {
+  cd `chart_dir`
+  local vol=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "snapshot-config")' | tee /dev/stderr)
+  local actual
+  actual=$(echo $vol | jq -r '. .name' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-config' ]
+
+  actual=$(echo $vol | jq -r '. .readOnly' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  actual=$(echo $vol | jq -r '. .mountPath' | tee /dev/stderr)
+  [ "${actual}" = '/consul/config' ]
+}
+
+@test "client/SnapshotAgentDeployment: set config-dir argument on snapshot agent command to volume mount" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("-config-dir=/consul/config")' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
 #--------------------------------------------------------------------
 # tolerations
 
@@ -744,6 +821,93 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = "" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault snapshot agent config annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulSnapshotAgentRole=bar' \
+    --set 'client.snapshotAgent.enabled=true' \
+    --set 'client.snapshotAgent.configSecret.secretName=path/to/secret' \
+    --set 'client.snapshotAgent.configSecret.secretKey=config' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+
+  actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-snapshot-agent-config.txt"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.config -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  actual=$(echo $object | jq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault does not add volume for snapshot agent config secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "snapshot-config")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault does not add volume mount for snapshot agent config secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "snapshot-config")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault decondes snapshot-agent-config.txt into a .json file so that consul snapshot agent will process it" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=config' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat /vault/secrets/snapshot-agent-config.txt | base64 -d > /vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+@test "client/SnapshotAgentDeployment: vault sets config-file argument on snapshot agent command to config downloaded by vault agent injector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("-config-file=/vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }
 
 #--------------------------------------------------------------------

@@ -9,6 +9,7 @@ IMPROVEMENTS:
   * Upgrade Docker image Alpine version from 3.14 to 3.15. [[GH-1058](https://github.com/hashicorp/consul-k8s/pull/1058)]
 * Helm
   * API Gateway: Allow controller to read Kubernetes namespaces in order to determine if route is allowed for gateway. [[GH-1092](https://github.com/hashicorp/consul-k8s/pull/1092)]
+* Vault: Add support for Snapshot Agent to be configured in Vault. [[GH-XXXX](https://github.com/hashicorp/consul-k8s/pull/XXXX)]
 
 BUG FIXES:
 * Helm
