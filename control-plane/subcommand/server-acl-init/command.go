@@ -790,7 +790,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 	// to each gateway role depending on what services it represents.
 	for _, name := range gatewayParams.GatewayNames {
 		if name == "" {
-			errMessage := fmt.Sprintf("%s gateway names cannot be empty",
+			errMessage := fmt.Sprintf("%s gateway name cannot be empty",
 				strings.Title(strings.ToLower(gatewayParams.GatewayType)))
 			c.log.Error(errMessage)
 			return errors.New(errMessage)
