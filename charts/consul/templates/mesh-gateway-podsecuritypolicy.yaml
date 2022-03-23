@@ -30,6 +30,14 @@ spec:
   {{- else }}
   hostNetwork: false
   {{- end }}
+  hostPorts:
+  {{- if .Values.meshGateway.hostPort }}
+  - min: {{ .Values.meshGateway.hostPort }}
+    max: {{ .Values.meshGateway.hostPort }}
+  {{- else if .Values.meshGateway.hostNetwork }}
+  - min: {{ .Values.meshGateway.containerPort }}
+    max: {{ .Values.meshGateway.containerPort }}
+  {{- end }}
   hostIPC: false
   hostPID: false
   runAsUser:
