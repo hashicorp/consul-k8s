@@ -335,8 +335,8 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"enterprise-license-token",
 				"gw-ingress-gateway-token",
 				"anothergw-ingress-gateway-token",
-				"gw-terminating-gateway-token",
-				"anothergw-terminating-gateway-token",
+				resourcePrefix + "-gw-terminating-gateway-policy",
+				resourcePrefix + "-anothergw-terminating-gateway-policy",
 				"connect-inject-policy",
 				"controller-policy",
 			}
@@ -388,8 +388,8 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"cross-namespace-policy",
 				"gw-ingress-gateway-token",
 				"anothergw-ingress-gateway-token",
-				"gw-terminating-gateway-token",
-				"anothergw-terminating-gateway-token",
+				resourcePrefix + "-gw-terminating-gateway-policy",
+				resourcePrefix + "-anothergw-terminating-gateway-policy",
 				"controller-policy",
 				"partitions-token",
 			}
@@ -692,19 +692,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
 			LocalToken: true,
 		},
-		"terminating gateway tokens": {
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
-			LocalToken: true,
-		},
 		"acl-replication token": {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
@@ -900,9 +887,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
 				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-terminating-terminating-gateway-policy",
+				resourcePrefix + "-gateway-terminating-gateway-policy",
+				resourcePrefix + "-another-gateway-terminating-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -940,9 +927,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating.",
 				"-terminating-gateway-name=gateway.namespace1",
 				"-terminating-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-terminating-terminating-gateway-policy",
+				resourcePrefix + "-gateway-terminating-gateway-policy",
+				resourcePrefix + "-another-gateway-terminating-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {

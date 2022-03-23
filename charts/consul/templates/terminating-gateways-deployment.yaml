@@ -24,7 +24,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  name: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
   namespace: {{ $root.Release.Namespace }}
   labels:
     app: {{ template "consul.name" $root }}
@@ -32,7 +32,7 @@ metadata:
     heritage: {{ $root.Release.Service }}
     release: {{ $root.Release.Name }}
     component: terminating-gateway
-    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
 spec:
   replicas: {{ default $defaults.replicas .replicas }}
   selector:
@@ -42,7 +42,7 @@ spec:
       heritage: {{ $root.Release.Service }}
       release: {{ $root.Release.Name }}
       component: terminating-gateway
-      terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+      terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
   template:
     metadata:
       labels:
@@ -51,7 +51,7 @@ spec:
         heritage: {{ $root.Release.Service }}
         release: {{ $root.Release.Name }}
         component: terminating-gateway
-        terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+        terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
       annotations:
         {{- if (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
@@ -90,7 +90,7 @@ spec:
         {{ tpl (default $defaults.tolerations .tolerations) $root | nindent 8 | trim }}
       {{- end }}
       terminationGracePeriodSeconds: 10
-      serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
+      serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
       volumes:
         - name: consul-bin
           emptyDir: {}
@@ -154,8 +154,8 @@ spec:
         {{- if (and $root.Values.global.tls.enabled $root.Values.global.tls.enableAutoEncrypt) }}
         {{- include "consul.getAutoEncryptClientCA" $root | nindent 8 }}
         {{- end }}
-        # service-init registers the terminating gateway service.
-        - name: service-init
+        # terminating-gateway-init registers the terminating gateway service with Consul.
+        - name: terminating-gateway-init
           image: {{ $root.Values.global.imageK8S }}
           env:
             - name: HOST_IP
@@ -185,9 +185,14 @@ spec:
             - |
                 {{- if $root.Values.global.acls.manageSystemACLs }}
                 consul-k8s-control-plane acl-init \
-                  -secret-name="{{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway-acl-token" \
-                  -k8s-namespace={{ $root.Release.Namespace }} \
-                  -token-sink-file=/consul/service/acl-token
+                  -component-name=terminating-gateway/{{ template "consul.fullname" $root }}-{{ .name }} \
+                  -acl-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
+                  {{- if $root.Values.global.adminPartitions.enabled }}
+                  -partition={{ $root.Values.global.adminPartitions.name }} \
+                  {{- end }}
+                  -token-sink-file=/consul/service/acl-token \
+                  -log-level={{ default $root.Values.global.logLevel }} \
+                  -log-json={{ $root.Values.global.logJSON }}
                 {{- end }}
 
                 cat > /consul/service/service.hcl << EOF
@@ -252,6 +257,9 @@ spec:
           volumeMounts:
           - name: consul-bin
             mountPath: /consul-bin
+          - mountPath: /consul/service
+            name: consul-service
+            readOnly: true
           {{- if $root.Values.global.tls.enabled }}
           {{- if $root.Values.global.tls.enableAutoEncrypt }}
           - name: consul-auto-encrypt-ca-cert
@@ -280,12 +288,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             {{- if $root.Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_HTTP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway-acl-token"
-                  key: "token"
-            {{- end}}
+            - name: CONSUL_HTTP_TOKEN_FILE
+              value: "/consul/service/acl-token"
+            {{- end }}
             {{- if $root.Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: https://$(HOST_IP):8501
@@ -345,6 +350,9 @@ spec:
                       -partition={{ $root.Values.global.adminPartitions.name }} \
                       {{- end }}
                       -id="${POD_NAME}"
+                  {{- if $root.Values.global.acls.manageSystemACLs }}
+                  - "/consul-bin/consul logout"
+                  {{- end}}
 
         # consul-sidecar ensures the terminating gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.

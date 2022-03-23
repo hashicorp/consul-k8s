@@ -185,20 +185,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken: true,
 		},
 		{
-			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
-			LocalToken: true,
-		},
-		{
 			TestName:    "ACL replication token",
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
@@ -370,20 +356,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
 			LocalToken: true,
 		},
-		{
-			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token-dc2",
-				"gateway-terminating-gateway-token-dc2",
-				"another-gateway-terminating-gateway-token-dc2"},
-			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
-			LocalToken: true,
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -465,18 +437,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
 				resourcePrefix + "-gateway-ingress-gateway-acl-token",
 				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
-		},
-		{
-			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
 		},
 		{
 			TestName:    "ACL replication token",
@@ -1836,7 +1796,6 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-
 	responseCode := cmd.Run([]string{
 		"-timeout=500ms",
 		"-resource-prefix=" + resourcePrefix,
@@ -2192,6 +2151,18 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			PolicyNames: []string{"client-policy"},
 			Roles:       []string{resourcePrefix + "-client-acl-role"},
 		},
+		{
+			TestName: "Terminating Gateway",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{resourcePrefix + "-terminating-terminating-gateway-policy",
+				resourcePrefix + "-gateway-terminating-gateway-policy",
+				resourcePrefix + "-another-gateway-terminating-gateway-policy"},
+			Roles: []string{resourcePrefix + "-terminating-terminating-gateway-acl-role",
+				resourcePrefix + "-gateway-terminating-gateway-acl-role",
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-role"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2332,6 +2303,19 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-client-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
 		},
+		{
+			TestName: "Terminating Gateway",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{resourcePrefix + "-terminating-terminating-gateway-policy-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-terminating-gateway-policy-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-terminating-gateway-policy-" + secondaryDatacenter},
+			Roles: []string{resourcePrefix + "-terminating-terminating-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-gateway-terminating-gateway-acl-role-" + secondaryDatacenter,
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-role-" + secondaryDatacenter},
+			GlobalAuthMethod: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -2418,10 +2402,11 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		ComponentName string
-		TokenFlags    []string
-		Roles         []string
-		GlobalToken   bool
+		ComponentName      string
+		TokenFlags         []string
+		Roles              []string
+		ServiceAccountName string
+		GlobalToken        bool
 	}{
 		{
 			ComponentName: "controller",
@@ -2465,11 +2450,27 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			Roles:         []string{resourcePrefix + "-client-acl-role"},
 			GlobalToken:   false,
 		},
+		// We are only testing one terminating gateway here because we are just
+		// validating that we can issue a consul login for each component type.
+		// Having multiple gateways is not necessary given that to make the
+		// login that occurs from the test here would require getting multiple
+		// tokens in the test fixture instead of the hardcoded
+		// serviceAccountToken we have in this file
+		{
+			ComponentName:      "terminating-gateway",
+			TokenFlags:         []string{"-terminating-gateway-name=terminating"},
+			Roles:              []string{resourcePrefix + "-terminating-terminating-gateway-acl-role"},
+			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "terminating-terminating-gateway"),
+			GlobalToken:        false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
 			authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
 			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
+			if len(c.ServiceAccountName) > 0 {
+				serviceAccountName = c.ServiceAccountName
+			}
 
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
@@ -2533,11 +2534,12 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		ComponentName    string
-		TokenFlags       []string
-		Roles            []string
-		GlobalAuthMethod bool
-		GlobalToken      bool
+		ComponentName      string
+		TokenFlags         []string
+		Roles              []string
+		ServiceAccountName string
+		GlobalAuthMethod   bool
+		GlobalToken        bool
 	}{
 		{
 			ComponentName:    "controller",
@@ -2588,6 +2590,20 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			GlobalAuthMethod: false,
 			GlobalToken:      false,
 		},
+		// We are only testing one terminating gateway here because we are just
+		// validating that we can issue a consul login for each component type.
+		// Having multiple gateways is not necessary given that to make the
+		// login that occurs from the test here would require getting multiple
+		// tokens in the test fixture instead of the hardcoded
+		// serviceAccountToken we have in this file
+		{
+			ComponentName:      "terminating-gateway",
+			TokenFlags:         []string{"-terminating-gateway-name=terminating"},
+			Roles:              []string{resourcePrefix + "-terminating-terminating-gateway-acl-role-dc2"},
+			ServiceAccountName: fmt.Sprintf("%s-%s", resourcePrefix, "terminating-terminating-gateway"),
+			GlobalAuthMethod:   false,
+			GlobalToken:        false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.ComponentName, func(t *testing.T) {
@@ -2598,6 +2614,9 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 				authMethodName = fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, "dc2")
 			}
 			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
+			if len(c.ServiceAccountName) > 0 {
+				serviceAccountName = c.ServiceAccountName
+			}
 
 			k8s, _, consulHTTPAddr, cleanup := mockReplicatedSetup(t, bootToken)
 			defer cleanup()

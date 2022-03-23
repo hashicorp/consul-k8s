@@ -7,7 +7,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name:  {{ template "consul.fullname" $root }}-{{ .name }}
+  name:  {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
   namespace: {{ $root.Release.Namespace }}
   labels:
     app: {{ template "consul.name" $root }}
@@ -15,14 +15,14 @@ metadata:
     heritage: {{ $root.Release.Service }}
     release: {{ $root.Release.Name }}
     component: terminating-gateway
-    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
 {{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.enablePodSecurityPolicies) }}
 rules:
 {{- if $root.Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
     resourceNames:
-      -  {{ template "consul.fullname" $root }}-{{ .name }}
+      -  {{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway
     verbs:
       - use
 {{- end }}

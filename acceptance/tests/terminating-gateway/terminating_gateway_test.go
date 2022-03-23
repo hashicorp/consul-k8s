@@ -69,11 +69,11 @@ func TestTerminatingGateway(t *testing.T) {
 			// Register the external service
 			registerExternalService(t, consulClient, "")
 
-			// If ACLs are enabled we need to update the token of the terminating gateway
+			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can can request Connect certificates for it.
 			if c.secure {
-				updateTerminatingGatewayToken(t, consulClient, staticServerPolicyRules)
+				updateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
 			}
 
 			// Create the config entry for the terminating gateway.
@@ -133,32 +133,32 @@ func registerExternalService(t *testing.T, consulClient *api.Client, namespace s
 	require.NoError(t, err)
 }
 
-func updateTerminatingGatewayToken(t *testing.T, consulClient *api.Client, rules string) {
+func updateTerminatingGatewayRole(t *testing.T, consulClient *api.Client, rules string) {
 	t.Helper()
 
-	// Create a write policy for the static-server.
+	logger.Log(t, "creating a write policy for the static-server")
 	_, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
 		Name:  "static-server-write-policy",
 		Rules: rules,
 	}, nil)
 	require.NoError(t, err)
 
-	// Get the terminating gateway token.
-	tokens, _, err := consulClient.ACL().TokenList(nil)
+	logger.Log(t, "getting the terminating gateway role")
+	roles, _, err := consulClient.ACL().RoleList(nil)
 	require.NoError(t, err)
-	var termGwTokenID string
-	for _, token := range tokens {
-		if strings.Contains(token.Description, "terminating-gateway-terminating-gateway-token") {
-			termGwTokenID = token.AccessorID
+	terminatingGatewayRoleID := ""
+	for _, role := range roles {
+		if strings.Contains(role.Name, "terminating-gateway") {
+			terminatingGatewayRoleID = role.ID
 			break
 		}
 	}
-	termGwToken, _, err := consulClient.ACL().TokenRead(termGwTokenID, nil)
-	require.NoError(t, err)
 
-	// Add policy to the token and update it
-	termGwToken.Policies = append(termGwToken.Policies, &api.ACLTokenPolicyLink{Name: "static-server-write-policy"})
-	_, _, err = consulClient.ACL().TokenUpdate(termGwToken, nil)
+	logger.Log(t, "update role with policy")
+	termGwRole, _, err := consulClient.ACL().RoleRead(terminatingGatewayRoleID, nil)
+	require.NoError(t, err)
+	termGwRole.Policies = append(termGwRole.Policies, &api.ACLTokenPolicyLink{Name: "static-server-write-policy"})
+	_, _, err = consulClient.ACL().RoleUpdate(termGwRole, nil)
 	require.NoError(t, err)
 }
 
