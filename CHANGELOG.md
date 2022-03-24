@@ -3,7 +3,25 @@
 BREAKING CHANGES:
 * Helm
   * Minimum Kubernetes version supported is 1.19 and now matches what is stated in the `README.md` file.  [[GH-1049](https://github.com/hashicorp/consul-k8s/pull/1049)] 
+* ACLs
+  * Support Terminating Gateway obtaining an ACL token via using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
+  * **Note**: If you have updated a token with a new policy for a terminating gateway, this will not apply any more as ACL tokens will be ephemeral and are issued to the terminating gateways when the pod is created and destroyed when the pod is stopped.  To achieve the same ACL permissions, you will need to assign the policy to the role for the terminating gateway, rather than the token.   
+  
 
+FEATURES:
+* ACLs: Enable issuing ACL tokens via Consul login with a Kubernetes Auth Method and replace the need for storing ACL tokens as Kubernetes secrets.
+  * Support CRD controller obtaining an ACL token via using a k8s auth method. [GH-995](https://github.com/hashicorp/consul-k8s/pull/995)
+  * Support Connect Inject obtaining an ACL token via using a k8s auth method. [GH-1076](https://github.com/hashicorp/consul-k8s/pull/1076)
+  * Support Sync Catalog obtaining an ACL token via using a k8s auth method. [GH-1081](https://github.com/hashicorp/consul-k8s/pull/1081), [GHT-1077](https://github.com/hashicorp/consul-k8s/pull/1077)
+  * Support API Gateway controller obtaining an ACL token via using a k8s auth method. [GH-1083](https://github.com/hashicorp/consul-k8s/pull/1083)
+  * Support Snapshot Agent obtaining an ACL token via using a k8s auth method. [GH-1084](https://github.com/hashicorp/consul-k8s/pull/1084)
+  * Support Mesh Gateway obtaining an ACL token via using a k8s auth method. [GH-1085](https://github.com/hashicorp/consul-k8s/pull/1085)
+  * Support Ingress Gateway obtaining an ACL token via using a k8s auth method. [GH-1118](https://github.com/hashicorp/consul-k8s/pull/1118)
+  * Support Terminating Gateway obtaining an ACL token via using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
+  * Support Client obtaining an ACL token via using a k8s auth method. [GH-1093](https://github.com/hashicorp/consul-k8s/pull/1093)
+  * Support issuing global ACL tokens via k8s auth method. [GH-1075](https://github.com/hashicorp/consul-k8s/pull/1075)
+  
+  
 IMPROVEMENTS:
 * Control Plane
   * Upgrade Docker image Alpine version from 3.14 to 3.15. [[GH-1058](https://github.com/hashicorp/consul-k8s/pull/1058)]
