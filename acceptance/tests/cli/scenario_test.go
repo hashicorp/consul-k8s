@@ -28,9 +28,10 @@ func TestUpgradeInNonConsulNamespace(t *testing.T) {
 	}
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
+	cfg.KubeNamespace = "default"
 
 	cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
-	cluster.Create(t, "-namespace", "default")
+	cluster.Create(t)
 
 	// Try to upgrade Consul.
 	cluster.Upgrade(t, helmValues)

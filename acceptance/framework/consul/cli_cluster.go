@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	consulNS       = "consul"
 	CLIReleaseName = "consul"
 )
 
@@ -57,20 +56,25 @@ func NewCLICluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *CLICluster {
+	// Use "consul" as the default namespace, same as the CLI.
+	if cfg.KubeNamespace == "" {
+		cfg.KubeNamespace = "consul"
+	}
+
 	// Create the namespace so the PSPs, SCCs, and enterprise secret can be
 	// created in the right namespace.
-	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
+	createOrUpdateNamespace(t, ctx.KubernetesClient(t), cfg.KubeNamespace)
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, consulNS)
+		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, cfg.KubeNamespace)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
-		configureSCCs(t, ctx.KubernetesClient(t), cfg, consulNS)
+		configureSCCs(t, ctx.KubernetesClient(t), cfg, cfg.KubeNamespace)
 	}
 
 	if cfg.EnterpriseLicense != "" {
-		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, consulNS)
+		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, cfg.KubeNamespace)
 	}
 
 	// Deploy with the following defaults unless helmValues overwrites it.
@@ -85,7 +89,7 @@ func NewCLICluster(
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
-	kopts.Namespace = consulNS
+	kopts.Namespace = cfg.KubeNamespace
 	hopts := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: kopts,
@@ -129,6 +133,7 @@ func (c *CLICluster) Create(t *testing.T, args ...string) {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
 	args = append(args, "-auto-approve")
+	args = append(args, "-namespace", c.namespace)
 
 	out, err := c.runCLI(args)
 	if err != nil {
@@ -137,7 +142,7 @@ func (c *CLICluster) Create(t *testing.T, args ...string) {
 	}
 	require.NoError(t, err)
 
-	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, c.namespace, fmt.Sprintf("release=%s", c.releaseName))
 }
 
 // Upgrade uses the `consul-k8s upgrade` command to upgrade a Consul cluster.
@@ -169,7 +174,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string, args ..
 	}
 	require.NoError(t, err)
 
-	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, c.namespace, fmt.Sprintf("release=%s", c.releaseName))
 }
 
 // Destroy uses the `consul-k8s uninstall` command to destroy a Consul cluster.
