@@ -65,7 +65,7 @@ func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 }
 
 // FetchChartValues will attempt to fetch the values from the currently installed Helm chart.
-func FetchChartValues(namespace string, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (map[string]interface{}, error) {
+func FetchChartValues(namespace, name string, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (map[string]interface{}, error) {
 	cfg := new(action.Configuration)
 	cfg, err := InitActionConfig(cfg, namespace, settings, uiLogger)
 	if err != nil {
@@ -73,7 +73,7 @@ func FetchChartValues(namespace string, settings *helmCLI.EnvSettings, uiLogger 
 	}
 
 	status := action.NewStatus(cfg)
-	release, err := status.Run(namespace)
+	release, err := status.Run(name)
 	if err != nil {
 		return nil, err
 	}
