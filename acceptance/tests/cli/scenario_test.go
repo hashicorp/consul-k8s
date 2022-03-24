@@ -16,11 +16,22 @@ func TestUpgradeAfterFailedInstall(t *testing.T) {
 	cfg := suite.Config()
 
 	cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
-	t.Log("Installing Consul in a way that will fail")
 	cluster.Create(t, "-timeout", "1s")
 
 	// Try to upgrade Consul.
-	t.Log("Attempting to upgrade Consul")
 	cluster.Upgrade(t, helmValues)
-	t.Log("Done")
+}
+
+func TestUpgradeInNonConsulNamespace(t *testing.T) {
+	helmValues := map[string]string{
+		"server.replicas": "1",
+	}
+	ctx := suite.Environment().DefaultContext(t)
+	cfg := suite.Config()
+
+	cluster := consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
+	cluster.Create(t, "-namespace", "default")
+
+	// Try to upgrade Consul.
+	cluster.Upgrade(t, helmValues)
 }
