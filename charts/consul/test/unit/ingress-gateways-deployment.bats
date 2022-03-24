@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
 }
 
 @test "ingressGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -57,7 +57,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
 }
 
 @test "ingressGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -1330,7 +1330,7 @@ key2: value2' \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-ingress-gateway-ingress-gateway \
+  -name=RELEASE-NAME-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1400,7 +1400,7 @@ consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-ingress-gateway-ingress-gateway \
+  -name=RELEASE-NAME-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1627,10 +1627,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

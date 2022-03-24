@@ -97,7 +97,7 @@ func TestIngressGateway(t *testing.T) {
 				logger.Log(t, "testing intentions prevent ingress")
 				k8s.CheckStaticServerConnectionFailing(t, k8sOptions,
 					staticClientName, "-H", "Host: static-server.ingress.consul",
-					fmt.Sprintf("http://%s-consul-%s-ingress-gateway:8080/", releaseName, igName))
+					fmt.Sprintf("http://%s-consul-%s:8080/", releaseName, igName))
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
@@ -119,7 +119,7 @@ func TestIngressGateway(t *testing.T) {
 			logger.Log(t, "trying calls to ingress gateway")
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions,
 				staticClientName, "-H", "Host: static-server.ingress.consul",
-				fmt.Sprintf("http://%s-consul-%s-ingress-gateway:8080/", releaseName, igName))
+				fmt.Sprintf("http://%s-consul-%s:8080/", releaseName, igName))
 		})
 	}
 }

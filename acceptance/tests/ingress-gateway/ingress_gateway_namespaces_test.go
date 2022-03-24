@@ -121,7 +121,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s-ingress-gateway.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -247,7 +247,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s-ingress-gateway.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
