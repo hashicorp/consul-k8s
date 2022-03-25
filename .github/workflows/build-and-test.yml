@@ -9,7 +9,24 @@ env:
   GOTESTSUM_VERSION: 1.6.4 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 jobs:
+  get-go-version:
+    name: "Determine Go toolchain version"
+    runs-on: ubuntu-latest
+    outputs:
+      go-version: ${{ steps.get-go-version.outputs.go-version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Determine Go version
+        id: get-go-version
+        # We use .go-version as our source of truth for current Go
+        # version, because "goenv" can react to it automatically.
+        run: |
+          echo "Building with Go $(cat .go-version)"
+          echo "::set-output name=go-version::$(cat .go-version)"
+
   validate-helm-gen:
+    needs:
+      - get-go-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -18,7 +35,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -36,22 +53,25 @@ jobs:
           go run ./... -validate
 
   golangci-lint-helm-gen:
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
-    with:
+   needs:
+    - get-go-version
+   uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
+   with:
       directory: hack/helm-reference-gen
-      go-version: 1.17.2
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
       #TODO: This is a workaround in order to get pipelines working. godot and staticcheck fail for helm-reference-gen
       args: "--no-config --disable-all --enable gofmt,govet"
 
   unit-helm-gen:
-    needs: [golangci-lint-helm-gen, validate-helm-gen]
+    needs: [get-go-version, golangci-lint-helm-gen, validate-helm-gen]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@main
     with:
       directory: hack/helm-reference-gen
-      go-version: 1.17.2
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
 
   unit-test-helm-templates:
-    needs: [unit-helm-gen]
+    needs: 
+      - unit-helm-gen
     runs-on: ubuntu-latest
     container: 
       image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
@@ -65,6 +85,8 @@ jobs:
         run:  bats --jobs 4 ./test/unit
 
   lint-control-plane:
+    needs:
+      - get-go-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -73,7 +95,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
 
       - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
 
@@ -82,13 +104,15 @@ jobs:
         run: go run hack/lint-api-new-client/main.go
 
   golangci-lint-control-plane:
+    needs:
+      - get-go-version
     uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
     with:
       directory: control-plane
-      go-version: 1.17.2
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
 
   test-control-plane:
-    needs: [lint-control-plane, golangci-lint-control-plane]
+    needs: [get-go-version, lint-control-plane, golangci-lint-control-plane]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -97,7 +121,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -135,7 +159,7 @@ jobs:
 
   test-enterprise-control-plane:
     if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
-    needs: [lint-control-plane, golangci-lint-control-plane]
+    needs: [get-go-version, lint-control-plane, golangci-lint-control-plane]
     runs-on: ubuntu-latest
     env:
       CONSUL_LICENSE: ${{secrets.CONSUL_LICENSE}}
@@ -146,7 +170,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.2
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
 
       - name: Setup go mod cache
         uses: actions/cache@v2
@@ -183,15 +207,15 @@ jobs:
             gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
   build-distros:
-    needs: [test-control-plane, test-enterprise-control-plane]
+    needs: [get-go-version, test-control-plane, test-enterprise-control-plane]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - {go: "1.17.2", goos: "linux", goarch: "386"}
-          - {go: "1.17.2", goos: "linux", goarch: "amd64"}
-          - {go: "1.17.2", goos: "linux", goarch: "arm"}
-          - {go: "1.17.2", goos: "linux", goarch: "arm64"}
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386"}
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64"}
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm"}
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64"}
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} build
@@ -219,30 +243,34 @@ jobs:
           path: control-plane/consul-k8s_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
   golangci-lint-acceptance:
+    needs:
+      - get-go-version
     uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
     with:
       directory:  acceptance 
-      go-version: 1.17.2 
+      go-version: ${{ needs.get-go-version.outputs.go-version }} 
 
   unit-acceptance-framework:
-    needs: golangci-lint-acceptance
+    needs: [get-go-version, golangci-lint-acceptance]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@main
     with:
       directory: acceptance/framework
-      go-version: 1.17.2
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
 
   golangci-lint-cli:
+    needs:
+      - get-go-version
     uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
     with:
       directory: cli 
-      go-version: 1.17.2
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
 
   unit-cli:
-    needs: golangci-lint-cli
+    needs: [get-go-version, golangci-lint-cli]
     uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@main
     with:
       directory: cli 
-      go-version: 1.17.2
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
 
 # Disabling for now until we get faster VMs to run acceptance tests. Faster VMs for Github Actions are supposed
 # to be available in the summer of 2022. For now, run the dev-upload docker and acceptance tests in CircleCI
@@ -272,26 +300,26 @@ jobs:
 #          make ci.dev-docker-github
 #
 #  acceptance-tproxy:
-#    needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+#    needs: [get-go-version, unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
 #    needs: dev-upload-docker
 #    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
 #    with:
 #      name: acceptance-tproxy
 #      directory: acceptance/tests
-#      go-version: 1.17.2
+#      go-version: ${{ needs.get-go-version.outputs.go-version }}
 #      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
 #      gotestsum-version: 1.6.4
 #    secrets:
 #      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 #
 #  acceptance:
-#    #needs: [unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
+#    #needs: [get-go-version, unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
 #    needs: dev-upload-docker
 #    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
 #    with:
 #      name: acceptance
 #      directory: acceptance/tests
-#      go-version: 1.17.2
+#      go-version: ${{ needs.get-go-version.outputs.go-version }}
 #      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2"
 #      gotestsum-version: 1.6.4
 #    secrets:

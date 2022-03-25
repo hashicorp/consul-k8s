@@ -1,3 +1,6 @@
+
+VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
+
 # ===========> Helm Targets
 
 gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
@@ -8,8 +11,6 @@ copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make c
 
 bats-tests: ## Run Helm chart bats tests.
 	 bats --jobs 4 charts/consul/test/unit
-
-
 
 
 # ===========> Control Plane Targets
@@ -23,7 +24,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       -f $(CURDIR)/control-plane/build-support/docker/Dev.dockerfile $(CURDIR)/control-plane
+			 -f $(CURDIR)/control-plane/build-support/docker/Dev.dockerfile $(CURDIR)/control-plane
 
 control-plane-test: ## Run go test for the control plane.
 	cd control-plane; go test ./...
@@ -94,13 +95,13 @@ endif
 ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after failed acceptance tests.
 	@cd hack/aws-acceptance-test-cleanup; go run ./... -auto-approve
 
-
-
+version:
+	@echo $(VERSION)
 
 # ===========> Makefile config
 
 .DEFAULT_GOAL := help
-.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup
+.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version
 SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
