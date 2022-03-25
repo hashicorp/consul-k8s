@@ -22,6 +22,9 @@ func TestUpgradeAfterFailedInstall(t *testing.T) {
 	cluster.Upgrade(t, helmValues)
 }
 
+// TestUpgradeInNonConsulNamespace exercises the scenario where Consul is
+// installed in a namespace other than "consul". The upgrade command should
+// find the Consul cluster in the namespace and upgrade it.
 func TestUpgradeInNonConsulNamespace(t *testing.T) {
 	helmValues := map[string]string{
 		"server.replicas": "1",
