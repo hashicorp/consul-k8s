@@ -1,4 +1,3 @@
-
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
 
 # ===========> Helm Targets
