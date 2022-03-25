@@ -47,7 +47,7 @@ load _helpers
       --set 'client.snapshotAgent.configSecret.secretKey=bar' \
         .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "client.snapshotAgent.configSecret.secretKey and secretName must both be specified." ]]
+  [[ "$output" =~ "client.snapshotAgent.configSecret.secretKey and client.snapshotAgent.configSecret.secretName must both be specified." ]]
 }
 
 @test "client/SnapshotAgentDeployment: when client.snapshotAgent.configSecret.secretName!=null and client.snapshotAgent.configSecret.secretKey=null, fail" {
@@ -58,7 +58,7 @@ load _helpers
         --set 'client.snapshotAgent.configSecret.secretKey=' \
         .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "client.snapshotAgent.configSecret.secretKey and secretName must both be specified." ]]
+  [[ "$output" =~ "client.snapshotAgent.configSecret.secretKey and client.snapshotAgent.configSecret.secretName must both be specified." ]]
 }
 
 @test "client/SnapshotAgentDeployment: adds volume for snapshot agent config secret when secret is configured" {
@@ -891,7 +891,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
       --set 'client.snapshotAgent.configSecret.secretKey=config' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat /vault/secrets/snapshot-agent-config.txt | base64 -d > /vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat \"$decodedJson\" > /vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
 
