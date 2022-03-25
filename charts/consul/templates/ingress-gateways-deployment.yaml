@@ -9,6 +9,16 @@
 {{- $defaults := .Values.ingressGateways.defaults }}
 {{- $names := dict }}
 
+{{- $gateways := .Values.ingressGateways.gateways }}
+{{- range $outerIngressIndex, $outerIngressVal := $gateways }}
+
+{{- range $innerIngressIndex, $innerIngressVal := $gateways }}
+{{- if (and (ne $outerIngressIndex $innerIngressIndex) (eq $outerIngressVal.name $innerIngressVal.name)) }}
+{{ fail "ingress gateways must have unique names" }}
+{{ end -}}
+{{ end -}}
+{{ end -}}
+
 {{- range .Values.ingressGateways.gateways }}
 
 {{- $service := .service }}

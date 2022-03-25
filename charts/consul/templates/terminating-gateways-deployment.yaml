@@ -9,6 +9,22 @@
 {{- $defaults := .Values.terminatingGateways.defaults }}
 {{- $names := dict }}
 
+{{- $gateways := .Values.terminatingGateways.gateways }}
+{{- range $outerTerminatingIndex, $outerTerminatingVal := $gateways }}
+
+{{- range $innerTerminatingIndex, $innerTerminatingVal := $gateways }}
+{{- if (and (ne $outerTerminatingIndex $innerTerminatingIndex) (eq $outerTerminatingVal.name $innerTerminatingVal.name)) }}
+{{ fail "terminating gateways must have unique names" }}
+{{ end -}}
+{{ end -}}
+
+{{- range $outerIngressIndex, $outerIngressVal := $root.Values.ingressGateways.gateways }}
+{{- if (eq $outerTerminatingVal.name $outerIngressVal.name) }}
+{{ fail "terminating gateways cannot have duplicate names of any ingress gateways" }}
+{{ end -}}
+{{ end -}}
+{{ end -}}
+
 {{- range .Values.terminatingGateways.gateways }}
 
 {{- if empty .name }}

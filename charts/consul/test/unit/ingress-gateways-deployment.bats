@@ -142,6 +142,36 @@ load _helpers
   [[ "$output" =~ "clients must be enabled" ]]
 }
 
+@test "ingressGateways/Deployment: fails if there are duplicate gateway names" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[1].name=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "ingress gateways must have unique names" ]]
+}
+
+@test "ingressGateways/Deployment: fails if a terminating gateway has the same name as an ingress gateway" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways" ]]
+}
 #--------------------------------------------------------------------
 # envoyImage
 
