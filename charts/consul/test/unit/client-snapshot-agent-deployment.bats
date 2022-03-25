@@ -891,7 +891,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
       --set 'client.snapshotAgent.configSecret.secretKey=config' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat \"$decodedJson\" > /vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("echo \"$decodedJson\" > /vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
 
