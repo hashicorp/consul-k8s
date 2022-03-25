@@ -12,6 +12,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Helm
+  * Don't set TTL for server certificates when using Vault as the secrets backend. [[GH-1104](https://github.com/hashicorp/consul-k8s/pull/1104)]
   * Fix PodSecurityPolicies for clients/mesh gateways when hostNetwork is used. [[GH-1090](https://github.com/hashicorp/consul-k8s/pull/1090)]
 
 ## 0.41.1 (February 24, 2022)
