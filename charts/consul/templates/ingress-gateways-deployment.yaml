@@ -9,6 +9,7 @@
 {{- $defaults := .Values.ingressGateways.defaults }}
 {{- $names := dict }}
 
+{{- /* Check if gateway names are unique. */ -}}
 {{- $gateways := .Values.ingressGateways.gateways }}
 {{- range $outerIngressIndex, $outerIngressVal := $gateways }}
 
