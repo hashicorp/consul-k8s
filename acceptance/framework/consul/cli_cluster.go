@@ -29,7 +29,10 @@ const (
 	CLIReleaseName = "consul"
 )
 
-var cliDefaultArgs = []string{"-timeout", "15m"}
+var cliDefaultArgs = map[string]string{
+	"-timeout":      "15m",
+	"-auto-approve": "",
+}
 
 // CLICluster.
 type CLICluster struct {
@@ -124,15 +127,11 @@ func (c *CLICluster) Create(t *testing.T, args ...string) {
 	})
 
 	// Set the args for running the install command.
-	if len(args) == 0 {
-		args = cliDefaultArgs
-	}
-	args = append([]string{"install"}, args...)
+	args = append([]string{"install"}, mergeArgs(cliDefaultArgs, args...)...)
 	args = c.setKube(args)
 	for k, v := range c.values {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
-	args = append(args, "-auto-approve")
 	args = append(args, "-namespace", c.namespace)
 
 	out, err := c.runCLI(args)
@@ -154,17 +153,14 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string, args ..
 		return
 	}
 
-	// Set the args for running the upgrade command.
-	if len(args) == 0 {
-		args = cliDefaultArgs
-	}
-	args = append([]string{"upgrade"}, args...)
-	args = c.setKube(args)
 	helpers.MergeMaps(c.helmOptions.SetValues, helmValues)
+
+	// Set the args for running the upgrade command.
+	args = append([]string{"upgrade"}, mergeArgs(cliDefaultArgs, args...)...)
+	args = c.setKube(args)
 	for k, v := range c.helmOptions.SetValues {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
-	args = append(args, "-auto-approve")
 
 	out, err := c.runCLI(args)
 	if err != nil {
@@ -182,12 +178,9 @@ func (c *CLICluster) Destroy(t *testing.T, args ...string) {
 	k8s.WritePodsDebugInfoIfFailed(t, c.kubectlOptions, c.debugDirectory, "release="+c.releaseName)
 
 	// Set the args for running the uninstall command.
-	if len(args) == 0 {
-		args = cliDefaultArgs
-	}
-	args = append([]string{"uninstall"}, args...)
+	args = append([]string{"uninstall"}, mergeArgs(cliDefaultArgs, args...)...)
 	args = c.setKube(args)
-	args = append(args, "-auto-approve", "-wipe-data")
+	args = append(args, "-wipe-data")
 
 	// Use `go run` so that the CLI is recompiled and therefore uses the local
 	// charts directory rather than the directory from whenever it was last
@@ -309,4 +302,27 @@ func (c *CLICluster) runCLI(args []string) ([]byte, error) {
 	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
 	cmd.Dir = config.CLIPath
 	return cmd.Output()
+}
+
+// mergeArgs merges the given args with the default args.
+func mergeArgs(defaults map[string]string, args ...string) []string {
+	contains := func(s []string, e string) bool {
+		for _, a := range s {
+			if a == e {
+				return true
+			}
+		}
+		return false
+	}
+
+	for k, v := range defaults {
+		if !contains(args, k) {
+			args = append(args, k)
+			if v != "" {
+				args = append(args, v)
+			}
+		}
+	}
+
+	return args
 }
