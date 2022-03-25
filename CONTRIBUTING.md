@@ -394,9 +394,8 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
             - name: "foo"
     ```
 
-### Updating consul-helm
-1. To copy the CRD YAML into the consul-helm repo, run `make ctrl-crd-copy helm='../charts/consul'`. If the location of your helm chart is not in the higher level `consul-k8s` directory, replace the `helm` argument in the call to make with the relative or absolute path. This will copy your CRD into consul-helm with the required formatting.
-1. In consul-helm, update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
+### Updating Helm chart
+1. Update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
    using the updated `control-plane/config/webhook/manifests.v1beta1.yaml` and replacing `clientConfig.service.name/namespace`
    with the templated strings shown below to match the other webhooks.:
     ```yaml
