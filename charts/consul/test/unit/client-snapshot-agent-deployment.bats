@@ -838,12 +838,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.txt"]' | tee /dev/stderr)
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.json"]' | tee /dev/stderr)
   [ "${actual}" = "path/to/secret" ]
 
   actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-snapshot-agent-config.txt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.config -}}\n{{- end -}}'
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- base64Decode .Data.data.config -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   actual=$(echo $object | jq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
@@ -878,21 +878,6 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "snapshot-config")' | tee /dev/stderr)
       [ "${actual}" = "" ]
-}
-
-@test "client/SnapshotAgentDeployment: vault decondes snapshot-agent-config.txt into a .json file so that consul snapshot agent will process it" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-deployment.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=foo' \
-      --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'client.snapshotAgent.enabled=true' \
-      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
-      --set 'client.snapshotAgent.configSecret.secretKey=config' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2] | contains("echo \"$decodedJson\" > /vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
-  [ "${actual}" = 'true' ]
 }
 
 @test "client/SnapshotAgentDeployment: vault sets config-file argument on snapshot agent command to config downloaded by vault agent injector" {
