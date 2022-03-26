@@ -149,11 +149,6 @@ spec:
           {{- .Values.client.snapshotAgent.caCert | nindent 14 }}
           EOF
           {{- end }}
-          {{- if  .Values.global.secretsBackend.vault.enabled }}
-          decodedJson={{ "/vault/secrets/snapshot-agent-config.txt" | .Files.Get | b64dec }};
-          echo "$decodedJson"
-          echo "$decodedJson" > /vault/secrets/snapshot-agent-config.json
-          {{- end }}
           exec /bin/consul snapshot agent \
             {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
             {{- if  .Values.global.secretsBackend.vault.enabled }}
