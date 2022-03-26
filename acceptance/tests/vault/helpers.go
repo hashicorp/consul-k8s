@@ -1,8 +1,10 @@
 package vault
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -54,6 +56,11 @@ path "/%s/connect_inter/*" {
 `
 	caPolicy = `
 path "pki/cert/ca" {
+  capabilities = ["read"]
+}`
+
+	snapshotAgentPolicy = `
+path "consul/data/secret/snapshot-agent-config" {
   capabilities = ["read"]
 }`
 )
@@ -113,6 +120,47 @@ func configureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 	require.NoError(t, err)
 
 	err = vaultClient.Sys().PutPolicy("license", enterpriseLicensePolicy)
+	require.NoError(t, err)
+}
+
+// configureEnterpriseLicenseVaultSecret stores it in vault as a secret and configures a policy to access it.
+func configureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig) {
+	logger.Log(t, "Creating the Snapshot Agent Config secret")
+	config := map[string]interface{}{
+		"snapshot_agent": map[string]interface{}{
+			"log": map[string]interface{}{
+				"level":           "INFO",
+				"enable_syslog":   false,
+				"syslog_facility": "LOCAL0",
+			},
+			"snapshot": map[string]interface{}{
+				"interval":           "1m",
+				"retain":             30,
+				"stale":              false,
+				"service":            "consul-snapshot",
+				"deregister_after":   "72h",
+				"lock_key":           "consul-snapshot/lock",
+				"max_failures":       3,
+				"local_scratch_path": "",
+			},
+			"local_storage": map[string]interface{}{
+				"path": ".",
+			},
+		},
+	}
+	buf := bytes.NewBuffer(nil)
+	json.NewEncoder(buf).Encode(config)
+	jsonConfig, err := json.Marshal(&config)
+	require.NoError(t, err)
+	params := map[string]interface{}{
+		"data": map[string]interface{}{
+			"config": jsonConfig,
+		},
+	}
+	_, err = vaultClient.Logical().Write("consul/data/secret/snapshot-agent-config", params)
+	require.NoError(t, err)
+
+	err = vaultClient.Sys().PutPolicy("snapshot-agent-config", snapshotAgentPolicy)
 	require.NoError(t, err)
 }
 
