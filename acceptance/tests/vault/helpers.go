@@ -150,7 +150,8 @@ func configureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *c
 		},
 	}
 	buf := bytes.NewBuffer(nil)
-	json.NewEncoder(buf).Encode(config)
+	err := json.NewEncoder(buf).Encode(config)
+	require.NoError(t, err)
 	jsonConfig, err := json.Marshal(&config)
 	require.NoError(t, err)
 	params := map[string]interface{}{
