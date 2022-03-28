@@ -101,8 +101,8 @@ type BootstrapToken struct {
 }
 
 type ReplicationToken struct {
-	SecretName interface{} `yaml:"secretName"`
-	SecretKey  interface{} `yaml:"secretKey"`
+	SecretName string `yaml:"secretName"`
+	SecretKey  string `yaml:"secretKey"`
 }
 
 type Acls struct {
@@ -113,9 +113,9 @@ type Acls struct {
 }
 
 type EnterpriseLicense struct {
-	SecretName            interface{} `yaml:"secretName"`
-	SecretKey             interface{} `yaml:"secretKey"`
-	EnableLicenseAutoload bool        `yaml:"enableLicenseAutoload"`
+	SecretName            string `yaml:"secretName"`
+	SecretKey             string `yaml:"secretKey"`
+	EnableLicenseAutoload bool   `yaml:"enableLicenseAutoload"`
 }
 
 type Federation struct {
