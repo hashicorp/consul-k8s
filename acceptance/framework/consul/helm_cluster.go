@@ -453,7 +453,7 @@ func defaultValues() map[string]string {
 	return values
 }
 
-func CreateOrUpdateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string, secretName string, secretKey string, secret string) {
+func CreateOrUpdateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
 	_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
