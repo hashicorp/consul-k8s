@@ -1,4 +1,4 @@
-package vault
+package snapshotagent
 
 import (
 	"context"
@@ -17,13 +17,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TestVault_SnapshotAgent installs snapshot agent config with an embedded token as a Vault secret.
+// TestSnapshotAgent_Vault installs snapshot agent config with an embedded token as a Vault secret.
 // It then installs Consul with Vault as a secrets backend and verifies that snapshot files
 // are generated.
 // Currently, the token needs to be embedded in the snapshot agent config due to a Consul
 // bug that does not recognize the token for snapshot command being configured via
 // a command line arg or an environment variable.
-func TestVault_SnapshotAgent(t *testing.T) {
+func TestSnapshotAgent_Vault(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -48,7 +48,7 @@ func TestVault_SnapshotAgent(t *testing.T) {
 
 	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 
-	vault.ConfigureSnapshotAgentSecret(t, vaultClient, cfg, bootstrapToken)
+	vault.ConfigureSnapshotAgentSecret(t, vaultClient, cfg, generateSnapshotAgentConfig(t, bootstrapToken))
 
 	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
 	if cfg.EnableEnterprise {

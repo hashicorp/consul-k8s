@@ -1,10 +1,8 @@
 package vault
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -124,42 +122,14 @@ func ConfigureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 }
 
 // ConfigureEnterpriseLicenseVaultSecret stores it in vault as a secret and configures a policy to access it.
-func ConfigureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig, token string) {
+func ConfigureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig, config []byte) {
 	logger.Log(t, "Creating the Snapshot Agent Config secret")
-	config := map[string]interface{}{
-		"snapshot_agent": map[string]interface{}{
-			"token": token,
-			"log": map[string]interface{}{
-				"level":           "INFO",
-				"enable_syslog":   false,
-				"syslog_facility": "LOCAL0",
-			},
-			"snapshot": map[string]interface{}{
-				"interval":           "1m",
-				"retain":             30,
-				"stale":              false,
-				"service":            "consul-snapshot",
-				"deregister_after":   "72h",
-				"lock_key":           "consul-snapshot/lock",
-				"max_failures":       3,
-				"local_scratch_path": "",
-			},
-			"local_storage": map[string]interface{}{
-				"path": ".",
-			},
-		},
-	}
-	buf := bytes.NewBuffer(nil)
-	err := json.NewEncoder(buf).Encode(config)
-	require.NoError(t, err)
-	jsonConfig, err := json.Marshal(&config)
-	require.NoError(t, err)
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
-			"config": jsonConfig,
+			"config": config,
 		},
 	}
-	_, err = vaultClient.Logical().Write("consul/data/secret/snapshot-agent-config", params)
+	_, err := vaultClient.Logical().Write("consul/data/secret/snapshot-agent-config", params)
 	require.NoError(t, err)
 
 	err = vaultClient.Sys().PutPolicy("snapshot-agent-config", snapshotAgentPolicy)
