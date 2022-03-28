@@ -160,14 +160,6 @@ spec:
               - key: {{ .Values.global.secretsBackend.vault.ca.secretKey }}
                 path: tls.crt
         {{- end }}
-        {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.secretsBackend.vault.enabled)) }}
-        - name: bootstrap-token
-          secret:
-            secretName: {{ .Values.global.acls.bootstrapToken.secretName }}
-            items:
-              - key: {{ .Values.global.acls.bootstrapToken.secretKey }}
-                path: bootstrap-token
-        {{- end}}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -249,6 +241,13 @@ spec:
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
               {{- end }}
             {{- end }}
+            {{- if and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName }}
+            - name: ACL_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.bootstrapToken.secretName | quote }}
+                  key: {{ .Values.global.acls.bootstrapToken.secretKey | quote }}
+            {{- end }}
             {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: ACL_REPLICATION_TOKEN
               valueFrom:
@@ -262,10 +261,6 @@ spec:
             - "-ec"
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
-
-              {{- if and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName }}
-              BOOTSTRAP_TOKEN=`cat /consul/acl/tokens/bootstrap-token`
-              {{- end }}
               
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
@@ -348,7 +343,7 @@ spec:
                 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.bootstrapToken.secretName }}
                 -config-file=/vault/secrets/bootstrap-token-config.hcl \
                 {{- else if (and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName) }}
-                -hcl="acl { tokens { initial_management = \"${BOOTSTRAP_TOKEN}\" } }" \
+                -hcl="acl { tokens { initial_management = \"${ACL_BOOTSTRAP_TOKEN}\" } }" \
                 {{- end }}
                 {{- /* Always include the extraVolumes at the end so that users can
                       override other Consul settings. The last -config-dir takes
@@ -386,11 +381,6 @@ spec:
             {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
             - name: vault-ca
               mountPath: /consul/vault-ca/
-              readOnly: true
-            {{- end }}
-            {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.secretsBackend.vault.enabled)) }}
-            - name: bootstrap-token
-              mountPath: /consul/acl/tokens
               readOnly: true
             {{- end }}
           ports:
