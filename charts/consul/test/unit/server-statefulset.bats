@@ -1231,46 +1231,32 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken
 
+@test "server/StatefulSet: when global.acls.bootstrapToken.secretKey!=null and global.acls.bootstrapToken.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.acls.bootstrapToken.secretName=' \
+        --set 'global.acls.bootstrapToken.secretKey=enterpriselicense' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.acls.bootstrapToken.secretKey and secretName must both be specified." ]]
+}
+
+@test "server/StatefulSet: when global.acls.bootstrapToken.secretName!=null and global.acls.bootstrapToken.secretKey=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.acls.bootstrapToken.secretName=foo' \
+        --set 'global.acls.bootstrapToken.secretKey=' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.acls.bootstrapToken.secretKey and secretName must both be specified." ]]
+}
+
 @test "server/StatefulSet: acl bootstrap token config is not set by default" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr)
-
-  # Test the flag is not set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any(contains("ACL_BOOTSTRAP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  # Test the ACL_BOOTSTRAP_TOKEN environment variable is not set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].env | map(select(.name == "ACL_BOOTSTRAP_TOKEN")) | length == 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: acl bootstrap token config is not set when acls.bootstrapToken.secretName is set but secretKey is not" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.acls.bootstrapToken.secretName=name' \
-      . | tee /dev/stderr)
-
-  # Test the flag is not set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any(contains("ACL_BOOTSTRAP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  # Test the ACL_BOOTSTRAP_TOKEN environment variable is not set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].env | map(select(.name == "ACL_BOOTSTRAP_TOKEN")) | length == 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: acl bootstrap token config is not set when acls.bootstrapToken.secretKey is set but secretName is not" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.acls.bootstrapToken.secretKey=key' \
       . | tee /dev/stderr)
 
   # Test the flag is not set.
