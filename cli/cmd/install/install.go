@@ -179,19 +179,6 @@ func (c *Command) init() {
 	c.Init()
 }
 
-type helmValues struct {
-	Global globalValues `yaml:"global"`
-}
-
-type globalValues struct {
-	EnterpriseLicense enterpriseLicense `yaml:"enterpriseLicense"`
-}
-
-type enterpriseLicense struct {
-	SecretName string `yaml:"secretName"`
-	SecretKey  string `yaml:"secretKey"`
-}
-
 // Run installs Consul into a Kubernetes cluster.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
