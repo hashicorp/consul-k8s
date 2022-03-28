@@ -154,7 +154,7 @@ load _helpers
       --set 'client.enabled=true' .
   echo "status: $output"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "ingress gateways must have unique names" ]]
+  [[ "$output" =~ "ingress gateways must have unique names but found duplicate name foo" ]]
 }
 
 @test "ingressGateways/Deployment: fails if a terminating gateway has the same name as an ingress gateway" {

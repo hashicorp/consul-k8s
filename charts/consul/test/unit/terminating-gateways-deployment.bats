@@ -107,7 +107,7 @@ load _helpers
       --set 'client.enabled=true' .
   echo "status: $output"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "terminating gateways must have unique names" ]]
+  [[ "$output" =~ "terminating gateways must have unique names but found duplicate name foo" ]]
 }
 
 @test "terminatingGateways/Deployment: fails if a terminating gateway has the same name as an ingress gateway" {
@@ -123,7 +123,7 @@ load _helpers
       --set 'client.enabled=true' .
   echo "status: $output"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways" ]]
+  [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways but found duplicate name foo" ]]
 }
 
 #--------------------------------------------------------------------

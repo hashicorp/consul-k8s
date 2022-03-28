@@ -14,13 +14,13 @@
 
 {{- range $innerTerminatingIndex, $innerTerminatingVal := $gateways }}
 {{- if (and (ne $outerTerminatingIndex $innerTerminatingIndex) (eq $outerTerminatingVal.name $innerTerminatingVal.name)) }}
-{{ fail "terminating gateways must have unique names" }}
+{{ fail (cat "terminating gateways must have unique names but found duplicate name" $innerTerminatingVal.name) }}
 {{ end -}}
 {{ end -}}
 
 {{- range $outerIngressIndex, $outerIngressVal := $root.Values.ingressGateways.gateways }}
 {{- if (eq $outerTerminatingVal.name $outerIngressVal.name) }}
-{{ fail "terminating gateways cannot have duplicate names of any ingress gateways" }}
+{{ fail (cat "terminating gateways cannot have duplicate names of any ingress gateways but found duplicate name" $outerTerminatingVal.name) }}
 {{ end -}}
 {{ end -}}
 {{ end -}}

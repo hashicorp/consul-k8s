@@ -15,7 +15,7 @@
 
 {{- range $innerIngressIndex, $innerIngressVal := $gateways }}
 {{- if (and (ne $outerIngressIndex $innerIngressIndex) (eq $outerIngressVal.name $innerIngressVal.name)) }}
-{{ fail "ingress gateways must have unique names" }}
+{{ fail (cat "ingress gateways must have unique names but found duplicate name" $innerIngressVal.name) }}
 {{ end -}}
 {{ end -}}
 {{ end -}}
