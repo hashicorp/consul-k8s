@@ -58,12 +58,15 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
 	// Add bootstrap token secret
+	logger.Log(t, "Storing bootstrap token as a k8s secret")
 	consul.CreateOrUpdateK8sSecret(t, client, cfg, ns, bsSecretName, bsSecretKey, bootstrapToken)
 
 	// Add snapshot agent config secret
+	logger.Log(t, "Storing snapshot agent config as a k8s secret")
 	configBytes := generateSnapshotAgentConfig(t, bootstrapToken)
-	config := fmt.Sprint(configBytes)
-	consul.CreateOrUpdateK8sSecret(t, client, cfg, ns, bsSecretName, bsSecretKey, config)
+	config := string(configBytes)
+	logger.Logf(t, "Snapshot agent config: %s", config)
+	consul.CreateOrUpdateK8sSecret(t, client, cfg, ns, saSecretName, saSecretKey, config)
 
 	// Create cluster
 	consulCluster.Create(t)
