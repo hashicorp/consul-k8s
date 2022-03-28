@@ -102,24 +102,24 @@ func TestVault_Partitions(t *testing.T) {
 		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, ns)
 	}
 
-	configureGossipVaultSecret(t, vaultClient)
-	createConnectCAPolicy(t, vaultClient, "dc1")
-	configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
-	configureACLTokenVaultSecret(t, vaultClient, "bootstrap")
-	configureACLTokenVaultSecret(t, vaultClient, "partition")
+	vault.ConfigureGossipVaultSecret(t, vaultClient)
+	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
+	vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
+	vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
+	vault.ConfigureACLTokenVaultSecret(t, vaultClient, "partition")
 
 	serverPolicies := "gossip,license,connect-ca-dc1,server-cert-dc1,bootstrap-token"
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,partition-token")
-	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,partition-token")
+	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "client", "gossip")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "server-acl-init", "partition-token")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "partition-init", "partition-token")
-	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-"+secondaryPartition)
-	configurePKICA(t, vaultClient)
-	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "client", "gossip")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "server-acl-init", "partition-token")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "partition-init", "partition-token")
+	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-"+secondaryPartition)
+	vault.ConfigurePKICA(t, vaultClient)
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
 
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 

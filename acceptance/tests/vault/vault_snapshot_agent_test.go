@@ -41,27 +41,27 @@ func TestVault_SnapshotAgent(t *testing.T) {
 
 	// gossipKey := configureGossipVaultSecret(t, vaultClient)
 
-	createConnectCAPolicy(t, vaultClient, "dc1")
+	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
 	if cfg.EnableEnterprise {
-		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
+		vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
-	bootstrapToken := configureACLTokenVaultSecret(t, vaultClient, "bootstrap")
+	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 
-	configureSnapshotAgentSecret(t, vaultClient, cfg, bootstrapToken)
+	vault.ConfigureSnapshotAgentSecret(t, vaultClient, cfg, bootstrapToken)
 
 	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
 	if cfg.EnableEnterprise {
 		serverPolicies += ",license"
 	}
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "snapshot-agent", "snapshot-agent-config,license")
-	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "snapshot-agent", "snapshot-agent-config,license")
+	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
-	configurePKICA(t, vaultClient)
-	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	vault.ConfigurePKICA(t, vaultClient)
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
