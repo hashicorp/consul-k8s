@@ -162,7 +162,7 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
-      # The Vault role for the Consul client snapshot agent.
+      # [Enterprise Only] The Vault role for the Consul client snapshot agent.
       # The role must be connected to the Consul client snapshot agent's service account and
       # have a policy with read capabilities for the following secrets:
       # - gossip encryption key defined by `client.snapshotAgent.configSecret.secretName`.
