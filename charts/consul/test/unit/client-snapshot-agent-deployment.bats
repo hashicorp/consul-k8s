@@ -43,6 +43,7 @@ load _helpers
     cd `chart_dir`
     run helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=' \
       --set 'client.snapshotAgent.configSecret.secretKey=bar' \
         .
@@ -54,6 +55,7 @@ load _helpers
     cd `chart_dir`
     run helm template \
         -s templates/client-snapshot-agent-deployment.yaml  \
+        --set 'client.snapshotAgent.enabled=true' \
         --set 'client.snapshotAgent.configSecret.secretName=foo' \
         --set 'client.snapshotAgent.configSecret.secretKey=' \
         .
@@ -929,4 +931,67 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+
+@test "client/SnapshotAgentDeployment: vault properly sets vault role when global.secretsBackend.vault.consulCARole is set but global.secretsBackend.vault.consulSnapshotAgentRole is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=ca-role' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "ca-role" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault properly sets vault role when global.secretsBackend.vault.consulSnapshotAgentRole is set but global.secretsBackend.vault.consulCARole is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulSnapshotAgentRole=sa-role' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "sa-role" ]
+}
+
+@test "client/SnapshotAgentDeployment: vault properly sets vault role when both global.secretsBackend.vault.consulSnapshotAgentRole and global.secretsBackend.vault.consulCARole are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulSnapshotAgentRole=sa-role' \
+      --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      --set 'global.secretsBackend.vault.consulCARole=ca-role' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "ca-role,sa-role" ]
 }
