@@ -973,7 +973,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "sa-role" ]
 }
 
-@test "client/SnapshotAgentDeployment: vault properly sets vault role when both global.secretsBackend.vault.consulSnapshotAgentRole and global.secretsBackend.vault.consulCARole are set" {
+@test "client/SnapshotAgentDeployment: vault properly sets vault role to global.secretsBackend.vault.consulSnapshotAgentRole value when both global.secretsBackend.vault.consulSnapshotAgentRole and global.secretsBackend.vault.consulCARole are set" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
@@ -993,5 +993,5 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 
   local actual
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
-  [ "${actual}" = "ca-role,sa-role" ]
+  [ "${actual}" = "sa-role" ]
 }
