@@ -39,7 +39,6 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
-	// gossipKey := configureGossipVaultSecret(t, vaultClient)
 
 	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
 	if cfg.EnableEnterprise {
