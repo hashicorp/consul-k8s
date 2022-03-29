@@ -18,7 +18,7 @@ FEATURES:
   * Support Mesh Gateway obtaining an ACL token via using a k8s auth method. [GH-1085](https://github.com/hashicorp/consul-k8s/pull/1085)
   * Support Ingress Gateway obtaining an ACL token via using a k8s auth method. [GH-1118](https://github.com/hashicorp/consul-k8s/pull/1118)
   * Support Terminating Gateway obtaining an ACL token via using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
-  * Support Client obtaining an ACL token via using a k8s auth method. [GH-1093](https://github.com/hashicorp/consul-k8s/pull/1093)
+  * Support Consul Client obtaining an ACL token via using a k8s auth method. [GH-1093](https://github.com/hashicorp/consul-k8s/pull/1093)
   * Support issuing global ACL tokens via k8s auth method. [GH-1075](https://github.com/hashicorp/consul-k8s/pull/1075)
   
   
