@@ -164,8 +164,7 @@ global:
 
       # [Enterprise Only] The Vault role for the Consul client snapshot agent.
       # The role must be connected to the Consul client snapshot agent's service account and
-      # have a policy with read capabilities for the following secrets:
-      # - gossip encryption key defined by `client.snapshotAgent.configSecret.secretName`.
+      # have a policy with read capabilities for the snapshot agent config defined by `client.snapshotAgent.configSecret.secretName`.
       # To discover the service account name of the Consul client, run
       #     ```shell-session
       #     $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
