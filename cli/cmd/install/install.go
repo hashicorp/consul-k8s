@@ -422,7 +422,7 @@ func (c *Command) checkForPreviousPVCs() error {
 func (c *Command) checkForPreviousSecrets(release release.Release) (string, error) {
 	secrets, err := validation.ListConsulSecrets(context.TODO(), c.kubernetes)
 	if err != nil {
-		return "", fmt.Errorf("error listing Consul secrets: %s", err)
+		return "", fmt.Errorf("Error listing Consul secrets: %s", err)
 	}
 
 	// If the Consul configuration is a secondary DC, only one secret should
