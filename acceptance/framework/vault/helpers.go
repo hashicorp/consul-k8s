@@ -81,7 +81,7 @@ func GenerateGossipSecret() (string, error) {
 }
 
 // ConfigureGossipVaultSecret generates a gossip encryption key,
-// stores it in vault as a secret and configures a policy to access it.
+// stores it in Vault as a secret and configures a policy to access it.
 func ConfigureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
 	// Create the Vault Policy for the gossip key.
 	logger.Log(t, "Creating gossip policy")
@@ -105,7 +105,7 @@ func ConfigureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
 	return gossipKey
 }
 
-// ConfigureEnterpriseLicenseVaultSecret stores it in vault as a secret and configures a policy to access it.
+// ConfigureEnterpriseLicenseVaultSecret stores it in Vault as a secret and configures a policy to access it.
 func ConfigureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig) {
 	// Create the enterprise license secret.
 	logger.Log(t, "Creating the Enterprise License secret")
@@ -121,7 +121,7 @@ func ConfigureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 	require.NoError(t, err)
 }
 
-// ConfigureSnapshotAgentSecret stores it in vault as a secret and configures a policy to access it.
+// ConfigureSnapshotAgentSecret stores it in Vault as a secret and configures a policy to access it.
 func ConfigureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig, config []byte) {
 	logger.Log(t, "Creating the Snapshot Agent Config secret")
 	params := map[string]interface{}{
@@ -136,7 +136,7 @@ func ConfigureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *c
 	require.NoError(t, err)
 }
 
-// ConfigureKubernetesAuthRole configures a role for the component for the Kubernetes auth method
+// ConfigureKubernetesAuthRole configures a role in Vault for the component for the Kubernetes auth method
 // that will be used by the test Helm chart installation.
 func ConfigureKubernetesAuthRole(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, authPath, component, policies string) {
 	componentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, component)
@@ -158,8 +158,8 @@ func ConfigureKubernetesAuthRole(t *testing.T, vaultClient *vapi.Client, consulR
 	require.NoError(t, err)
 }
 
-// ConfigureKubernetesAuthRole configures a role that allows all service accounts within the installation
-// namespace access to the Consul server CA.
+// ConfigureConsulCAKubernetesAuthRole configures a role in Vault that allows all service accounts
+// within the installation namespace access to the Consul server CA.
 func ConfigureConsulCAKubernetesAuthRole(t *testing.T, vaultClient *vapi.Client, ns, authPath string) {
 	// Create the CA role that all components will use to fetch the Server CA certs.
 	params := map[string]interface{}{
@@ -188,7 +188,7 @@ func ConfigurePKICA(t *testing.T, vaultClient *vapi.Client) {
 	require.NoError(t, err)
 }
 
-// ConfigurePKICertificates configures roles so that Consul server TLS certificates
+// ConfigurePKICertificates configures roles in Vault so that Consul server TLS certificates
 // can be issued by Vault.
 func ConfigurePKICertificates(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, datacenter string) string {
 	// Create the Vault PKI Role.
@@ -222,7 +222,7 @@ path %q {
 }
 
 // ConfigureACLTokenVaultSecret generates a token secret ID for a given name,
-// stores it in vault as a secret and configures a policy to access it.
+// stores it in Vault as a secret and configures a policy to access it.
 func ConfigureACLTokenVaultSecret(t *testing.T, vaultClient *vapi.Client, tokenName string) string {
 	// Create the Vault Policy for the token.
 	logger.Logf(t, "Creating %s token policy", tokenName)
