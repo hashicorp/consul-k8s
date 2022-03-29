@@ -39,7 +39,6 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
-
 	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
 	if cfg.EnableEnterprise {
 		vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
@@ -47,7 +46,8 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 
 	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 
-	vault.ConfigureSnapshotAgentSecret(t, vaultClient, cfg, generateSnapshotAgentConfig(t, bootstrapToken))
+	config := generateSnapshotAgentConfig(t, bootstrapToken)
+	vault.ConfigureSnapshotAgentSecret(t, vaultClient, cfg, config)
 
 	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
 	if cfg.EnableEnterprise {
@@ -133,5 +133,5 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 			logger.Logf(t, "Agent pod does not contain snapshot files")
 		}
 	}
-	require.True(t, hasSnapshots, ".snap")
+	require.True(t, hasSnapshots)
 }

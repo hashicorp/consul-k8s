@@ -63,8 +63,7 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 
 	// Add snapshot agent config secret
 	logger.Log(t, "Storing snapshot agent config as a k8s secret")
-	configBytes := generateSnapshotAgentConfig(t, bootstrapToken)
-	config := string(configBytes)
+	config := generateSnapshotAgentConfig(t, bootstrapToken)
 	logger.Logf(t, "Snapshot agent config: %s", config)
 	consul.CreateK8sSecret(t, client, cfg, ns, saSecretName, saSecretKey, config)
 
@@ -98,7 +97,7 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 	require.True(t, hasSnapshots, ".snap")
 }
 
-func generateSnapshotAgentConfig(t *testing.T, token string) []byte {
+func generateSnapshotAgentConfig(t *testing.T, token string) string {
 	config := map[string]interface{}{
 		"snapshot_agent": map[string]interface{}{
 			"token": token,
@@ -127,5 +126,5 @@ func generateSnapshotAgentConfig(t *testing.T, token string) []byte {
 	require.NoError(t, err)
 	jsonConfig, err := json.Marshal(&config)
 	require.NoError(t, err)
-	return jsonConfig
+	return string(jsonConfig)
 }

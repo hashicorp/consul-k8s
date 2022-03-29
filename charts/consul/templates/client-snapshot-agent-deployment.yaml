@@ -58,7 +58,7 @@ spec:
         {{- if .Values.client.snapshotAgent.configSecret.secretName }}
         {{- with .Values.client.snapshotAgent.configSecret }}
         "vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.json": "{{ .secretName }}"
-        "vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json": {{ template "consul.vaultDecodedSecretTemplate" . }}
+        "vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json": {{ template "consul.vaultSecretTemplate" . }}
         {{- end }} 
         {{- end }}
         {{- end }}
