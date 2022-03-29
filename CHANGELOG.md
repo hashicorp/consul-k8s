@@ -17,7 +17,7 @@ BUG FIXES:
   * Don't set TTL for server certificates when using Vault as the secrets backend. [[GH-1104](https://github.com/hashicorp/consul-k8s/pull/1104)]
   * Fix PodSecurityPolicies for clients/mesh gateways when hostNetwork is used. [[GH-1090](https://github.com/hashicorp/consul-k8s/pull/1090)]
 * CLI
-  * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded [[GH-1115](https://github.com/hashicorp/consul-k8s/pull/1115)]
+  * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/issue/1005)]
 
 ## 0.41.1 (February 24, 2022)
 
