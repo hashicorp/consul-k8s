@@ -1,7 +1,6 @@
 package install
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -420,7 +419,7 @@ func (c *Command) checkForPreviousPVCs() error {
 // and returns a message if the secret configuration is ok or an error if
 // the secret configuration could cause a conflict.
 func (c *Command) checkForPreviousSecrets(release release.Release) (string, error) {
-	secrets, err := validation.ListConsulSecrets(context.TODO(), c.kubernetes)
+	secrets, err := validation.ListConsulSecrets(c.Ctx, c.kubernetes)
 	if err != nil {
 		return "", fmt.Errorf("Error listing Consul secrets: %s", err)
 	}
