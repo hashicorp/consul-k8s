@@ -442,11 +442,7 @@ func (c *Command) checkForPreviousSecrets(release release.Release) (string, erro
 		// Nicely format the delete commands for existing Consul secrets.
 		namespacedSecrets := make(map[string][]string)
 		for _, secret := range secrets.Items {
-			if _, ok := namespacedSecrets[secret.Namespace]; ok {
-				namespacedSecrets[secret.Namespace] = append(namespacedSecrets[secret.Namespace], secret.Name)
-			} else {
-				namespacedSecrets[secret.Namespace] = []string{secret.Name}
-			}
+			namespacedSecrets[secret.Namespace] = append(namespacedSecrets[secret.Namespace], secret.Name)
 		}
 
 		var deleteCmds string
