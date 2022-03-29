@@ -386,7 +386,7 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 }
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	CreateOrUpdateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
+	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
@@ -453,7 +453,7 @@ func defaultValues() map[string]string {
 	return values
 }
 
-func CreateOrCheckK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
+func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
 	_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
