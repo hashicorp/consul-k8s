@@ -1239,7 +1239,7 @@ load _helpers
         --set 'global.acls.bootstrapToken.secretKey=enterpriselicense' \
         .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.acls.bootstrapToken.secretKey and secretName must both be specified." ]]
+  [[ "$output" =~ "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." ]]
 }
 
 @test "server/StatefulSet: when global.acls.bootstrapToken.secretName!=null and global.acls.bootstrapToken.secretKey=null, fail" {
@@ -1250,7 +1250,7 @@ load _helpers
         --set 'global.acls.bootstrapToken.secretKey=' \
         .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.acls.bootstrapToken.secretKey and secretName must both be specified." ]]
+  [[ "$output" =~ "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." ]]
 }
 
 @test "server/StatefulSet: acl bootstrap token config is not set by default" {
