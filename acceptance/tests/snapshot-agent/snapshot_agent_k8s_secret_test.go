@@ -108,7 +108,7 @@ func generateSnapshotAgentConfig(t *testing.T, token string) []byte {
 				"syslog_facility": "LOCAL0",
 			},
 			"snapshot": map[string]interface{}{
-				"interval":           "1m",
+				"interval":           "5s",
 				"retain":             30,
 				"stale":              false,
 				"service":            "consul-snapshot",
