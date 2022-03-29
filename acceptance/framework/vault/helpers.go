@@ -121,7 +121,7 @@ func ConfigureEnterpriseLicenseVaultSecret(t *testing.T, vaultClient *vapi.Clien
 	require.NoError(t, err)
 }
 
-// ConfigureEnterpriseLicenseVaultSecret stores it in vault as a secret and configures a policy to access it.
+// ConfigureSnapshotAgentSecret stores it in vault as a secret and configures a policy to access it.
 func ConfigureSnapshotAgentSecret(t *testing.T, vaultClient *vapi.Client, cfg *config.TestConfig, config []byte) {
 	logger.Log(t, "Creating the Snapshot Agent Config secret")
 	params := map[string]interface{}{
