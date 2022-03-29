@@ -4,7 +4,7 @@ BREAKING CHANGES:
 * Helm
   * Minimum Kubernetes version supported is 1.19 and now matches what is stated in the `README.md` file.  [[GH-1049](https://github.com/hashicorp/consul-k8s/pull/1049)] 
 * ACLs
-  * Support Terminating Gateway obtaining an ACL token via using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
+  * Support Terminating Gateway obtaining an ACL token using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
   * **Note**: If you have updated a token with a new policy for a terminating gateway, this will not apply any more as ACL tokens will be ephemeral and are issued to the terminating gateways when the pod is created and destroyed when the pod is stopped.  To achieve the same ACL permissions, you will need to assign the policy to the role for the terminating gateway, rather than the token.   
   
 
