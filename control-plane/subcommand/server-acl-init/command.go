@@ -797,7 +797,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 		// The names in the Helm chart are specified by users and so may not contain
 		// the words "ingress-gateway" or "terminating-gateway". We need to create unique names for tokens
 		// across all gateway types and so must suffix with either `-ingress-gateway` of `-terminating-gateway`.
-		serviceAccountName := c.withPrefix(fmt.Sprintf("%s-%s", name, fmt.Sprintf("%s-gateway", gatewayParams.GatewayType)))
+		serviceAccountName := c.withPrefix(name)
 		err = c.createACLPolicyRoleAndBindingRule(serviceAccountName, rules,
 			gatewayParams.ConsulDC, gatewayParams.PrimaryDC, localPolicy,
 			gatewayParams.Primary, gatewayParams.AuthMethodName, serviceAccountName, consulClient)

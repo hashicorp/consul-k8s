@@ -295,10 +295,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-connect-inject",
 				"-snapshot-agent",
 				"-create-enterprise-license-token",
-				"-ingress-gateway-name=gw",
-				"-ingress-gateway-name=anothergw",
-				"-terminating-gateway-name=gw",
-				"-terminating-gateway-name=anothergw",
+				"-ingress-gateway-name=igw",
+				"-ingress-gateway-name=anotherigw",
+				"-terminating-gateway-name=tgw",
+				"-terminating-gateway-name=anothertgw",
 				"-controller",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
@@ -333,10 +333,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"mesh-gateway-policy",
 				"snapshot-agent-policy",
 				"enterprise-license-token",
-				resourcePrefix + "-gw-ingress-gateway-policy",
-				resourcePrefix + "-anothergw-ingress-gateway-policy",
-				resourcePrefix + "-gw-terminating-gateway-policy",
-				resourcePrefix + "-anothergw-terminating-gateway-policy",
+				resourcePrefix + "-igw-policy",
+				resourcePrefix + "-anotherigw-policy",
+				resourcePrefix + "-tgw-policy",
+				resourcePrefix + "-anothertgw-policy",
 				"connect-inject-policy",
 				"controller-policy",
 			}
@@ -386,10 +386,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"cross-namespace-policy",
-				resourcePrefix + "-gw-ingress-gateway-policy",
-				resourcePrefix + "-anothergw-ingress-gateway-policy",
-				resourcePrefix + "-gw-terminating-gateway-policy",
-				resourcePrefix + "-anothergw-terminating-gateway-policy",
+				resourcePrefix + "-igw-policy",
+				resourcePrefix + "-anotherigw-policy",
+				resourcePrefix + "-tgw-policy",
+				resourcePrefix + "-anothertgw-policy",
 				"controller-policy",
 				"partitions-token",
 			}
@@ -776,9 +776,9 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
 				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy",
-				resourcePrefix + "-gateway-ingress-gateway-policy",
-				resourcePrefix + "-another-gateway-ingress-gateway-policy"},
+			PolicyNames: []string{resourcePrefix + "-ingress-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -825,9 +825,9 @@ partition "default" {
 			TokenFlags: []string{"-ingress-gateway-name=ingress.",
 				"-ingress-gateway-name=gateway.namespace1",
 				"-ingress-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{resourcePrefix + "-ingress-ingress-gateway-policy",
-				resourcePrefix + "-gateway-ingress-gateway-policy",
-				resourcePrefix + "-another-gateway-ingress-gateway-policy"},
+			PolicyNames: []string{resourcePrefix + "-ingress-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -874,9 +874,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
 				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{resourcePrefix + "-terminating-terminating-gateway-policy",
-				resourcePrefix + "-gateway-terminating-gateway-policy",
-				resourcePrefix + "-another-gateway-terminating-gateway-policy"},
+			PolicyNames: []string{resourcePrefix + "-terminating-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -914,9 +914,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating.",
 				"-terminating-gateway-name=gateway.namespace1",
 				"-terminating-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{resourcePrefix + "-terminating-terminating-gateway-policy",
-				resourcePrefix + "-gateway-terminating-gateway-policy",
-				resourcePrefix + "-another-gateway-terminating-gateway-policy"},
+			PolicyNames: []string{resourcePrefix + "-terminating-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {

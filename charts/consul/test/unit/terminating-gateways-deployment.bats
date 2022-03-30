@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway-terminating-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway" ]
 }
 
 @test "terminatingGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -93,6 +93,37 @@ load _helpers
       --set 'client.enabled=false' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "clients must be enabled" ]]
+}
+
+@test "terminatingGateways/Deployment: fails if there are duplicate gateway names" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=foo' \
+      --set 'terminatingGateways.gateways[1].name=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "terminating gateways must have unique names but found duplicate name foo" ]]
+}
+
+@test "terminatingGateways/Deployment: fails if a terminating gateway has the same name as an ingress gateway" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways but found duplicate name foo" ]]
 }
 
 #--------------------------------------------------------------------
@@ -265,7 +296,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway-terminating-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -1406,10 +1437,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1-terminating-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2-terminating-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

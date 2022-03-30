@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -79,6 +80,9 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=client-snapshot-agent,release=%s", releaseName)})
 	require.NoError(t, err)
 	require.True(t, len(podList.Items) > 0)
+
+	// Wait for 10seconds to allow snapsot to write.
+	time.Sleep(10 * time.Second)
 
 	// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
 	hasSnapshots := false

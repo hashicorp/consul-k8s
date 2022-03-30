@@ -22,7 +22,21 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
+}
+
+@test "ingressGateways/Deployment: serviceAccountName is set properly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'ingress.defaults.consulNamespace=namespace' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
 }
 
 @test "ingressGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -44,20 +58,6 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.readOnly' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: serviceAccountName is set properly" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'ingress.defaults.consulNamespace=namespace' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
-
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -107,6 +107,36 @@ load _helpers
   [[ "$output" =~ "clients must be enabled" ]]
 }
 
+@test "ingressGateways/Deployment: fails if there are duplicate gateway names" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[1].name=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "ingress gateways must have unique names but found duplicate name foo" ]]
+}
+
+@test "ingressGateways/Deployment: fails if a terminating gateway has the same name as an ingress gateway" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways" ]]
+}
 #--------------------------------------------------------------------
 # envoyImage
 
@@ -1295,7 +1325,7 @@ key2: value2' \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-ingress-gateway-ingress-gateway \
+  -name=RELEASE-NAME-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1365,7 +1395,7 @@ consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-ingress-gateway-ingress-gateway \
+  -name=RELEASE-NAME-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1592,10 +1622,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
