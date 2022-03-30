@@ -62,6 +62,36 @@ data:
       }
     }
   {{- end }}
+  {{- if .Values.global.tls.enabled }}
+  tls-config.json: |-
+    {
+      {{- if .Values.global.secretsBackend.vault.enabled }}
+      "ca_file": "/vault/secrets/serverca.crt",
+      "cert_file": "/vault/secrets/servercert.crt",
+      "key_file": "/vault/secrets/servercert.key",
+      {{- else }}
+      "ca_file": "/consul/tls/ca/tls.crt",
+      "cert_file": "/consul/tls/server/tls.crt",
+      "key_file": "/consul/tls/server/tls.key",
+      {{- end }}
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      "auto_encrypt": {
+          "allow_tls": true
+      },
+      {{- end }}
+      {{- if .Values.global.tls.verify }}
+      "verify_incoming_rpc": true,
+      "verify_outgoing": true,
+      "verify_server_hostname": true,
+      {{- end }}
+      "ports": {
+         {{- if .Values.global.tls.httpsOnly }}
+         "http": -1,
+         {{- end }}
+         "https": 8501
+       }
+    }
+  {{- end }}
   {{- if (and .Values.ui.enabled (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString))))) }}
   ui-config.json: |-
     {
