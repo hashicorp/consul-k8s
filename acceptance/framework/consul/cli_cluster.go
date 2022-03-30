@@ -30,7 +30,6 @@ const (
 )
 
 var cliDefaultArgs = map[string]string{
-	"-timeout":      "15m",
 	"-auto-approve": "",
 }
 
