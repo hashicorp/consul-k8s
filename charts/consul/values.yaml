@@ -162,6 +162,16 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
+      # [Enterprise Only] The Vault role for the Consul client snapshot agent.
+      # The role must be connected to the Consul client snapshot agent's service account and
+      # have a policy with read capabilities for the snapshot agent config defined by `client.snapshotAgent.configSecret.secretName`.
+      # To discover the service account name of the Consul client, run
+      #     ```shell-session
+      #     $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulSnapshotAgentRole: ""
+
       # A Vault role to allow Kubernetes job that manages ACLs for this Helm chart (`server-acl-init`)
       # to read and update Vault secrets for the Consul's bootstrap, replication or partition tokens.
       # This role must be bound the `server-acl-init`'s service account.
@@ -1274,9 +1284,9 @@ client:
     # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)
     # for details.
     configSecret:
-      # The name of the Kubernetes secret.
+      # secretName is the name of the Kubernetes secret or Vault secret path that holds the snapshot agentconfig.
       secretName: null
-      # The key of the Kubernetes secret.
+      # secretKey is the key within the Kubernetes secret or Vault secret key that holds the snapshot agentconfig.
       secretKey: null
 
     serviceAccount:
