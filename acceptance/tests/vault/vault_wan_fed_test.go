@@ -66,10 +66,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	vaultClient := primaryVaultCluster.VaultClient(t)
 
-	configureGossipVaultSecret(t, vaultClient)
+	vault.ConfigureGossipVaultSecret(t, vaultClient)
 
 	if cfg.EnableEnterprise {
-		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
+		vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
 	// Configure Vault Kubernetes auth method for the secondary datacenter.
@@ -116,28 +116,28 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		commonServerPolicies += ",license"
 	}
 	primaryServerPolicies := commonServerPolicies + ",connect-ca-dc1,server-cert-dc1,bootstrap-token"
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", primaryServerPolicies)
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,replication-token")
-	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", primaryServerPolicies)
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,replication-token")
+	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
 	secondaryServerPolicies := commonServerPolicies + ",connect-ca-dc2,server-cert-dc2,replication-token"
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server", secondaryServerPolicies)
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "client", "gossip")
-	configureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server-acl-init", "replication-token")
-	configureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-dc2")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server", secondaryServerPolicies)
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "client", "gossip")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server-acl-init", "replication-token")
+	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-dc2")
 
 	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
-	configurePKICA(t, vaultClient)
-	primaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
-	secondaryCertPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
+	vault.ConfigurePKICA(t, vaultClient)
+	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
 
-	bootstrapToken := configureACLTokenVaultSecret(t, vaultClient, "bootstrap")
-	replicationToken := configureACLTokenVaultSecret(t, vaultClient, "replication")
+	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
+	replicationToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "replication")
 
 	// Create the Vault Policy for the Connect CA in both datacenters.
-	createConnectCAPolicy(t, vaultClient, "dc1")
-	createConnectCAPolicy(t, vaultClient, "dc2")
+	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
+	vault.CreateConnectCAPolicy(t, vaultClient, "dc2")
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.

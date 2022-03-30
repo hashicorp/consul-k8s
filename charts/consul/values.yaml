@@ -1278,7 +1278,7 @@ client:
     # The number of snapshot agents to run.
     replicas: 2
 
-    # A Kubernetes secret that should be manually created to contain the entire
+    # A Kubernetes or Vault secret that should be manually created to contain the entire
     # config to be used on the snapshot agent.
     # This is the preferred method of configuration since there are usually storage
     # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)

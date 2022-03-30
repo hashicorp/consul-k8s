@@ -845,7 +845,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 
   actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- base64Decode .Data.data.config -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.config -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   actual=$(echo $object | jq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
