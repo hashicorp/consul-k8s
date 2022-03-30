@@ -60,20 +60,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "ingressGateways/Deployment: serviceAccountName is set properly" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'ingress.defaults.consulNamespace=namespace' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
-
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway" ]
-}
-
 #--------------------------------------------------------------------
 # prerequisites
 
