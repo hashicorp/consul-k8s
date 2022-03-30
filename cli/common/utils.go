@@ -74,6 +74,9 @@ func MergeMaps(a, b map[string]interface{}) map[string]interface{} {
 	return out
 }
 
+// CloseWithError terminates a command and cleans up its resources.
+// If termination fails, the error is logged and the process exits with an
+// exit code of 1.
 func CloseWithError(c *BaseCommand) {
 	if err := c.Close(); err != nil {
 		c.Log.Error(err.Error())
