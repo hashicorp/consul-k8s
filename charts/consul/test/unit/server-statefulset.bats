@@ -769,7 +769,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# tolerations
+# topologySpreadConstraints
 
 @test "server/StatefulSet: topologySpreadConstraints not set by default" {
   cd `chart_dir`
@@ -994,7 +994,7 @@ load _helpers
   [ "${actual}" != "" ]
 }
 
-@test "server/StatefulSet: server volume present when TLS is enabled" {
+@test "server/StatefulSet: server cert volume present when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -1086,17 +1086,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/StatefulSet: HTTP is disabled in agent when httpsOnly is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.httpsOnly=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("ports { http = -1 }")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "server/StatefulSet: sets Consul environment variables when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
@@ -1130,45 +1119,6 @@ load _helpers
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
     [ "${actual}" = "/vault/secrets/serverca.crt" ]
-}
-
-@test "server/StatefulSet: sets verify_* flags to true by default when global.tls.enabled" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $command | jq -r '. | contains("verify_incoming_rpc = true")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | contains("verify_outgoing = true")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | contains("verify_server_hostname = true")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: doesn't set the verify_* flags by default when global.tls.enabled and global.tls.verify is false" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/server-statefulset.yaml \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.verify=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $command | jq -r '. | contains("verify_incoming_rpc = true")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  actual=$(echo $command | jq -r '. | contains("verify_outgoing = true")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  actual=$(echo $command | jq -r '. | contains("verify_server_hostname = true")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 }
 
 @test "server/StatefulSet: can overwrite CA secret with the provided one" {
@@ -1363,20 +1313,6 @@ load _helpers
   local actual=$(echo "$object" |
     yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = '[{"name":"ACL_REPLICATION_TOKEN","valueFrom":{"secretKeyRef":{"name":"name","key":"key"}}}]' ]
-}
-
-#--------------------------------------------------------------------
-# global.tls.enableAutoEncrypt
-
-@test "server/StatefulSet: enables auto-encrypt for the servers when global.tls.enableAutoEncrypt is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("auto_encrypt = {allow_tls = true}")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -1859,10 +1795,6 @@ load _helpers
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
   local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
-
-  local actual=$(echo $object |
-    yq -r '.spec.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 @test "server/StatefulSet: tls related volumes not attached when tls is enabled on vault" {

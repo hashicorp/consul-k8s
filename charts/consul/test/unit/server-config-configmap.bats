@@ -506,7 +506,7 @@ load _helpers
 @test "server/ConfigMap: adds empty federation config when global.federation.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
+      -s templates/server-config-configmap.yaml \
       --set 'global.federation.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'meshGateway.enabled=true' \
@@ -519,7 +519,7 @@ load _helpers
 @test "server/ConfigMap: can set primary dc and gateways when global.federation.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
+      -s templates/server-config-configmap.yaml \
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc1' \
       --set 'global.federation.primaryGateways[0]=1.1.1.1:443' \
@@ -530,4 +530,112 @@ load _helpers
       . | tee /dev/stderr |
       yq '.data["federation-config.json"]' | tee /dev/stderr)
   [ "${actual}" = '"{\n  \"primary_datacenter\": \"dc1\",\n  \"primary_gateways\": [\"1.1.1.1:443\",\"2.2.2.2:443\"]\n}"' ]
+}
+
+#--------------------------------------------------------------------
+# TLS
+
+@test "server/ConfigMap: sets correct default configuration when global.tls.enabled" {
+  cd `chart_dir`
+  local config=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $config | jq -r .ca_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+
+  actual=$(echo $config | jq -r .cert_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/server/tls.crt" ]
+
+  actual=$(echo $config | jq -r .key_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/server/tls.key" ]
+
+  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -c .ports | tee /dev/stderr)
+  [ "${actual}" = '{"http":-1,"https":8501}' ]
+}
+
+@test "server/ConfigMap: doesn't set verify_* configuration to true when global.tls.enabled and global.tls.verify is false" {
+  cd `chart_dir`
+  local config=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.verify=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: HTTP port is not set in when httpsOnly is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | jq -c .ports | tee /dev/stderr)
+  [ "${actual}" = '{"https":8501}' ]
+}
+
+#--------------------------------------------------------------------
+# global.tls.enableAutoEncrypt
+
+@test "server/ConfigMap: enables auto-encrypt for the servers when global.tls.enableAutoEncrypt is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | jq -c .auto_encrypt | tee /dev/stderr)
+  [ "${actual}" = '{"allow_tls":true}' ]
+}
+
+#--------------------------------------------------------------------
+# TLS + Vault
+
+@test "server/ConfigMap: sets TLS file paths point to vault secrets when Vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-config-configmap.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+    yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r .ca_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
+
+  local actual=$(echo $object | jq -r .cert_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/servercert.crt" ]
+
+  local actual=$(echo $object | jq -r .key_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/servercert.key" ]
 }
