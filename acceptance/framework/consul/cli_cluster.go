@@ -138,6 +138,7 @@ func (c *CLICluster) Create(t *testing.T, args ...string) {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
 	}
+	require.NoError(t, err)
 
 	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, c.namespace, fmt.Sprintf("release=%s", c.releaseName))
 }
@@ -166,6 +167,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string, args ..
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
 	}
+	require.NoError(t, err)
 
 	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, c.namespace, fmt.Sprintf("release=%s", c.releaseName))
 }
@@ -189,6 +191,7 @@ func (c *CLICluster) Destroy(t *testing.T, args ...string) {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
 	}
+	require.NoError(t, err)
 }
 
 func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
