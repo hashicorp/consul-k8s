@@ -39,17 +39,15 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# retry-join
+# server.replicas and server.bootstrapExpect
 
-@test "server/StatefulSet: retry join gets populated" {
+@test "server/StatefulSet: errors if bootstrapExpect < replicas" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.replicas=3' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command | any(contains("-retry-join"))' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
+      --set 'server.bootstrapExpect=1' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.bootstrapExpect cannot be less than server.replicas" ]]
 }
 
 #--------------------------------------------------------------------
@@ -329,9 +327,6 @@ load _helpers
 
   local command=$(echo "$object" |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-serf-lan-port=8301"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 @test "server/StatefulSet: server.ports.serflan.port can be customized" {
@@ -351,22 +346,6 @@ load _helpers
 
   local command=$(echo "$object" |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-serf-lan-port=9301"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: retry join uses server.ports.serflan.port" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'server.replicas=3' \
-      --set 'server.ports.serflan.port=9301' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -717,7 +696,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 97314eb896e88e23a6552ca812e1a3205243b1fa2f4d3e6e95e63c893a7c1f1e ]
+  [ "${actual}" = 6e60da3b41ca20684b887b27c188eebfefacd77ecb47491b83f55c19b1ba9374 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -727,7 +706,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 004fe72210e383398b8e36de2e918d005dcd6b8e162d67ad23aef024a872dda8 ]
+  [ "${actual}" = e9595e03c13c8208168fbbe251768bb8660021d6df8114363512012024b06bdb ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -737,7 +716,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 54aae134d108d934d0a10b527df62dfbb10074fffb27c196625ebf5da6b8206d ]
+  [ "${actual}" = d5b7cfe1ff7a5835a5702d88aeca8e2683d236daa6f67f6bfdf1ab9ba61f2a92 ]
 }
 
 #--------------------------------------------------------------------
@@ -1307,37 +1286,6 @@ load _helpers
   local actual=$(echo "$object" |
     yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = '[{"name":"ACL_REPLICATION_TOKEN","valueFrom":{"secretKeyRef":{"name":"name","key":"key"}}}]' ]
-}
-
-#--------------------------------------------------------------------
-# -bootstrap-expect
-
-@test "server/StatefulSet: -bootstrap-expect defaults to replicas" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-bootstrap-expect=3")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: -bootstrap-expect can be set by server.bootstrapExpect" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'server.bootstrapExpect=5' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-bootstrap-expect=5")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: errors if bootstrapExpect < replicas" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'server.bootstrapExpect=1' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "server.bootstrapExpect cannot be less than server.replicas" ]]
 }
 
 #--------------------------------------------------------------------

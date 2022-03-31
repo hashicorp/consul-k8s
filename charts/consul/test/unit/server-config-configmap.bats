@@ -49,6 +49,78 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# retry-join
+
+@test "server/ConfigMap: retry join gets populated" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .retry_join[0] | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:8301" ]
+}
+
+#--------------------------------------------------------------------
+# serflan
+
+@test "server/ConfigMap: server.ports.serflan.port is set to 8301 by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .ports.serf_lan | tee /dev/stderr)
+
+  [ "${actual}" = "8301" ]
+}
+
+@test "server/ConfigMap: server.ports.serflan.port can be customized" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.ports.serflan.port=9301' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .ports.serf_lan | tee /dev/stderr)
+
+  [ "${actual}" = "9301" ]
+}
+
+@test "server/ConfigMap: retry join uses server.ports.serflan.port" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      --set 'server.ports.serflan.port=9301' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .retry_join[0] | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:9301" ]
+}
+
+#--------------------------------------------------------------------
+# bootstrap_expect
+
+@test "server/ConfigMap: bootstrap_expect defaults to replicas" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq .bootstrap_expect | tee /dev/stderr)
+  [ "${actual}" = "3" ]
+}
+
+@test "server/ConfigMap: bootstrap_expect can be set by server.bootstrapExpect" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.bootstrapExpect=5' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq .bootstrap_expect | tee /dev/stderr)
+  [ "${actual}" = "5" ]
+}
+
+#--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
 @test "server/ConfigMap: creates acl config with .global.acls.manageSystemACLs enabled" {

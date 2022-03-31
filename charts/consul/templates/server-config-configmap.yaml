@@ -12,6 +12,23 @@ metadata:
     release: {{ .Release.Name }}
     component: server
 data:
+  server.json: |
+    {
+      "bind_addr": "0.0.0.0",
+      "bootstrap_expect": {{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }},
+      "client_addr": "0.0.0.0",
+      "connect": {
+        "enabled": {{ .Values.server.connect }}
+      },
+      "datacenter": "{{ .Values.global.datacenter }}",
+      "data_dir": "/consul/data",
+      "domain": "{{ .Values.global.domain }}",
+      "ports": {
+        "serf_lan": {{ .Values.server.ports.serflan.port }}
+      },
+      "retry_join": ["{{template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.ports.serflan.port }}"],
+      "server": true
+    }
   {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
   {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
   {{- with .Values.global.secretsBackend.vault }}
