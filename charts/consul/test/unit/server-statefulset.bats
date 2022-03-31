@@ -723,7 +723,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 2c5397272acdc6fe5b079bf25c846c5a17f474603c794c64e7226ce0690625f7 ]
+  [ "${actual}" = 97314eb896e88e23a6552ca812e1a3205243b1fa2f4d3e6e95e63c893a7c1f1e ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -733,7 +733,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = b0d22cb051216505edc0e61b57f9eacc0d7e15b24719d815842df88f06f1abe0 ]
+  [ "${actual}" = 004fe72210e383398b8e36de2e918d005dcd6b8e162d67ad23aef024a872dda8 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -743,7 +743,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 7772975be982e25cc8df101375374e2ba672a55737f8f1580011e0d88d8752a8 ]
+  [ "${actual}" = 54aae134d108d934d0a10b527df62dfbb10074fffb27c196625ebf5da6b8206d ]
 }
 
 #--------------------------------------------------------------------
@@ -2038,33 +2038,5 @@ load _helpers
 
   # Check that path to Vault secret config is provided to the command.
   local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# ui.dashboardURLTemplates.service
-
-@test "server/StatefulSet: dashboard_url_templates not set by default" {
-  cd `chart_dir`
-
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr |
-      yq -r ".spec.template.spec.containers[0].command | any(contains(\"dashboard_url_templates\"))" | tee /dev/stderr)
-
-  [ "${actual}" = "false" ]
-}
-
-@test "server/StatefulSet: ui.dashboardURLTemplates.service sets the template" {
-  cd `chart_dir`
-
-  local expected='-hcl='\''ui_config { dashboard_url_templates { service = \"http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}\" } }'
-
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'ui.dashboardURLTemplates.service=http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}' \
-      . | tee /dev/stderr |
-      yq -r ".spec.template.spec.containers[0].command | any(contains(\"$expected\"))" | tee /dev/stderr)
-
   [ "${actual}" = "true" ]
 }

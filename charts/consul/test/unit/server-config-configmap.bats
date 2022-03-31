@@ -62,61 +62,84 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.metrics.enabled & ui.enabled
+# ui.enabled
 
-@test "server/ConfigMap: creates ui config with .ui.enabled=true and .global.metrics.enabled=true" {
+@test "server/ConfigMap: creates ui config with .ui.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"enabled":true}' ]
+}
+
+@test "server/ConfigMap: does not create ui config with .ui.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.data["ui-config.json"] | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: adds metrics ui config with .global.metrics.enabled=true and ui.metrics.enabled=-" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true' \
       --set 'ui.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"metrics_provider":"prometheus","metrics_proxy":{"base_url":"http://prometheus-server"},"enabled":true}' ]
 }
 
-@test "server/ConfigMap: creates ui config with .ui.enabled=true and .ui.metrics.enabled=true" {
+@test "server/ConfigMap: adds metrics ui config with .global.metrics.enabled=false and .ui.metrics.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'ui.metrics.enabled=true' \
       --set 'ui.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"metrics_provider":"prometheus","metrics_proxy":{"base_url":"http://prometheus-server"},"enabled":true}' ]
 }
 
-@test "server/ConfigMap: does not create ui config when .ui.enabled=false and .ui.metrics.enabled=true" {
+@test "server/ConfigMap: adds metrics ui config with .global.metrics.enabled=true and .ui.metrics.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
-      --set 'ui.enabled=false' \
-      --set 'ui.metrics.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .global.metrics.enabled=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true' \
+      --set 'ui.metrics.enabled=true' \
       --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"metrics_provider":"prometheus","metrics_proxy":{"base_url":"http://prometheus-server"},"enabled":true}' ]
+}
+
+@test "server/ConfigMap: doesn't add metrics ui config with .global.metrics.enabled=true and .ui.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true' \
+      --set 'ui.metrics.enabled=false' \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"enabled":true}' ]
+}
+
+@test "server/ConfigMap: doesn't add metrics ui config with .global.metrics.enabled=false and .ui.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .ui.metrics.enabled=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'ui.enabled=true' \
       --set 'ui.metrics.enabled=false' \
+      --set 'ui.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"enabled":true}' ]
 }
 
 @test "server/ConfigMap: updates ui config with .ui.metrics.provider" {
@@ -141,6 +164,34 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["ui-config.json"]' | yq -r '.ui_config.metrics_proxy.base_url' | tee /dev/stderr)
   [ "${actual}" = "http://foo.bar" ]
+}
+
+#--------------------------------------------------------------------
+# ui.dashboardURLTemplates.service
+
+@test "server/ConfigMap: dashboard_url_templates not set by default" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq .dashboard_url_templates | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: ui.dashboardURLTemplates.service sets the template" {
+  cd `chart_dir`
+
+  local expected='-hcl='\''ui_config { dashboard_url_templates { service = \"http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}\" } }'
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.dashboardURLTemplates.service=http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config.dashboard_url_templates | tee /dev/stderr)
+
+  [ "${actual}" = '{"service":"http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}"}' ]
 }
 
 #--------------------------------------------------------------------
