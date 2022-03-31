@@ -302,10 +302,7 @@ spec:
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
                 {{- end }}
-                {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
-                {{- range $index := until (.Values.server.replicas | int) }}
-                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
-                {{- end }}
+                -retry-join="${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ .Values.server.ports.serflan.port }}" \
                 -serf-lan-port={{ .Values.server.ports.serflan.port }} \
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
