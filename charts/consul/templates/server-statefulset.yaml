@@ -287,9 +287,6 @@ spec:
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
                 {{- end }}
-                {{- range $value := .Values.global.recursors }}
-                -recursor={{ quote $value }} \
-                {{- end }}
                 {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
                 $recursor_flags \
                 {{- end }}

@@ -696,7 +696,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 6e60da3b41ca20684b887b27c188eebfefacd77ecb47491b83f55c19b1ba9374 ]
+  [ "${actual}" = 0413362d01133dcd9c1da159e01c20143fb1fe4e2e2ade27bd3b85645653d7cf ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -706,7 +706,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = e9595e03c13c8208168fbbe251768bb8660021d6df8114363512012024b06bdb ]
+  [ "${actual}" = 7394f1cb933e3501be41dd0225d8d2248f2d592e0241876035127e5b9540ec31 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -716,7 +716,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = d5b7cfe1ff7a5835a5702d88aeca8e2683d236daa6f67f6bfdf1ab9ba61f2a92 ]
+  [ "${actual}" = 62db9fd78a8dd95db274586c7d372af85c899b8c9db942a2a0bb691b25c87f55 ]
 }
 
 #--------------------------------------------------------------------
@@ -1322,16 +1322,6 @@ load _helpers
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]
-}
-
-@test "server/StatefulSet: -recursor can be set by global.recursors" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.recursors[0]=1.2.3.4' \
-      . | tee /dev/stderr |
-      yq -r -c '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 @test "server/StatefulSet: when global.enterpriseLicense.secretKey!=null and global.enterpriseLicense.secretName=null, fail" {

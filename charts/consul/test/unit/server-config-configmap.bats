@@ -98,6 +98,17 @@ load _helpers
   [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:9301" ]
 }
 
+@test "server/StatefulSet: recursors can be set by global.recursors" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.recursors[0]=1.1.1.1' \
+      --set 'global.recursors[1]=2.2.2.2' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -c .recursors | tee /dev/stderr)
+  [ "${actual}" = '["1.1.1.1","2.2.2.2"]' ]
+}
+
 #--------------------------------------------------------------------
 # bootstrap_expect
 
