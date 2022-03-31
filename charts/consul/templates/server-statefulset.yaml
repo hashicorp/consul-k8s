@@ -274,9 +274,6 @@ spec:
                 {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
                 {{- end }}
-                {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
-                -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
-                {{- end }}
                 {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
                 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.acls.createReplicationToken)) }}
                 -config-file=/vault/secrets/replication-token-config.hcl \

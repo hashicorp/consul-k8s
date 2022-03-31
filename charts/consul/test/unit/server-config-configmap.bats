@@ -773,3 +773,28 @@ load _helpers
   local actual=$(echo $object | jq -r .key_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/servercert.key" ]
 }
+
+@test "server/ConfigMap: when global.metrics.enableAgentMetrics=true, sets telemetry config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prometheus_retention_time | tee /dev/stderr)
+
+  [ "${actual}" = "1m" ]
+}
+
+@test "server/ConfigMap: when global.metrics.enableAgentMetrics=true and global.metrics.agentMetricsRetentionTime is set, sets telemetry config with updated retention time" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.agentMetricsRetentionTime=5m'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prometheus_retention_time | tee /dev/stderr)
+
+  [ "${actual}" = "5m" ]
+}
