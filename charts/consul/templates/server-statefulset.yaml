@@ -302,12 +302,6 @@ spec:
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
                 {{- end }}
-                {{- if .Values.ui.enabled }}
-                -ui \
-                {{- if .Values.ui.dashboardURLTemplates.service }}
-                -hcl='ui_config { dashboard_url_templates { service = "{{ .Values.ui.dashboardURLTemplates.service }}" } }' \
-                {{- end }}
-                {{- end }}
                 {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
                 {{- range $index := until (.Values.server.replicas | int) }}
                 -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \

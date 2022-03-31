@@ -92,15 +92,22 @@ data:
        }
     }
   {{- end }}
-  {{- if (and .Values.ui.enabled (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString))))) }}
+  {{- if .Values.ui.enabled }}
   ui-config.json: |-
     {
       "ui_config": {
-        "enabled": true,
+        {{- if (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString)))) }}
         "metrics_provider": "{{ .Values.ui.metrics.provider }}",
         "metrics_proxy": {
           "base_url": "{{ .Values.ui.metrics.baseURL }}"
-        }
+        },
+        {{- end }}
+        {{- if .Values.ui.dashboardURLTemplates.service }}
+        "dashboard_url_templates": {
+          "service": "{{ .Values.ui.dashboardURLTemplates.service }}"
+        },
+        {{- end }}
+        "enabled": true
       }
     }
   {{- end }}
