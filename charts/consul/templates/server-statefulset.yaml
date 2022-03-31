@@ -277,9 +277,6 @@ spec:
                 {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
                 -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
                 {{- end }}
-                {{- if .Values.global.federation.enabled }}
-                -hcl="connect { enable_mesh_gateway_wan_federation = true }" \
-                {{- end }}
                 {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
                 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.acls.createReplicationToken)) }}
                 -config-file=/vault/secrets/replication-token-config.hcl \

@@ -137,7 +137,10 @@ data:
   federation-config.json: |-
     {
       "primary_datacenter": "{{ .Values.global.federation.primaryDatacenter }}",
-      "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }}
+      "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }},
+      "connect": {
+        "enable_mesh_gateway_wan_federation": true
+      }
     }
   {{- end }}
 {{- end }}

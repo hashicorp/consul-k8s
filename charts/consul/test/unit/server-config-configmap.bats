@@ -98,7 +98,7 @@ load _helpers
   [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:9301" ]
 }
 
-@test "server/StatefulSet: recursors can be set by global.recursors" {
+@test "server/ConfigMap: recursors can be set by global.recursors" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
@@ -628,7 +628,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/ConfigMap: doesn't add federation config by default" {
+@test "server/ConfigMap: doesn't add federation config when global.federation.enabled is false (default)" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
@@ -637,7 +637,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: adds empty federation config when global.federation.enabled is true" {
+@test "server/ConfigMap: adds default federation config when global.federation.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml \
@@ -646,8 +646,8 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["federation-config.json"]' | tee /dev/stderr)
-  [ "${actual}" = '"{\n  \"primary_datacenter\": \"\",\n  \"primary_gateways\": []\n}"' ]
+      yq -r '.data["federation-config.json"]' | jq -c . | tee /dev/stderr)
+  [ "${actual}" = '{"primary_datacenter":"","primary_gateways":[],"connect":{"enable_mesh_gateway_wan_federation":true}}' ]
 }
 
 @test "server/ConfigMap: can set primary dc and gateways when global.federation.enabled is true" {
@@ -662,8 +662,8 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["federation-config.json"]' | tee /dev/stderr)
-  [ "${actual}" = '"{\n  \"primary_datacenter\": \"dc1\",\n  \"primary_gateways\": [\"1.1.1.1:443\",\"2.2.2.2:443\"]\n}"' ]
+      yq -r '.data["federation-config.json"]' | jq -c . | tee /dev/stderr)
+  [ "${actual}" = '{"primary_datacenter":"dc1","primary_gateways":["1.1.1.1:443","2.2.2.2:443"],"connect":{"enable_mesh_gateway_wan_federation":true}}' ]
 }
 
 #--------------------------------------------------------------------
