@@ -99,6 +99,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- if .Values.externalServers.k8sAuthMethodHostSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.externalServers.k8sAuthMethodHostSecretName }}
+          {{- end }}
           {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
           volumeMounts:
             {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
@@ -175,6 +180,8 @@ spec:
                 -create-inject-token=true \
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
                 -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
+                {{- else if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHostSecretName }}
+                -inject-auth-method-host=${K8S_API_SERVER_ENDPOINT} \
                 {{- end }}
                 {{- end }}
 
