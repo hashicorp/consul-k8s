@@ -937,6 +937,7 @@ externalServers:
   # Alternatively, specify a secret to pull the K8S_API_SERVER_ENDPOINT environment variable from
   # and use that to define the address of the Kubernetes API server.
   k8sAuthMethodSecretName: null
+  k8sAuthMethodSecretKey: null
 
 # Values that configure running a Consul client on Kubernetes nodes.
 client:

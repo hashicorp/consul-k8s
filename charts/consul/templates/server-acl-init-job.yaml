@@ -180,8 +180,8 @@ spec:
                 -create-inject-token=true \
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
                 -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
-                {{- else if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHostSecretName }}
-                -inject-auth-method-host=${K8S_API_SERVER_ENDPOINT} \
+                {{- else if (and .Values.externalServers.enabled (and .Values.externalServers.k8sAuthMethodHostSecretName .Values.externalServers.k8sAuthMethodHostSSecretKey)) }}
+                -inject-auth-method-host=${{{ .Values.externalServers.k8sAuthMethodHostSecretKey }}} \
                 {{- end }}
                 {{- end }}
 
