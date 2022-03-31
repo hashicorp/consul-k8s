@@ -13,28 +13,26 @@ metadata:
     release: {{ .Release.Name }}
     component: server-acl-init
 rules:
-  - apiGroups: [""]
-    resources:
-      - secrets
-    verbs:
-      - create
-      - get
-{{- if .Values.connectInject.enabled }}
-  - apiGroups: [""]
-    resources:
-      - serviceaccounts
-    resourceNames:
-      - {{ template "consul.fullname" . }}-connect-injector
-    verbs:
-      - get
-{{- end }}
+- apiGroups: [ "" ]
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+- apiGroups: [ "" ]
+  resources:
+  - serviceaccounts
+  resourceNames:
+  - {{ template "consul.fullname" . }}-auth-method
+  verbs:
+  - get
 {{- if .Values.global.enablePodSecurityPolicies }}
-  - apiGroups: ["policy"]
-    resources: ["podsecuritypolicies"]
-    resourceNames:
-      - {{ template "consul.fullname" . }}-server-acl-init
-    verbs:
-      - use
+- apiGroups: [ "policy" ]
+  resources: [ "podsecuritypolicies" ]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-server-acl-init
+  verbs:
+  - use
 {{- end }}
 {{- end }}
 {{- end }}

@@ -47,16 +47,57 @@ spec:
     spec:
       {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
+      {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
+      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
+      {{- end }}
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: controller-acl-init
+        env:
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          {{- if .Values.global.tls.enabled }}
+          - name: CONSUL_CACERT
+            value: /consul/tls/ca/tls.crt
+          {{- end }}
+          - name: CONSUL_HTTP_ADDR
+            {{- if .Values.global.tls.enabled }}
+            value: https://$(HOST_IP):8501
+            {{- else }}
+            value: http://$(HOST_IP):8500
+            {{- end }}
         image: {{ .Values.global.imageK8S }}
+        volumeMounts:
+        - mountPath: /consul/login
+          name: consul-data
+          readOnly: false
+        {{- if .Values.global.tls.enabled }}
+        {{- if .Values.global.tls.enableAutoEncrypt }}
+        - name: consul-auto-encrypt-ca-cert
+        {{- else }}
+        - name: consul-ca-cert
+        {{- end }}
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
         command:
           - "/bin/sh"
           - "-ec"
           - |
             consul-k8s-control-plane acl-init \
-              -secret-name="{{ template "consul.fullname" . }}-controller-acl-token" \
-              -k8s-namespace={{ .Release.Namespace }}
+              -component-name=controller \
+              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+              -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+              -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+              {{- else }}
+              -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+              {{- end }}
+              {{- if .Values.global.adminPartitions.enabled }}
+              -partition={{ .Values.global.adminPartitions.name }} \
+              {{- end }}
+              -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
+              -log-json={{ .Values.global.logJSON }}
         resources:
           requests:
             memory: "25Mi"
@@ -64,9 +105,6 @@ spec:
           limits:
             memory: "25Mi"
             cpu: "50m"
-      {{- end }}
-      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
-      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
       {{- end }}
       {{- end }}
       containers:
@@ -98,7 +136,21 @@ spec:
             -consul-cross-namespace-acl-policy=cross-namespace-policy \
             {{- end }}
             {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-ec"
+                - |
+                  consul-k8s-control-plane consul-logout
+        {{- end }}
         env:
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_HTTP_TOKEN_FILE
+          value: "/consul/login/acl-token"
+        {{- end }}
         - name: HOST_IP
           valueFrom:
             fieldRef:
@@ -110,13 +162,6 @@ spec:
               name: {{ .Values.controller.aclToken.secretName }}
               key: {{ .Values.controller.aclToken.secretKey }}
         {{- end }}
-        {{- if .Values.global.acls.manageSystemACLs }}
-        - name: CONSUL_HTTP_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: "{{ template "consul.fullname" . }}-controller-acl-token"
-              key: "token"
-        {{- end}}
         {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
           value: /consul/tls/ca/tls.crt
@@ -138,6 +183,9 @@ spec:
           {{- toYaml . | nindent 12 }}
         {{- end }}
         volumeMounts:
+        - mountPath: /consul/login
+          name: consul-data
+          readOnly: true
         - mountPath: /tmp/controller-webhook/certs
           name: cert
           readOnly: true
@@ -175,6 +223,9 @@ spec:
           medium: "Memory"
       {{- end }}
       {{- end }}
+      - name: consul-data
+        emptyDir:
+          medium: "Memory"
       serviceAccountName: {{ template "consul.fullname" . }}-controller
       {{- if .Values.controller.nodeSelector }}
       nodeSelector:

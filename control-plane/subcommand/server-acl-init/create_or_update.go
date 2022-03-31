@@ -10,6 +10,183 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// createACLPolicyRoleAndBindingRule will create the ACL Policy for the component
+// then create a set of ACLRole and ACLBindingRule which tie the component's serviceaccount
+// to the authMethod, allowing the serviceaccount to later be allowed to issue a Consul Login.
+func (c *Command) createACLPolicyRoleAndBindingRule(componentName, rules, dc, primaryDC string, global, primary bool, authMethodName, serviceAccountName string, client *api.Client) error {
+	// Create policy with the given rules.
+	policyName := fmt.Sprintf("%s-policy", componentName)
+	if c.flagFederation && !primary {
+		// If performing ACL replication, we must ensure policy names are
+		// globally unique so we append the datacenter name but only in secondary datacenters..
+		policyName += fmt.Sprintf("-%s", dc)
+	}
+	var datacenters []string
+	if !global && dc != "" {
+		datacenters = append(datacenters, dc)
+	}
+	policyTmpl := api.ACLPolicy{
+		Name:        policyName,
+		Description: fmt.Sprintf("%s Token Policy", policyName),
+		Rules:       rules,
+		Datacenters: datacenters,
+	}
+	err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+		func() error {
+			return c.createOrUpdateACLPolicy(policyTmpl, client)
+		})
+	if err != nil {
+		return err
+	}
+
+	// Create an ACLRolePolicyLink list to attach to the ACLRole.
+	ap := &api.ACLRolePolicyLink{
+		Name: policyName,
+	}
+	apl := []*api.ACLRolePolicyLink{}
+	apl = append(apl, ap)
+
+	// Add the ACLRole and ACLBindingRule.
+	return c.addRoleAndBindingRule(client, serviceAccountName, authMethodName, apl, global, primary, primaryDC, dc)
+}
+
+// addRoleAndBindingRule adds an ACLRole and ACLBindingRule which reference the authMethod.
+func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName string, authMethodName string, policies []*api.ACLRolePolicyLink, global, primary bool, primaryDC, dc string) error {
+	// This is the ACLRole which will allow the component which uses the serviceaccount
+	// to be able to do a consul login.
+	aclRoleName := fmt.Sprintf("%s-acl-role", serviceAccountName)
+	if c.flagFederation && !primary {
+		// If performing ACL replication, we must ensure policy names are
+		// globally unique so we append the datacenter name but only in secondary datacenters.
+		aclRoleName += fmt.Sprintf("-%s", dc)
+	}
+	role := &api.ACLRole{
+		Name:        aclRoleName,
+		Description: fmt.Sprintf("ACL Role for %s", serviceAccountName),
+		Policies:    policies,
+	}
+	err := c.updateOrCreateACLRole(client, role)
+	if err != nil {
+		c.log.Error("unable to update or create ACL Role", err)
+		return err
+	}
+
+	// Create the ACLBindingRule, this ties the Policies defined in the Role to the authMethod via serviceaccount.
+	abr := &api.ACLBindingRule{
+		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
+		AuthMethod:  authMethodName,
+		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
+		BindType:    api.BindingRuleBindTypeRole,
+		BindName:    aclRoleName,
+	}
+	writeOptions := &api.WriteOptions{}
+	if global && dc != primaryDC {
+		writeOptions.Datacenter = primaryDC
+	}
+	return c.createOrUpdateBindingRule(client, authMethodName, abr, &api.QueryOptions{}, writeOptions)
+}
+
+// updateOrCreateACLRole will query to see if existing role is in place and update them
+// or create them if they do not yet exist.
+func (c *Command) updateOrCreateACLRole(client *api.Client, role *api.ACLRole) error {
+	err := c.untilSucceeds(fmt.Sprintf("update or create acl role for %s", role.Name),
+		func() error {
+			var err error
+			aclRole, _, err := client.ACL().RoleReadByName(role.Name, &api.QueryOptions{})
+			if err != nil {
+				c.log.Error("unable to read ACL Roles", err)
+				return err
+			}
+			if aclRole != nil {
+				_, _, err := client.ACL().RoleUpdate(aclRole, &api.WriteOptions{})
+				if err != nil {
+					c.log.Error("unable to update role", err)
+					return err
+				}
+				return nil
+			}
+			_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
+			if err != nil {
+				c.log.Error("unable to create role", err)
+				return err
+			}
+			return err
+		})
+	return err
+}
+
+// createConnectBindingRule will query to see if existing binding rules are in place and update them
+// or create them if they do not yet exist.
+func (c *Command) createConnectBindingRule(client *api.Client, authMethodName string, abr *api.ACLBindingRule) error {
+	// Binding rule list api call query options.
+	queryOptions := api.QueryOptions{}
+
+	// If namespaces and mirroring are enabled, this is not necessary because
+	// the binding rule will fall back to being created in the Consul `default`
+	// namespace automatically, as is necessary for mirroring.
+	if c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
+		abr.Namespace = c.flagConsulInjectDestinationNamespace
+		queryOptions.Namespace = c.flagConsulInjectDestinationNamespace
+	}
+
+	return c.createOrUpdateBindingRule(client, authMethodName, abr, &queryOptions, nil)
+}
+
+func (c *Command) createOrUpdateBindingRule(client *api.Client, authMethodName string, abr *api.ACLBindingRule, queryOptions *api.QueryOptions, writeOptions *api.WriteOptions) error {
+	var existingRules []*api.ACLBindingRule
+	err := c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
+		func() error {
+			var err error
+			existingRules, _, err = client.ACL().BindingRuleList(authMethodName, queryOptions)
+			return err
+		})
+	if err != nil {
+		return err
+	}
+
+	// If the binding rule already exists, update it
+	// This updates the binding rule any time the acl bootstrapping
+	// command is rerun, which is a bit of extra overhead, but is
+	// necessary to pick up any potential config changes.
+	if len(existingRules) > 0 {
+		// Find the policy that matches our name and description
+		// and that's the ID we need
+		for _, existingRule := range existingRules {
+			if existingRule.BindName == abr.BindName && existingRule.Description == abr.Description {
+				abr.ID = existingRule.ID
+			}
+		}
+
+		// This will only happen if there are existing policies
+		// for this auth method, but none that match the binding
+		// rule set up here in the bootstrap method. Hence the
+		// new binding rule must be created as it belongs to the
+		// same auth method.
+		if abr.ID == "" {
+			c.log.Info("unable to find a matching ACL binding rule to update. creating ACL binding rule.")
+			err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
+				func() error {
+					_, _, err := client.ACL().BindingRuleCreate(abr, writeOptions)
+					return err
+				})
+		} else {
+			err = c.untilSucceeds(fmt.Sprintf("updating acl binding rule for %s", authMethodName),
+				func() error {
+					_, _, err := client.ACL().BindingRuleUpdate(abr, writeOptions)
+					return err
+				})
+		}
+	} else {
+		// Otherwise create the binding rule
+		err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
+			func() error {
+				_, _, err := client.ACL().BindingRuleCreate(abr, writeOptions)
+				return err
+			})
+	}
+	return err
+}
+
 // createLocalACL creates a policy and acl token for this dc (datacenter), i.e.
 // the policy is only valid for this datacenter and the token is a local token.
 func (c *Command) createLocalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
@@ -23,15 +200,14 @@ func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, consul
 	return c.createACL(name, rules, false, dc, isPrimary, consulClient, "")
 }
 
-// createGlobalACLWithSecretID creates a global policy and acl token with provided secret ID.
-func (c *Command) createGlobalACLWithSecretID(name, rules, dc string, isPrimary bool, consulClient *api.Client, secretID string) error {
-	return c.createACL(name, rules, false, dc, isPrimary, consulClient, secretID)
+// createACLWithSecretID creates a global policy and acl token with provided secret ID.
+func (c *Command) createACLWithSecretID(name, rules, dc string, isPrimary bool, consulClient *api.Client, secretID string, local bool) error {
+	return c.createACL(name, rules, local, dc, isPrimary, consulClient, secretID)
 }
 
 // createACL creates a policy with rules and name. If localToken is true then
 // the token will be a local token and the policy will be scoped to only dc.
 // If localToken is false, the policy will be global.
-// The token will be written to a Kubernetes secret.
 // When secretID is provided, we will use that value for the created token and
 // will skip writing it to a Kubernetes secret (because in this case we assume that
 // this value already exists in some secrets storage).
@@ -69,9 +245,9 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 	}
 
 	// Check if the replication token already exists in some form.
-	secretName := c.withPrefix(name + "-acl-token")
 	// When secretID is not provided, we assume that replication token should exist
 	// as a Kubernetes secret.
+	secretName := c.withPrefix(name + "-acl-token")
 	if secretID == "" {
 		// Check if the secret already exists, if so, we assume the ACL has already been
 		// created and return.
@@ -136,7 +312,7 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 	// Allowing the Consul node name to be configurable also requires any sync
 	// policy to be updated in case the node name has changed.
 	if isPolicyExistsErr(err, policy.Name) {
-		if c.flagEnableNamespaces || c.flagCreateSyncToken {
+		if c.flagEnableNamespaces || c.flagSyncCatalog {
 			c.log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
 
 			// The policy ID is required in any PolicyUpdate call, so first we need to

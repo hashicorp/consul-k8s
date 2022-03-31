@@ -39,10 +39,11 @@ func TestIngressGateway(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
+			igName := "ingress-gateway"
 			helmValues := map[string]string{
 				"connectInject.enabled":                "true",
 				"ingressGateways.enabled":              "true",
-				"ingressGateways.gateways[0].name":     "ingress-gateway",
+				"ingressGateways.gateways[0].name":     igName,
 				"ingressGateways.gateways[0].replicas": "1",
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
@@ -70,7 +71,7 @@ func TestIngressGateway(t *testing.T) {
 			// Create config entry
 			created, _, err := consulClient.ConfigEntries().Set(&api.IngressGatewayConfigEntry{
 				Kind: api.IngressGateway,
-				Name: "ingress-gateway",
+				Name: igName,
 				Listeners: []api.IngressListener{
 					{
 						Port:     8080,
@@ -94,7 +95,9 @@ func TestIngressGateway(t *testing.T) {
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				logger.Log(t, "testing intentions prevent ingress")
-				k8s.CheckStaticServerConnectionFailing(t, k8sOptions, staticClientName, "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+				k8s.CheckStaticServerConnectionFailing(t, k8sOptions,
+					staticClientName, "-H", "Host: static-server.ingress.consul",
+					fmt.Sprintf("http://%s-consul-%s:8080/", releaseName, igName))
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
@@ -103,7 +106,7 @@ func TestIngressGateway(t *testing.T) {
 					Name: "static-server",
 					Sources: []*api.SourceIntention{
 						{
-							Name:   "ingress-gateway",
+							Name:   igName,
 							Action: api.IntentionActionAllow,
 						},
 					},
@@ -114,7 +117,9 @@ func TestIngressGateway(t *testing.T) {
 			// Test that we can make a call to the ingress gateway
 			// via the static-client pod. It should route to the static-server pod.
 			logger.Log(t, "trying calls to ingress gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, staticClientName, "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions,
+				staticClientName, "-H", "Host: static-server.ingress.consul",
+				fmt.Sprintf("http://%s-consul-%s:8080/", releaseName, igName))
 		})
 	}
 }

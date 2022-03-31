@@ -114,6 +114,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'client.join[0]=1.1.1.1' \
       --set 'client.join[1]=2.2.2.2' \
       . | tee /dev/stderr |
@@ -132,6 +133,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'client.join[0]=provider=my-cloud config=val' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command')
@@ -804,6 +806,57 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "client/DaemonSet: Adds consul envvars CONSUL_HTTP_ADDR on acl-init init container when ACLs are enabled and tls is enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = "https://RELEASE-NAME-consul-server.default.svc:8501" ]
+}
+
+@test "client/DaemonSet: Adds consul envvars CONSUL_HTTP_ADDR on acl-init init container when ACLs are enabled and tls is not enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = "http://RELEASE-NAME-consul-server.default.svc:8500" ]
+}
+
+@test "client/DaemonSet: Does not add consul envvars CONSUL_CACERT on acl-init init container when ACLs are enabled and tls is not enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT")' | tee /dev/stderr)
+
+  [ "${actual}" = "" ]
+}
+
+@test "client/DaemonSet: Adds consul envvars CONSUL_CACERT on acl-init init container when ACLs are enabled and tls is enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+}
+
 @test "client/DaemonSet: both ACL and TLS init containers are created when global.tls.enabled=true and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local has_acl_init_container=$(helm template \
@@ -1023,7 +1076,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[2].name == "aclconfig"' | tee /dev/stderr)
+      yq '.spec.template.spec.volumes[3].name == "aclconfig"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1033,7 +1086,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[2]' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].volumeMounts[3]' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.name' | tee /dev/stderr)
@@ -1054,7 +1107,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: init container is created when global.acls.manageSystemACLs=true" {
+@test "client/DaemonSet: init container is created when global.acls.manageSystemACLs=true and command args are properly set" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
@@ -1064,6 +1117,350 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+local actual=$(echo $object |
+      yq -r '.command | any(contains("secret-name"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("k8s-namespace"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("component-name=client"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("init-type=\"client\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("acl-auth-method=\"RELEASE-NAME-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("log-json=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+}
+
+@test "client/DaemonSet: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("secret-name"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("k8s-namespace"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("component-name=client"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("init-type=\"client\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("acl-auth-method=\"RELEASE-NAME-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("log-json=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]  
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=false' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: consul-logout preStop hook is added when ACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul logout"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: Adds consul login volume when ACLs are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | yq '.spec.template.spec.volumes[2]' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-data" ]
+
+  local actual=$(echo $object |
+      yq -r '.emptyDir.medium' | tee /dev/stderr)
+  [ "${actual}" = "Memory" ]
+}
+
+@test "client/DaemonSet: Adds consul login volumeMount to client container when ACLs are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | yq '.spec.template.spec.containers[0].volumeMounts[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-data" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/login" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: Adds consul login volumeMount to acl-init init container when ACLs are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[1]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-data" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/login" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: Adds consul ca cert volumeMount to acl-init init container when ACLs and tls are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-ca-cert" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: Does not add consul ca cert volumeMount to acl-init init container when tls is not enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=false' \
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-ca-cert" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca" ]
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: fail when externalServers is enabled but the externalServers.hosts is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      .
+  echo "status:$status"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
+}
+
+@test "client/DaemonSet: server-address flag is set with hosts when externalServers.hosts are provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=foo'  \
+      --set 'externalServers.hosts[1]=bar'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"foo\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"bar\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: tls-server-name flag is set when externalServers.tlsServerName is provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true'  \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      --set 'externalServers.tlsServerName=foo'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: tls-server-name flag is not set when externalServers.tlsServerName is not provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: use-https flag is not set when global.tls.enabled is not provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: use-https flag is set when global.tls.enabled is provided and externalServers.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: use-https flag is not set when global.tls.enabled is enabled but externalServers.enabled is false" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=false'  \
+      --set 'server.enabled=false' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: server-port flag is not set when externalServers.enabled is false" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=false'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: server-port flag is set when externalServers.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true'  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=computer'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1872,12 +2269,36 @@ rollingUpdate:
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
   [ "${actual}" = "path/to/secret" ]
-  local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)
+
   local actual="$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
   local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.enterpriselicense -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
+}
+
+@test "client/DaemonSet: vault enterprise license annotations are not set when ent license is set and ACLs are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.manageSystemACLsRole=aclsrole' \
+    --set 'global.enterpriseLicense.secretName=path/to/secret' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    --set 'global.acls.manageSystemACLs=true' \
+    --set 'global.acls.bootstrapToken.secretName=boot' \
+    --set 'global.acls.bootstrapToken.secretKey=token' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
+  [ "${actual}" = "null" ]
 }
 
 @test "client/DaemonSet: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
@@ -1926,6 +2347,49 @@ rollingUpdate:
       [ "${actual}" = "" ]
 }
 
+@test "client/DaemonSet: vault adds consul envvars CONSUL_CACERT on acl-init init container when ACLs are enabled and tls is enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=true' \
+      --set 'global.acls.replicationToken.secretName=replication' \
+      --set 'global.acls.replicationToken.secretKey=key' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+    [ "${actual}" = "/vault/secrets/serverca.crt" ]
+}
+
+@test "client/DaemonSet: Vault does not add consul ca cert volumeMount to acl-init init container when ACLs are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
 #--------------------------------------------------------------------
 # Vault agent annotations
 
@@ -1937,7 +2401,7 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."vault.hashicorp.com/agent-init-first")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

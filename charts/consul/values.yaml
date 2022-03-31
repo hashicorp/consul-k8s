@@ -38,10 +38,12 @@ global:
     # must be installed in the default partition. Creation of Admin Partitions is only supported during installation.
     # Admin Partitions cannot be installed via a Helm upgrade operation. Only Helm installs are supported.
     enabled: false
+
     # The name of the Admin Partition. The partition name cannot be modified once the partition has been installed.
     # Changing the partition name would require an un-install and a re-install with the updated name.
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
+
     # Partition service properties.
     service:
       type: LoadBalancer
@@ -85,7 +87,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.11.3"
+  image: "hashicorp/consul:1.11.4"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -155,20 +157,41 @@ global:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
       # To discover the service account name of the Consul client, run
       #     ```shell-session
-      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> charts/consul
+      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> hashicorp/consul
       #     ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
+      # [Enterprise Only] The Vault role for the Consul client snapshot agent.
+      # The role must be connected to the Consul client snapshot agent's service account and
+      # have a policy with read capabilities for the snapshot agent config defined by `client.snapshotAgent.configSecret.secretName`.
+      # To discover the service account name of the Consul client, run
+      #     ```shell-session
+      #     $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulSnapshotAgentRole: ""
+
       # A Vault role to allow Kubernetes job that manages ACLs for this Helm chart (`server-acl-init`)
-      # to read and update Vault secrets for the Consul's bootstrap and replication tokens.
+      # to read and update Vault secrets for the Consul's bootstrap, replication or partition tokens.
       # This role must be bound the `server-acl-init`'s service account.
       # To discover the service account name of the `server-acl-init` job, run
       #     ```shell-session
-      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml <release-name> charts/consul
+      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml \
+      #           --set global.acls.manageSystemACLs=true <release-name> hashicorp/consul
       #     ```
       # and check the name of `metadata.name`.
       manageSystemACLsRole: ""
+
+      # [Enterprise Only] A Vault role to allow Kubernetes job that creates a Consul partition for this Helm chart (`partition-init`)
+      # to read Vault secret for the partition ACL token.
+      # This role must be bound the `partition-init`'s service account.
+      # To discover the service account name of the `partition-init` job, run with Helm values for the client cluster:
+      #     ```shell-session
+      #     $ helm template --show-only templates/partition-init-serviceaccount.yaml -f client-cluster-values.yaml <release-name> hashicorp/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      adminPartitionsRole: ""
 
       # This value defines additional annotations for
       # Vault agent on any pods where it'll be running.
@@ -397,6 +420,18 @@ global:
       # The key of the Kubernetes or Vault secret.
       secretKey: null
 
+    # partitionToken references a Vault secret containing the ACL token to be used in non-default partitions.
+    # This value should only be provided in the default partition and only when setting
+    # `global.secretsBackend.vault.enabled` to true.
+    # We will use the value of the secret stored in Vault to create an ACL token in Consul with the value of the
+    # secret as the secretID for the token.
+    # In non-default, partitions set this secret as the `bootstrapToken`.
+    partitionToken:
+      # The name of the path of the secret in Vault.
+      secretName: null
+      # The key of the Vault secret.
+      secretKey: null
+
   # [Enterprise Only] This value refers to a Kubernetes secret that you have created
   # that contains your enterprise license. It is required if you are using an
   # enterprise binary. Defining it here applies it to your cluster once a leader
@@ -431,12 +466,30 @@ global:
     createFederationSecret: false
 
     # The name of the primary datacenter.
-    primaryDatacenter: ""
+    # @type: string
+    primaryDatacenter: null
 
     # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`.
-    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"] 
+    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"]
     # @type: array<string>
     primaryGateways: []
+
+    # If you are setting `global.federation.enabled` to true and are in a secondary datacenter,
+    # set `k8sAuthMethodHost` to the address of the Kubernetes API server of the secondary datacenter.
+    # This address must be reachable from the Consul servers in the primary datacenter.
+    # This authmethod will be used to provision ACL tokens for Consul components and is different
+    # from the one used by the Consul Service Mesh.
+    # Please see the Kubernetes Auth Method documentation (https://consul.io/docs/acl/auth-methods/kubernetes).
+    #
+    # You could retrieve this value from your `kubeconfig` by running:
+    #
+    # ```shell-session
+    # $ kubectl config view \
+    #   -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
+    # ```
+    #
+    # @type: string
+    k8sAuthMethodHost: null
 
   # Configures metrics for Consul service mesh
   metrics:
@@ -1225,15 +1278,15 @@ client:
     # The number of snapshot agents to run.
     replicas: 2
 
-    # A Kubernetes secret that should be manually created to contain the entire
+    # A Kubernetes or Vault secret that should be manually created to contain the entire
     # config to be used on the snapshot agent.
     # This is the preferred method of configuration since there are usually storage
     # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)
     # for details.
     configSecret:
-      # The name of the Kubernetes secret.
+      # secretName is the name of the Kubernetes secret or Vault secret path that holds the snapshot agentconfig.
       secretName: null
-      # The key of the Kubernetes secret.
+      # secretKey is the key within the Kubernetes secret or Vault secret key that holds the snapshot agentconfig.
       secretKey: null
 
     serviceAccount:
@@ -2641,6 +2694,29 @@ apiGateway:
       #
       # @type: string
       annotations: null
+
+  # Resource settings for api gateway pods.
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: "100Mi"
+      cpu: "100m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
+
+  # Resource settings for the `copy-consul-bin` init container.
+  # @recurse: false
+  # @type: map
+  initCopyConsulContainer:
+    resources:
+      requests:
+        memory: "25Mi"
+        cpu: "50m"
+      limits:
+        memory: "150Mi"
+        cpu: "50m"
 
 # Configuration settings for the webhook-cert-manager
 # `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.

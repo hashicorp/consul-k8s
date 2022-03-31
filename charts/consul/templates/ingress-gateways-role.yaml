@@ -37,7 +37,7 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway-acl-token
+      - {{ template "consul.fullname" $root }}-{{ .name }}-acl-token
     verbs:
       - get
 {{- end }}
