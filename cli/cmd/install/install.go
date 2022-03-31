@@ -14,6 +14,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/release"
+	"github.com/hashicorp/consul-k8s/cli/validation"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
@@ -176,19 +178,6 @@ func (c *Command) init() {
 	c.Init()
 }
 
-type helmValues struct {
-	Global globalValues `yaml:"global"`
-}
-
-type globalValues struct {
-	EnterpriseLicense enterpriseLicense `yaml:"enterpriseLicense"`
-}
-
-type enterpriseLicense struct {
-	SecretName string `yaml:"secretName"`
-	SecretKey  string `yaml:"secretKey"`
-}
-
 // Run installs Consul into a Kubernetes cluster.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
@@ -268,13 +257,6 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Output("No existing Consul persistent volume claims found", terminal.WithSuccessStyle())
 
-	// Ensure there's no previous bootstrap secret lying around.
-	if err := c.checkForPreviousSecrets(); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output("No existing Consul secrets found", terminal.WithSuccessStyle())
-
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
 	if err != nil {
@@ -287,16 +269,29 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var v helmValues
-	err = yaml.Unmarshal(valuesYaml, &v)
+	var values helm.Values
+	err = yaml.Unmarshal(valuesYaml, &values)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
+	release := release.Release{
+		Name:          "consul",
+		Namespace:     c.flagNamespace,
+		Configuration: values,
+	}
+
+	msg, err := c.checkForPreviousSecrets(release)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	c.UI.Output(msg, terminal.WithSuccessStyle())
+
 	// If an enterprise license secret was provided, check that the secret exists and that the enterprise Consul image is set.
-	if v.Global.EnterpriseLicense.SecretName != "" {
-		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName); err != nil {
+	if values.Global.EnterpriseLicense.SecretName != "" {
+		if err := c.checkValidEnterprise(release.Configuration.Global.EnterpriseLicense.SecretName); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
@@ -420,21 +415,45 @@ func (c *Command) checkForPreviousPVCs() error {
 	return nil
 }
 
-// checkForPreviousSecrets checks for the bootstrap token and returns an error if found.
-func (c *Command) checkForPreviousSecrets() error {
-	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue})
+// checkForPreviousSecrets checks for Consul secrets that exist in the cluster
+// and returns a message if the secret configuration is ok or an error if
+// the secret configuration could cause a conflict.
+func (c *Command) checkForPreviousSecrets(release release.Release) (string, error) {
+	secrets, err := validation.ListConsulSecrets(c.Ctx, c.kubernetes)
 	if err != nil {
-		return fmt.Errorf("error listing secrets: %s", err)
+		return "", fmt.Errorf("Error listing Consul secrets: %s", err)
 	}
-	for _, secret := range secrets.Items {
-		// future TODO: also check for federation secret
-		if secret.ObjectMeta.Labels[common.CLILabelKey] == common.CLILabelValue {
-			return fmt.Errorf("found Consul secret from previous installation: %q in namespace %q. Use the command `kubectl delete secret %s --namespace %s` to delete",
-				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
+
+	// If the Consul configuration is a secondary DC, only one secret should
+	// exist, the Consul federation secret.
+	fedSecret := release.Configuration.Global.Acls.ReplicationToken.SecretName
+	if release.ShouldExpectFederationSecret() {
+		if len(secrets.Items) == 1 && secrets.Items[0].Name == fedSecret {
+			return fmt.Sprintf("Found secret %s for Consul federation.", fedSecret), nil
+		} else if len(secrets.Items) == 0 {
+			return "", fmt.Errorf("Missing secret %s for Consul federation.\n"+
+				"Please refer to the Consul Secondary Cluster configuration docs:\nhttps://www.consul.io/docs/k8s/installation/multi-cluster/kubernetes#secondary-cluster-s", fedSecret)
 		}
 	}
 
-	return nil
+	// If not a secondary DC for federation, no Consul secrets should exist.
+	if len(secrets.Items) > 0 {
+		// Nicely format the delete commands for existing Consul secrets.
+		namespacedSecrets := make(map[string][]string)
+		for _, secret := range secrets.Items {
+			namespacedSecrets[secret.Namespace] = append(namespacedSecrets[secret.Namespace], secret.Name)
+		}
+
+		var deleteCmds string
+		for namespace, secretNames := range namespacedSecrets {
+			deleteCmds += fmt.Sprintf("kubectl delete secret %s --namespace %s\n", strings.Join(secretNames, " "), namespace)
+		}
+
+		return "", fmt.Errorf("Found Consul secrets, possibly from a previous installation.\n"+
+			"Delete existing Consul secrets from Kubernetes:\n\n%s", deleteCmds)
+	}
+
+	return "No existing Consul secrets found.", nil
 }
 
 // mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the

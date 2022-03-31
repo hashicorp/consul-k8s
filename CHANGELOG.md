@@ -12,6 +12,8 @@ IMPROVEMENTS:
   * Support a pre-configured bootstrap ACL token. [[GH-1125](https://github.com/hashicorp/consul-k8s/pull/1125)]
 * Vault
   * Enable snapshot agent configuration to be retrieved from vault. [[GH-1113](https://github.com/hashicorp/consul-k8s/pull/1113)]
+* CLI
+  * Enable users to set up secondary clusters with existing federation secrets. [[GH-1126](https://github.com/hashicorp/consul-k8s/pull/1126)] 
 
 BUG FIXES:
 * Helm

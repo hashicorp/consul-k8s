@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -49,33 +51,102 @@ func TestCheckForPreviousPVCs(t *testing.T) {
 }
 
 func TestCheckForPreviousSecrets(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "test-consul-bootstrap-acl-token",
-			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+	t.Parallel()
+
+	cases := map[string]struct {
+		helmValues helm.Values
+		secret     *v1.Secret
+		expectMsg  bool
+		expectErr  bool
+	}{
+		"No secrets, none expected": {
+			helmValues: helm.Values{},
+			secret:     nil,
+			expectMsg:  true,
+			expectErr:  false,
+		},
+		"Non-Consul secrets, none expected": {
+			helmValues: helm.Values{},
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "non-consul-secret",
+				},
+			},
+			expectMsg: true,
+			expectErr: false,
+		},
+		"Consul secrets, none expected": {
+			helmValues: helm.Values{},
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "consul-secret",
+					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+				},
+			},
+			expectMsg: false,
+			expectErr: true,
+		},
+		"Federation secret, expected": {
+			helmValues: helm.Values{
+				Global: helm.Global{
+					Datacenter: "dc2",
+					Federation: helm.Federation{
+						Enabled:                true,
+						PrimaryDatacenter:      "dc1",
+						CreateFederationSecret: false,
+					},
+					Acls: helm.Acls{
+						ReplicationToken: helm.ReplicationToken{
+							SecretName: "consul-federation",
+						},
+					},
+				},
+			},
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "consul-federation",
+					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+				},
+			},
+			expectMsg: true,
+			expectErr: false,
+		},
+		"No federation secret, but expected": {
+			helmValues: helm.Values{
+				Global: helm.Global{
+					Datacenter: "dc2",
+					Federation: helm.Federation{
+						Enabled:                true,
+						PrimaryDatacenter:      "dc1",
+						CreateFederationSecret: false,
+					},
+					Acls: helm.Acls{
+						ReplicationToken: helm.ReplicationToken{
+							SecretName: "consul-federation",
+						},
+					},
+				},
+			},
+			secret:    nil,
+			expectMsg: false,
+			expectErr: true,
 		},
 	}
-	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
-	err := c.checkForPreviousSecrets()
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "found Consul secret from previous installation")
 
-	// Clear out the client and make sure the check now passes.
-	c.kubernetes = fake.NewSimpleClientset()
-	err = c.checkForPreviousSecrets()
-	require.NoError(t, err)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := getInitializedCommand(t)
+			c.kubernetes = fake.NewSimpleClientset()
 
-	// Add a new irrelevant secret and make sure the check continues to pass.
-	secret = &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "irrelevant-secret",
-		},
+			c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), tc.secret, metav1.CreateOptions{})
+
+			release := release.Release{Configuration: tc.helmValues}
+			msg, err := c.checkForPreviousSecrets(release)
+
+			require.Equal(t, tc.expectMsg, msg != "")
+			require.Equal(t, tc.expectErr, err != nil)
+		})
 	}
-	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
-	err = c.checkForPreviousSecrets()
-	require.NoError(t, err)
 }
 
 // TestValidateFlags tests the validate flags function.
