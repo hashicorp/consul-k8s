@@ -70,10 +70,11 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			igName := "ingress-gateway"
 			logger.Log(t, "upgrading with ingress gateways enabled")
 			consulCluster.Upgrade(t, map[string]string{
 				"ingressGateways.enabled":                     "true",
-				"ingressGateways.gateways[0].name":            "ingress-gateway",
+				"ingressGateways.gateways[0].name":            igName,
 				"ingressGateways.gateways[0].replicas":        "1",
 				"ingressGateways.gateways[0].consulNamespace": testNamespace,
 			})
@@ -102,7 +103,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			logger.Log(t, "creating config entry")
 			created, _, err := consulClient.ConfigEntries().Set(&api.IngressGatewayConfigEntry{
 				Kind:      api.IngressGateway,
-				Name:      "ingress-gateway",
+				Name:      igName,
 				Namespace: testNamespace,
 				Listeners: []api.IngressListener{
 					{
@@ -120,7 +121,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-ingress-gateway.%s:8080/", releaseName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -138,7 +139,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 					Namespace: testNamespace,
 					Sources: []*api.SourceIntention{
 						{
-							Name:      "ingress-gateway",
+							Name:      igName,
 							Namespace: testNamespace,
 							Action:    api.IntentionActionAllow,
 						},
@@ -181,6 +182,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
+			igName := "ingress"
 			// Install the Helm chart without the ingress gateway first
 			// so that we can create the namespace for it.
 			helmValues := map[string]string{
@@ -192,7 +194,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 				"global.tls.enabled":            strconv.FormatBool(c.secure),
 
 				"ingressGateways.enabled":              "true",
-				"ingressGateways.gateways[0].name":     "ingress-gateway",
+				"ingressGateways.gateways[0].name":     igName,
 				"ingressGateways.gateways[0].replicas": "1",
 			}
 
@@ -227,7 +229,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			logger.Log(t, "creating config entry")
 			created, _, err := consulClient.ConfigEntries().Set(&api.IngressGatewayConfigEntry{
 				Kind:      api.IngressGateway,
-				Name:      "ingress-gateway",
+				Name:      igName,
 				Namespace: "default",
 				Listeners: []api.IngressListener{
 					{
@@ -245,7 +247,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-ingress-gateway.%s:8080/", releaseName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -263,7 +265,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 					Namespace: testNamespace,
 					Sources: []*api.SourceIntention{
 						{
-							Name:      "ingress-gateway",
+							Name:      igName,
 							Namespace: "default",
 							Action:    api.IntentionActionAllow,
 						},

@@ -15,6 +15,8 @@
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.secretsBackend.vault.consulCARole)) }}{{ fail "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
+{{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -80,6 +82,10 @@ spec:
         {{- if (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.createReplicationToken)) }}
         "vault.hashicorp.com/agent-inject-secret-replication-token-config.hcl": "{{ .Values.global.acls.replicationToken.secretName }}"
         "vault.hashicorp.com/agent-inject-template-replication-token-config.hcl":  {{ template "consul.vaultReplicationTokenConfigTemplate" . }}
+        {{- end }}
+        {{- if (and .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
+        "vault.hashicorp.com/agent-inject-secret-bootstrap-token-config.hcl": "{{ .Values.global.acls.bootstrapToken.secretName }}"
+        "vault.hashicorp.com/agent-inject-template-bootstrap-token-config.hcl":  {{ template "consul.vaultBootstrapTokenConfigTemplate" . }}
         {{- end }}
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
@@ -237,6 +243,13 @@ spec:
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
               {{- end }}
             {{- end }}
+            {{- if and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName }}
+            - name: ACL_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.bootstrapToken.secretName | quote }}
+                  key: {{ .Values.global.acls.bootstrapToken.secretKey | quote }}
+            {{- end }}
             {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: ACL_REPLICATION_TOKEN
               valueFrom:
@@ -250,7 +263,7 @@ spec:
             - "-ec"
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
-
+              
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
@@ -290,14 +303,6 @@ spec:
                 {{- end }}
                 -client=0.0.0.0 \
                 -config-dir=/consul/config \
-                {{- /* Always include the extraVolumes at the end so that users can
-                    override other Consul settings. The last -config-dir takes
-                    precedence. */}}
-                {{- range .Values.server.extraVolumes }}
-                {{- if .load }}
-                -config-dir=/consul/userconfig/{{ .name }} \
-                {{- end }}
-                {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
                 -domain={{ .Values.global.domain }} \
@@ -336,6 +341,19 @@ spec:
                 {{- end }}
                 {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
                 $recursor_flags \
+                {{- end }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.bootstrapToken.secretName }}
+                -config-file=/vault/secrets/bootstrap-token-config.hcl \
+                {{- else if (and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName) }}
+                -hcl="acl { tokens { initial_management = \"${ACL_BOOTSTRAP_TOKEN}\" } }" \
+                {{- end }}
+                {{- /* Always include the extraVolumes at the end so that users can
+                      override other Consul settings. The last -config-dir takes
+                      precedence. */}}
+                {{- range .Values.server.extraVolumes }}
+                {{- if .load }}
+                -config-dir=/consul/userconfig/{{ .name }} \
+                {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -server

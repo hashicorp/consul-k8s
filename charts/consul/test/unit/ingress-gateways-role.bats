@@ -46,7 +46,7 @@ load _helpers
   [ "${actual}" = "secrets" ]
 
   local actual=$(echo $object | yq -r '.resourceNames[0]' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-ingress-gateway-acl-token" ]
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway-acl-token" ]
 }
 
 @test "ingressGateways/Role: rules for ingressGateways service" {

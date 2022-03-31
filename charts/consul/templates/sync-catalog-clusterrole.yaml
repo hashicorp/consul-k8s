@@ -30,15 +30,6 @@ rules:
       - nodes
     verbs:
       - get
-{{- if .Values.global.acls.manageSystemACLs }}
-  - apiGroups: [""]
-    resources:
-      - secrets
-    resourceNames:
-      - {{ template "consul.fullname" . }}-catalog-sync-acl-token
-    verbs:
-      - get
-{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
