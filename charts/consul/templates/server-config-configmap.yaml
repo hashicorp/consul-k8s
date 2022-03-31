@@ -143,4 +143,12 @@ data:
       }
     }
   {{- end }}
+  {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+  telemetry-config.json: |-
+    {
+      "telemetry": {
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}"
+      }
+    }
+  {{- end }}
 {{- end }}

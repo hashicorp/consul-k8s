@@ -648,31 +648,6 @@ load _helpers
   [ "${actual}" = "/v1/agent/metrics" ]
 }
 
-@test "server/StatefulSet: when global.metrics.enableAgentMetrics=true, sets telemetry flag" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.metrics.enabled=true'  \
-      --set 'global.metrics.enableAgentMetrics=true'  \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"1m\" }")' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: when global.metrics.enableAgentMetrics=true and global.metrics.agentMetricsRetentionTime is set, sets telemetry flag with updated retention time" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.metrics.enabled=true'  \
-      --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.agentMetricsRetentionTime=5m'  \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"5m\" }")' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
-}
-
 @test "server/StatefulSet: when global.metrics.enableAgentMetrics=true, global.tls.enabled=true and global.tls.httpsOnly=true, fail" {
   cd `chart_dir`
   run helm template \
