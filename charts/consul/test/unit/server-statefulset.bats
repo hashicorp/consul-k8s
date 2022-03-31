@@ -1128,29 +1128,6 @@ load _helpers
   [[ "$output" =~ "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" ]]
 }
 
-@test "server/StatefulSet: mesh gateway federation enabled when federation.enabled=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.federation.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("connect { enable_mesh_gateway_wan_federation = true }")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: mesh gateway federation not enabled when federation.enabled=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.federation.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("connect { enable_mesh_gateway_wan_federation = true }")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken
 
