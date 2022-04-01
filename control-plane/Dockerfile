@@ -55,12 +55,8 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
-
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS TARGETARCH
-
-# This is the location of the releases.
-ENV HASHICORP_RELEASES=https://releases.hashicorp.com
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -70,13 +66,8 @@ COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
-# alternate release image, just for the sake of example. In this case we're using
-# debian as the base image just to make the image different from the default alpine one.
-#
-# The use cases for alternate images are things like defining an additional UBI compatible
-# image, or an image with a different function than the main image, e.g. Waypoint's ODR images.
 # -----------------------------------
-# Dockerfile for consul-k8s with UBI as its base image. Used for running on
+# Dockerfile target for consul-k8s with UBI as its base image. Used for running on
 # OpenShift.
 #
 # This Dockerfile creates a production release image for the project. This
@@ -86,7 +77,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5 as release-alternate
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5 as ubi
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -108,13 +99,10 @@ ENV VERSION=${VERSION}
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS TARGETARCH
 
-# This is the location of the releases.
-ENV HASHICORP_RELEASES=https://releases.hashicorp.com
-
 # Copy license for Red Hat certification.
 COPY LICENSE.md /licenses/mozilla.txt
 
-RUN microdnf install -y shadow-utils
+RUN microdnf install -y ca-certificates gnupg libcap openssl shadow-utils iptables
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
