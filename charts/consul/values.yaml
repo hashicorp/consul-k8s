@@ -145,10 +145,9 @@ global:
       # - CA certificate defined by the `global.tls.caCert.secretName` value
       # - replication token defined by the `global.acls.replicationToken.secretName` value if `global.federation.enabled` is `true`
       # To discover the service account name of the Consul server, run
-      #
-      #     ```shell-session
-      #     $ helm template --show-only templates/server-serviceaccount.yaml <release-name> hashicorp/consul
-      #     ```
+      # ```shell-session
+      # $ helm template --show-only templates/server-serviceaccount.yaml <release-name> hashicorp/consul
+      # ```
       # and check the name of `metadata.name`.
       consulServerRole: ""
 
@@ -157,10 +156,9 @@ global:
       # The role must also have a policy with read capabilities for the gossip encryption
       # key defined by the `global.gossipEncryption.secretName` value.
       # To discover the service account name of the Consul client, run
-      #
-      #     ```shell-session
-      #     $ helm template --show-only templates/client-serviceaccount.yaml <release-name> hashicorp/consul
-      #     ```
+      # ```shell-session
+      # $ helm template --show-only templates/client-serviceaccount.yaml <release-name> hashicorp/consul
+      # ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
@@ -169,10 +167,9 @@ global:
       # The role must also have a policy with read capabilities for the snapshot agent config
       # defined by the `client.snapshotAgent.configSecret.secretName` value.
       # To discover the service account name of the Consul client, run
-      #
-      #     ```shell-session
-      #     $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
-      #     ```
+      # ```shell-session
+      # $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
+      # ```
       # and check the name of `metadata.name`.
       consulSnapshotAgentRole: ""
 
@@ -180,11 +177,10 @@ global:
       # The role must be connected to the `server-acl-init` job's service account.
       # The role must also have a policy with read and write capabilities for the bootstrap, replication or partition tokens
       # To discover the service account name of the `server-acl-init` job, run
-      #
-      #     ```shell-session
-      #     $ helm template --show-only templates/server-acl-init-serviceaccount.yaml \
-      #           --set global.acls.manageSystemACLs=true <release-name> hashicorp/consul
-      #     ```
+      # ```shell-session
+      # $ helm template --show-only templates/server-acl-init-serviceaccount.yaml \
+      #   --set global.acls.manageSystemACLs=true <release-name> hashicorp/consul
+      # ```
       # and check the name of `metadata.name`.
       manageSystemACLsRole: ""
 
@@ -193,10 +189,9 @@ global:
       # .
       # This role must be bound the `partition-init` job's service account.
       # To discover the service account name of the `partition-init` job, run with Helm values for the client cluster:
-      #
-      #     ```shell-session
-      #     $ helm template --show-only templates/partition-init-serviceaccount.yaml -f client-cluster-values.yaml <release-name> hashicorp/consul
-      #     ```
+      # ```shell-session
+      # $ helm template --show-only templates/partition-init-serviceaccount.yaml -f client-cluster-values.yaml <release-name> hashicorp/consul
+      # ```
       # and check the name of `metadata.name`.
       adminPartitionsRole: ""
 
