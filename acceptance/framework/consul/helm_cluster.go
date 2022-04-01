@@ -207,7 +207,6 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
 	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
-
 	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }

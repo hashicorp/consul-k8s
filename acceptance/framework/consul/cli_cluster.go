@@ -83,7 +83,7 @@ func NewCLICluster(
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
-	kopts.Namespace = cfg.KubeNamespace
+	kopts.Namespace = consulNS
 	hopts := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: kopts,
@@ -120,6 +120,7 @@ func (c *CLICluster) Create(t *testing.T) {
 	// Set the args for running the install command.
 	args := []string{"install"}
 	args = c.setKube(args)
+
 	for k, v := range c.values {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
@@ -135,7 +136,7 @@ func (c *CLICluster) Create(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, c.namespace, fmt.Sprintf("release=%s", c.releaseName))
+	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
 
 // Upgrade uses the `consul-k8s upgrade` command to upgrade a Consul cluster.
