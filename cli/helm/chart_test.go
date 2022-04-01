@@ -4,11 +4,12 @@ import (
 	"embed"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/cli/test/mock"
 	"github.com/stretchr/testify/require"
 )
 
 // Embed a test chart to test against.
-//go:embed fixtures/consul/* fixtures/consul/templates/_helpers.tpl
+//go:embed test_fixtures/consul/* test_fixtures/consul/templates/_helpers.tpl
 var testChartFiles embed.FS
 
 func TestLoadChart(t *testing.T) {
@@ -31,6 +32,20 @@ func TestLoadChart(t *testing.T) {
 	require.Equal(t, expectedValues, actual.Values)
 }
 
+func TestFetchChartValues(t *testing.T) {
+	namespace := "default"
+	name := "consul"
+	settings := mock.CreateMockEnvSettings(t, namespace)
+	logger := mock.CreateLogger(t)
+
+	expected := map[string]interface{}{}
+
+	actual, err := FetchChartValues(namespace, name, settings, logger)
+	require.NoError(t, err)
+
+	require.Equal(t, expected, actual)
+}
+
 func TestReadChartFiles(t *testing.T) {
 	directory := "fixtures/consul"
 	expectedFiles := map[string]string{
@@ -40,7 +55,7 @@ func TestReadChartFiles(t *testing.T) {
 		"templates/foo.yaml":     "foo: bar\n",
 	}
 
-	files, err := ReadChartFiles(testChartFiles, directory)
+	files, err := readChartFiles(testChartFiles, directory)
 	require.NoError(t, err)
 
 	actualFiles := make(map[string]string, len(files))
