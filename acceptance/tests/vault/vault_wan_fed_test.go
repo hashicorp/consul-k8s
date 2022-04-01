@@ -23,7 +23,7 @@ import (
 // as the secrets backend, testing all possible credentials that can be used for WAN federation.
 // This test deploys a Vault cluster with a server in the primary k8s cluster and exposes it to the
 // secondary cluster via a Kubernetes service. We then only need to deploy Vault agent injector
-// in the secondary that will treat the Vault server in the primary as an external server.
+// // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableMultiCluster {
@@ -129,8 +129,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
 	vault.ConfigurePKICA(t, vaultClient)
-	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
-	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
+	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "")
+	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2", "")
 
 	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 	replicationToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "replication")
@@ -293,9 +293,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Verify federation between servers.
 	logger.Log(t, "verifying federation was successful")
 	primaryConsulCluster.ACLToken = bootstrapToken
-	primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
+	primaryClient, _ := primaryConsulCluster.SetupConsulClient(t, true)
 	secondaryConsulCluster.ACLToken = replicationToken
-	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
+	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
 
 	// Create a ProxyDefaults resource to configure services to use the mesh

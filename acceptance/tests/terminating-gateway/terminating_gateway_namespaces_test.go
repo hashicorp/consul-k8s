@@ -58,7 +58,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create the destination namespace in the non-secure case.
 			// In the secure installation, this namespace is created by the server-acl-init job.
@@ -172,7 +172,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)

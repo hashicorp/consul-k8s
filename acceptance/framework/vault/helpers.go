@@ -190,8 +190,11 @@ func ConfigurePKICA(t *testing.T, vaultClient *vapi.Client) {
 
 // ConfigurePKICertificates configures roles in Vault so that Consul server TLS certificates
 // can be issued by Vault.
-func ConfigurePKICertificates(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, datacenter string) string {
+func ConfigurePKICertificates(t *testing.T, vaultClient *vapi.Client, consulReleaseName, ns, datacenter string, maxTtl string) string {
 	// Create the Vault PKI Role.
+	if maxTtl == "" {
+		maxTtl = "1h"
+	}
 	consulServerDNSName := consulReleaseName + "-consul-server"
 	allowedDomains := fmt.Sprintf("%s.consul,%s,%s.%s,%s.%s.svc", datacenter, consulServerDNSName, consulServerDNSName, ns, consulServerDNSName, ns)
 	params := map[string]interface{}{
@@ -200,7 +203,7 @@ func ConfigurePKICertificates(t *testing.T, vaultClient *vapi.Client, consulRele
 		"allow_localhost":    "true",
 		"allow_subdomains":   "true",
 		"generate_lease":     "true",
-		"max_ttl":            "1h",
+		"max_ttl":            maxTtl,
 	}
 
 	pkiRoleName := fmt.Sprintf("server-cert-%s", datacenter)

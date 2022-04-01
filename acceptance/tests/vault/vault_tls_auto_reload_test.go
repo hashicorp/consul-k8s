@@ -1,8 +1,11 @@
 package vault
 
 import (
+	"crypto/tls"
 	"fmt"
+	"log"
 	"testing"
+	"time"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -13,11 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const staticClientName = "static-client"
-
-// TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
+// TestVault_TlsAutoReload installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
-func TestVault(t *testing.T) {
+func TestVault_TlsAutoReload(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
@@ -32,7 +33,7 @@ func TestVault(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
-	gossipKey := vault.ConfigureGossipVaultSecret(t, vaultClient)
+	vault.ConfigureGossipVaultSecret(t, vaultClient)
 
 	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
 	if cfg.EnableEnterprise {
@@ -51,11 +52,13 @@ func TestVault(t *testing.T) {
 	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
 	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "")
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "30s")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
 	consulHelmValues := map[string]string{
+		"server.extraConfig": `"{\"auto_reload_config\": true}"`,
+
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
@@ -84,22 +87,9 @@ func TestVault(t *testing.T) {
 		"global.gossipEncryption.secretName":    "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":     "gossip",
 
-		"ingressGateways.enabled":               "true",
-		"ingressGateways.defaults.replicas":     "1",
-		"terminatingGateways.enabled":           "true",
-		"terminatingGateways.defaults.replicas": "1",
-
 		"server.serverCert.secretName": certPath,
 		"global.tls.caCert.secretName": "pki/cert/ca",
 		"global.tls.enableAutoEncrypt": "true",
-
-		// For sync catalog, it is sufficient to check that the deployment is running and ready
-		// because we only care that get-auto-encrypt-client-ca init container was able
-		// to talk to the Consul server using the CA from Vault. For this reason,
-		// we don't need any services to be synced in either direction.
-		"syncCatalog.enabled":  "true",
-		"syncCatalog.toConsul": "false",
-		"syncCatalog.toK8S":    "false",
 	}
 
 	if cfg.EnableEnterprise {
@@ -114,17 +104,34 @@ func TestVault(t *testing.T) {
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
 	consulCluster.ACLToken = bootstrapToken
-	consulClient, _ := consulCluster.SetupConsulClient(t, true)
-	keys, err := consulClient.Operator().KeyringList(nil)
-	require.NoError(t, err)
-	// There are two identical keys for LAN and WAN since there is only 1 dc.
-	require.Len(t, keys, 2)
-	require.Equal(t, 1, keys[0].PrimaryKeys[gossipKey])
+	_, address := consulCluster.SetupConsulClient(t, true)
 
-	// Confirm that the Vault Connect CA has been bootstrapped correctly.
-	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
-	require.NoError(t, err)
-	require.Equal(t, caConfig.Provider, "vault")
+	logger.Log(t, "Checking TLS....")
+	conf := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	conn, err := tls.Dial("tcp", address, conf)
+	if err != nil {
+		log.Println("Error in Dial", err)
+		return
+	}
+	defer conn.Close()
+
+	connState := conn.ConnectionState()
+	logger.Logf(t, "Connection State: %+v", connState)
+	cert := connState.PeerCertificates[0]
+	// here we can verify that the cert expiry changed
+	logger.Logf(t, "Expiry: %s \n", cert.NotAfter.String())
+
+	logger.Log(t, "Wait 30 seconds for certificates to rotate....")
+	time.Sleep(30 * time.Second)
+
+	conn2, err := tls.Dial("tcp", address, conf)
+	if err != nil {
+		log.Println("Error in Dial", err)
+		return
+	}
+	defer conn2.Close()
 
 	// Validate that consul sever is running correctly and the consul members command works
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
@@ -132,14 +139,6 @@ func TestVault(t *testing.T) {
 	logger.Logf(t, "Members: \n%s", membersOutput)
 	require.NoError(t, err)
 	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
-
-	if cfg.EnableEnterprise {
-		// Validate that the enterprise license is set correctly.
-		logger.Log(t, "Validating the enterprise license has been set correctly.")
-		license, licenseErr := consulClient.Operator().LicenseGet(nil)
-		require.NoError(t, licenseErr)
-		require.True(t, license.Valid)
-	}
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
@@ -160,4 +159,13 @@ func TestVault(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
+
+	connState2 := conn2.ConnectionState()
+	cert2 := connState2.PeerCertificates[0]
+	// here we can verify that the cert expiry changed
+	logger.Logf(t, "Expiry: %s \n", cert2.NotAfter.String())
+
+	// verify that a previous cert expired and that a new one has been issued
+	// by comparing the NotAfter on the two certs.
+	require.NotEqual(t, cert.NotAfter, cert2.NotAfter)
 }

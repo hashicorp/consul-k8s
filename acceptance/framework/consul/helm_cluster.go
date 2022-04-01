@@ -211,7 +211,7 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
-func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
+func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, string) {
 	t.Helper()
 
 	namespace := h.helmOptions.KubectlOptions.Namespace
@@ -275,7 +275,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 
-	return consulClient
+	return consulClient, config.Address
 }
 
 // configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,

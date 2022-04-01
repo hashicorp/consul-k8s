@@ -194,7 +194,7 @@ func (c *CLICluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
+func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, string) {
 	t.Helper()
 
 	namespace := c.kubectlOptions.Namespace
@@ -264,7 +264,7 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 
-	return consulClient
+	return consulClient, config.Address
 }
 
 func createOrUpdateNamespace(t *testing.T, client kubernetes.Interface, namespace string) {

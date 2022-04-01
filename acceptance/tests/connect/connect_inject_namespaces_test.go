@@ -108,7 +108,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
 			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
@@ -313,7 +313,7 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 			expectedConsulNS := staticClientNamespace
 			if !c.mirrorK8S {
 				expectedConsulNS = c.destinationNamespace
