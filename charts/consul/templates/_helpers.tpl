@@ -191,6 +191,11 @@ This template is for an init container.
       mountPath: /consul/tls/ca
     {{- end }}
     {{- end }}
+    {{- range .Values.connectInject.extraVolumes }}
+    - name: userconfig-{{ .name }}
+      readOnly: true
+      mountPath: /consul/userconfig/{{ .name }}
+    {{- end }}
     - name: consul-auto-encrypt-ca-cert
       mountPath: /consul/tls/client/ca
   resources:

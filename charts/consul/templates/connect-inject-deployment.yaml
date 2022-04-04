@@ -297,6 +297,15 @@ spec:
           medium: "Memory"
       {{- end }}
       {{- end }}
+      {{- range .Values.connectInject.extraVolumes }}
+      - name: userconfig-{{ .name }}
+        {{ .type }}:
+          {{- if (eq .type "configMap") }}
+          name: {{ .name }}
+          {{- else if (eq .type "secret") }}
+          secretName: {{ .name }}
+          {{- end }}
+      {{- end }}
       {{- if or (and .Values.global.acls.manageSystemACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
       {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
