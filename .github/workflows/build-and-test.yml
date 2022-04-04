@@ -111,6 +111,7 @@ jobs:
     with:
       directory: control-plane
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      args: "--config ../.golangci.yml"
 
   test-control-plane:
     needs: [get-go-version, lint-control-plane, golangci-lint-control-plane]
