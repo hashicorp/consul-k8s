@@ -19,6 +19,7 @@ spec:
   # Allow core volume types.
   volumes:
     - 'secret'
+    - 'emptyDir'
   allowPrivilegeEscalation: false
   # This is redundant with non-root + disallow privilege escalation,
   # but we can provide it for defense in depth.
