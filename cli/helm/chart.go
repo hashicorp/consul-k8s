@@ -2,7 +2,8 @@ package helm
 
 import (
 	"embed"
-	"path/filepath"
+	"path"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -34,9 +35,15 @@ func LoadChart(chart embed.FS, chartDirName string) (*chart.Chart, error) {
 func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile, error) {
 	var chartFiles []*loader.BufferedFile
 
+	// NOTE: Because we're using the embedded filesystem, we must use path.* functions,
+	// *not* filepath.* functions. This is because the embedded filesystem always uses
+	// linux-style separators, even if this code is running on Windows. If we use
+	// filepath.* functions, then Go on Windows will try to use `\` delimiters to access
+	// the embedded filesystem, which will then fail.
+
 	// Load Chart.yaml and values.yaml first.
 	for _, f := range []string{chartFileName, valuesFileName} {
-		file, err := readFile(chart, filepath.Join(chartDirName, f), chartDirName)
+		file, err := readFile(chart, path.Join(chartDirName, f), chartDirName)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +51,7 @@ func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 	}
 
 	// Now load everything under templates/.
-	dirs, err := chart.ReadDir(filepath.Join(chartDirName, templatesDirName))
+	dirs, err := chart.ReadDir(path.Join(chartDirName, templatesDirName))
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +61,7 @@ func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 			continue
 		}
 
-		file, err := readFile(chart, filepath.Join(chartDirName, templatesDirName, f.Name()), chartDirName)
+		file, err := readFile(chart, path.Join(chartDirName, templatesDirName, f.Name()), chartDirName)
 		if err != nil {
 			return nil, err
 		}
@@ -86,11 +93,7 @@ func readFile(chart embed.FS, f string, pathPrefix string) (*loader.BufferedFile
 	if err != nil {
 		return nil, err
 	}
-	// Remove the path prefix.
-	rel, err := filepath.Rel(pathPrefix, f)
-	if err != nil {
-		return nil, err
-	}
+	rel := strings.TrimPrefix(f, pathPrefix+"/")
 	return &loader.BufferedFile{
 		Name: rel,
 		Data: bytes,
