@@ -893,10 +893,6 @@ workflows:
           requires:
             - dev-upload-docker
       - cleanup-gcp-resources
-      - dev-upload-docker:
-          context: consul-ci
-          requires:
-            - build-distros-amd64
       - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources
