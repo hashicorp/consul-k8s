@@ -12,7 +12,7 @@ import (
 var testChartFiles embed.FS
 
 func TestLoadChart(t *testing.T) {
-	directory := "fixtures/consul"
+	directory := "test_fixtures/consul"
 
 	expectedApiVersion := "v2"
 	expectedName := "Foo"
@@ -32,7 +32,7 @@ func TestLoadChart(t *testing.T) {
 }
 
 func TestReadChartFiles(t *testing.T) {
-	directory := "fixtures/consul"
+	directory := "test_fixtures/consul"
 	expectedFiles := map[string]string{
 		"Chart.yaml":             "# This is a mock Helm Chart.yaml file used for testing.\napiVersion: v2\nname: Foo\nversion: 0.1.0\ndescription: Mock Helm Chart for testing.",
 		"values.yaml":            "# This is a mock Helm values.yaml file used for testing.\nkey: value",
