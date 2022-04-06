@@ -89,6 +89,8 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
