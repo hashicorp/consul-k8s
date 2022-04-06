@@ -13,11 +13,37 @@
 
 # dev copies the binary from a local build
 # -----------------------------------
-FROM hashicorp/consul-k8s-control-plane:latest as dev
-
 # BIN_NAME is a requirement in the hashicorp docker github action 
+
+FROM alpine:3.15 AS dev
+
+# NAME and VERSION are the name of the software in releases.hashicorp.com
+# and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
+ARG VERSION
+
+LABEL name=${BIN_NAME} \
+      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+      vendor="HashiCorp" \
+      version=${VERSION} \
+      release=${VERSION} \
+      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes."
+
+# Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
+ENV BIN_NAME=${BIN_NAME}
+ENV VERSION=${VERSION}
+
+RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
+
+# Create a non-root user to run the software.
+RUN addgroup ${BIN_NAME} && \
+    adduser -S -G ${BIN_NAME} 100
+
 COPY pkg/bin/linux_amd64/${BIN_NAME} /bin
+
+USER 100
+CMD /bin/${BIN_NAME}
 
 
 # ===================================
@@ -40,7 +66,7 @@ FROM alpine:3.15 AS release-default
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
-ARG BIN_NAME=consul-k8s
+ARG BIN_NAME=consul-k8s-control-plane
 ARG VERSION
 
 LABEL name=${BIN_NAME} \
@@ -54,6 +80,8 @@ LABEL name=${BIN_NAME} \
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
+
+RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS TARGETARCH
