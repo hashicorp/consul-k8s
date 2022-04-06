@@ -4,7 +4,6 @@ import (
 	"embed"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/test/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,20 +29,6 @@ func TestLoadChart(t *testing.T) {
 	require.Equal(t, expectedVersion, actual.Metadata.Version)
 	require.Equal(t, expectedDescription, actual.Metadata.Description)
 	require.Equal(t, expectedValues, actual.Values)
-}
-
-func TestFetchChartValues(t *testing.T) {
-	namespace := "default"
-	name := "consul"
-	settings := mock.CreateMockEnvSettings(t, namespace)
-	logger := mock.CreateLogger(t)
-
-	expected := map[string]interface{}{}
-
-	actual, err := FetchChartValues(namespace, name, settings, logger)
-	require.NoError(t, err)
-
-	require.Equal(t, expected, actual)
 }
 
 func TestReadChartFiles(t *testing.T) {
