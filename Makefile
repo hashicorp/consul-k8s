@@ -20,10 +20,11 @@ control-plane-dev: ## Build consul-k8s-control-plane binary.
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
 	@DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t '$(DEV_IMAGE)' \
+       --target=dev \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       -f $(CURDIR)/control-plane/build-support/docker/Dev.dockerfile $(CURDIR)/control-plane
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
 control-plane-test: ## Run go test for the control plane.
 	cd control-plane; go test ./...
