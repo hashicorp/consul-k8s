@@ -201,6 +201,41 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	}
+
+	// Verify all Consul Pods are deleted.
+	pods, err = h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 0)
+
+	// Verify all Consul PVCs are deleted.
+	pvcs, err := h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, pvcs.Items, 0)
+
+	// Verify all Consul service accounts are deleted.
+	sas, err = h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, sas.Items, 0)
+
+	// Verify all Consul Roles are deleted.
+	roles, err = h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, roles.Items, 0)
+
+	// Verify all Consul Role Bindings are deleted.
+	roleBindings, err = h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, roleBindings.Items, 0)
+
+	// Verify all Consul Secrets are deleted.
+	secrets, err = h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, secrets.Items, 0)
+
+	// Verify all Consul Jobs are deleted.
+	jobs, err = h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, jobs.Items, 0)
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
