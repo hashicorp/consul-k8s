@@ -3373,6 +3373,119 @@ func TestReconcile_endpointsIgnoredWhenNotInjected(t *testing.T) {
 	require.False(t, resp.Requeue)
 }
 
+// Test that when an endpoints pod specifies the name for the Kubernetes service it wants to use
+// for registration, all other endpoints for that pod are skipped.
+func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
+	nodeName := "test-node"
+	namespace := "default"
+
+	// Set up the fake Kubernetes client with a few endpoints, pod, consul client, and the default namespace.
+	badEndpoint := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-in-mesh",
+			Namespace: namespace,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "1.2.3.4",
+						NodeName: &nodeName,
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      "pod1",
+							Namespace: namespace,
+						},
+					},
+				},
+			},
+		},
+	}
+	endpoint := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "in-mesh",
+			Namespace: namespace,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "1.2.3.4",
+						NodeName: &nodeName,
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      "pod1",
+							Namespace: namespace,
+						},
+					},
+				},
+			},
+		},
+	}
+	pod1 := createPod("pod1", "1.2.3.4", true, true)
+	pod1.Annotations[annotationKubernetesService] = endpoint.Name
+	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, fakeClientPod, &ns}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+	// Create test Consul server.
+	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
+	require.NoError(t, err)
+	defer consul.Stop()
+	consul.WaitForServiceIntentions(t)
+	cfg := &api.Config{Address: consul.HTTPAddr}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+	addr := strings.Split(consul.HTTPAddr, ":")
+	consulPort := addr[1]
+
+	// Create the endpoints controller.
+	ep := &EndpointsController{
+		Client:                fakeClient,
+		Log:                   logrtest.TestLogger{T: t},
+		ConsulClient:          consulClient,
+		ConsulPort:            consulPort,
+		ConsulScheme:          "http",
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSetWith(),
+		ReleaseName:           "consul",
+		ReleaseNamespace:      namespace,
+		ConsulClientCfg:       cfg,
+	}
+
+	// Run the reconcile process to check service registration.
+	serviceName := badEndpoint.Name
+	namespacedName := types.NamespacedName{Namespace: badEndpoint.Namespace, Name: serviceName}
+	resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Check that no services are registered with Consul.
+	serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+	require.NoError(t, err)
+	require.Len(t, serviceInstances, 0)
+	proxyServiceInstances, _, err := consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+	require.NoError(t, err)
+	require.Len(t, proxyServiceInstances, 0)
+
+	// Run the reconcile again with the service we want to register.
+	serviceName = endpoint.Name
+	namespacedName = types.NamespacedName{Namespace: badEndpoint.Namespace, Name: serviceName}
+	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Check that the correct services are registered with Consul.
+	serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
+	require.NoError(t, err)
+	require.Len(t, serviceInstances, 1)
+	proxyServiceInstances, _, err = consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+	require.NoError(t, err)
+	require.Len(t, proxyServiceInstances, 1)
+}
+
 func TestFilterAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
