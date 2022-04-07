@@ -3,6 +3,10 @@
 BUG FIXES:
   * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/issue/1005)]
 
+IMPROVEMENTS:
+* Helm
+  * API Gateway: Allow controller to read ReferencePolicy in order to determine if route is allowed for backend in different namespace. [[GH-1148](https://github.com/hashicorp/consul-k8s/pull/1148)]
+
 ## 0.42.0 (April 04, 2022)
 
 BREAKING CHANGES:
