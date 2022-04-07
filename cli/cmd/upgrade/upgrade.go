@@ -230,7 +230,7 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
 
-	currentChartValues, err := helm.FetchChartValues(namespace, settings, uiLogger)
+	currentChartValues, err := helm.FetchChartValues(namespace, name, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1

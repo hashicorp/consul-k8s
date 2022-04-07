@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/consul-k8s/cli/validation"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
@@ -358,15 +357,8 @@ func (c *Command) Run(args []string) int {
 	install.Wait = c.flagWait
 	install.Timeout = c.timeoutDuration
 
-	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := helm.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Create a *chart.Chart object from the files to run the installation from.
-	chart, err := loader.LoadFiles(chartFiles)
+	// Load the Helm chart.
+	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1

@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+BUG FIXES:
+  * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/issue/1005)]
+
 ## 0.42.0 (April 04, 2022)
 
 BREAKING CHANGES:
