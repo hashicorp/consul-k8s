@@ -8,11 +8,11 @@ import (
 )
 
 // Embed a test chart to test against.
-//go:embed fixtures/consul/* fixtures/consul/templates/_helpers.tpl
+//go:embed test_fixtures/consul/* test_fixtures/consul/templates/_helpers.tpl
 var testChartFiles embed.FS
 
 func TestLoadChart(t *testing.T) {
-	directory := "fixtures/consul"
+	directory := "test_fixtures/consul"
 
 	expectedApiVersion := "v2"
 	expectedName := "Foo"
@@ -32,7 +32,7 @@ func TestLoadChart(t *testing.T) {
 }
 
 func TestReadChartFiles(t *testing.T) {
-	directory := "fixtures/consul"
+	directory := "test_fixtures/consul"
 	expectedFiles := map[string]string{
 		"Chart.yaml":             "# This is a mock Helm Chart.yaml file used for testing.\napiVersion: v2\nname: Foo\nversion: 0.1.0\ndescription: Mock Helm Chart for testing.",
 		"values.yaml":            "# This is a mock Helm values.yaml file used for testing.\nkey: value",
@@ -40,7 +40,7 @@ func TestReadChartFiles(t *testing.T) {
 		"templates/foo.yaml":     "foo: bar\n",
 	}
 
-	files, err := ReadChartFiles(testChartFiles, directory)
+	files, err := readChartFiles(testChartFiles, directory)
 	require.NoError(t, err)
 
 	actualFiles := make(map[string]string, len(files))
