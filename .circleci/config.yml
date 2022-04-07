@@ -891,6 +891,23 @@ workflows:
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
+      - cleanup-gcp-resources
+      - cleanup-azure-resources
+      - cleanup-eks-resources
+      # Disable until we can use UBI images.
+      #      - acceptance-openshift:
+      #          requires:
+      #          - cleanup-azure-resources
+      - acceptance-gke-1-20:
+          requires:
+            - cleanup-gcp-resources
+      - acceptance-eks-1-19:
+          requires:
+            - cleanup-eks-resources
+      - acceptance-aks-1-21:
+          requires:
+            - cleanup-azure-resources
+      - acceptance-kind-1-23
   nightly-acceptance-tests:
     triggers:
       - schedule:
