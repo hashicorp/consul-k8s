@@ -175,6 +175,12 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					continue
 				}
 
+				serviceName, ok := pod.Annotations[annotationKubernetesService]
+				if ok && serviceEndpoints.Name != serviceName {
+					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+					continue
+				}
+
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err := r.registerServicesAndHealthCheck(pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
