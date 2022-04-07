@@ -4,15 +4,23 @@ package serveraclinit
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -24,7 +32,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	consulDestNamespaces := []string{"default", "destination"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(tt)
+			k8s, testAgent := completeSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
@@ -40,7 +48,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-token",
+				"-connect-inject",
 				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
@@ -64,7 +72,13 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			}
 			methods, _, err := consul.ACL().AuthMethodList(namespaceQuery)
 			require.NoError(err)
-			require.Len(methods, 1)
+			if consulDestNamespace == "default" {
+				// If the destination mamespace is default then AuthMethodList
+				// will return the component-auth-method as well.
+				require.Len(methods, 2)
+			} else {
+				require.Len(methods, 1)
+			}
 
 			// Check the ACL auth method is created in the expected namespace.
 			authMethodName := resourcePrefix + "-k8s-auth-method"
@@ -146,7 +160,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(tt)
+			k8s, testAgent := completeSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
@@ -162,7 +176,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-token",
+				"-connect-inject",
 				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
@@ -263,7 +277,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 	k8sNamespaceFlags := []string{"default", "other"}
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t)
+			k8s, testAgent := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
 			defer testAgent.Stop()
 			require := require.New(t)
@@ -274,18 +288,18 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace", k8sNamespaceFlag,
-				"-create-client-token",
+				"-client",
 				"-allow-dns",
-				"-create-mesh-gateway-token",
-				"-create-sync-token",
-				"-create-inject-token",
-				"-create-snapshot-agent-token",
+				"-mesh-gateway",
+				"-sync-catalog",
+				"-connect-inject",
+				"-snapshot-agent",
 				"-create-enterprise-license-token",
-				"-ingress-gateway-name=gw",
-				"-ingress-gateway-name=anothergw",
-				"-terminating-gateway-name=gw",
-				"-terminating-gateway-name=anothergw",
-				"-create-controller-token",
+				"-ingress-gateway-name=igw",
+				"-ingress-gateway-name=anotherigw",
+				"-terminating-gateway-name=tgw",
+				"-terminating-gateway-name=anothertgw",
+				"-controller",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -314,17 +328,17 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			// Check that the expected policies were created.
 			firstRunExpectedPolicies := []string{
 				"anonymous-token-policy",
-				"client-token",
-				"catalog-sync-token",
-				"mesh-gateway-token",
-				"client-snapshot-agent-token",
+				"client-policy",
+				"sync-catalog-policy",
+				"mesh-gateway-policy",
+				"snapshot-agent-policy",
 				"enterprise-license-token",
-				"gw-ingress-gateway-token",
-				"anothergw-ingress-gateway-token",
-				"gw-terminating-gateway-token",
-				"anothergw-terminating-gateway-token",
-				"connect-inject-token",
-				"controller-token",
+				resourcePrefix + "-igw-policy",
+				resourcePrefix + "-anotherigw-policy",
+				resourcePrefix + "-tgw-policy",
+				resourcePrefix + "-anothertgw-policy",
+				"connect-inject-policy",
+				"controller-policy",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -365,18 +379,18 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			// Check that the policies have all been updated.
 			secondRunExpectedPolicies := []string{
 				"anonymous-token-policy",
-				"client-token",
-				"catalog-sync-token",
-				"connect-inject-token",
-				"mesh-gateway-token",
-				"client-snapshot-agent-token",
+				"client-policy",
+				"sync-catalog-policy",
+				"connect-inject-policy",
+				"mesh-gateway-policy",
+				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"cross-namespace-policy",
-				"gw-ingress-gateway-token",
-				"anothergw-ingress-gateway-token",
-				"gw-terminating-gateway-token",
-				"anothergw-terminating-gateway-token",
-				"controller-token",
+				resourcePrefix + "-igw-policy",
+				resourcePrefix + "-anotherigw-policy",
+				resourcePrefix + "-tgw-policy",
+				resourcePrefix + "-anothertgw-policy",
+				"controller-policy",
 				"partitions-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)
@@ -401,11 +415,11 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				require.True(ok, "Did not find policy %s", expected)
 
 				switch expected {
-				case "connect-inject-token":
+				case "connect-inject-policy":
 					// The connect inject token doesn't have namespace config,
 					// but does change to operator:write from an empty string.
 					require.Contains(actRules, "policy = \"write\"")
-				case "client-snapshot-agent-token", "enterprise-license-token":
+				case "snapshot-agent-policy", "enterprise-license-token":
 					// The snapshot agent and enterprise license tokens shouldn't change.
 					require.NotContains(actRules, "namespace")
 					require.Contains(actRules, "acl = \"write\"")
@@ -577,7 +591,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
-			k8s, testAgent := completeEnterpriseSetup(tt)
+			k8s, testAgent := completeSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 
@@ -589,7 +603,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-enable-partitions",
 				"-partition=default",
-				"-create-inject-token",
+				"-connect-inject",
 			}
 
 			// First run. NOTE: we don't assert anything here since we've
@@ -658,27 +672,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 		SecretNames []string
 		LocalToken  bool
 	}{
-		"client token": {
-			TokenFlags:  []string{"-create-client-token"},
-			PolicyNames: []string{"client-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
-			LocalToken:  true,
-		},
-		"catalog-sync token": {
-			TokenFlags:  []string{"-create-sync-token"},
-			PolicyNames: []string{"catalog-sync-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
-			LocalToken:  false,
-		},
-		"connect-inject-token": {
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
 		"enterprise-license token": {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -686,72 +679,11 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 			LocalToken:  true,
 		},
-		"client-snapshot-agent token": {
-			TokenFlags:  []string{"-create-snapshot-agent-token"},
-			PolicyNames: []string{"client-snapshot-agent-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
-			LocalToken:  true,
-		},
-		"mesh-gateway token": {
-			TokenFlags:  []string{"-create-mesh-gateway-token"},
-			PolicyNames: []string{"mesh-gateway-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
-			LocalToken:  false,
-		},
-		"ingress gateway tokens": {
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
-				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
-			LocalToken: true,
-		},
-		"terminating gateway tokens": {
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
-				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
-			LocalToken: true,
-		},
 		"acl-replication token": {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
-			LocalToken:  false,
-		},
-		"inject token with namespaces (deprecated)": {
-			TokenFlags:  []string{"-create-inject-auth-method", "-enable-namespaces", "-create-inject-namespace-token"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		"inject token and namespaces": {
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		"controller token": {
-			TokenFlags:  []string{"-create-controller-token"},
-			PolicyNames: []string{"controller-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
 			LocalToken:  false,
 		},
 		"partitions token": {
@@ -764,7 +696,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
-			k8s, testSvr := completeEnterpriseSetup(t)
+			k8s, testSvr := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
@@ -797,17 +729,16 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			})
 			require.NoError(err)
 
+			// Check that the expected policy was created.
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
-
 				// Test that the token was created as a Kubernetes Secret.
 				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]
 				require.True(ok)
-
 				// Test that the token has the expected policies in Consul.
 				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
 				require.NoError(err)
@@ -845,9 +776,9 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
 				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-ingress-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -894,9 +825,9 @@ partition "default" {
 			TokenFlags: []string{"-ingress-gateway-name=ingress.",
 				"-ingress-gateway-name=gateway.namespace1",
 				"-ingress-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
-				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-ingress-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -943,9 +874,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
 				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-terminating-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -983,9 +914,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating.",
 				"-terminating-gateway-name=gateway.namespace1",
 				"-terminating-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
-				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+			PolicyNames: []string{resourcePrefix + "-terminating-policy",
+				resourcePrefix + "-gateway-policy",
+				resourcePrefix + "-another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -1021,8 +952,9 @@ partition "default" {
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
-			k8s, testSvr := completeEnterpriseSetup(t)
+			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
+			setUpK8sServiceAccount(t, k8s, ns)
 			require := require.New(t)
 
 			// Run the command.
@@ -1076,16 +1008,259 @@ partition "default" {
 	}
 }
 
-// Set up test consul agent and kubernetes cluster.
-func completeEnterpriseSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
-	k8s := fake.NewSimpleClientset()
+// Test that server-acl-init used the local auth method to create the desired token in the primary datacenter.
+// The test works by running the login command and then ensuring that the token
+// returned has the correct role for the component.
+func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
+	t.Parallel()
 
-	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-		c.ACL.Enabled = true
+	cases := []struct {
+		ComponentName string
+		TokenFlags    []string
+		Roles         []string
+		Namespace     string
+		GlobalToken   bool
+	}{
+		{
+			ComponentName: "connect-injector",
+			TokenFlags:    []string{"-connect-inject"},
+			Roles:         []string{resourcePrefix + "-connect-injector-acl-role"},
+			Namespace:     ns,
+			GlobalToken:   false,
+		},
+		{
+			ComponentName: "sync-catalog",
+			TokenFlags:    []string{"-sync-catalog"},
+			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role"},
+			Namespace:     ns,
+			GlobalToken:   false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.ComponentName, func(t *testing.T) {
+			authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
+			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
+
+			k8s, testSvr := completeSetup(t)
+			defer testSvr.Stop()
+			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
+
+			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("content-type", "application/json")
+				if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
+					w.Write([]byte(test.TokenReviewsResponse(serviceAccountName, c.Namespace)))
+				}
+				if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", c.Namespace, serviceAccountName) &&
+					r.Method == "GET" {
+					w.Write([]byte(test.ServiceAccountGetResponse(serviceAccountName, c.Namespace)))
+				}
+			}))
+			t.Cleanup(k8sMockServer.Close)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-timeout=500ms",
+				"-resource-prefix=" + resourcePrefix,
+				"-enable-namespaces",
+				"-k8s-namespace=" + c.Namespace,
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace", c.Namespace,
+				"-auth-method-host=" + k8sMockServer.URL,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			client, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(t, err)
+
+			tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+				AuthMethod:  authMethodName,
+				BearerToken: jwtToken,
+				Meta:        map[string]string{},
+			}, &api.WriteOptions{})
+			require.NoError(t, err)
+
+			require.Equal(t, len(tok.Roles), len(c.Roles))
+			for _, role := range tok.Roles {
+				require.Contains(t, c.Roles, role.Name)
+			}
+			require.Equal(t, !c.GlobalToken, tok.Local)
+		})
+	}
+}
+
+// Test that server-acl-init used the global auth method to create the desired token in the secondary datacenter.
+// The test works by running the login command and then ensuring that the token
+// returned has the correct role for the component.
+func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		ComponentName string
+		TokenFlags    []string
+		Roles         []string
+		Namespace     string
+		GlobalToken   bool
+	}{
+		{
+			ComponentName: "connect-injector",
+			TokenFlags:    []string{"-connect-inject"},
+			Roles:         []string{resourcePrefix + "-connect-injector-acl-role-dc2"},
+			Namespace:     ns,
+			GlobalToken:   true,
+		},
+		{
+			ComponentName: "sync-catalog",
+			TokenFlags:    []string{"-sync-catalog"},
+			Roles:         []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
+			Namespace:     ns,
+			GlobalToken:   true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.ComponentName, func(t *testing.T) {
+			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			tokenFile := common.WriteTempFile(t, bootToken)
+			authMethodName := fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, "dc2")
+			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
+
+			k8s, _, consulHTTPAddr, cleanup := mockReplicatedSetup(t, bootToken)
+			defer cleanup()
+			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
+
+			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("content-type", "application/json")
+				if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
+					w.Write([]byte(test.TokenReviewsResponse(serviceAccountName, c.Namespace)))
+				}
+				if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", c.Namespace, serviceAccountName) &&
+					r.Method == "GET" {
+					w.Write([]byte(test.ServiceAccountGetResponse(serviceAccountName, c.Namespace)))
+				}
+			}))
+			t.Cleanup(k8sMockServer.Close)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-federation",
+				"-timeout=1m",
+				"-resource-prefix=" + resourcePrefix,
+				"-enable-namespaces",
+				"-k8s-namespace=" + c.Namespace,
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace", c.Namespace,
+				"-acl-replication-token-file", tokenFile,
+				"-auth-method-host=" + k8sMockServer.URL,
+				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
+				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			client, err := api.NewClient(&api.Config{
+				Address:    consulHTTPAddr,
+				Datacenter: "dc1",
+			})
+			require.NoError(t, err)
+
+			retry.Run(t, func(r *retry.R) {
+				tok, _, err := client.ACL().Login(&api.ACLLoginParams{
+					AuthMethod:  authMethodName,
+					BearerToken: jwtToken,
+					Meta:        map[string]string{},
+				}, &api.WriteOptions{})
+				require.NoError(r, err)
+
+				require.Equal(r, len(tok.Roles), len(c.Roles))
+				for _, role := range tok.Roles {
+					require.Contains(r, c.Roles, role.Name)
+				}
+				require.Equal(r, !c.GlobalToken, tok.Local)
+			})
+		})
+	}
+}
+
+// Test that the partition token can be created when it's provided with a file.
+func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
+	defer testSvr.Stop()
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	partitionToken := "123e4567-e89b-12d3-a456-426614174000"
+	partitionTokenFile, err := ioutil.TempFile("", "partitiontoken")
+	require.NoError(t, err)
+	defer os.Remove(partitionTokenFile.Name())
+
+	partitionTokenFile.WriteString(partitionToken)
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-enable-partitions",
+		"-partition=default",
+		"-partition-token-file", partitionTokenFile.Name(),
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Check that this token is created.
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   partitionToken,
 	})
 	require.NoError(t, err)
+	token, _, err := consul.ACL().TokenReadSelf(nil)
+	require.NoError(t, err)
 
-	return k8s, svr
+	for _, policyLink := range token.Policies {
+		policy := policyExists(t, policyLink.Name, consul)
+		require.Equal(t, policy.Datacenters, []string{"dc1"})
+
+		// Test that the token was not created as a Kubernetes Secret.
+		_, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-partitions-acl-token", metav1.GetOptions{})
+		require.True(t, k8serrors.IsNotFound(err))
+	}
+
+	// Test that if the same command is run again, it doesn't error.
+	t.Run(t.Name()+"-retried", func(t *testing.T) {
+		ui = cli.NewMockUi()
+		cmd = Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+		responseCode = cmd.Run(cmdArgs)
+		require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+	})
 }
 
 // partitionedSetup is a helper function which creates a server and a consul agent that runs as

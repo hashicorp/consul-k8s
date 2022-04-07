@@ -1,14 +1,42 @@
 ## UNRELEASED
 
+BUG FIXES:
+  * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/issue/1005)]
+
+## 0.42.0 (April 04, 2022)
+
 BREAKING CHANGES:
 * Helm
   * Minimum Kubernetes version supported is 1.19 and now matches what is stated in the `README.md` file.  [[GH-1049](https://github.com/hashicorp/consul-k8s/pull/1049)] 
+* ACLs
+  * Support Terminating Gateway obtaining an ACL token using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
+    * **Note**: If you have updated a token with a new policy for a terminating gateway, this will not apply any more as ACL tokens will be ephemeral and are issued to the terminating gateways when the pod is created and destroyed when the pod is stopped. To achieve the same ACL permissions, you will need to assign the policy to the role for the terminating gateway, rather than the token.  
+  * Support Mesh Gateway obtaining an ACL token using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
+    * **Note**: This is a breaking change if you are using a mesh gateway with mesh federation. To properly configure mesh federation with mesh gateways, you will need to configure the `global.federation.k8sAuthMethodHost` in secondary datacenters to point to the address of the Kubernetes API server of the secondary datacenter.  This address must be reachable from the Consul servers in the primary datacenter.
+  * **General Note on old ACL Tokens**:  As of this release, ACL tokens no longer need to be stored as Kubernetes secrets. They will transparently be provisioned by the Kubernetes Auth Method when client and component pods are provisioned and will also be destroyed when client and component pods are destroyed.  Old ACL tokens, however, will still exist as Kubernetes secrets and in Consul and will need to be identified and manually deleted.
 
+FEATURES:
+* ACLs: Enable issuing ACL tokens via Consul login with a Kubernetes Auth Method and replace the need for storing ACL tokens as Kubernetes secrets.
+  * Support CRD controller obtaining an ACL token via using a k8s auth method. [GH-995](https://github.com/hashicorp/consul-k8s/pull/995)
+  * Support Connect Inject obtaining an ACL token via using a k8s auth method. [GH-1076](https://github.com/hashicorp/consul-k8s/pull/1076)
+  * Support Sync Catalog obtaining an ACL token via using a k8s auth method. [GH-1081](https://github.com/hashicorp/consul-k8s/pull/1081), [GHT-1077](https://github.com/hashicorp/consul-k8s/pull/1077)
+  * Support API Gateway controller obtaining an ACL token via using a k8s auth method. [GH-1083](https://github.com/hashicorp/consul-k8s/pull/1083)
+  * Support Snapshot Agent obtaining an ACL token via using a k8s auth method. [GH-1084](https://github.com/hashicorp/consul-k8s/pull/1084)
+  * Support Mesh Gateway obtaining an ACL token via using a k8s auth method. [GH-1085](https://github.com/hashicorp/consul-k8s/pull/1085)
+  * Support Ingress Gateway obtaining an ACL token via using a k8s auth method. [GH-1118](https://github.com/hashicorp/consul-k8s/pull/1118)
+  * Support Terminating Gateway obtaining an ACL token via using a k8s auth method. [GH-1102](https://github.com/hashicorp/consul-k8s/pull/1102)
+  * Support Consul Client obtaining an ACL token via using a k8s auth method. [GH-1093](https://github.com/hashicorp/consul-k8s/pull/1093)
+  * Support issuing global ACL tokens via k8s auth method. [GH-1075](https://github.com/hashicorp/consul-k8s/pull/1075)
+  
+  
 IMPROVEMENTS:
 * Control Plane
   * Upgrade Docker image Alpine version from 3.14 to 3.15. [[GH-1058](https://github.com/hashicorp/consul-k8s/pull/1058)]
 * Helm
   * API Gateway: Allow controller to read Kubernetes namespaces in order to determine if route is allowed for gateway. [[GH-1092](https://github.com/hashicorp/consul-k8s/pull/1092)]
+  * Support a pre-configured bootstrap ACL token. [[GH-1125](https://github.com/hashicorp/consul-k8s/pull/1125)]
+* Vault
+  * Enable snapshot agent configuration to be retrieved from vault. [[GH-1113](https://github.com/hashicorp/consul-k8s/pull/1113)]
 * CLI
   * Enable users to set up secondary clusters with existing federation secrets. [[GH-1126](https://github.com/hashicorp/consul-k8s/pull/1126)] 
 
@@ -17,7 +45,7 @@ BUG FIXES:
   * Don't set TTL for server certificates when using Vault as the secrets backend. [[GH-1104](https://github.com/hashicorp/consul-k8s/pull/1104)]
   * Fix PodSecurityPolicies for clients/mesh gateways when hostNetwork is used. [[GH-1090](https://github.com/hashicorp/consul-k8s/pull/1090)]
 * CLI
-  * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/issue/1005)]
+  * Fix `install` and `upgrade` commands for Windows. [[GH-1139](https://github.com/hashicorp/consul-k8s/pull/1139)]
 
 ## 0.41.1 (February 24, 2022)
 

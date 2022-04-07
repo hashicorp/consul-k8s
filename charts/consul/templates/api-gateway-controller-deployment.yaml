@@ -60,11 +60,8 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         {{- if .Values.global.acls.manageSystemACLs }}
-        - name: CONSUL_HTTP_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: "{{ template "consul.fullname" . }}-api-gateway-controller-acl-token"
-              key: "token"
+        - name: CONSUL_HTTP_TOKEN_FILE
+          value: "/consul/login/acl-token"
         {{- end }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.global.tls.enabled }}
@@ -73,35 +70,57 @@ spec:
           value: http://$(HOST_IP):8500
           {{- end }}
         command:
-          - "/bin/sh"
-          - "-ec"
-          - |
-            consul-api-gateway server \
-              -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
-              -k8s-namespace {{ .Release.Namespace }} \
-              {{- if .Values.global.enableConsulNamespaces }}
-              {{- if .Values.apiGateway.consulNamespaces.consulDestinationNamespace }}
-              -consul-destination-namespace={{ .Values.apiGateway.consulNamespaces.consulDestinationNamespace }} \
-              {{- end }}
-              {{- if .Values.apiGateway.consulNamespaces.mirroringK8S }}
-              -mirroring-k8s=true \
-              {{- if .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }}
-              -mirroring-k8s-prefix={{ .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }} \
-              {{- end }}
-              {{- end }}
-              {{- end }}
-              -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-api-gateway server \
+            -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
+            -k8s-namespace {{ .Release.Namespace }} \
+            {{- if .Values.global.enableConsulNamespaces }}
+            {{- if .Values.apiGateway.consulNamespaces.consulDestinationNamespace }}
+            -consul-destination-namespace={{ .Values.apiGateway.consulNamespaces.consulDestinationNamespace }} \
+            {{- end }}
+            {{- if .Values.apiGateway.consulNamespaces.mirroringK8S }}
+            -mirroring-k8s=true \
+            {{- if .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }}
+            -mirroring-k8s-prefix={{ .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }} \
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
+            -log-json={{ .Values.global.logJSON }}
         volumeMounts:
-          {{- if .Values.global.tls.enabled }}
-          {{- if .Values.global.tls.enableAutoEncrypt }}
-          - name: consul-auto-encrypt-ca-cert
-          {{- else }}
-          - name: consul-ca-cert
-          {{- end }}
-            mountPath: /consul/tls/ca
-            readOnly: true
-          {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: consul-bin
+          mountPath: /consul-bin
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        {{- if .Values.global.tls.enableAutoEncrypt }}
+        - name: consul-auto-encrypt-ca-cert
+        {{- else }}
+        - name: consul-ca-cert
+        {{- end }}
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        - mountPath: /consul/login
+          name: consul-data
+          readOnly: true
+        {{- if .Values.apiGateway.resources }}
+        resources:
+          {{- toYaml .Values.apiGateway.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        lifecycle:
+          preStop:
+            exec:
+              command: [ "/bin/sh", "-ec", "/consul-bin/consul logout" ]
+        {{- end }}
       volumes:
+      {{- if .Values.global.acls.manageSystemACLs }}
+      - name: consul-bin
+        emptyDir: { }
+      {{- end }}
       {{- if .Values.global.tls.enabled }}
       {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert
@@ -121,18 +140,73 @@ spec:
           medium: "Memory"
       {{- end }}
       {{- end }}
-      {{- if or (and .Values.global.acls.manageSystemACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      - name: consul-data
+        emptyDir:
+          medium: "Memory"
+      {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
-      - name: api-gateway-controller-acl-init
-        image: {{ .Values.global.imageK8S }}
+      - name: copy-consul-bin
+        image: {{ .Values.global.image | quote }}
         command:
-          - "/bin/sh"
-          - "-ec"
-          - |
-            consul-k8s-control-plane acl-init \
-              -secret-name="{{ template "consul.fullname" . }}-api-gateway-controller-acl-token" \
-              -k8s-namespace={{ .Release.Namespace }}
+        - cp
+        - /bin/consul
+        - /consul-bin/consul
+        volumeMounts:
+        - name: consul-bin
+          mountPath: /consul-bin
+        {{- if .Values.apiGateway.initCopyConsulContainer }}
+        {{- if .Values.apiGateway.initCopyConsulContainer.resources }}
+        resources: {{ toYaml .Values.apiGateway.initCopyConsulContainer.resources | nindent 12 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.global.acls.manageSystemACLs }}
+      - name: api-gateway-controller-acl-init
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+          {{- if .Values.global.tls.enabled }}
+        - name: CONSUL_CACERT
+          value: /consul/tls/ca/tls.crt
+          {{- end }}
+        - name: CONSUL_HTTP_ADDR
+          {{- if .Values.global.tls.enabled }}
+          value: https://$(HOST_IP):8501
+          {{- else }}
+          value: http://$(HOST_IP):8500
+          {{- end }}
+        image: {{ .Values.global.imageK8S }}
+        volumeMounts:
+        - mountPath: /consul/login
+          name: consul-data
+          readOnly: false
+        {{- if .Values.global.tls.enabled }}
+        {{- if .Values.global.tls.enableAutoEncrypt }}
+        - name: consul-auto-encrypt-ca-cert
+        {{- else }}
+        - name: consul-ca-cert
+        {{- end }}
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s-control-plane acl-init \
+            -component-name=api-gateway-controller \
+            -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            {{- if .Values.global.adminPartitions.enabled }}
+            -partition={{ .Values.global.adminPartitions.name }} \
+            {{- end }}
+            -log-level={{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
+            -log-json={{ .Values.global.logJSON }}
         resources:
           requests:
             memory: "25Mi"
@@ -140,9 +214,6 @@ spec:
           limits:
             memory: "25Mi"
             cpu: "50m"
-      {{- end }}
-      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
-      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
       {{- end }}
       {{- end }}
       {{- if .Values.apiGateway.controller.priorityClassName }}

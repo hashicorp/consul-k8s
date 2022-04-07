@@ -1,0 +1,264 @@
+name: build
+on:
+  workflow_dispatch:
+  push:
+    # Sequence of patterns matched against refs/heads
+    branches:
+      # Push events on main branch
+      - main
+      # Push events to branches matching refs/heads/release/**
+      - "release/**"
+
+env:
+  PKG_NAME: "consul-k8s-control-plane"
+
+jobs:
+  get-go-version:
+    name: "Determine Go toolchain version"
+    runs-on: ubuntu-latest
+    outputs:
+      go-version: ${{ steps.get-go-version.outputs.go-version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Determine Go version
+        id: get-go-version
+        # We use .go-version as our source of truth for current Go
+        # version, because "goenv" can react to it automatically.
+        run: |
+          echo "Building with Go $(cat .go-version)"
+          echo "::set-output name=go-version::$(cat .go-version)"
+
+  get-product-version:
+    runs-on: ubuntu-latest
+    outputs:
+      product-version: ${{ steps.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: get product version
+        id: get-product-version
+        run: |
+          make version
+          echo "::set-output name=product-version::$(make version)"
+
+  generate-metadata-file:
+    needs: get-product-version
+    runs-on: ubuntu-latest
+    outputs:
+      filepath: ${{ steps.generate-metadata-file.outputs.filepath }}
+    steps:
+      - name: "Checkout directory"
+        uses: actions/checkout@v2
+      - name: Generate metadata file
+        id: generate-metadata-file
+        uses: hashicorp/actions-generate-metadata@v1
+        with:
+          version: ${{ needs.get-product-version.outputs.product-version }}
+          product: ${{ env.PKG_NAME }}
+          repositoryOwner: "hashicorp"
+      - uses: actions/upload-artifact@v2
+        with:
+          name: metadata.json
+          path: ${{ steps.generate-metadata-file.outputs.filepath }}
+
+  build:
+    needs: [get-go-version, get-product-version]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+        # cli 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s" } 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s" } 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s" } 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s" }
+        # control-plane
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" } 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane" } 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane" } 
+            # solaris is only built for the control plane
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" } 
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "cli", pkg_name: "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane" }
+      fail-fast: true
+
+    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        working-directory: ${{ matrix.component }}
+        run: |
+          mkdir -p dist out
+          GCO_ENABLED=0 go build -o dist/${{ matrix.pkg_name }} .
+          zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
+
+      - name: Upload built binaries 
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+            
+      - name: Package rpm and deb files 
+        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        uses: hashicorp/actions-packaging-linux@v1
+        with:
+          name: consul-k8s 
+          description: "consul-k8s provides a cli interface to first-class integrations between Consul and Kubernetes."
+          arch: ${{ matrix.goarch }}
+          version: ${{ needs.get-product-version.outputs.product-version }}
+          maintainer: "HashiCorp"
+          homepage: "https://github.com/hashicorp/consul-k8s"
+          license: "MPL-2.0"
+          binary: "${{ matrix.component }}/dist/${{ matrix.pkg_name }}"
+          deb_depends: "openssl"
+          rpm_depends: "openssl"
+
+      - name: Set package names
+        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        run: |
+          echo "RPM_PACKAGE=$(basename out/*.rpm)" >> $GITHUB_ENV
+          echo "DEB_PACKAGE=$(basename out/*.deb)" >> $GITHUB_ENV
+
+      - name: Test rpm package
+        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        uses: addnab/docker-run-action@v3
+        with:
+          image: registry.access.redhat.com/ubi8/ubi:latest
+          options: -v ${{ github.workspace }}:/work
+          run: |
+            dnf install -qy openssl
+            cd /work
+            rpm -ivh out/${{ env.RPM_PACKAGE }}
+            CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
+            VERSION="${{ needs.get-product-version.outputs.product-version }}"
+            if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
+              echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+              exit 1
+            fi
+            echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+
+      - name: Upload rpm package
+        uses: actions/upload-artifact@v2
+        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        with:
+          name: ${{ env.RPM_PACKAGE }}
+          path: out/${{ env.RPM_PACKAGE }}
+
+      - name: Test debian package
+        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ubuntu:latest
+          options: -v ${{ github.workspace }}:/work
+          run: |
+            apt update && apt install -y openssl
+            cd /work
+            apt install ./out/${{ env.DEB_PACKAGE }}
+            CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
+            VERSION="${{ needs.get-product-version.outputs.product-version }}"
+            if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
+              echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+              exit 1
+            fi
+            echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+
+      - name: Upload debian packages 
+        uses: actions/upload-artifact@v2
+        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        with:
+          name: ${{ env.DEB_PACKAGE }}
+          path: out/${{ env.DEB_PACKAGE }}
+
+  build-docker-default:
+    name: Docker ${{ matrix.arch }} default release build
+    needs: [get-product-version, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: ["arm", "arm64", "386", "amd64"]
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Docker Build (Action)
+        uses: hashicorp/actions-docker-build@v1.2.1
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: release-default
+          arch: ${{ matrix.arch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane 
+          workdir: control-plane
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
+            986891699432.dkr.ecr.us-east-1.amazonaws.com/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-dev
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
+
+# Disabling UBI build for now so that we do not inadvertently push a ubi image that we have not tested.
+  # build-docker-alternate:
+  #   name: Docker ${{ matrix.arch }} alternate release build
+  #   needs: [get-product-version, build]
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       arch: ["amd64"]
+  #   env:
+  #     repo: ${{ github.event.repository.name }}
+  #     version: ${{ needs.get-product-version.outputs.product-version }}
+  #
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Copy LICENSE.md 
+  #       run: 
+  #         cp LICENSE.md ./control-plane
+  #     - uses: hashicorp/actions-docker-build@v1.2.1
+  #       with:
+  #         smoke_test: |
+  #           TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+  #           if [ "${TEST_VERSION}" != "${version}" ]; then
+  #             echo "Test FAILED"
+  #             exit 1
+  #           fi
+  #           echo "Test PASSED"
+  #         version: ${{ env.version }}
+  #         target: ubi 
+  #         arch: ${{ matrix.arch }}
+  #         pkg_name: consul-k8s-control-plane_${{ env.version }}
+  #         bin_name: consul-k8s-control-plane 
+  #         workdir: control-plane
+  #         tags: |
+  #           registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:${{env.version}}-ubi
+  #         dev_tags: |
+  #           hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-dev
+  #           docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
+  #

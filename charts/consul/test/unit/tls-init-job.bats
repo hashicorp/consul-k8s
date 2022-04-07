@@ -70,6 +70,37 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "tlsInit/Job: sets additional DNS SANs by default when global.tls.enabled=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo "$command" |
+    yq 'any(contains("additional-dnsname=\"*.server.dc1.consul\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "tlsInit/Job: sets additional DNS SANs when provided and global.tls.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \

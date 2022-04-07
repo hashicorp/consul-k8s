@@ -12,58 +12,124 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	defaultTokenSinkFile   = "/consul/login/acl-token"
 )
 
 type Command struct {
 	UI cli.Ui
 
-	flags             *flag.FlagSet
-	k8s               *flags.K8SFlags
-	flagSecretName    string
-	flagInitType      string
-	flagNamespace     string
-	flagACLDir        string
-	flagTokenSinkFile string
+	flags *flag.FlagSet
+	k8s   *flags.K8SFlags
+	http  *flags.HTTPFlags
+
+	flagSecretName        string
+	flagInitType          string
+	flagNamespace         string
+	flagPrimaryDatacenter string
+	flagACLDir            string
+	flagTokenSinkFile     string
+
+	flagACLAuthMethod string // Auth Method to use for ACLs.
+	flagLogLevel      string
+	flagLogJSON       bool
+
+	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
+	flagComponentName string // Name of the component to be used as metadata to ACL Login.
+
+	// Flags to configure Consul connection
+	flagServerAddresses []string
+	flagServerPort      uint
+	flagConsulCACert    string
+	flagUseHTTPS        bool
 
 	k8sClient kubernetes.Interface
 
-	once sync.Once
-	help string
+	once      sync.Once
+	help      string
+	logger    hclog.Logger
+	providers map[string]discover.Provider
 
-	ctx context.Context
+	ctx          context.Context
+	consulClient *api.Client
 }
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
+
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "",
 		"Name of secret to watch for an ACL token")
 	c.flags.StringVar(&c.flagInitType, "init-type", "",
 		"ACL init type. The only supported value is 'client'. If set to 'client' will write Consul client ACL config to an acl-config.json file in -acl-dir")
-	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
-		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.StringVar(&c.flagACLDir, "acl-dir", "/consul/aclconfig",
 		"Directory name of shared volume where client acl config file acl-config.json will be written if -init-type=client")
 	c.flags.StringVar(&c.flagTokenSinkFile, "token-sink-file", "",
 		"Optional filepath to write acl token")
 
+	// Flags related to using consul login to fetch the ACL token.
+	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of Kubernetes namespace where the token Kubernetes secret is stored.")
+	c.flags.StringVar(&c.flagPrimaryDatacenter, "primary-datacenter", "", "Name of the primary datacenter when federation is enabled and the command is run in a secondary datacenter.")
+	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login with.")
+	c.flags.StringVar(&c.flagComponentName, "component-name", "",
+		"Name of the component to pass to ACL Login as metadata.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
+			"At least one value is required.")
+	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
+	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
+		"Path to the PEM-encoded CA certificate of the Consul cluster.")
+	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
+		"Toggle for using HTTPS for all API calls to Consul.")
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
+
 	c.k8s = &flags.K8SFlags{}
+	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
+	flags.Merge(c.flags, c.http.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
 
 func (c *Command) Run(args []string) int {
+	var err error
 	c.once.Do(c.init)
-	if err := c.flags.Parse(args); err != nil {
+	if err = c.flags.Parse(args); err != nil {
 		return 1
 	}
 	if len(c.flags.Args()) > 0 {
 		c.UI.Error("Should have no non-flag arguments.")
 		return 1
+	}
+
+	if c.bearerTokenFile == "" {
+		c.bearerTokenFile = defaultBearerTokenFile
+	}
+	// This allows us to utilize the default path of `/consul/login/acl-token` for the ACL token
+	// but only in the case of when we're using ACL.Login. If flagACLAuthMethod is not set and
+	// the tokenSinkFile is also unset it means we do not want to write an ACL token in the case
+	// of the client token.
+	if c.flagTokenSinkFile == "" && c.flagACLAuthMethod != "" {
+		c.flagTokenSinkFile = defaultTokenSinkFile
+	}
+	if c.flagNamespace == "" {
+		c.flagNamespace = corev1.NamespaceDefault
 	}
 
 	if c.ctx == nil {
@@ -84,19 +150,75 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Check if the client secret exists yet
-	// If not, wait until it does
-	var secret string
-	for {
-		var err error
-		secret, err = c.getSecret(c.flagSecretName)
+	// Set up logging.
+	if c.logger == nil {
+		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error getting Kubernetes secret: %s", err))
+			c.UI.Error(err.Error())
+			return 1
 		}
-		if err == nil {
-			break
+	}
+
+	var secret string
+	if c.flagACLAuthMethod != "" {
+		cfg := api.DefaultConfig()
+		c.http.MergeOntoConfig(cfg)
+
+		if len(c.flagServerAddresses) > 0 {
+			serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.logger)
+			if err != nil {
+				c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+				return 1
+			}
+
+			scheme := "http"
+			if c.flagUseHTTPS {
+				scheme = "https"
+			}
+
+			serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
+			cfg.Address = serverAddr
+			cfg.Scheme = scheme
 		}
-		time.Sleep(1 * time.Second)
+
+		c.consulClient, err = consul.NewClient(cfg)
+		if err != nil {
+			c.logger.Error("Unable to get client connection", "error", err)
+			return 1
+		}
+
+		loginParams := common.LoginParams{
+			AuthMethod:      c.flagACLAuthMethod,
+			Datacenter:      c.flagPrimaryDatacenter,
+			BearerTokenFile: c.bearerTokenFile,
+			TokenSinkFile:   c.flagTokenSinkFile,
+			Meta: map[string]string{
+				"component": c.flagComponentName,
+			},
+		}
+		secret, err = common.ConsulLogin(c.consulClient, loginParams, c.logger)
+		if err != nil {
+			c.logger.Error("Consul login failed", "error", err)
+			return 1
+		}
+		c.logger.Info("Successfully read ACL token from the server")
+	} else {
+		// Use k8s secret to obtain token.
+
+		// Check if the client secret exists yet
+		// If not, wait until it does.
+		for {
+			var err error
+			secret, err = c.getSecret(c.flagSecretName)
+			if err != nil {
+				c.logger.Error("Error getting Kubernetes secret: ", "error", err)
+			}
+			if err == nil {
+				c.logger.Info("Successfully read Kubernetes secret")
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
 	}
 
 	if c.flagInitType == "client" {
@@ -106,7 +228,7 @@ func (c *Command) Run(args []string) int {
 		tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
 		err := tpl.Execute(&buf, secret)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating template: %s", err))
+			c.logger.Error("Error creating template", "error", err)
 			return 1
 		}
 
@@ -115,7 +237,7 @@ func (c *Command) Run(args []string) int {
 		// to be readable by the consul user.
 		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0644)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error writing config file: %s", err))
+			c.logger.Error("Error writing config file", "error", err)
 			return 1
 		}
 	}
@@ -125,7 +247,7 @@ func (c *Command) Run(args []string) int {
 		// to have permissions to overwrite our file.
 		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0600)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error writing token to file %q: %s", c.flagTokenSinkFile, err))
+			c.logger.Error("Error writing token to file", "file", c.flagTokenSinkFile, "error", err)
 			return 1
 		}
 	}

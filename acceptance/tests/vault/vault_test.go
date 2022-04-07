@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticClientName = "static-client"
@@ -34,17 +32,26 @@ func TestVault(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
-	gossipKey := configureGossipVaultSecret(t, vaultClient)
+	gossipKey := vault.ConfigureGossipVaultSecret(t, vaultClient)
 
-	createConnectCAPolicy(t, vaultClient, "dc1")
+	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
 	if cfg.EnableEnterprise {
-		configureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
+		vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
 	}
 
-	configureKubernetesAuthRoles(t, vaultClient, consulReleaseName, ns, "kubernetes", "dc1", cfg)
+	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 
-	configurePKICA(t, vaultClient)
-	certPath := configurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
+	if cfg.EnableEnterprise {
+		serverPolicies += ",license"
+	}
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
+	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token")
+	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+
+	vault.ConfigurePKICA(t, vaultClient)
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
@@ -57,10 +64,11 @@ func TestVault(t *testing.T) {
 		"connectInject.replicas": "1",
 		"controller.enabled":     "true",
 
-		"global.secretsBackend.vault.enabled":          "true",
-		"global.secretsBackend.vault.consulServerRole": "consul-server",
-		"global.secretsBackend.vault.consulClientRole": "consul-client",
-		"global.secretsBackend.vault.consulCARole":     "consul-ca",
+		"global.secretsBackend.vault.enabled":              "true",
+		"global.secretsBackend.vault.consulServerRole":     "server",
+		"global.secretsBackend.vault.consulClientRole":     "client",
+		"global.secretsBackend.vault.consulCARole":         "consul-ca",
+		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
@@ -69,10 +77,12 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
 
-		"global.acls.manageSystemACLs":       "true",
-		"global.tls.enabled":                 "true",
-		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
-		"global.gossipEncryption.secretKey":  "gossip",
+		"global.acls.manageSystemACLs":          "true",
+		"global.acls.bootstrapToken.secretName": "consul/data/secret/bootstrap",
+		"global.acls.bootstrapToken.secretKey":  "token",
+		"global.tls.enabled":                    "true",
+		"global.gossipEncryption.secretName":    "consul/data/secret/gossip",
+		"global.gossipEncryption.secretKey":     "gossip",
 
 		"ingressGateways.enabled":               "true",
 		"ingressGateways.defaults.replicas":     "1",
@@ -93,8 +103,8 @@ func TestVault(t *testing.T) {
 	}
 
 	if cfg.EnableEnterprise {
-		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/enterpriselicense"
-		consulHelmValues["global.enterpriseLicense.secretKey"] = "enterpriselicense"
+		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
+		consulHelmValues["global.enterpriseLicense.secretKey"] = "license"
 	}
 
 	logger.Log(t, "Installing Consul")
@@ -103,6 +113,7 @@ func TestVault(t *testing.T) {
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
+	consulCluster.ACLToken = bootstrapToken
 	consulClient := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
@@ -116,12 +127,8 @@ func TestVault(t *testing.T) {
 	require.Equal(t, caConfig.Provider, "vault")
 
 	// Validate that consul sever is running correctly and the consul members command works
-	tokenSecret, err := ctx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), fmt.Sprintf("%s-consul-bootstrap-acl-token", consulReleaseName), metav1.GetOptions{})
-	require.NoError(t, err)
-	token := string(tokenSecret.Data["token"])
-
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
-	membersOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, ctx.KubectlOptions(t), terratestLogger.Discard, "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", token))
+	membersOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, ctx.KubectlOptions(t), terratestLogger.Discard, "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", bootstrapToken))
 	logger.Logf(t, "Members: \n%s", membersOutput)
 	require.NoError(t, err)
 	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))

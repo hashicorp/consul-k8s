@@ -121,26 +121,26 @@ spec:
         {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
         {{- include "consul.getAutoEncryptClientCA" . | nindent 8 }}
         {{- end }}
-        # service-init registers the mesh gateway service.
-        - name: service-init
+        - name: mesh-gateway-init
           image: {{ .Values.global.imageK8S }}
           env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          {{- if .Values.global.tls.enabled }}
+          - name: CONSUL_CACERT
+            value: /consul/tls/ca/tls.crt
+          {{- end }}
+          - name: CONSUL_HTTP_ADDR
             {{- if .Values.global.tls.enabled }}
-            - name: CONSUL_HTTP_ADDR
-              value: https://$(HOST_IP):8501
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
+            value: https://$(HOST_IP):8501
             {{- else }}
-            - name: CONSUL_HTTP_ADDR
-              value: http://$(HOST_IP):8500
+            value: http://$(HOST_IP):8500
             {{- end }}
           command:
             - "/bin/sh"
@@ -148,9 +148,19 @@ spec:
             - |
                 {{- if .Values.global.acls.manageSystemACLs }}
                 consul-k8s-control-plane acl-init \
-                  -secret-name="{{ template "consul.fullname" . }}-mesh-gateway-acl-token" \
-                  -k8s-namespace={{ .Release.Namespace }} \
-                  -token-sink-file=/consul/service/acl-token
+                  -component-name=mesh-gateway \
+                  -token-sink-file=/consul/service/acl-token \
+                  {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+                  -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+                  -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+                  {{- else }}
+                  -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+                  {{- end }}
+                  {{- if .Values.global.adminPartitions.enabled }}
+                  -partition={{ .Values.global.adminPartitions.name }} \
+                  {{- end }}
+                  -log-level={{ default .Values.global.logLevel }} \
+                  -log-json={{ .Values.global.logJSON }}
                 {{ end }}
 
                 {{- $source := .Values.meshGateway.wanAddress.source }}
@@ -258,6 +268,9 @@ spec:
             {{- end }}
           {{- end }}
           volumeMounts:
+          - mountPath: /consul/service
+            name: consul-service
+            readOnly: true
           - name: consul-bin
             mountPath: /consul-bin
           {{- if .Values.global.tls.enabled }}
@@ -285,12 +298,9 @@ spec:
                   fieldPath: spec.nodeName
             {{- end }}
             {{- if .Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_HTTP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ template "consul.fullname" . }}-mesh-gateway-acl-token"
-                  key: "token"
-            {{- end}}
+            - name: CONSUL_HTTP_TOKEN_FILE
+              value: /consul/service/acl-token
+            {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: https://$(HOST_IP):8501
@@ -337,7 +347,13 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""]
+                command: 
+                - "/bin/sh"
+                - "-ec"
+                - "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""
+                {{- if .Values.global.acls.manageSystemACLs }}
+                - "/consul-bin/consul logout"
+                {{- end}}
 
         # consul-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
