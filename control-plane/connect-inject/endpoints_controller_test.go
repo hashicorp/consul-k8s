@@ -3455,15 +3455,34 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		ConsulClientCfg:       cfg,
 	}
 
-	// Run the reconcile process to check service registration.
 	serviceName := badEndpoint.Name
+
+	// Initially register the pod with the bad endpoint
+	err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+		ID:      "pod1-" + serviceName,
+		Name:    serviceName,
+		Port:    0,
+		Address: "1.2.3.4",
+		Meta: map[string]string{
+			"k8s-namespace":    namespace,
+			"k8s-service-name": serviceName,
+			"managed-by":       "consul-k8s-endpoints-controller",
+			"pod-name":         "pod1",
+		},
+	})
+	require.NoError(t, err)
+	serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+	require.NoError(t, err)
+	require.Len(t, serviceInstances, 1)
+
+	// Run the reconcile process to check service deregistration.
 	namespacedName := types.NamespacedName{Namespace: badEndpoint.Namespace, Name: serviceName}
 	resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
-	// Check that no services are registered with Consul.
-	serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+	// Check that the service has been deregistered with Consul.
+	serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
 	require.NoError(t, err)
 	require.Len(t, serviceInstances, 0)
 	proxyServiceInstances, _, err := consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
