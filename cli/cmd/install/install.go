@@ -411,7 +411,7 @@ func (c *Command) checkForPreviousPVCs() error {
 // and returns a message if the secret configuration is ok or an error if
 // the secret configuration could cause a conflict.
 func (c *Command) checkForPreviousSecrets(release release.Release) (string, error) {
-	secrets, err := validation.ListConsulSecrets(c.Ctx, c.kubernetes)
+	secrets, err := validation.ListConsulSecrets(c.Ctx, c.kubernetes, release.Namespace)
 	if err != nil {
 		return "", fmt.Errorf("Error listing Consul secrets: %s", err)
 	}
