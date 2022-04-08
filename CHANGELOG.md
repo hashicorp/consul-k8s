@@ -3,6 +3,7 @@
 BUG FIXES:
 * CLI
   * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/pull/1115)]
+  * Fix issue where the CLI was looking for secrets in namespaces other than the namespace targeted by the release. [[GH-1156](https://github.com/hashicorp/consul-k8s/pull/1156)]
 
 IMPROVEMENTS:
 * Helm
