@@ -16,6 +16,7 @@ func TestListConsulSecrets(t *testing.T) {
 
 	cases := map[string]struct {
 		secrets         *v1.SecretList
+		namespace       string
 		expectedSecrets int
 	}{
 		"No secrets": {
@@ -33,6 +34,7 @@ func TestListConsulSecrets(t *testing.T) {
 					},
 				},
 			},
+			namespace:       v1.NamespaceDefault,
 			expectedSecrets: 1,
 		},
 		"A Consul and a non-Consul Secret": {
@@ -51,7 +53,22 @@ func TestListConsulSecrets(t *testing.T) {
 					},
 				},
 			},
+			namespace:       v1.NamespaceDefault,
 			expectedSecrets: 1,
+		},
+		"A Consul Secret in default namespace with lookup in consul namespace": {
+			secrets: &v1.SecretList{
+				Items: []v1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "test-consul-bootstrap-acl-token",
+							Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+						},
+					},
+				},
+			},
+			namespace:       "consul",
+			expectedSecrets: 0,
 		},
 	}
 
@@ -64,7 +81,7 @@ func TestListConsulSecrets(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			actual, err := ListConsulSecrets(context.Background(), client)
+			actual, err := ListConsulSecrets(context.Background(), client, tc.namespace)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedSecrets, len(actual.Items))
 		})
