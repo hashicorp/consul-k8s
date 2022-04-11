@@ -13,6 +13,10 @@ metadata:
     release: {{ .Release.Name }}
     component: client
 data:
+  client.json: |-
+    {
+      "auto_reload_config": true
+    }
   extra-from-values.json: |-
 {{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
   central-config.json: |-
