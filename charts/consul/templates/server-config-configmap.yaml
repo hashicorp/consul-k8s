@@ -12,6 +12,24 @@ metadata:
     release: {{ .Release.Name }}
     component: server
 data:
+  server.json: |
+    {
+      "bind_addr": "0.0.0.0",
+      "bootstrap_expect": {{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }},
+      "client_addr": "0.0.0.0",
+      "connect": {
+        "enabled": {{ .Values.server.connect }}
+      },
+      "datacenter": "{{ .Values.global.datacenter }}",
+      "data_dir": "/consul/data",
+      "domain": "{{ .Values.global.domain }}",
+      "ports": {
+        "serf_lan": {{ .Values.server.ports.serflan.port }}
+      },
+      "recursors": {{ .Values.global.recursors | toJson }},
+      "retry_join": ["{{template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.ports.serflan.port }}"],
+      "server": true
+    }
   {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
   {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
   {{- with .Values.global.secretsBackend.vault }}
@@ -62,15 +80,52 @@ data:
       }
     }
   {{- end }}
-  {{- if (and .Values.ui.enabled (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString))))) }}
+  {{- if .Values.global.tls.enabled }}
+  tls-config.json: |-
+    {
+      {{- if .Values.global.secretsBackend.vault.enabled }}
+      "ca_file": "/vault/secrets/serverca.crt",
+      "cert_file": "/vault/secrets/servercert.crt",
+      "key_file": "/vault/secrets/servercert.key",
+      {{- else }}
+      "ca_file": "/consul/tls/ca/tls.crt",
+      "cert_file": "/consul/tls/server/tls.crt",
+      "key_file": "/consul/tls/server/tls.key",
+      {{- end }}
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      "auto_encrypt": {
+          "allow_tls": true
+      },
+      {{- end }}
+      {{- if .Values.global.tls.verify }}
+      "verify_incoming_rpc": true,
+      "verify_outgoing": true,
+      "verify_server_hostname": true,
+      {{- end }}
+      "ports": {
+         {{- if .Values.global.tls.httpsOnly }}
+         "http": -1,
+         {{- end }}
+         "https": 8501
+       }
+    }
+  {{- end }}
+  {{- if .Values.ui.enabled }}
   ui-config.json: |-
     {
       "ui_config": {
-        "enabled": true,
+        {{- if (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString)))) }}
         "metrics_provider": "{{ .Values.ui.metrics.provider }}",
         "metrics_proxy": {
           "base_url": "{{ .Values.ui.metrics.baseURL }}"
-        }
+        },
+        {{- end }}
+        {{- if .Values.ui.dashboardURLTemplates.service }}
+        "dashboard_url_templates": {
+          "service": "{{ .Values.ui.dashboardURLTemplates.service }}"
+        },
+        {{- end }}
+        "enabled": true
       }
     }
   {{- end }}
@@ -82,7 +137,18 @@ data:
   federation-config.json: |-
     {
       "primary_datacenter": "{{ .Values.global.federation.primaryDatacenter }}",
-      "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }}
+      "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }},
+      "connect": {
+        "enable_mesh_gateway_wan_federation": true
+      }
+    }
+  {{- end }}
+  {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+  telemetry-config.json: |-
+    {
+      "telemetry": {
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}"
+      }
     }
   {{- end }}
 {{- end }}
