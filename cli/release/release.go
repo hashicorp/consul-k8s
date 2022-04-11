@@ -21,5 +21,12 @@ type Release struct {
 func (r *Release) ShouldExpectFederationSecret() bool {
 	return r.Configuration.Global.Federation.Enabled &&
 		r.Configuration.Global.Datacenter != r.Configuration.Global.Federation.PrimaryDatacenter &&
-		!r.Configuration.Global.Federation.CreateFederationSecret
+		!r.Configuration.Global.Federation.CreateFederationSecret &&
+		!r.Configuration.Global.SecretsBackend.Vault.Enabled
+}
+
+// FedSecret returns the name of the federation secret which should be created
+// by the operator.
+func (r *Release) FedSecret() string {
+	return r.Name + "-federation"
 }

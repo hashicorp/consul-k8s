@@ -54,19 +54,22 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		helmValues helm.Values
-		secret     *v1.Secret
-		expectMsg  bool
-		expectErr  bool
+		releaseName string
+		helmValues  helm.Values
+		secret      *v1.Secret
+		expectMsg   bool
+		expectErr   bool
 	}{
 		"No secrets, none expected": {
-			helmValues: helm.Values{},
-			secret:     nil,
-			expectMsg:  true,
-			expectErr:  false,
+			releaseName: "consul",
+			helmValues:  helm.Values{},
+			secret:      nil,
+			expectMsg:   true,
+			expectErr:   false,
 		},
 		"Non-Consul secrets, none expected": {
-			helmValues: helm.Values{},
+			releaseName: "consul",
+			helmValues:  helm.Values{},
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "non-consul-secret",
@@ -76,7 +79,8 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 			expectErr: false,
 		},
 		"Consul secrets, none expected": {
-			helmValues: helm.Values{},
+			releaseName: "consul",
+			helmValues:  helm.Values{},
 			secret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "consul-secret",
@@ -87,6 +91,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 			expectErr: true,
 		},
 		"Federation secret, expected": {
+			releaseName: "consul",
 			helmValues: helm.Values{
 				Global: helm.Global{
 					Datacenter: "dc2",
@@ -112,6 +117,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 			expectErr: false,
 		},
 		"No federation secret, but expected": {
+			releaseName: "consul",
 			helmValues: helm.Values{
 				Global: helm.Global{
 					Datacenter: "dc2",
@@ -140,7 +146,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 
 			c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), tc.secret, metav1.CreateOptions{})
 
-			release := release.Release{Configuration: tc.helmValues}
+			release := release.Release{Name: tc.releaseName, Configuration: tc.helmValues}
 			msg, err := c.checkForPreviousSecrets(release)
 
 			require.Equal(t, tc.expectMsg, msg != "")
