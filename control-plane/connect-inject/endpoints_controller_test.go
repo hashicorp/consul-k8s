@@ -3491,7 +3491,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 
 	// Run the reconcile again with the service we want to register.
 	serviceName = endpoint.Name
-	namespacedName = types.NamespacedName{Namespace: badEndpoint.Namespace, Name: serviceName}
+	namespacedName = types.NamespacedName{Namespace: endpoint.Namespace, Name: serviceName}
 	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)

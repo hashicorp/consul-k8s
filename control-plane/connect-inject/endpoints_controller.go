@@ -178,7 +178,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 				serviceName, ok := pod.Annotations[annotationKubernetesService]
 				if ok && serviceEndpoints.Name != serviceName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-					// deregistration happens later because we don't add this pod to the endpointAddressMap
+					// deregistration for service instances that don't match the annotation happens later because we don't add this pod to the endpointAddressMap.
 					continue
 				}
 
