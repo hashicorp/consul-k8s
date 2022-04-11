@@ -17,8 +17,8 @@ import (
 )
 
 // TestVault_TlsAutoReload installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
-// It then gets certs for https, rpc, and grpc, waits for the certs to rotate, and then checks that certs
-// have different expirations.
+// It then gets certs for https and rpc on the server. It then waits for the certs to rotate and checks
+// that certs have different expirations.
 func TestVault_TlsAutoReload(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
@@ -106,7 +106,6 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	consulCluster.ACLToken = bootstrapToken
 	_, httpsAddress := consulCluster.SetupConsulClient(t, true)
 	rpcAddress := consulCluster.CreatePortForwardTunnel(t, 8300)
-	grpcAddress := consulCluster.CreatePortForwardTunnel(t, 8502)
 
 	// here we can verify that the cert expiry changed
 	err, httpsCert := getCertificate(t, httpsAddress)
@@ -116,10 +115,6 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	err, rpcCert := getCertificate(t, rpcAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "RPC expiry: %s \n", rpcCert.NotAfter.String())
-
-	err, grpcCert := getCertificate(t, grpcAddress)
-	require.NoError(t, err)
-	logger.Logf(t, "GRPC expiry: %s \n", grpcCert.NotAfter.String())
 
 	// Validate that consul sever is running correctly and the consul members command works
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
@@ -159,15 +154,11 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	require.NoError(t, err)
 	logger.Logf(t, "RPC 2 expiry: %s \n", rpcCert2.NotAfter.String())
 
-	err, grpcCert2 := getCertificate(t, grpcAddress)
-	require.NoError(t, err)
-	logger.Logf(t, "GRPC 2 expiry: %s \n", grpcCert2.NotAfter.String())
-
 	// verify that a previous cert expired and that a new one has been issued
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, httpsCert.NotAfter, httpsCert2.NotAfter)
 	require.NotEqual(t, rpcCert.NotAfter, rpcCert2.NotAfter)
-	require.NotEqual(t, grpcCert.NotAfter, grpcCert2.NotAfter)
+
 }
 
 func getCertificate(t *testing.T, address string) (error, *x509.Certificate) {
