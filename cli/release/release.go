@@ -24,26 +24,8 @@ func (r *Release) ShouldExpectFederationSecret() bool {
 		!r.Configuration.Global.Federation.CreateFederationSecret
 }
 
-// FedSecret fetches the federation secret for the release or an empty string
-// if the federation secret is not set. The federation secret could be set
-// in several places in the configuration. This method returns the first
-// secret name that is set.
+// FedSecret returns the name of the federation secret which should be created
+// by the operator.
 func (r *Release) FedSecret() string {
-	if s := r.Configuration.Global.TLS.CaCert.SecretName; s != "" {
-		return s
-	}
-
-	if s := r.Configuration.Global.TLS.CaKey.SecretName; s != "" {
-		return s
-	}
-
-	if s := r.Configuration.Global.Acls.ReplicationToken.SecretName; s != "" {
-		return s
-	}
-
-	if s := r.Configuration.Global.GossipEncryption.SecretName; s != "" {
-		return s
-	}
-
-	return ""
+	return r.Name + "-federation"
 }
