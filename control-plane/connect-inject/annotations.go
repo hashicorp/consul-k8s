@@ -20,6 +20,11 @@ const (
 	// This defaults to the name of the Kubernetes service associated with the pod.
 	annotationService = "consul.hashicorp.com/connect-service"
 
+	// annotationKubernetesService is the name of the Kubernetes service to register.
+	// This allows a pod to specify what Kubernetes service should trigger a Consul
+	// service registration in the case of multiple services referencing a deployment.
+	annotationKubernetesService = "consul.hashicorp.com/kubernetes-service"
+
 	// annotationPort is the name or value of the port to proxy incoming
 	// connections to.
 	annotationPort = "consul.hashicorp.com/connect-service-port"
