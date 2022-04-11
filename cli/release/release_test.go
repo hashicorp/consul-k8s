@@ -48,6 +48,24 @@ func TestShouldExpectFederationSecret(t *testing.T) {
 			},
 			expected: true,
 		},
+		"Non-primary DC, federation enabled, Vault secrets backend": {
+			configuration: helm.Values{
+				Global: helm.Global{
+					Datacenter: "dc2",
+					Federation: helm.Federation{
+						Enabled:                true,
+						PrimaryDatacenter:      "dc1",
+						CreateFederationSecret: false,
+					},
+					SecretsBackend: helm.SecretsBackend{
+						Vault: helm.Vault{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
 	}
 
 	for name, tc := range cases {
