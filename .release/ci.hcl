@@ -10,8 +10,6 @@ project "consul-k8s" {
     repository = "consul-k8s"
     release_branches = [
       # The CRT tool does not support * yes as a branch name
-      "main",
-      "release/0.41.x",
       "release/0.42.x",
       "cb/crt-production-workflows"
     ]
@@ -94,11 +92,19 @@ event "notarize-darwin-amd64" {
     organization = "hashicorp"
     repository = "crt-workflows-common"
     workflow = "notarize-darwin-amd64"
+  }
 
-    parameter {
-      key = "SOME_KEY"
-      value = "SOME_VALUE"
-    }
+  notification {
+    on = "fail"
+  }
+}
+
+event "notarize-darwin-arm64" {
+  depends = ["notarize-darwin-amd64"]
+  action "notarize-darwin-arm64" {
+    organization = "hashicorp"
+    repository = "crt-workflows-common"
+    workflow = "notarize-darwin-arm64"
   }
 
   notification {
@@ -107,16 +113,11 @@ event "notarize-darwin-amd64" {
 }
 
 event "notarize-windows-386" {
-  depends = ["notarize-darwin-amd64"]
+  depends = ["notarize-darwin-arm64"]
   action "notarize-windows-386" {
     organization = "hashicorp"
     repository = "crt-workflows-common"
     workflow = "notarize-windows-386"
-
-    parameter {
-      key = "SOME_KEY"
-      value = "SOME_VALUE"
-    }
   }
 
   notification {
@@ -130,11 +131,6 @@ event "notarize-windows-amd64" {
     organization = "hashicorp"
     repository = "crt-workflows-common"
     workflow = "notarize-windows-amd64"
-
-    parameter {
-      key = "SOME_KEY"
-      value = "SOME_VALUE"
-    }
   }
 
   notification {
