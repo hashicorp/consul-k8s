@@ -57,8 +57,6 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
 	consulHelmValues := map[string]string{
-		"server.extraConfig": `"{\"auto_reload_config\": true}"`,
-
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
