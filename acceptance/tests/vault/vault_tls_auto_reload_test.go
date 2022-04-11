@@ -2,8 +2,8 @@ package vault
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
@@ -17,7 +17,8 @@ import (
 )
 
 // TestVault_TlsAutoReload installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
-// It then configures Consul to use vault as the backend and checks that it works.
+// It then gets certs for https, rpc, and grpc, waits for the certs to rotate, and then checks that certs
+// have different expirations.
 func TestVault_TlsAutoReload(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
@@ -57,6 +58,7 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
 	consulHelmValues := map[string]string{
+		"client.grpc":                 "true",
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
@@ -102,34 +104,22 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
 	consulCluster.ACLToken = bootstrapToken
-	_, address := consulCluster.SetupConsulClient(t, true)
+	_, httpsAddress := consulCluster.SetupConsulClient(t, true)
+	rpcAddress := consulCluster.CreatePortForwardTunnel(t, 8300)
+	grpcAddress := consulCluster.CreatePortForwardTunnel(t, 8502)
 
-	logger.Log(t, "Checking TLS....")
-	conf := &tls.Config{
-		InsecureSkipVerify: true,
-	}
-	conn, err := tls.Dial("tcp", address, conf)
-	if err != nil {
-		log.Println("Error in Dial", err)
-		return
-	}
-	defer conn.Close()
-
-	connState := conn.ConnectionState()
-	logger.Logf(t, "Connection State: %+v", connState)
-	cert := connState.PeerCertificates[0]
 	// here we can verify that the cert expiry changed
-	logger.Logf(t, "Expiry: %s \n", cert.NotAfter.String())
+	err, httpsCert := getCertificate(t, httpsAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "HTTPS expiry: %s \n", httpsCert.NotAfter.String())
 
-	logger.Log(t, "Wait 30 seconds for certificates to rotate....")
-	time.Sleep(30 * time.Second)
+	err, rpcCert := getCertificate(t, rpcAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "RPC expiry: %s \n", rpcCert.NotAfter.String())
 
-	conn2, err := tls.Dial("tcp", address, conf)
-	if err != nil {
-		log.Println("Error in Dial", err)
-		return
-	}
-	defer conn2.Close()
+	err, grpcCert := getCertificate(t, grpcAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "GRPC expiry: %s \n", grpcCert.NotAfter.String())
 
 	// Validate that consul sever is running correctly and the consul members command works
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
@@ -158,12 +148,44 @@ func TestVault_TlsAutoReload(t *testing.T) {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 
-	connState2 := conn2.ConnectionState()
-	cert2 := connState2.PeerCertificates[0]
-	// here we can verify that the cert expiry changed
-	logger.Logf(t, "Expiry: %s \n", cert2.NotAfter.String())
+	logger.Log(t, "Wait 30 seconds for certificates to rotate....")
+	time.Sleep(30 * time.Second)
+
+	err, httpsCert2 := getCertificate(t, httpsAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "HTTPS 2 expiry: %s \n", httpsCert2.NotAfter.String())
+
+	err, rpcCert2 := getCertificate(t, rpcAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "RPC 2 expiry: %s \n", rpcCert2.NotAfter.String())
+
+	err, grpcCert2 := getCertificate(t, grpcAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "GRPC 2 expiry: %s \n", grpcCert2.NotAfter.String())
 
 	// verify that a previous cert expired and that a new one has been issued
 	// by comparing the NotAfter on the two certs.
-	require.NotEqual(t, cert.NotAfter, cert2.NotAfter)
+	require.NotEqual(t, httpsCert.NotAfter, httpsCert2.NotAfter)
+	require.NotEqual(t, rpcCert.NotAfter, rpcCert2.NotAfter)
+	require.NotEqual(t, grpcCert.NotAfter, grpcCert2.NotAfter)
+}
+
+func getCertificate(t *testing.T, address string) (error, *x509.Certificate) {
+	logger.Log(t, "Checking TLS....")
+	conf := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+
+	logger.Logf(t, "Dialing %s", address)
+	conn, err := tls.Dial("tcp", address, conf)
+	if err != nil {
+		logger.Log(t, "Error in Dial", err)
+		return err, nil
+	}
+	defer conn.Close()
+
+	connState := conn.ConnectionState()
+	logger.Logf(t, "Connection State: %+v", connState)
+	cert := connState.PeerCertificates[0]
+	return nil, cert
 }
