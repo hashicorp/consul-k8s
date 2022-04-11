@@ -49,6 +49,89 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# retry-join
+
+@test "server/ConfigMap: retry join gets populated" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .retry_join[0] | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:8301" ]
+}
+
+#--------------------------------------------------------------------
+# serflan
+
+@test "server/ConfigMap: server.ports.serflan.port is set to 8301 by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .ports.serf_lan | tee /dev/stderr)
+
+  [ "${actual}" = "8301" ]
+}
+
+@test "server/ConfigMap: server.ports.serflan.port can be customized" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.ports.serflan.port=9301' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .ports.serf_lan | tee /dev/stderr)
+
+  [ "${actual}" = "9301" ]
+}
+
+@test "server/ConfigMap: retry join uses server.ports.serflan.port" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      --set 'server.ports.serflan.port=9301' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .retry_join[0] | tee /dev/stderr)
+
+  [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:9301" ]
+}
+
+@test "server/ConfigMap: recursors can be set by global.recursors" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.recursors[0]=1.1.1.1' \
+      --set 'global.recursors[1]=2.2.2.2' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -c .recursors | tee /dev/stderr)
+  [ "${actual}" = '["1.1.1.1","2.2.2.2"]' ]
+}
+
+#--------------------------------------------------------------------
+# bootstrap_expect
+
+@test "server/ConfigMap: bootstrap_expect defaults to replicas" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq .bootstrap_expect | tee /dev/stderr)
+  [ "${actual}" = "3" ]
+}
+
+@test "server/ConfigMap: bootstrap_expect can be set by server.bootstrapExpect" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.bootstrapExpect=5' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq .bootstrap_expect | tee /dev/stderr)
+  [ "${actual}" = "5" ]
+}
+
+#--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
 @test "server/ConfigMap: creates acl config with .global.acls.manageSystemACLs enabled" {
@@ -62,61 +145,84 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.metrics.enabled & ui.enabled
+# ui.enabled
 
-@test "server/ConfigMap: creates ui config with .ui.enabled=true and .global.metrics.enabled=true" {
+@test "server/ConfigMap: creates ui config with .ui.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"enabled":true}' ]
+}
+
+@test "server/ConfigMap: does not create ui config with .ui.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.data["ui-config.json"] | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: adds metrics ui config with .global.metrics.enabled=true and ui.metrics.enabled=-" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true' \
       --set 'ui.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"metrics_provider":"prometheus","metrics_proxy":{"base_url":"http://prometheus-server"},"enabled":true}' ]
 }
 
-@test "server/ConfigMap: creates ui config with .ui.enabled=true and .ui.metrics.enabled=true" {
+@test "server/ConfigMap: adds metrics ui config with .global.metrics.enabled=false and .ui.metrics.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'ui.metrics.enabled=true' \
       --set 'ui.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"metrics_provider":"prometheus","metrics_proxy":{"base_url":"http://prometheus-server"},"enabled":true}' ]
 }
 
-@test "server/ConfigMap: does not create ui config when .ui.enabled=false and .ui.metrics.enabled=true" {
+@test "server/ConfigMap: adds metrics ui config with .global.metrics.enabled=true and .ui.metrics.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
-      --set 'ui.enabled=false' \
-      --set 'ui.metrics.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .global.metrics.enabled=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true' \
+      --set 'ui.metrics.enabled=true' \
       --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"metrics_provider":"prometheus","metrics_proxy":{"base_url":"http://prometheus-server"},"enabled":true}' ]
+}
+
+@test "server/ConfigMap: doesn't add metrics ui config with .global.metrics.enabled=true and .ui.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true' \
+      --set 'ui.metrics.enabled=false' \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"enabled":true}' ]
+}
+
+@test "server/ConfigMap: doesn't add metrics ui config with .global.metrics.enabled=false and .ui.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .ui.metrics.enabled=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'ui.enabled=true' \
       --set 'ui.metrics.enabled=false' \
+      --set 'ui.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config | tee /dev/stderr)
+  [ "${actual}" = '{"enabled":true}' ]
 }
 
 @test "server/ConfigMap: updates ui config with .ui.metrics.provider" {
@@ -141,6 +247,34 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["ui-config.json"]' | yq -r '.ui_config.metrics_proxy.base_url' | tee /dev/stderr)
   [ "${actual}" = "http://foo.bar" ]
+}
+
+#--------------------------------------------------------------------
+# ui.dashboardURLTemplates.service
+
+@test "server/ConfigMap: dashboard_url_templates not set by default" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq .dashboard_url_templates | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: ui.dashboardURLTemplates.service sets the template" {
+  cd `chart_dir`
+
+  local expected='-hcl='\''ui_config { dashboard_url_templates { service = \"http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}\" } }'
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.dashboardURLTemplates.service=http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | jq -c .ui_config.dashboard_url_templates | tee /dev/stderr)
+
+  [ "${actual}" = '{"service":"http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}"}' ]
 }
 
 #--------------------------------------------------------------------
@@ -494,7 +628,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/ConfigMap: doesn't add federation config by default" {
+@test "server/ConfigMap: doesn't add federation config when global.federation.enabled is false (default)" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
@@ -503,23 +637,23 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: adds empty federation config when global.federation.enabled is true" {
+@test "server/ConfigMap: adds default federation config when global.federation.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
+      -s templates/server-config-configmap.yaml \
       --set 'global.federation.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["federation-config.json"]' | tee /dev/stderr)
-  [ "${actual}" = '"{\n  \"primary_datacenter\": \"\",\n  \"primary_gateways\": []\n}"' ]
+      yq -r '.data["federation-config.json"]' | jq -c . | tee /dev/stderr)
+  [ "${actual}" = '{"primary_datacenter":"","primary_gateways":[],"connect":{"enable_mesh_gateway_wan_federation":true}}' ]
 }
 
 @test "server/ConfigMap: can set primary dc and gateways when global.federation.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
+      -s templates/server-config-configmap.yaml \
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc1' \
       --set 'global.federation.primaryGateways[0]=1.1.1.1:443' \
@@ -528,6 +662,139 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["federation-config.json"]' | tee /dev/stderr)
-  [ "${actual}" = '"{\n  \"primary_datacenter\": \"dc1\",\n  \"primary_gateways\": [\"1.1.1.1:443\",\"2.2.2.2:443\"]\n}"' ]
+      yq -r '.data["federation-config.json"]' | jq -c . | tee /dev/stderr)
+  [ "${actual}" = '{"primary_datacenter":"dc1","primary_gateways":["1.1.1.1:443","2.2.2.2:443"],"connect":{"enable_mesh_gateway_wan_federation":true}}' ]
+}
+
+#--------------------------------------------------------------------
+# TLS
+
+@test "server/ConfigMap: sets correct default configuration when global.tls.enabled" {
+  cd `chart_dir`
+  local config=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $config | jq -r .ca_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+
+  actual=$(echo $config | jq -r .cert_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/server/tls.crt" ]
+
+  actual=$(echo $config | jq -r .key_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/server/tls.key" ]
+
+  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -c .ports | tee /dev/stderr)
+  [ "${actual}" = '{"http":-1,"https":8501}' ]
+}
+
+@test "server/ConfigMap: doesn't set verify_* configuration to true when global.tls.enabled and global.tls.verify is false" {
+  cd `chart_dir`
+  local config=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.verify=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: HTTP port is not set in when httpsOnly is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | jq -c .ports | tee /dev/stderr)
+  [ "${actual}" = '{"https":8501}' ]
+}
+
+#--------------------------------------------------------------------
+# global.tls.enableAutoEncrypt
+
+@test "server/ConfigMap: enables auto-encrypt for the servers when global.tls.enableAutoEncrypt is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | jq -c .auto_encrypt | tee /dev/stderr)
+  [ "${actual}" = '{"allow_tls":true}' ]
+}
+
+#--------------------------------------------------------------------
+# TLS + Vault
+
+@test "server/ConfigMap: sets TLS file paths point to vault secrets when Vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-config-configmap.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+    yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r .ca_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
+
+  local actual=$(echo $object | jq -r .cert_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/servercert.crt" ]
+
+  local actual=$(echo $object | jq -r .key_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/servercert.key" ]
+}
+
+@test "server/ConfigMap: when global.metrics.enableAgentMetrics=true, sets telemetry config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prometheus_retention_time | tee /dev/stderr)
+
+  [ "${actual}" = "1m" ]
+}
+
+@test "server/ConfigMap: when global.metrics.enableAgentMetrics=true and global.metrics.agentMetricsRetentionTime is set, sets telemetry config with updated retention time" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.agentMetricsRetentionTime=5m'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prometheus_retention_time | tee /dev/stderr)
+
+  [ "${actual}" = "5m" ]
 }

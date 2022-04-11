@@ -205,10 +205,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
             - name: CONSUL_DISABLE_PERM_MGMT
               value: "true"
             {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
@@ -262,8 +258,6 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              CONSUL_FULLNAME="{{template "consul.fullname" . }}"
-              
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
@@ -276,47 +270,9 @@ spec:
 
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
                 -advertise="${ADVERTISE_IP}" \
-                -bind=0.0.0.0 \
-                -bootstrap-expect={{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }} \
-                {{- if .Values.global.tls.enabled }}
-                {{- if .Values.global.secretsBackend.vault.enabled }}
-                -hcl='ca_file = "/vault/secrets/serverca.crt"' \
-                -hcl='cert_file = "/vault/secrets/servercert.crt"' \
-                -hcl='key_file = "/vault/secrets/servercert.key"' \
-                {{- else }}
-                -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
-                -hcl='cert_file = "/consul/tls/server/tls.crt"' \
-                -hcl='key_file = "/consul/tls/server/tls.key"' \
-                {{- end }}
-                {{- if .Values.global.tls.enableAutoEncrypt }}
-                -hcl='auto_encrypt = {allow_tls = true}' \
-                {{- end }}
-                {{- if .Values.global.tls.verify }}
-                -hcl='verify_incoming_rpc = true' \
-                -hcl='verify_outgoing = true' \
-                -hcl='verify_server_hostname = true' \
-                {{- end }}
-                -hcl='ports { https = 8501 }' \
-                {{- if .Values.global.tls.httpsOnly }}
-                -hcl='ports { http = -1 }' \
-                {{- end }}
-                {{- end }}
-                -client=0.0.0.0 \
                 -config-dir=/consul/config \
-                -datacenter={{ .Values.global.datacenter }} \
-                -data-dir=/consul/data \
-                -domain={{ .Values.global.domain }} \
                 {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
-                {{- end }}
-                {{- if .Values.server.connect }}
-                -hcl="connect { enabled = true }" \
-                {{- end }}
-                {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
-                -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
-                {{- end }}
-                {{- if .Values.global.federation.enabled }}
-                -hcl="connect { enable_mesh_gateway_wan_federation = true }" \
                 {{- end }}
                 {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
                 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.acls.createReplicationToken)) }}
@@ -324,20 +280,6 @@ spec:
                 {{- else }}
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
-                {{- end }}
-                {{- if .Values.ui.enabled }}
-                -ui \
-                {{- if .Values.ui.dashboardURLTemplates.service }}
-                -hcl='ui_config { dashboard_url_templates { service = "{{ .Values.ui.dashboardURLTemplates.service }}" } }' \
-                {{- end }}
-                {{- end }}
-                {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
-                {{- range $index := until (.Values.server.replicas | int) }}
-                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
-                {{- end }}
-                -serf-lan-port={{ .Values.server.ports.serflan.port }} \
-                {{- range $value := .Values.global.recursors }}
-                -recursor={{ quote $value }} \
                 {{- end }}
                 {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
                 $recursor_flags \
@@ -355,8 +297,7 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json \
-                -server
+                -config-file=/consul/extra-config/extra-from-values.json
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
               mountPath: /consul/data
