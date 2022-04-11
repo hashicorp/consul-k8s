@@ -75,13 +75,13 @@ type GossipEncryption struct {
 }
 
 type CaCert struct {
-	SecretName interface{} `yaml:"secretName"`
-	SecretKey  interface{} `yaml:"secretKey"`
+	SecretName string `yaml:"secretName"`
+	SecretKey  string `yaml:"secretKey"`
 }
 
 type CaKey struct {
-	SecretName interface{} `yaml:"secretName"`
-	SecretKey  interface{} `yaml:"secretKey"`
+	SecretName string `yaml:"secretName"`
+	SecretKey  string `yaml:"secretKey"`
 }
 
 type TLS struct {

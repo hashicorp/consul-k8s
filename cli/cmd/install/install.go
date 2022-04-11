@@ -418,7 +418,7 @@ func (c *Command) checkForPreviousSecrets(release release.Release) (string, erro
 
 	// If the Consul configuration is a secondary DC, only one secret should
 	// exist, the Consul federation secret.
-	fedSecret := release.Configuration.Global.Acls.ReplicationToken.SecretName
+	fedSecret := release.FedSecret()
 	if release.ShouldExpectFederationSecret() {
 		if len(secrets.Items) == 1 && secrets.Items[0].Name == fedSecret {
 			return fmt.Sprintf("Found secret %s for Consul federation.", fedSecret), nil
