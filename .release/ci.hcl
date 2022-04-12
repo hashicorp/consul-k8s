@@ -11,7 +11,7 @@ project "consul-k8s" {
     release_branches = [
       # The CRT tool does not support * as a branch name
       "main",
-      "cb/crt-testing"
+      "crt-testing"
     ]
   }
 }
