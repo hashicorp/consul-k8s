@@ -8,11 +8,7 @@ project "consul-k8s" {
   github {
     organization = "hashicorp"
     repository = "consul-k8s"
-    release_branches = [
-      # The CRT tool does not support * as a branch name
-      "main",
-      "cb/crt-testing"
-    ]
+    release_branches = ["main"]
   }
 }
 
