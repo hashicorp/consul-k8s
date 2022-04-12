@@ -44,20 +44,6 @@ event "upload-dev" {
   }
 }
 
-event "promote-dev-docker" {
-  depends = ["verify"]
-  action "promote-dev-docker" {
-    organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-dev-docker"
-    depends = ["verify"]
-  }
-
-  notification {
-    on = "fail"
-  }
-}
-
 event "security-scan-binaries" {
   depends = ["upload-dev"]
   action "security-scan-binaries" {
@@ -176,6 +162,21 @@ event "verify" {
     on = "always"
   }
 }
+
+event "promote-dev-docker" {
+  depends = ["verify"]
+  action "promote-dev-docker" {
+    organization = "hashicorp"
+    repository = "crt-workflows-common"
+    workflow = "promote-dev-docker"
+    depends = ["verify"]
+  }
+
+  notification {
+    on = "fail"
+  }
+}
+
 
 ## These are promotion and post-publish events
 ## they should be added to the end of the file after the verify event stanza.
