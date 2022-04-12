@@ -10,8 +10,8 @@ project "consul-k8s" {
     repository = "consul-k8s"
     release_branches = [
       # The CRT tool does not support * yes as a branch name
-      "release/0.42.x",
-      "cb/crt-production-workflows"
+      "main",
+      "cb/crt-testing"
     ]
   }
 }
