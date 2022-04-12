@@ -9,7 +9,7 @@ project "consul-k8s" {
     organization = "hashicorp"
     repository = "consul-k8s"
     release_branches = [
-      # The CRT tool does not support * yes as a branch name
+      # The CRT tool does not support * as a branch name
       "main",
       "cb/crt-testing"
     ]
