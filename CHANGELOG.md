@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+FEATURES:
+* Control Plane
+  * Add `"consul.hashicorp.com/kubernetes-service"` annotation for explicitly specifying which service you want registered, when multiple Kubernetes services are selected for a pod. [[GH-1150](https://github.com/hashicorp/consul-k8s/pull/1150)
+
 BUG FIXES:
 * CLI
   * Fix issue where clusters not in the same namespace as their deployment name could not be upgraded. [[GH-1115](https://github.com/hashicorp/consul-k8s/pull/1115)]
