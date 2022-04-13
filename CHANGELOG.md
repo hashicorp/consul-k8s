@@ -2,7 +2,7 @@
 
 BREAKING CHANGES:
 * Helm
-  * API Gateway: Re-use connectInject.consulNamespaces instead of requiring apiGateway.consulNamespaces have the same value. [[GH-1169](https://github.com/hashicorp/consul-k8s/pull/1169)]
+  * API Gateway: Re-use connectInject.consulNamespaces instead of requiring that apiGateway.consulNamespaces have the same value when ACLs are enabled. [[GH-1169](https://github.com/hashicorp/consul-k8s/pull/1169)]
 
 FEATURES:
 * Control Plane
