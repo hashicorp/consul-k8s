@@ -1608,6 +1608,9 @@ syncCatalog:
     # already exist, it will be created. Turning this on overrides the
     # `consulDestinationNamespace` setting.
     # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
+    # If mirroring is enabled, avoid creating any Consul resources in the following 
+    # Kubernetes namespaces, as Consul currently reserves these namespaces for 
+    # system use: "system", "universal", "operator", "root". 
     mirroringK8S: false
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
@@ -1934,7 +1937,9 @@ connectInject:
     # of the same name as their k8s namespace, optionally prefixed if
     # `mirroringK8SPrefix` is set below. If the Consul namespace does not
     # already exist, it will be created. Turning this on overrides the
-    # `consulDestinationNamespace` setting.
+    # `consulDestinationNamespace` setting. If mirroring is enabled, avoid creating any Consul 
+    # resources in the following Kubernetes namespaces, as Consul currently reserves these 
+    # namespaces for system use: "system", "universal", "operator", "root". 
     mirroringK8S: false
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
@@ -2646,6 +2651,9 @@ apiGateway:
     # already exist, it will be created. Turning this on overrides the
     # `consulDestinationNamespace` setting.
     # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
+    # If mirroring is enabled, avoid creating any Consul resources in the following 
+    # Kubernetes namespaces, as Consul currently reserves these namespaces for system use: 
+    # "system", "universal", "operator", "root". 
     mirroringK8S: false
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
