@@ -1926,10 +1926,6 @@ EOF
   reservedNameTest "universal"
 }
 
-@test "connectInject/Deployment: fails when consulDestinationNamespace=consul" {
-  reservedNameTest "consul"
-}
-
 @test "connectInject/Deployment: fails when consulDestinationNamespace=operator" {
   reservedNameTest "operator"
 }
