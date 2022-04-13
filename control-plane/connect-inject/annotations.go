@@ -16,6 +16,12 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
+	// annotationInjectMountVolumes is the key of the annotation that controls whether
+	// the data volume that connect inject uses to store data including the Consul ACL token
+	// is mounted to other containers in the pod. It is a comma-separated list of container names
+	// to mount the volume on. It will be mounted at the path `/consul/connect-inject`.
+	annotationInjectMountVolumes = "consul.hashicorp.com/connect-inject-mount-volume"
+
 	// annotationService is the name of the service to proxy.
 	// This defaults to the name of the Kubernetes service associated with the pod.
 	annotationService = "consul.hashicorp.com/connect-service"
