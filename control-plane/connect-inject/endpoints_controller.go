@@ -188,11 +188,6 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						errs = multierror.Append(errs, err)
 					}
-				} else {
-					// If this endpoints object points to a pod that has injection disabled,
-					// then we want to ignore it for any further processing and exit early.
-					r.Log.Info("ignoring because endpoints pods have not been injected", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-					return ctrl.Result{}, nil
 				}
 			}
 		}
