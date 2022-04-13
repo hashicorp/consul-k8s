@@ -15,6 +15,7 @@ BUG FIXES:
 IMPROVEMENTS:
 * Helm
   * API Gateway: Allow controller to read ReferencePolicy in order to determine if route is allowed for backend in different namespace. [[GH-1148](https://github.com/hashicorp/consul-k8s/pull/1148)]
+  * API Gateway: Re-use connectInject.consulNamespaces instead of requiring apiGateway.consulNamespaces have the same value. [[GH-1169](https://github.com/hashicorp/consul-k8s/pull/1169)]
 
 ## 0.42.0 (April 04, 2022)
 
