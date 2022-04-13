@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm
+  * API Gateway: Re-use connectInject.consulNamespaces instead of requiring apiGateway.consulNamespaces have the same value. [[GH-1169](https://github.com/hashicorp/consul-k8s/pull/1169)]
+
 FEATURES:
 * Control Plane
     * Add a `"consul.hashicorp.com/kubernetes-service"` annotation for pods to specify which Kubernetes service they want to use for registration when multiple services target the same pod. [[GH-1150](https://github.com/hashicorp/consul-k8s/pull/1150)]
@@ -15,7 +19,6 @@ BUG FIXES:
 IMPROVEMENTS:
 * Helm
   * API Gateway: Allow controller to read ReferencePolicy in order to determine if route is allowed for backend in different namespace. [[GH-1148](https://github.com/hashicorp/consul-k8s/pull/1148)]
-  * API Gateway: Re-use connectInject.consulNamespaces instead of requiring apiGateway.consulNamespaces have the same value. [[GH-1169](https://github.com/hashicorp/consul-k8s/pull/1169)]
 
 ## 0.42.0 (April 04, 2022)
 
