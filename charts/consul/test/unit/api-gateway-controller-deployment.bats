@@ -55,7 +55,7 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
-      --set 'apiGateway.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | join(" ") | contains("-mirroring-k8s=true")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -68,8 +68,8 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
-      --set 'apiGateway.consulNamespaces.mirroringK8S=true' \
-      --set 'apiGateway.consulNamespaces.mirroringK8SPrefix=foo' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8SPrefix=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | join(" ") | contains("-mirroring-k8s-prefix=foo")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
