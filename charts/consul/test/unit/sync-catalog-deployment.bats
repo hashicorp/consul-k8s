@@ -1358,10 +1358,6 @@ load _helpers
   reservedNameTest "universal"
 }
 
-@test "syncCatalog/Deployment: fails when consulDestinationNamespace=consul" {
-  reservedNameTest "consul"
-}
-
 @test "syncCatalog/Deployment: fails when consulDestinationNamespace=operator" {
   reservedNameTest "operator"
 }
