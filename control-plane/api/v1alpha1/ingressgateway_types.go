@@ -62,9 +62,20 @@ type IngressGatewaySpec struct {
 type GatewayTLSConfig struct {
 	// Indicates that TLS should be enabled for this gateway service.
 	Enabled bool `json:"enabled"`
-
 	// SDS allows configuring TLS certificate from an SDS service.
 	SDS *GatewayTLSSDSConfig `json:"sds,omitempty"`
+	// TLSMinVersion sets the default minimum TLS version supported.
+	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+	// If unspecified, Envoy v1.22.0 and newer will default to TLS 1.2 as a min version,
+	// while older releases of Envoy default to TLS 1.0.
+	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
+	// TLSMaxVersion sets the default maximum TLS version supported. Must be greater than or equal to `TLSMinVersion`.
+	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+	// If unspecified, Envoy will default to TLS 1.3 as a max version for incoming connections.
+	TLSMaxVersion string `json:"tlsMaxVersion,omitempty"`
+	// Define a subset of cipher suites to restrict
+	// Only applicable to connections negotiated via TLS 1.2 or earlier.
+	CipherSuites []string `json:"cipherSuites,omitempty"`
 }
 
 type GatewayServiceTLSConfig struct {
@@ -73,7 +84,10 @@ type GatewayServiceTLSConfig struct {
 }
 
 type GatewayTLSSDSConfig struct {
-	ClusterName  string `json:"clusterName,omitempty"`
+	// ClusterName is the SDS cluster name to connect to, to retrieve certificates.
+	// This cluster must be specified in the Gateway's bootstrap configuration.
+	ClusterName string `json:"clusterName,omitempty"`
+	// CertResource is the SDS resource name to request when fetching the certificate from the SDS service.
 	CertResource string `json:"certResource,omitempty"`
 }
 
@@ -81,19 +95,15 @@ type GatewayTLSSDSConfig struct {
 type IngressListener struct {
 	// Port declares the port on which the ingress gateway should listen for traffic.
 	Port int `json:"port,omitempty"`
-
 	// Protocol declares what type of traffic this listener is expected to
 	// receive. Depending on the protocol, a listener might support multiplexing
 	// services over a single port, or additional discovery chain features. The
 	// current supported values are: (tcp | http | http2 | grpc).
 	Protocol string `json:"protocol,omitempty"`
-
 	// TLS config for this listener.
 	TLS *GatewayTLSConfig `json:"tls,omitempty"`
-
 	// Services declares the set of services to which the listener forwards
 	// traffic.
-	//
 	// For "tcp" protocol listeners, only a single service is allowed.
 	// For "http" listeners, multiple services can be declared.
 	Services []IngressService `json:"services,omitempty"`
@@ -111,7 +121,6 @@ type IngressService struct {
 	// A name can be specified on multiple listeners, and will be exposed on both
 	// of the listeners.
 	Name string `json:"name,omitempty"`
-
 	// Hosts is a list of hostnames which should be associated to this service on
 	// the defined listener. Only allowed on layer 7 protocols, this will be used
 	// to route traffic to the service by matching the Host header of the HTTP
@@ -124,18 +133,14 @@ type IngressService struct {
 	// This cannot be specified when using the wildcard specifier, "*", or when
 	// using a "tcp" listener.
 	Hosts []string `json:"hosts,omitempty"`
-
 	// Namespace is the namespace where the service is located.
 	// Namespacing is a Consul Enterprise feature.
 	Namespace string `json:"namespace,omitempty"`
-
 	// Partition is the admin-partition where the service is located.
 	// Partitioning is a Consul Enterprise feature.
 	Partition string `json:"partition,omitempty"`
-
 	// TLS allows specifying some TLS configuration per listener.
 	TLS *GatewayServiceTLSConfig `json:"tls,omitempty"`
-
 	// Allow HTTP header manipulation to be configured.
 	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
 	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
@@ -246,6 +251,8 @@ func (in *IngressGateway) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
+	errs = append(errs, in.Spec.TLS.validate(path.Child("tls"))...)
+
 	for i, v := range in.Spec.Listeners {
 		errs = append(errs, v.validate(path.Child("listeners").Index(i), consulMeta)...)
 	}
@@ -282,9 +289,28 @@ func (in *GatewayTLSConfig) toConsul() *capi.GatewayTLSConfig {
 		return nil
 	}
 	return &capi.GatewayTLSConfig{
-		Enabled: in.Enabled,
-		SDS:     in.SDS.toConsul(),
+		Enabled:       in.Enabled,
+		SDS:           in.SDS.toConsul(),
+		TLSMaxVersion: in.TLSMaxVersion,
+		TLSMinVersion: in.TLSMinVersion,
+		CipherSuites:  in.CipherSuites,
 	}
+}
+
+func (in *GatewayTLSConfig) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	var errs field.ErrorList
+	versions := []string{"TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""}
+
+	if !sliceContains(versions, in.TLSMaxVersion) {
+		errs = append(errs, field.Invalid(path.Child("tlsMaxVersion"), in.TLSMaxVersion, notInSliceMessage(versions)))
+	}
+	if !sliceContains(versions, in.TLSMinVersion) {
+		errs = append(errs, field.Invalid(path.Child("tlsMinVersion"), in.TLSMinVersion, notInSliceMessage(versions)))
+	}
+	return errs
 }
 
 func (in IngressListener) toConsul() capi.IngressListener {
@@ -347,6 +373,8 @@ func (in IngressListener) validate(path *field.Path, consulMeta common.ConsulMet
 			string(asJSON),
 			fmt.Sprintf("if protocol is \"tcp\", only a single service is allowed, found %d", len(in.Services))))
 	}
+
+	errs = append(errs, in.TLS.validate(path.Child("tls"))...)
 
 	for i, svc := range in.Services {
 		if svc.Name == wildcardServiceName && in.Protocol != "http" {

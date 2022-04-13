@@ -82,7 +82,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
@@ -109,4 +109,4 @@ DEV_IMAGE?=consul-k8s-control-plane-dev
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
-CRD_OPTIONS ?= "crd:trivialVersions=true,allowDangerousTypes=true"
+CRD_OPTIONS ?= "crd:allowDangerousTypes=true"

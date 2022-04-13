@@ -50,6 +50,9 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 							ClusterName:  "cluster1",
 							CertResource: "cert1",
 						},
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 					},
 					Listeners: []IngressListener{
 						{
@@ -61,6 +64,9 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 									ClusterName:  "cluster1",
 									CertResource: "cert1",
 								},
+								TLSMinVersion: "TLSv1_0",
+								TLSMaxVersion: "TLSv1_1",
+								CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 							},
 							Services: []IngressService{
 								{
@@ -134,6 +140,9 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 						ClusterName:  "cluster1",
 						CertResource: "cert1",
 					},
+					TLSMinVersion: "TLSv1_0",
+					TLSMaxVersion: "TLSv1_1",
+					CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 				},
 				Listeners: []capi.IngressListener{
 					{
@@ -145,6 +154,9 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 								ClusterName:  "cluster1",
 								CertResource: "cert1",
 							},
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 						},
 						Services: []capi.IngressService{
 							{
@@ -273,6 +285,9 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 							ClusterName:  "cluster1",
 							CertResource: "cert1",
 						},
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 					},
 					Listeners: []IngressListener{
 						{
@@ -284,6 +299,9 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 									ClusterName:  "cluster1",
 									CertResource: "cert1",
 								},
+								TLSMinVersion: "TLSv1_0",
+								TLSMaxVersion: "TLSv1_1",
+								CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 							},
 							Services: []IngressService{
 								{
@@ -356,6 +374,9 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 						ClusterName:  "cluster1",
 						CertResource: "cert1",
 					},
+					TLSMinVersion: "TLSv1_0",
+					TLSMaxVersion: "TLSv1_1",
+					CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 				},
 				Listeners: []capi.IngressListener{
 					{
@@ -367,6 +388,9 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 								ClusterName:  "cluster1",
 								CertResource: "cert1",
 							},
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 						},
 						Services: []capi.IngressService{
 							{
@@ -453,6 +477,38 @@ func TestIngressGateway_Validate(t *testing.T) {
 		partitionEnabled  bool
 		expectedErrMsgs   []string
 	}{
+		"tls.minTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					TLS: GatewayTLSConfig{
+						TLSMinVersion: "foo",
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.tls.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"tls.maxTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					TLS: GatewayTLSConfig{
+						TLSMaxVersion: "foo",
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.tls.tlsMaxVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
 		"listener.protocol invalid": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -568,6 +624,46 @@ func TestIngressGateway_Validate(t *testing.T) {
 				`spec.listeners[0].services[0].hosts: Invalid value: "[\"host1\",\"host2\"]": hosts must be empty if protocol is "tcp"`,
 			},
 		},
+		"listeners.tls.minTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								TLSMinVersion: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].tls.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"listeners.tls.maxTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								TLSMaxVersion: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].tls.tlsMaxVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
 		"service.namespace set when namespaces disabled": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -612,6 +708,37 @@ func TestIngressGateway_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: true,
+		},
+		"tls valid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					TLS: GatewayTLSConfig{
+						TLSMinVersion: "TLS_AUTO",
+						TLSMaxVersion: "TLS_AUTO",
+					},
+				},
+			},
+		},
+		"listeners.tls valid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								TLSMinVersion: "TLS_AUTO",
+								TLSMaxVersion: "TLS_AUTO",
+							},
+						},
+					},
+				},
+			},
 		},
 		"service.partition set when partitions disabled": {
 			input: &IngressGateway{
