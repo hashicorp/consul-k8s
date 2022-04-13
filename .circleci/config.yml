@@ -692,6 +692,14 @@ jobs:
             primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
             secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
+            export KUBECONFIG=$primary_kubeconfig
+            curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/v1.15.0/deploy/install-driver.sh | bash -s v1.15.0 snapshot --
+            kubectl get csidriver disk.csi.azure.com -o yaml
+            export KUBECONFIG=$secondary_kubeconfig
+            curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/v1.15.0/deploy/install-driver.sh | bash -s v1.15.0 snapshot --
+            kubectl get csidriver disk.csi.azure.com -o yaml
+            unset KUBECONFIG
+
             echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
             echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
@@ -891,6 +899,7 @@ workflows:
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
+      - acceptance-aks-1-21
   nightly-acceptance-tests:
     triggers:
       - schedule:
