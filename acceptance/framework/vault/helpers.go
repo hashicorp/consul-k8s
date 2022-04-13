@@ -83,6 +83,7 @@ func GenerateGossipSecret() (string, error) {
 // ConfigureGossipVaultSecret generates a gossip encryption key,
 // stores it in Vault as a secret and configures a policy to access it.
 func ConfigureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
+	vaultClient.SetNamespace("admin")
 	// Create the Vault Policy for the gossip key.
 	logger.Log(t, "Creating gossip policy")
 	err := vaultClient.Sys().PutPolicy("gossip", gossipPolicy)
@@ -252,5 +253,33 @@ func CreateConnectCAPolicy(t *testing.T, vaultClient *vapi.Client, datacenter st
 	err := vaultClient.Sys().PutPolicy(
 		fmt.Sprintf("connect-ca-%s", datacenter),
 		fmt.Sprintf(connectCAPolicyTemplate, datacenter, datacenter))
+	require.NoError(t, err)
+}
+
+// CreateConnectCAPolicy creates the Vault Policy for the connect-ca in a given datacenter.
+func CreateConnectCAPolicyWithoutDataCenters(t *testing.T, vaultClient *vapi.Client) {
+	connectCAPolicyTemplate := `
+path "/sys/mounts" {
+  capabilities = [ "read" ]
+}
+
+path "/sys/mounts/connect_root" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+
+path "/sys/mounts/connect_inter" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+
+path "/connect_root/*" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+
+path "/connect_inter/*" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+`
+	err := vaultClient.Sys().PutPolicy(
+		fmt.Sprintf("connect-ca"), connectCAPolicyTemplate)
 	require.NoError(t, err)
 }
