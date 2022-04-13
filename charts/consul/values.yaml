@@ -236,6 +236,9 @@ global:
         # The mount path of the Kubernetes auth method in Vault.
         authMethodPath: "kubernetes"
 
+        # Namespace in Vault where referenced Vault secrets are stored.
+        namespace: ""
+      
         # The path to a PKI secrets engine for the root certificate.
         # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
         rootPKIPath: ""
