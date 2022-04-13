@@ -12,7 +12,7 @@ BUG FIXES:
 * Control Plane
   * Fix issue where upgrading a deployment from non-service mesh to service mesh would cause Pods to hang in init. [[GH-1136](https://github.com/hashicorp/consul-k8s/pull/1136)]
 * Helm
-  * Respect client nodeSelector, tolerations, and priorityClass when scheduling `create-federation-secret` Job [[GH-1164](https://github.com/hashicorp/consul-k8s/pull/1164)]
+  * Respect client nodeSelector, tolerations, and priorityClass when scheduling `create-federation-secret` Job. [[GH-1108](https://github.com/hashicorp/consul-k8s/issues/1108)]
 
 IMPROVEMENTS:
 * Helm
