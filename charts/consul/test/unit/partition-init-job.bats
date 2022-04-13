@@ -174,10 +174,6 @@ load _helpers
   reservedNameTest "universal"
 }
 
-@test "partitionInit/Job: fails when adminPartitions.name=consul" {
-  reservedNameTest "consul"
-}
-
 @test "partitionInit/Job: fails when adminPartitions.name=operator" {
   reservedNameTest "operator"
 }

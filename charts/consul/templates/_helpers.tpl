@@ -215,7 +215,7 @@ Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
 {{- define "consul.reservedNamesFailer" -}}
 {{- $name := index . 0 -}}
 {{- $key := index . 1 -}}
-{{- if or (eq "system" $name) (eq "universal" $name) (eq "consul" $name) (eq "operator" $name) (eq "root" $name) }}
+{{- if or (eq "system" $name) (eq "universal" $name) (eq "operator" $name) (eq "root" $name) }}
 {{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
 {{- end }}
 {{- end -}}
