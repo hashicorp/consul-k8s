@@ -2636,32 +2636,6 @@ apiGateway:
       # @type: string
       service: null
 
-  # [Enterprise Only] These settings manage the API Gateway's interaction with
-  # Consul namespaces (requires consul-ent v1.7+).
-  # Also, `global.enableConsulNamespaces` must be true.
-  consulNamespaces:
-    # Name of the Consul namespace to register all
-    # k8s services into. If the Consul namespace does not already exist,
-    # it will be created. This will be ignored if `mirroringK8S` is true.
-    consulDestinationNamespace: "default"
-
-    # If true, k8s services will be registered into a Consul namespace
-    # of the same name as their k8s namespace, optionally prefixed if
-    # `mirroringK8SPrefix` is set below. If the Consul namespace does not
-    # already exist, it will be created. Turning this on overrides the
-    # `consulDestinationNamespace` setting.
-    # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
-    # If mirroring is enabled, avoid creating any Consul resources in the following 
-    # Kubernetes namespaces, as Consul currently reserves these namespaces for system use: 
-    # "system", "universal", "operator", "root". 
-    mirroringK8S: false
-
-    # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
-    # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
-    # service in the k8s `staging` namespace will be registered into the
-    # `k8s-staging` Consul namespace.
-    mirroringK8SPrefix: ""
-
   # Configuration for the ServiceAccount created for the api-gateway component
   serviceAccount:
     # This value defines additional annotations for the client service account. This should be formatted as a multi-line
