@@ -692,6 +692,9 @@ jobs:
             primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
             secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
+            # Temporary fix to workaround issues with attaching volumes on AKS.
+            # See https://github.com/Azure/AKS/issues/2840
+            # TODO: remove once AKS release includes this version of the CSI driver.
             export KUBECONFIG=$primary_kubeconfig
             curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/v1.15.0/deploy/install-driver.sh | bash -s v1.15.0 snapshot --
             kubectl get csidriver disk.csi.azure.com -o yaml
@@ -899,7 +902,6 @@ workflows:
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
-      - acceptance-aks-1-21
   nightly-acceptance-tests:
     triggers:
       - schedule:
