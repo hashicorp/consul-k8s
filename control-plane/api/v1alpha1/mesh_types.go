@@ -6,7 +6,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const (
@@ -43,7 +46,10 @@ type MeshList struct {
 
 // MeshSpec defines the desired state of Mesh.
 type MeshSpec struct {
+	// TransparentProxy controls the configuration specific to proxies in "transparent" mode. Added in v1.10.0.
 	TransparentProxy TransparentProxyMeshConfig `json:"transparentProxy,omitempty"`
+	// TLS defines the TLS configuration for the service mesh.
+	TLS *MeshTLSConfig `json:"tls,omitempty"`
 }
 
 // TransparentProxyMeshConfig controls configuration specific to proxies in "transparent" mode. Added in v1.10.0.
@@ -52,6 +58,33 @@ type TransparentProxyMeshConfig struct {
 	// to IP addresses not registered in Consul's catalog. If enabled, traffic will only be proxied to upstreams
 	// with service registrations in the catalog.
 	MeshDestinationsOnly bool `json:"meshDestinationsOnly,omitempty"`
+}
+
+type MeshTLSConfig struct {
+	// Incoming defines the TLS configuration for inbound mTLS connections targeting
+	// the public listener on Connect and TerminatingGateway proxy kinds.
+	Incoming *MeshDirectionalTLSConfig `json:"incoming,omitempty"`
+	// Outgoing defines the TLS configuration for outbound mTLS connections dialing upstreams
+	// from Connect and IngressGateway proxy kinds.
+	Outgoing *MeshDirectionalTLSConfig `json:"outgoing,omitempty"`
+}
+
+type MeshDirectionalTLSConfig struct {
+	// TLSMinVersion sets the default minimum TLS version supported.
+	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+	// If unspecified, Envoy v1.22.0 and newer will default to TLS 1.2 as a min version,
+	// while older releases of Envoy default to TLS 1.0.
+	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
+	// TLSMaxVersion sets the default maximum TLS version supported. Must be greater than or equal to `TLSMinVersion`.
+	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+	// If unspecified, Envoy will default to TLS 1.3 as a max version for incoming connections.
+	TLSMaxVersion string `json:"tlsMaxVersion,omitempty"`
+	// CipherSuites sets the default list of TLS cipher suites to support when negotiating connections using TLS 1.2 or earlier.
+	// If unspecified, Envoy will use a default server cipher list. The list of supported cipher suites can be seen in
+	// https://github.com/hashicorp/consul/blob/v1.11.2/types/tls.go#L154-L169 and is dependent on underlying support in Envoy.
+	// Future releases of Envoy may remove currently-supported but insecure cipher suites,
+	// and future releases of Consul may add new supported cipher suites if any are added to Envoy.
+	CipherSuites []string `json:"cipherSuites,omitempty"`
 }
 
 func (in *TransparentProxyMeshConfig) toConsul() capi.TransparentProxyMeshConfig {
@@ -140,6 +173,7 @@ func (in *Mesh) SetLastSyncedTime(time *metav1.Time) {
 func (in *Mesh) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.MeshConfigEntry{
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		TLS:              in.Spec.TLS.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -154,7 +188,66 @@ func (in *Mesh) MatchesConsul(candidate capi.ConfigEntry) bool {
 }
 
 func (in *Mesh) Validate(_ common.ConsulMeta) error {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+
+	errs = append(errs, in.Spec.TLS.validate(path.Child("tls"))...)
+
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: MeshKubeKind},
+			in.KubernetesName(), errs)
+	}
 	return nil
+}
+
+func (in *MeshTLSConfig) toConsul() *capi.MeshTLSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.MeshTLSConfig{
+		Incoming: in.Incoming.toConsul(),
+		Outgoing: in.Outgoing.toConsul(),
+	}
+}
+
+func (in *MeshTLSConfig) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+	errs = append(errs, in.Incoming.validate(path.Child("incoming"))...)
+	errs = append(errs, in.Outgoing.validate(path.Child("outgoing"))...)
+	return errs
+}
+
+func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+	versions := []string{"TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""}
+
+	if !sliceContains(versions, in.TLSMaxVersion) {
+		errs = append(errs, field.Invalid(path.Child("tlsMaxVersion"), in.TLSMaxVersion, notInSliceMessage(versions)))
+	}
+	if !sliceContains(versions, in.TLSMinVersion) {
+		errs = append(errs, field.Invalid(path.Child("tlsMinVersion"), in.TLSMinVersion, notInSliceMessage(versions)))
+	}
+	return errs
+}
+
+func (in *MeshDirectionalTLSConfig) toConsul() *capi.MeshDirectionalTLSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.MeshDirectionalTLSConfig{
+		TLSMinVersion: in.TLSMinVersion,
+		TLSMaxVersion: in.TLSMaxVersion,
+		CipherSuites:  in.CipherSuites,
+	}
 }
 
 // DefaultNamespaceFields has no behaviour here as meshes have no namespace specific fields.

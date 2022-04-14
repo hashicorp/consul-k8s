@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: servicesplitters.consul.hashicorp.com
 spec:
@@ -49,7 +48,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceSplitterSpec defines the desired state of ServiceSplitter
+            description: ServiceSplitterSpec defines the desired state of ServiceSplitter.
             properties:
               splits:
                 description: Splits defines how much traffic to send to which set
