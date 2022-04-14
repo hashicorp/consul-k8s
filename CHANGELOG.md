@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm
+  * API Gateway: Re-use connectInject.consulNamespaces instead of requiring that apiGateway.consulNamespaces have the same value when ACLs are enabled. [[GH-1169](https://github.com/hashicorp/consul-k8s/pull/1169)]
+
 FEATURES:
 * Control Plane
     * Add a `"consul.hashicorp.com/kubernetes-service"` annotation for pods to specify which Kubernetes service they want to use for registration when multiple services target the same pod. [[GH-1150](https://github.com/hashicorp/consul-k8s/pull/1150)]

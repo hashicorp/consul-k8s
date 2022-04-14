@@ -77,13 +77,13 @@ spec:
             -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
             -k8s-namespace {{ .Release.Namespace }} \
             {{- if .Values.global.enableConsulNamespaces }}
-            {{- if .Values.apiGateway.consulNamespaces.consulDestinationNamespace }}
-            -consul-destination-namespace={{ .Values.apiGateway.consulNamespaces.consulDestinationNamespace }} \
+            {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+            -consul-destination-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }} \
             {{- end }}
-            {{- if .Values.apiGateway.consulNamespaces.mirroringK8S }}
+            {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
             -mirroring-k8s=true \
-            {{- if .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }}
-            -mirroring-k8s-prefix={{ .Values.apiGateway.consulNamespaces.mirroringK8SPrefix }} \
+            {{- if .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}
+            -mirroring-k8s-prefix={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }} \
             {{- end }}
             {{- end }}
             {{- end }}
