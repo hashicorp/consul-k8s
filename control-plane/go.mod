@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-cmp v0.5.6
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul/api v1.10.1-0.20220407215821-25ba9c147aa4
+	github.com/hashicorp/consul/api v1.10.1-0.20220413234639-3e88f579fce3
 	github.com/hashicorp/consul/sdk v0.9.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v0.16.1
