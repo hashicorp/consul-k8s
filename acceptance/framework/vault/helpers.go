@@ -255,31 +255,3 @@ func CreateConnectCAPolicy(t *testing.T, vaultClient *vapi.Client, datacenter st
 		fmt.Sprintf(connectCAPolicyTemplate, datacenter, datacenter))
 	require.NoError(t, err)
 }
-
-// CreateConnectCAPolicy creates the Vault Policy for the connect-ca in a given datacenter.
-func CreateConnectCAPolicyWithoutDataCenters(t *testing.T, vaultClient *vapi.Client) {
-	connectCAPolicyTemplate := `
-path "/sys/mounts" {
-  capabilities = [ "read" ]
-}
-
-path "/sys/mounts/connect_root" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-
-path "/sys/mounts/connect_inter" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-
-path "/connect_root/*" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-
-path "/connect_inter/*" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-`
-	err := vaultClient.Sys().PutPolicy(
-		fmt.Sprintf("connect-ca"), connectCAPolicyTemplate)
-	require.NoError(t, err)
-}
