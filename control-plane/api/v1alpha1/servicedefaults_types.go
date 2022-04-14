@@ -52,17 +52,6 @@ type ServiceDefaultsSpec struct {
 	// things like observability features and to unlock usage of the
 	// service-splitter and service-router config entries for a service.
 	Protocol string `json:"protocol,omitempty"`
-	// MeshGateway controls the default mesh gateway configuration for this service.
-	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
-	// Expose controls the default expose path configuration for Envoy.
-	Expose Expose `json:"expose,omitempty"`
-	// ExternalSNI is an optional setting that allows for the TLS SNI value
-	// to be changed to a non-connect value when federating with an external system.
-	ExternalSNI string `json:"externalSNI,omitempty"`
-	// TransparentProxy controls configuration specific to proxies in transparent mode.
-	// Note: This cannot be set using the CRD and should be set using annotations on the
-	// services that are part of the mesh.
-	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
 	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
 	// application traffic is being captured and redirected through the proxy. This mode does not
 	// enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
@@ -71,6 +60,17 @@ type ServiceDefaultsSpec struct {
 	// Note: This cannot be set using the CRD and should be set using annotations on the
 	// services that are part of the mesh.
 	Mode *ProxyMode `json:"mode,omitempty"`
+	// TransparentProxy controls configuration specific to proxies in transparent mode.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
+	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
+	// MeshGateway controls the default mesh gateway configuration for this service.
+	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
+	// Expose controls the default expose path configuration for Envoy.
+	Expose Expose `json:"expose,omitempty"`
+	// ExternalSNI is an optional setting that allows for the TLS SNI value
+	// to be changed to a non-connect value when federating with an external system.
+	ExternalSNI string `json:"externalSNI,omitempty"`
 	// UpstreamConfig controls default configuration settings that apply across all upstreams,
 	// and per-upstream configuration overrides. Note that per-upstream configuration applies
 	// across all federated datacenters to the pairing of source and upstream destination services.

@@ -59,10 +59,8 @@ type ExportedServicesSpec struct {
 type ExportedService struct {
 	// Name is the name of the service to be exported.
 	Name string `json:"name,omitempty"`
-
 	// Namespace is the namespace to export the service from.
 	Namespace string `json:"namespace,omitempty"`
-
 	// Consumers is a list of downstream consumers of the service to be exported.
 	Consumers []ServiceConsumer `json:"consumers,omitempty"`
 }

@@ -45,11 +45,35 @@ func TestMesh_MatchesConsul(t *testing.T) {
 					TransparentProxy: TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						},
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						},
+					},
 				},
 			},
 			Theirs: &capi.MeshConfigEntry{
 				TransparentProxy: capi.TransparentProxyMeshConfig{
 					MeshDestinationsOnly: true,
+				},
+				TLS: &capi.MeshTLSConfig{
+					Incoming: &capi.MeshDirectionalTLSConfig{
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+					},
+					Outgoing: &capi.MeshDirectionalTLSConfig{
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+					},
 				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -109,11 +133,35 @@ func TestMesh_ToConsul(t *testing.T) {
 					TransparentProxy: TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						},
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						},
+					},
 				},
 			},
 			Exp: &capi.MeshConfigEntry{
 				TransparentProxy: capi.TransparentProxyMeshConfig{
 					MeshDestinationsOnly: true,
+				},
+				TLS: &capi.MeshTLSConfig{
+					Incoming: &capi.MeshDirectionalTLSConfig{
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+					},
+					Outgoing: &capi.MeshDirectionalTLSConfig{
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+					},
 				},
 				Namespace: "",
 				Meta: map[string]string{
@@ -129,6 +177,151 @@ func TestMesh_ToConsul(t *testing.T) {
 			mesh, ok := act.(*capi.MeshConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, mesh)
+		})
+	}
+}
+
+func TestMesh_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input           *Mesh
+		expectedErrMsgs []string
+	}{
+		"tls.incoming.minTLSVersion invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "foo",
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"incoming.maxTLSVersion invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMaxVersion: "foo",
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.tlsMaxVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"outgoing.minTLSVersion invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "foo",
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.outgoing.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"outgoing.maxTLSVersion invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMaxVersion: "foo",
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.outgoing.tlsMaxVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"tls.incoming valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLS_AUTO",
+							TLSMaxVersion: "TLS_AUTO",
+						},
+					},
+				},
+			},
+		},
+		"tls.outgoing valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLS_AUTO",
+							TLSMaxVersion: "TLS_AUTO",
+						},
+					},
+				},
+			},
+		},
+		"multiple errors": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "foo",
+							TLSMaxVersion: "bar",
+						},
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "foo",
+							TLSMaxVersion: "bar",
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+				`spec.tls.incoming.tlsMaxVersion: Invalid value: "bar": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+				`spec.tls.outgoing.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+				`spec.tls.outgoing.tlsMaxVersion: Invalid value: "bar": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate(common.ConsulMeta{})
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

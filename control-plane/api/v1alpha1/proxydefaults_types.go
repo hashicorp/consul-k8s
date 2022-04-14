@@ -52,6 +52,18 @@ type ProxyDefaultsList struct {
 
 // ProxyDefaultsSpec defines the desired state of ProxyDefaults.
 type ProxyDefaultsSpec struct {
+	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
+	// application traffic is being captured and redirected through the proxy. This mode does not
+	// enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
+	// traffic is already being redirected. "direct" represents that the proxy's listeners must be
+	// dialed directly by the local application and other proxies.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
+	Mode *ProxyMode `json:"mode,omitempty"`
+	// TransparentProxy controls configuration specific to proxies in transparent mode.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
+	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.
 	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
@@ -63,18 +75,6 @@ type ProxyDefaultsSpec struct {
 	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
 	Expose Expose `json:"expose,omitempty"`
-	// TransparentProxy controls configuration specific to proxies in transparent mode.
-	// Note: This cannot be set using the CRD and should be set using annotations on the
-	// services that are part of the mesh.
-	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
-	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
-	// application traffic is being captured and redirected through the proxy. This mode does not
-	// enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
-	// traffic is already being redirected. "direct" represents that the proxy's listeners must be
-	// dialed directly by the local application and other proxies.
-	// Note: This cannot be set using the CRD and should be set using annotations on the
-	// services that are part of the mesh.
-	Mode *ProxyMode `json:"mode,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
