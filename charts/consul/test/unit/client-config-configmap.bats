@@ -72,7 +72,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# retry-join
+# auto_reload_config
 
 @test "client/ConfigMap: auto reload config is set to true" {
   cd `chart_dir`

@@ -23,7 +23,7 @@ import (
 // as the secrets backend, testing all possible credentials that can be used for WAN federation.
 // This test deploys a Vault cluster with a server in the primary k8s cluster and exposes it to the
 // secondary cluster via a Kubernetes service. We then only need to deploy Vault agent injector
-// // in the secondary that will treat the Vault server in the primary as an external server.
+// in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableMultiCluster {
