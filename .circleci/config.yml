@@ -293,6 +293,20 @@ jobs:
           working_directory: *control-plane-path
           command: make ci.dev-docker
 
+  # upload nightly dev docker image
+  nightly-dev-upload-docker:
+    executor: go
+    steps:
+      - checkout
+      # get consul-k8s binary
+      - attach_workspace:
+          at: .
+      - setup_remote_docker
+      - run:
+          name: make ci.nightly-dev-docker
+          working_directory: *control-plane-path
+          command: make ci.nightly-dev-docker
+
   unit-cli:
     executor: go
     steps:
@@ -902,6 +916,7 @@ workflows:
               only:
                 - main
     jobs:
+      - nightly-dev-upload-docker
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources

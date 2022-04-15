@@ -46,6 +46,25 @@ ifeq ($(CIRCLE_BRANCH), main)
 	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
 endif
 
+# TODO: Remove this ci.nightly-dev-docker target once we move the acceptance tests to Github Actions.
+# In CircleCI, the linux binary will be attached from a previous step at pkg/bin/linux_amd64/. This make target
+# should only run in CI and not locally. This is a guardrail for a case where the latest commit on main does not succeed to upload a docker image, so with this step the nightly test will upload its own docker image off of main before starting.
+ci.nightly-dev-docker:
+	@echo "Building consul-k8s Nightly Development container - $(CI_DEV_DOCKER_IMAGE_NAME)"
+	@docker build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):nightly-$(GIT_COMMIT)' \
+	--target=dev \
+	--label COMMIT_SHA=$(CIRCLE_SHA1) \
+	--label PULL_REQUEST=$(CIRCLE_PULL_REQUEST) \
+	--label CIRCLE_BUILD_URL=$(CIRCLE_BUILD_URL) \
+	$(CI_DEV_DOCKER_WORKDIR) -f $(CURDIR)/Dockerfile
+	@echo $(DOCKER_PASS) | docker login -u="$(DOCKER_USER)" --password-stdin
+	@echo "Pushing dev image to: https://cloud.docker.com/u/$(CI_DEV_DOCKER_NAMESPACE)/repository/docker/$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME)"
+	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)
+ifeq ($(CIRCLE_BRANCH), main)
+	@docker tag $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT) $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
+	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
+endif
+
 # In Github Actions, the linux binary will be attached from a previous step at pkg/bin/linux_amd64/. This make target
 # should only run in CI and not locally.
 ci.dev-docker-github:

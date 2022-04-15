@@ -201,6 +201,71 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	}
+
+	// Verify all Consul Pods are deleted.
+	pods, err = h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, h.releaseName) {
+			t.Logf("Found pod which should have been deleted: %s", pod.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul PVCs are deleted.
+	pvcs, err := h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, pvcs.Items, 0)
+
+	// Verify all Consul Service Accounts are deleted.
+	sas, err = h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, sa := range sas.Items {
+		if strings.Contains(sa.Name, h.releaseName) {
+			t.Logf("Found service account which should have been deleted: %s", sa.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Roles are deleted.
+	roles, err = h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, role := range roles.Items {
+		if strings.Contains(role.Name, h.releaseName) {
+			t.Logf("Found role which should have been deleted: %s", role.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Role Bindings are deleted.
+	roleBindings, err = h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, roleBinding := range roleBindings.Items {
+		if strings.Contains(roleBinding.Name, h.releaseName) {
+			t.Logf("Found role binding which should have been deleted: %s", roleBinding.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Secrets are deleted.
+	secrets, err = h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	for _, secret := range secrets.Items {
+		if strings.Contains(secret.Name, h.releaseName) {
+			t.Logf("Found secret which should have been deleted: %s", secret.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Jobs are deleted.
+	jobs, err = h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, job := range jobs.Items {
+		if strings.Contains(job.Name, h.releaseName) {
+			t.Logf("Found job which should have been deleted: %s", job.Name)
+			t.Fail()
+		}
+	}
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
