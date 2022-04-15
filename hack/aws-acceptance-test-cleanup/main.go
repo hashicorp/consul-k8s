@@ -197,6 +197,7 @@ func realMain(ctx context.Context) error {
 
 		vpcID := cluster.ResourcesVpcConfig.VpcId
 
+		// Once we have the VPC ID, collect VPC peering connections to delete.
 		filternameAccepter := "accepter-vpc-info.vpc-id"
 		filternameRequester := "requester-vpc-info.vpc-id"
 		vpcPeeringConnectionsWithAccepter, err := ec2Client.DescribeVpcPeeringConnections(&ec2.DescribeVpcPeeringConnectionsInput{
@@ -443,6 +444,7 @@ func realMain(ctx context.Context) error {
 			fmt.Printf("Security group: Destroyed [id=%s]\n", *sg.GroupId)
 		}
 
+		// Delete VPC Peering Connections.
 		for _, vpcpc := range vpcPeeringConnectionsToDelete {
 			_, err = ec2Client.DeleteVpcPeeringConnection(&ec2.DeleteVpcPeeringConnectionInput{VpcPeeringConnectionId: vpcpc.VpcPeeringConnectionId})
 			if err != nil {
