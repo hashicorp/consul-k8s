@@ -238,7 +238,7 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) stri
 
 }
 
-func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, string) {
+func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {
 	t.Helper()
 
 	namespace := h.helmOptions.KubectlOptions.Namespace

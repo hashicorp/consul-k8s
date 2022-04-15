@@ -53,7 +53,15 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
 	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "30s")
+
+	// Initially tried toset the expiration to 5-20s to keep the test as short running as possible,
+	// but at those levels, the pods would fail to start becuase the certs had expired and would throw errors.
+	// 30s seconds seemed to consistently clear this issue and not have startup problems.
+	// If trying to go lower, be sure to run this several times in CI to ensure that there are little issues.
+	// If wanting to make this higher, there is no problem except for consideration of how long the test will
+	// take to complete.
+	expirationInSeconds := 30
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", fmt.Sprintf("%ds", expirationInSeconds))
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
@@ -108,11 +116,11 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	rpcAddress := consulCluster.CreatePortForwardTunnel(t, 8300)
 
 	// here we can verify that the cert expiry changed
-	err, httpsCert := getCertificate(t, httpsAddress)
+	httpsCert, err := getCertificate(t, httpsAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "HTTPS expiry: %s \n", httpsCert.NotAfter.String())
 
-	err, rpcCert := getCertificate(t, rpcAddress)
+	rpcCert, err := getCertificate(t, rpcAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "RPC expiry: %s \n", rpcCert.NotAfter.String())
 
@@ -143,14 +151,14 @@ func TestVault_TlsAutoReload(t *testing.T) {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 
-	logger.Log(t, "Wait 30 seconds for certificates to rotate....")
-	time.Sleep(30 * time.Second)
+	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
+	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
 
-	err, httpsCert2 := getCertificate(t, httpsAddress)
+	httpsCert2, err := getCertificate(t, httpsAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "HTTPS 2 expiry: %s \n", httpsCert2.NotAfter.String())
 
-	err, rpcCert2 := getCertificate(t, rpcAddress)
+	rpcCert2, err := getCertificate(t, rpcAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "RPC 2 expiry: %s \n", rpcCert2.NotAfter.String())
 
@@ -161,7 +169,7 @@ func TestVault_TlsAutoReload(t *testing.T) {
 
 }
 
-func getCertificate(t *testing.T, address string) (error, *x509.Certificate) {
+func getCertificate(t *testing.T, address string) (*x509.Certificate, error) {
 	logger.Log(t, "Checking TLS....")
 	conf := &tls.Config{
 		InsecureSkipVerify: true,
@@ -171,12 +179,12 @@ func getCertificate(t *testing.T, address string) (error, *x509.Certificate) {
 	conn, err := tls.Dial("tcp", address, conf)
 	if err != nil {
 		logger.Log(t, "Error in Dial", err)
-		return err, nil
+		return nil, err
 	}
 	defer conn.Close()
 
 	connState := conn.ConnectionState()
 	logger.Logf(t, "Connection State: %+v", connState)
 	cert := connState.PeerCertificates[0]
-	return nil, cert
+	return cert, nil
 }

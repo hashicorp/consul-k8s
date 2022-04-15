@@ -129,8 +129,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
 	vault.ConfigurePKICA(t, vaultClient)
-	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "")
-	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2", "")
+	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
+	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2", "1h")
 
 	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 	replicationToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "replication")
