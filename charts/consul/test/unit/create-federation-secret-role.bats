@@ -38,7 +38,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.createReplicationToken=true' \
       . | tee /dev/stderr |
-      yq -r '.rules | map(select(.resourceNames[0] == "RELEASE-NAME-consul-acl-replication-acl-token")) | length' | tee /dev/stderr)
+      yq -r '.rules | map(select(.resourceNames[0] == "release-name-consul-acl-replication-acl-token")) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
 

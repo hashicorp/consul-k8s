@@ -8,13 +8,13 @@ load _helpers
 # These tests use test-runner.yaml to test the consul.fullname helper
 # since we need an existing template that calls the consul.fullname helper.
 
-@test "helper/consul.fullname: defaults to RELEASE-NAME-consul" {
+@test "helper/consul.fullname: defaults to release-name-consul" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/tests/test-runner.yaml \
       . | tee /dev/stderr |
       yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-test" ]
+  [ "${actual}" = "release-name-consul-test" ]
 }
 
 @test "helper/consul.fullname: fullnameOverride overrides the name" {
@@ -84,7 +84,7 @@ load _helpers
       --set nameOverride=override \
       . | tee /dev/stderr |
       yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-override-test" ]
+  [ "${actual}" = "release-name-override-test" ]
 }
 
 #--------------------------------------------------------------------
@@ -149,7 +149,7 @@ load _helpers
       yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
 
   # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=RELEASE-NAME-consul-server")')
+  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
   [ "${actual}" = "true" ]
 
   # check server port

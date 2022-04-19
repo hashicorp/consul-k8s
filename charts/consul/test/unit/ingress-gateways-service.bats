@@ -333,7 +333,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.selector."ingress-gateway-name"' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
+  [ "${actual}" = "release-name-consul-ingress-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -351,10 +351,10 @@ key2: value2' \
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
+  [ "${actual}" = "release-name-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
+  [ "${actual}" = "release-name-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[2] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]

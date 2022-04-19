@@ -46,7 +46,7 @@ load _helpers
   [ "${actual}" = "secrets" ]
 
   local actual=$(echo $object | yq -r '.resourceNames[0]' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway-acl-token" ]
+  [ "${actual}" = "release-name-consul-terminating-gateway-acl-token" ]
 }
 
 @test "terminatingGateways/Role: rules is empty if no ACLs, PSPs" {
@@ -87,10 +87,10 @@ load _helpers
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
+  [ "${actual}" = "release-name-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
+  [ "${actual}" = "release-name-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0].rules | length' | tee /dev/stderr)
   [ "${actual}" = "2" ]

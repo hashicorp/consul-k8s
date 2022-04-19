@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway" ]
+  [ "${actual}" = "release-name-consul-terminating-gateway" ]
 }
 
 @test "terminatingGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -296,7 +296,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway" ]
+  [ "${actual}" = "release-name-consul-terminating-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -1206,8 +1206,8 @@ EOF
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "terminating-gateway-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s-control-plane acl-init \
-  -component-name=terminating-gateway/RELEASE-NAME-consul-terminating \
-  -acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method \
+  -component-name=terminating-gateway/release-name-consul-terminating \
+  -acl-auth-method=release-name-consul-k8s-component-auth-method \
   -token-sink-file=/consul/service/acl-token \
   -log-level=info \
   -log-json=false
@@ -1437,10 +1437,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
+  [ "${actual}" = "release-name-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
+  [ "${actual}" = "release-name-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

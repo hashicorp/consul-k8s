@@ -74,7 +74,7 @@ jobs:
       - unit-helm-gen
     runs-on: ubuntu-latest
     container: 
-      image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
       options: --user 1001
     steps:
       - name: Checkout code

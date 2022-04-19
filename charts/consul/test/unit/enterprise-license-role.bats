@@ -65,7 +65,7 @@ load _helpers
       --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.rules | map(select(.resourceNames[0] == "RELEASE-NAME-consul-enterprise-license-acl-token")) | length' | tee /dev/stderr)
+      yq -r '.rules | map(select(.resourceNames[0] == "release-name-consul-enterprise-license-acl-token")) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
 
