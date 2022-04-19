@@ -155,7 +155,7 @@ load _helpers
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = "http://RELEASE-NAME-consul-server:8500" ]
+  [ "${actual}" = "http://release-name-consul-server:8500" ]
 }
 
 @test "enterpriseLicense/Job: URL is https when TLS is enabled" {
@@ -168,7 +168,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = "https://RELEASE-NAME-consul-server:8501" ]
+  [ "${actual}" = "https://release-name-consul-server:8501" ]
 }
 
 @test "enterpriseLicense/Job: CA certificate is specified when TLS is enabled" {

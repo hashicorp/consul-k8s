@@ -208,7 +208,7 @@ load _helpers
 
     local actual=$(echo "$object" |
         yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
-    [ "${actual}" = "RELEASE-NAME-consul-server-cert" ]
+    [ "${actual}" = "release-name-consul-server-cert" ]
 }
 
 @test "server/StatefulSet: consul-server-cert uses serverCert.secretName when serverCert (and caCert) are set" {
@@ -671,7 +671,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 5302306ae80c4a74dc23c90c24b23064c8d6c00ad1a7b981763e23cfcc8c71f1 ]
+  [ "${actual}" = 4c8adc33d5123dd1decbbe11d4999a3a8dd209003df703fe5035b0591e904624 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -681,7 +681,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 6c2ac4d32ceda09ae07cbe6a4e118908f9167bad765a1db6b37a5c6a93c279a4 ]
+  [ "${actual}" = 472da13553591e000f0354a013c661955fd4ee1b7dade29570785d8eb303182a ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -691,7 +691,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = c6712ea13c42769198eecfbdaaf18d5922e9495a1dc14523522f28dec50d33f8 ]
+  [ "${actual}" = a42be230e4c41dc0d3c239d099bd90b9e43b2a17b904d2a32fe9c8622d8f2194 ]
 }
 
 #--------------------------------------------------------------------
@@ -846,7 +846,7 @@ load _helpers
     -s templates/server-statefulset.yaml  \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
-    yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="RELEASE-NAME-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="release-name-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1668,7 +1668,7 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $object |
@@ -1677,7 +1677,7 @@ load _helpers
 
   local actual="$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
@@ -1724,12 +1724,12 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
@@ -1753,12 +1753,12 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 

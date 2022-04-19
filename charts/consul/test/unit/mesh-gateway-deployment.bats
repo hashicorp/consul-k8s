@@ -702,7 +702,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -800,7 +800,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1060,7 +1060,7 @@ key2: value2' \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-mesh-gateway \
+  -name=release-name-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1111,7 +1111,7 @@ EOF
   exp='consul-k8s-control-plane acl-init \
   -component-name=mesh-gateway \
   -token-sink-file=/consul/service/acl-token \
-  -acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method \
+  -acl-auth-method=release-name-consul-k8s-component-auth-method \
   -log-level=info \
   -log-json=false
 
@@ -1119,7 +1119,7 @@ consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-mesh-gateway \
+  -name=release-name-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1173,7 +1173,7 @@ EOF
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-mesh-gateway \
+  -name=release-name-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1452,7 +1452,7 @@ EOF
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-mesh-gateway \
+  -name=release-name-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1571,7 +1571,7 @@ EOF
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-mesh-gateway \
+  -name=release-name-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1623,7 +1623,7 @@ EOF
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-mesh-gateway \
+  -name=release-name-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"

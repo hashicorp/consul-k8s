@@ -278,7 +278,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |

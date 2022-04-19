@@ -492,7 +492,7 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"RELEASE-NAME-consul-k8s-auth-method\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"release-name-consul-k8s-auth-method\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -549,7 +549,7 @@ EOF
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-resource-prefix=RELEASE-NAME-consul")' | tee /dev/stderr)
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-resource-prefix=release-name-consul")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1036,7 +1036,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1154,7 +1154,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1180,7 +1180,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |

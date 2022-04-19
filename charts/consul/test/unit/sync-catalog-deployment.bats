@@ -531,7 +531,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -626,7 +626,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -652,7 +652,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1083,7 +1083,7 @@ load _helpers
 
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://RELEASE-NAME-consul-server:8501' ]
+  [ "${actual}" = 'https://release-name-consul-server:8501' ]
 
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
     [ "${actual}" = "/consul/tls/ca/tls.crt" ]
@@ -1101,7 +1101,7 @@ load _helpers
 
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://RELEASE-NAME-consul-server:8501' ]
+  [ "${actual}" = 'https://release-name-consul-server:8501' ]
 
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
     [ "${actual}" = "/consul/tls/ca/tls.crt" ]
