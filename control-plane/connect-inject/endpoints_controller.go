@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -924,6 +926,9 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig := r.ConsulClientCfg
 	localConfig.Address = newAddr
 	localConfig.Namespace = namespace
+	localConfig.HttpClient = &http.Client{
+		Timeout: time.Second * 2,
+	}
 	return consul.NewClient(localConfig)
 }
 
