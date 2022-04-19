@@ -79,22 +79,22 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$command" |
-    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server\""))' | tee /dev/stderr)
+    yq 'any(contains("additional-dnsname=\"release-name-consul-server\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
-    yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server\""))' | tee /dev/stderr)
+    yq 'any(contains("additional-dnsname=\"*.release-name-consul-server\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
-    yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
+    yq 'any(contains("additional-dnsname=\"*.release-name-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
-    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
+    yq 'any(contains("additional-dnsname=\"release-name-consul-server.${NAMESPACE}\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
-    yq 'any(contains("additional-dnsname=\"*.RELEASE-NAME-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+    yq 'any(contains("additional-dnsname=\"*.release-name-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
-    yq 'any(contains("additional-dnsname=\"RELEASE-NAME-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+    yq 'any(contains("additional-dnsname=\"release-name-consul-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo "$command" |
     yq 'any(contains("additional-dnsname=\"*.server.dc1.consul\""))' | tee /dev/stderr)

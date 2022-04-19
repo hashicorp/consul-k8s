@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
+  [ "${actual}" = "release-name-consul-ingress-gateway" ]
 }
 
 @test "ingressGateways/Deployment: serviceAccountName is set properly" {
@@ -36,7 +36,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
+  [ "${actual}" = "release-name-consul-ingress-gateway" ]
 }
 
 @test "ingressGateways/Deployment: Adds consul service volumeMount to gateway container" {
@@ -1325,7 +1325,7 @@ key2: value2' \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-ingress-gateway \
+  -name=release-name-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1385,8 +1385,8 @@ EOF
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s-control-plane acl-init \
-  -component-name=ingress-gateway/RELEASE-NAME-consul-ingress-gateway \
-  -acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method \
+  -component-name=ingress-gateway/release-name-consul-ingress-gateway \
+  -acl-auth-method=release-name-consul-k8s-component-auth-method \
   -token-sink-file=/consul/service/acl-token \
   -log-level=info \
   -log-json=false
@@ -1395,7 +1395,7 @@ consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
-  -name=RELEASE-NAME-consul-ingress-gateway \
+  -name=release-name-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1622,10 +1622,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
+  [ "${actual}" = "release-name-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
+  [ "${actual}" = "release-name-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

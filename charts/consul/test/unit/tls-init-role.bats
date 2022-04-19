@@ -68,7 +68,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.rules[] | select(.resources==["podsecuritypolicies"]) | .resourceNames[0]' | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-tls-init" ]
+  [ "${actual}" = "release-name-consul-tls-init" ]
 }
 
 #--------------------------------------------------------------------

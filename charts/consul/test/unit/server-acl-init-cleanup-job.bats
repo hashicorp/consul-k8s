@@ -55,7 +55,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
        yq -c '.spec.template.spec.containers[0].args' | tee /dev/stderr)
-       [ "${actual}" = '["delete-completed-job","-log-level=info","-log-json=false","-k8s-namespace=default","RELEASE-NAME-consul-server-acl-init"]' ]
+       [ "${actual}" = '["delete-completed-job","-log-level=info","-log-json=false","-k8s-namespace=default","release-name-consul-server-acl-init"]' ]
 }
 
 @test "serverACLInitCleanup/Job: enabled with externalServers.enabled=true and global.acls.manageSystemACLs=true, but server.enabled set to false" {

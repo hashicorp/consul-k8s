@@ -59,7 +59,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .retry_join[0] | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:8301" ]
+  [ "${actual}" = "release-name-consul-server.default.svc:8301" ]
 }
 
 #--------------------------------------------------------------------
@@ -95,7 +95,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .retry_join[0] | tee /dev/stderr)
 
-  [ "${actual}" = "RELEASE-NAME-consul-server.default.svc:9301" ]
+  [ "${actual}" = "release-name-consul-server.default.svc:9301" ]
 }
 
 @test "server/ConfigMap: recursors can be set by global.recursors" {

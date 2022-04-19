@@ -76,7 +76,7 @@ load _helpers
   local actual
 
   # test it uses the auto-generated ca secret
-  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-cert" and .secret.secretName=="RELEASE-NAME-consul-ca-cert")) | length > 0' | tee /dev/stderr)
+  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-cert" and .secret.secretName=="release-name-consul-ca-cert")) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # test it uses the correct secret key for the auto-generated ca secret
@@ -84,7 +84,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   # test it uses the auto-generated ca key secret
-  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-key" and .secret.secretName=="RELEASE-NAME-consul-ca-key")) | length > 0' | tee /dev/stderr)
+  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-key" and .secret.secretName=="release-name-consul-ca-key")) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # test it uses the correct secret key for the auto-generated ca key secret

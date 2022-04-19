@@ -551,7 +551,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = aa432a6e22a4c6c7c07f39896f893df1d638575222eea0245d33a5094914ab61 ]
+  [ "${actual}" = 3bd6198418457f5acc746c0d21fbb4afdf2b38e5bbcfef23fb3f97e2600fe964 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
@@ -561,7 +561,7 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 50357c9dd53f1cb8e5b4c953f832269df82f4fea12cb63f1581890ac55d9ce58 ]
+  [ "${actual}" = 41535aa4cb7cffc4c70641efc882f5d6e3e87fce6e76d409409ff287cb4b23e8 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
@@ -571,7 +571,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 60a99c69e2b0fc842723ef1c5e34b60fbdf15460b70deb1831b692f14f74e972 ]
+  [ "${actual}" = bad77069ea6e4915272cf520faecb96333f6adef97c992e0aecc324381754eb2 ]
 }
 
 #--------------------------------------------------------------------
@@ -614,7 +614,7 @@ load _helpers
     -s templates/client-daemonset.yaml  \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
-    yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="RELEASE-NAME-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="release-name-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -817,7 +817,7 @@ load _helpers
 
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = "https://RELEASE-NAME-consul-server.default.svc:8501" ]
+  [ "${actual}" = "https://release-name-consul-server.default.svc:8501" ]
 }
 
 @test "client/DaemonSet: Adds consul envvars CONSUL_HTTP_ADDR on acl-init init container when ACLs are enabled and tls is not enabled" {
@@ -830,7 +830,7 @@ load _helpers
 
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = "http://RELEASE-NAME-consul-server.default.svc:8500" ]
+  [ "${actual}" = "http://release-name-consul-server.default.svc:8500" ]
 }
 
 @test "client/DaemonSet: Does not add consul envvars CONSUL_CACERT on acl-init init container when ACLs are enabled and tls is not enabled" {
@@ -1136,7 +1136,7 @@ local actual=$(echo $object |
   [ "${actual}" = "true" ]  
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("acl-auth-method=\"RELEASE-NAME-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
+      yq -r '.command | any(contains("acl-auth-method=\"release-name-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo $object |
@@ -1180,7 +1180,7 @@ local actual=$(echo $object |
   [ "${actual}" = "true" ]  
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("acl-auth-method=\"RELEASE-NAME-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
+      yq -r '.command | any(contains("acl-auth-method=\"release-name-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo $object |

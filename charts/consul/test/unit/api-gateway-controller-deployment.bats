@@ -93,7 +93,7 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=bar' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-sds-server-host RELEASE-NAME-consul-api-gateway-controller.default.svc")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-sds-server-host release-name-consul-api-gateway-controller.default.svc")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -365,7 +365,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=RELEASE-NAME-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
