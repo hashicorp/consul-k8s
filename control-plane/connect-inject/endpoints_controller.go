@@ -15,7 +15,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-template/config"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
@@ -928,49 +927,6 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig.Address = newAddr
 	localConfig.Namespace = namespace
 
-	defConfig := api.DefaultConfig()
-	if config.Address == "" {
-		config.Address = defConfig.Address
-	}
-
-	if config.Scheme == "" {
-		config.Scheme = defConfig.Scheme
-	}
-
-	if config.Transport == nil {
-		config.Transport = defConfig.Transport
-	}
-
-	if config.TLSConfig.Address == "" {
-		config.TLSConfig.Address = defConfig.TLSConfig.Address
-	}
-
-	if config.TLSConfig.CAFile == "" {
-		config.TLSConfig.CAFile = defConfig.TLSConfig.CAFile
-	}
-
-	if config.TLSConfig.CAPath == "" {
-		config.TLSConfig.CAPath = defConfig.TLSConfig.CAPath
-	}
-
-	if config.TLSConfig.CertFile == "" {
-		config.TLSConfig.CertFile = defConfig.TLSConfig.CertFile
-	}
-
-	if config.TLSConfig.KeyFile == "" {
-		config.TLSConfig.KeyFile = defConfig.TLSConfig.KeyFile
-	}
-
-	if !config.TLSConfig.InsecureSkipVerify {
-		config.TLSConfig.InsecureSkipVerify = defConfig.TLSConfig.InsecureSkipVerify
-	}
-
-	tlsConfig, err := api.SetupTLSConfig(&localConfig.TLSConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	localConfig.Transport.TLSClientConfig = tlsConfig
 	localConfig.HttpClient = &http.Client{
 		Timeout:   time.Second * 2,
 		Transport: localConfig.Transport,
