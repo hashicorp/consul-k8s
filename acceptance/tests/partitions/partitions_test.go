@@ -243,7 +243,7 @@ func TestPartitions(t *testing.T) {
 				k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, staticClientNamespace)
 			})
 
-			consulClient := serverConsulCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
+			consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
 
 			serverQueryServerOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: defaultPartition}
 			clientQueryServerOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: defaultPartition}

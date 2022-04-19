@@ -68,7 +68,7 @@ func (c *ConnectHelper) Setup(t *testing.T) {
 func (c *ConnectHelper) Install(t *testing.T) {
 	logger.Log(t, "Installing Consul cluster")
 	c.consulCluster.Create(t)
-	c.consulClient = c.consulCluster.SetupConsulClient(t, c.Secure)
+	c.consulClient, _ = c.consulCluster.SetupConsulClient(t, c.Secure)
 }
 
 // Upgrade uses the existing Consul cluster and upgrades it using Helm values

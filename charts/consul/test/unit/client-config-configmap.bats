@@ -70,3 +70,16 @@ load _helpers
       yq '.data["config.json"] | contains("check_update_interval")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# auto_reload_config
+
+@test "client/ConfigMap: auto reload config is set to true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["client.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}

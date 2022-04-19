@@ -129,8 +129,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
 	vault.ConfigurePKICA(t, vaultClient)
-	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
-	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2")
+	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
+	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2", "1h")
 
 	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
 	replicationToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "replication")
@@ -293,9 +293,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Verify federation between servers.
 	logger.Log(t, "verifying federation was successful")
 	primaryConsulCluster.ACLToken = bootstrapToken
-	primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
+	primaryClient, _ := primaryConsulCluster.SetupConsulClient(t, true)
 	secondaryConsulCluster.ACLToken = replicationToken
-	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
+	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
 
 	// Create a ProxyDefaults resource to configure services to use the mesh

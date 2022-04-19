@@ -51,7 +51,7 @@ func TestBasicInstallation(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			client := consulCluster.SetupConsulClient(t, c.secure)
+			client, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create a KV entry
 			randomKey := helpers.RandomName()
