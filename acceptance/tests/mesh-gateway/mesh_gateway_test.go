@@ -104,8 +104,8 @@ func TestMeshGatewayDefault(t *testing.T) {
 		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "status", fmt.Sprintf("sts/%s-consul-server", releaseName))
 	}
 
-	primaryClient := primaryConsulCluster.SetupConsulClient(t, false)
-	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, false)
+	primaryClient, _ := primaryConsulCluster.SetupConsulClient(t, false)
+	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, false)
 
 	// Verify federation between servers
 	logger.Log(t, "verifying federation was successful")
@@ -258,8 +258,8 @@ func TestMeshGatewaySecure(t *testing.T) {
 				k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "status", fmt.Sprintf("sts/%s-consul-server", releaseName))
 			}
 
-			primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
-			secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
+			primaryClient, _ := primaryConsulCluster.SetupConsulClient(t, true)
+			secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 
 			// Verify federation between servers
 			logger.Log(t, "verifying federation was successful")

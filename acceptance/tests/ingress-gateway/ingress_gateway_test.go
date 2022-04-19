@@ -66,7 +66,7 @@ func TestIngressGateway(t *testing.T) {
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			logger.Log(t, "creating config entry")
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create config entry
 			created, _, err := consulClient.ConfigEntries().Set(&api.IngressGatewayConfigEntry{

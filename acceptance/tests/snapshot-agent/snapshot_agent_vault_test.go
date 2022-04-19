@@ -61,7 +61,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
 	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 

@@ -54,7 +54,7 @@ func TestExample(t *testing.T) {
 
 	// To make Consul API calls, you can get the Consul client from the consulCluster object,
 	// indicating whether the client needs to be secure or not (i.e. whether TLS and ACLs are enabled on the Consul cluster):
-	consulClient := consulCluster.SetupConsulClient(t, true)
+	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 	consulServices, _, err := consulClient.Catalog().Services(nil)
 	require.NoError(t, err)
 	require.NotNil(t, consulServices)

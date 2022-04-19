@@ -119,7 +119,7 @@ func TestVault_Partitions(t *testing.T) {
 	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "partition-init", "partition-token")
 	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-"+secondaryPartition)
 	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
 
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 

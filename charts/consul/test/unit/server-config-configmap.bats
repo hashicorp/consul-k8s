@@ -795,3 +795,16 @@ load _helpers
 
   [ "${actual}" = "5m" ]
 }
+
+#--------------------------------------------------------------------
+# auto_reload_config
+
+@test "server/ConfigMap: auto reload config is set to true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}

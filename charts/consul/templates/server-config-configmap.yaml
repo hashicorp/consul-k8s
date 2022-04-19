@@ -14,6 +14,7 @@ metadata:
 data:
   server.json: |
     {
+      "auto_reload_config": true,
       "bind_addr": "0.0.0.0",
       "bootstrap_expect": {{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }},
       "client_addr": "0.0.0.0",

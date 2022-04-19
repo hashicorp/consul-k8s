@@ -58,7 +58,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create the destination namespace in the non-secure case.
 			// In the secure installation, this namespace is created by the server-acl-init job.
@@ -223,7 +223,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			logger.Logf(t, "creating static-client in %s namespace", testNamespace)
 			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			logger.Log(t, "creating config entry")

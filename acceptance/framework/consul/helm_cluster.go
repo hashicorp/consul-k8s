@@ -276,12 +276,38 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
-func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
+func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) string {
+	localPort := terratestk8s.GetAvailablePort(t)
+	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
+	tunnel := terratestk8s.NewTunnelWithLogger(
+		h.helmOptions.KubectlOptions,
+		terratestk8s.ResourceTypePod,
+		serverPod,
+		localPort,
+		remotePort,
+		h.logger)
+
+	// Retry creating the port forward since it can fail occasionally.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
+		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
+		// get used to fail the test, just for logging.
+		require.NoError(r, tunnel.ForwardPortE(t))
+	})
+
+	t.Cleanup(func() {
+		tunnel.Close()
+	})
+
+	return fmt.Sprintf("127.0.0.1:%d", localPort)
+
+}
+
+func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {
 	t.Helper()
 
 	namespace := h.helmOptions.KubectlOptions.Namespace
 	config := api.DefaultConfig()
-	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
 
 	if secure {
@@ -315,32 +341,11 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		}
 	}
 
-	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		h.helmOptions.KubectlOptions,
-		terratestk8s.ResourceTypePod,
-		serverPod,
-		localPort,
-		remotePort,
-		h.logger)
-
-	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
-		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
-		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
-		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
-	})
-
-	t.Cleanup(func() {
-		tunnel.Close()
-	})
-
-	config.Address = fmt.Sprintf("127.0.0.1:%d", localPort)
+	config.Address = h.CreatePortForwardTunnel(t, remotePort)
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 
-	return consulClient
+	return consulClient, config.Address
 }
 
 // configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
