@@ -87,7 +87,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.11.4"
+  image: "hashicorp/consul:1.12.0"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -107,7 +107,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: "hashicorp/consul-k8s-control-plane:0.42.0"
+  imageK8S: "hashicorp/consul-k8s-control-plane:0.43.0"
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -556,7 +556,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
   # @default: envoyproxy/envoy-alpine:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy-alpine:v1.20.2"
+  imageEnvoy: "envoyproxy/envoy:v1.22.0"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
