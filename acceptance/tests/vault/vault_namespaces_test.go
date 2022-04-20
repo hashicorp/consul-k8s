@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestVault installs Vault, configures a Vault namespace, and then bootstraps it
+// TestVault_VaultNamespace installs Vault, configures a Vault namespace, and then bootstraps it
 // with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works
-//with the vault namespace.
+// with the vault namespace.
 func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
@@ -36,7 +36,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	logger.Log(t, "Creating secret for Vault license")
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
 	vaultHelmvalues := map[string]string{
-		"server.image.repository":             "hashicorp/vault-enterprise",
+		"server.image.repository":             "docker.mirror.hashicorp.services/hashicorp/vault-enterprise",
 		"server.image.tag":                    "1.9.4-ent",
 		"server.enterpriseLicense.secretName": vaultLicenseSecretName,
 		"server.enterpriseLicense.secretKey":  vaultLicenseSecretKey,
