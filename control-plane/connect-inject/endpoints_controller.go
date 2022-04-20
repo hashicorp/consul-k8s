@@ -930,9 +930,14 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig.HttpClient = &http.Client{
 		Timeout: time.Second * 2,
 	}
-	api.SetClientConfig(localConfig)
-	api.SetClientTransportWithTLSConfig(localConfig.HttpClient, localConfig.Transport, localConfig.TLSConfig)
-
+	err := api.SetClientConfig(localConfig)
+	if err != nil {
+		return nil, err
+	}
+	err = api.SetClientTransportWithTLSConfig(localConfig.HttpClient, localConfig.Transport, localConfig.TLSConfig)
+	if err != nil {
+		return nil, err
+	}
 	return consul.NewClient(localConfig)
 }
 
