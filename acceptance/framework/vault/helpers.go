@@ -83,7 +83,6 @@ func GenerateGossipSecret() (string, error) {
 // ConfigureGossipVaultSecret generates a gossip encryption key,
 // stores it in Vault as a secret and configures a policy to access it.
 func ConfigureGossipVaultSecret(t *testing.T, vaultClient *vapi.Client) string {
-	vaultClient.SetNamespace("admin")
 	// Create the Vault Policy for the gossip key.
 	logger.Log(t, "Creating gossip policy")
 	err := vaultClient.Sys().PutPolicy("gossip", gossipPolicy)

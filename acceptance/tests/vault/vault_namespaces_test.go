@@ -23,7 +23,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
-	vaultNamespacePath := "admin"
+	vaultNamespacePath := "test-namespace"
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
 
