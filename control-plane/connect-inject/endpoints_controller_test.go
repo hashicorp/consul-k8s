@@ -3574,6 +3574,109 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, proxyServiceInstances, 1)
 }
 
+// TestReconcileUnreachableClient tests the scenario where a consul client is unreachable.  We want to verify that
+// the Timeout on the HttpClient has timed out quickly so as not to infinitely wait and cause queuing of subsequent
+// endpoint objects.
+func TestReconcileUnreachableClient(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	cases := []struct {
+		name          string
+		consulSvcName string
+		k8sObjects    func() []runtime.Object
+	}{
+		{
+			name:          "Basic endpoints",
+			consulSvcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// The agent ip address will be set to 126.0.0.1 which is an unreachable address.
+			// The test will assert that a Client Timeout kicked in rather than just an infinite
+			// wait- in which case the test time of 30s out would expire first.
+			fakeClientPod := createPod("fake-consul-client", "126.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consul server
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: consul.HTTPAddr,
+			}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			// Create the endpoints controller
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "default",
+				ConsulClientCfg:       cfg,
+			}
+			namespacedName := types.NamespacedName{
+				Namespace: "default",
+				Name:      "service-created",
+			}
+
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+
+			//using concat (+) instead of fmt.Sprintf because string has lots of %s in it that cause issues
+			expectedError := "1 error occurred:\n\t* Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n\n"
+
+			require.EqualError(t, err, expectedError)
+			require.False(t, resp.Requeue)
+
+		})
+	}
+}
 func TestFilterAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
