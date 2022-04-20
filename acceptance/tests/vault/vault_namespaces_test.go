@@ -67,7 +67,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
 	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1")
+	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
@@ -133,7 +133,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
 	consulCluster.ACLToken = bootstrapToken
-	consulClient := consulCluster.SetupConsulClient(t, true)
+	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
 	// There are two identical keys for LAN and WAN since there is only 1 dc.
