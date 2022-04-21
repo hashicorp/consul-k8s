@@ -34,7 +34,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	vaultReleaseName := helpers.RandomName()
 
 	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, nil)
-	vaultCluster.Create(t, ctx)
+	vaultCluster.Create(t, ctx, "")
 	// Vault is now installed in the cluster.
 
 	// Now fetch the Vault client so we can create the policies and secrets.

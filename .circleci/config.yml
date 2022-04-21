@@ -900,9 +900,11 @@ workflows:
             - build-distros-amd64
       # Run acceptance tests using the docker image built for the control plane
       - acceptance:
+          context: consul-ci
           requires:
             - dev-upload-docker
       - acceptance-tproxy:
+          context: consul-ci
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:

@@ -2,10 +2,12 @@ package vault
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -13,20 +15,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const staticClientName = "static-client"
-
-// TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
-// It then configures Consul to use vault as the backend and checks that it works.
-func TestVault(t *testing.T) {
+// TestVault_VaultNamespace installs Vault, configures a Vault namespace, and then bootstraps it
+// with secrets, policies, and Kube Auth Method.
+// It then configures Consul to use vault as the backend and checks that it works
+// with the vault namespace.
+func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
-
+	vaultNamespacePath := "test-namespace"
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
 
-	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, nil)
-	vaultCluster.Create(t, ctx, "")
+	k8sClient := environment.KubernetesClientFromOptions(t, ctx.KubectlOptions(t))
+	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
+	vaultLicenseSecretKey := "license"
+
+	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
+
+	logger.Log(t, "Creating secret for Vault license")
+	consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
+	vaultHelmvalues := map[string]string{
+		"server.image.repository":             "docker.mirror.hashicorp.services/hashicorp/vault-enterprise",
+		"server.image.tag":                    "1.9.4-ent",
+		"server.enterpriseLicense.secretName": vaultLicenseSecretName,
+		"server.enterpriseLicense.secretKey":  vaultLicenseSecretKey,
+	}
+	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, vaultHelmvalues)
+	vaultCluster.Create(t, ctx, vaultNamespacePath)
 	// Vault is now installed in the cluster.
 
 	// Now fetch the Vault client so we can create the policies and secrets.
@@ -76,6 +92,9 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
+		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{\"connect\": [{ \"ca_config\": [{ \"namespace\": \"%s\"}]}]}"`, vaultNamespacePath),
+
+		"global.secretsBackend.vault.agentAnnotations": fmt.Sprintf("\"vault.hashicorp.com/namespace\": \"%s\"", vaultNamespacePath),
 
 		"global.acls.manageSystemACLs":          "true",
 		"global.acls.bootstrapToken.secretName": "consul/data/secret/bootstrap",
