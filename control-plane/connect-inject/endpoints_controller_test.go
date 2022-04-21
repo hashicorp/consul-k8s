@@ -10,6 +10,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	cpconsul "github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -3641,7 +3642,7 @@ func TestReconcileUnreachableClient(t *testing.T) {
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
 			}
-			consulClient, err := api.NewClient(cfg)
+			consulClient, err := cpconsul.NewClient(cfg)
 			require.NoError(t, err)
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]

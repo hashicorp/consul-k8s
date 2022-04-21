@@ -2,6 +2,8 @@ package consul
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/version"
 	capi "github.com/hashicorp/consul/api"
@@ -10,6 +12,11 @@ import (
 // NewClient returns a Consul API client. It adds a required User-Agent
 // header that describes the version of consul-k8s making the call.
 func NewClient(config *capi.Config) (*capi.Client, error) {
+	if config.HttpClient == nil {
+		config.HttpClient = &http.Client{
+			Timeout: 10 * time.Second,
+		}
+	}
 	client, err := capi.NewClient(config)
 	if err != nil {
 		return nil, err
