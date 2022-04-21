@@ -31,7 +31,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
 	vaultLicenseSecretKey := "license"
 
-	vaultEnterpriseLicense := os.Getenv("VAULT_ENT_LICENSE")
+	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
 	logger.Log(t, "Creating secret for Vault license")
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
