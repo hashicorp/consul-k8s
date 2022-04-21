@@ -924,7 +924,6 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig := r.ConsulClientCfg
 	localConfig.Address = newAddr
 	localConfig.Namespace = namespace
-
 	return consul.NewClient(localConfig)
 }
 

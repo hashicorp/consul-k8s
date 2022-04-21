@@ -47,7 +47,6 @@ func TestNewClient(t *testing.T) {
 func TestNewClient_httpClientDefaultTimeout(t *testing.T) {
 	client, err := NewClient(&capi.Config{Address: "http://126.0.0.1"})
 	require.NoError(t, err)
-	type Foo interface{ Bar() string }
 	// arbitrarily calling /agent/checks.  This could be any call.  We are
 	// really testing the unreachable address
 	_, err = client.Agent().Checks()
