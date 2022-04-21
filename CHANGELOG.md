@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.43.0 (April 21, 2022)
 
 BREAKING CHANGES:
 * Helm
