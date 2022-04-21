@@ -45,7 +45,7 @@ func TestVault_Partitions(t *testing.T) {
 		serverClusterVaultHelmValues["server.service.nodePort"] = "31000"
 	}
 	serverClusterVault := vault.NewVaultCluster(t, serverClusterCtx, cfg, vaultReleaseName, serverClusterVaultHelmValues)
-	serverClusterVault.Create(t, serverClusterCtx)
+	serverClusterVault.Create(t, serverClusterCtx, "")
 
 	externalVaultAddress := vaultAddress(t, cfg, serverClusterCtx, vaultReleaseName)
 
@@ -59,7 +59,7 @@ func TestVault_Partitions(t *testing.T) {
 	}
 
 	secondaryVaultCluster := vault.NewVaultCluster(t, clientClusterCtx, cfg, vaultReleaseName, clientClusterVaultHelmValues)
-	secondaryVaultCluster.Create(t, clientClusterCtx)
+	secondaryVaultCluster.Create(t, clientClusterCtx, "")
 
 	vaultClient := serverClusterVault.VaultClient(t)
 

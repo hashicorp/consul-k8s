@@ -48,7 +48,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	primaryVaultCluster := vault.NewVaultCluster(t, primaryCtx, cfg, vaultReleaseName, primaryVaultHelmValues)
-	primaryVaultCluster.Create(t, primaryCtx)
+	primaryVaultCluster.Create(t, primaryCtx, "")
 
 	externalVaultAddress := vaultAddress(t, cfg, primaryCtx, vaultReleaseName)
 
@@ -62,7 +62,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	secondaryVaultCluster := vault.NewVaultCluster(t, secondaryCtx, cfg, vaultReleaseName, secondaryVaultHelmValues)
-	secondaryVaultCluster.Create(t, secondaryCtx)
+	secondaryVaultCluster.Create(t, secondaryCtx, "")
 
 	vaultClient := primaryVaultCluster.VaultClient(t)
 
