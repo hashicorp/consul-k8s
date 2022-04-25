@@ -303,6 +303,8 @@ github.com/hashicorp/consul/api v1.10.1-0.20220420031317-1349e9eb35c5 h1:6PvqEz7
 github.com/hashicorp/consul/api v1.10.1-0.20220420031317-1349e9eb35c5/go.mod h1:ZlVrynguJKcYr54zGaDbaL3fOvKC9m72FhPvA8T35KQ=
 github.com/hashicorp/consul/api v1.10.1-0.20220421045807-e7bb156a82e2 h1:kwb0ddQK6XTg9AVQgxe517Q0vrJ7MIPMIrp0yP/EZbE=
 github.com/hashicorp/consul/api v1.10.1-0.20220421045807-e7bb156a82e2/go.mod h1:ZlVrynguJKcYr54zGaDbaL3fOvKC9m72FhPvA8T35KQ=
+github.com/hashicorp/consul/api v1.10.1-0.20220425143126-6d0162a58a94 h1:mPhpaeGO4BmD0Fi9gmevT7kYDyDml1kNjf0HKCFF5xM=
+github.com/hashicorp/consul/api v1.10.1-0.20220425143126-6d0162a58a94/go.mod h1:ZlVrynguJKcYr54zGaDbaL3fOvKC9m72FhPvA8T35KQ=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/consul/sdk v0.4.1-0.20220214194852-80dfcb1bcd68 h1:yw3OXf1OUgfnitE8rwnr+zaT9VluSgvrCHQGwSvA7V4=
 github.com/hashicorp/consul/sdk v0.4.1-0.20220214194852-80dfcb1bcd68/go.mod h1:K9S7H8bLBwkBb2I4hq0Ddm4LCVGuhtenfzSTx2Y36RM=

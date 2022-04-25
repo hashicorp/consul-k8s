@@ -17,6 +17,14 @@ func NewClient(config *capi.Config) (*capi.Client, error) {
 			Timeout: 10 * time.Second,
 		}
 	}
+	err := capi.SetClientConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	err = capi.SetClientTransportWithTLSConfig(config.HttpClient, config.Transport, config.TLSConfig)
+	if err != nil {
+		return nil, err
+	}
 	client, err := capi.NewClient(config)
 	if err != nil {
 		return nil, err
