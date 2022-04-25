@@ -2053,9 +2053,11 @@ connectInject:
   # The directory that Kubernetes will use on Kubernetes service creation, 
   # deletion, and update, to get TLS certificates used to send webhooks to
   # ConnectInject
-  # @type: string
-  tlsCertDir: /etc/connect-injector/certs
-
+  tlsCert: 
+    # @type: string
+    dir: /etc/connect-injector/certs
+    # @type: string
+    secretName: nil
 # Controller handles config entry custom resources.
 # Requires consul >= 1.8.4.
 # ServiceIntentions require consul 1.9+.
@@ -2073,8 +2075,11 @@ controller:
   # The directory that Kubernetes will use on Kubernetes CRD creation, 
   # deletion, and update, to get TLS certificates used to send webhooks to
   # the controller.
-  # @type: string
-  tlsCertDir: /tmp/controller-webhook/certs
+  tlsCert:
+    # @type: string
+    dir: /tmp/controller-webhook/certs
+    # @type: string
+    secretName: nil
 
   serviceAccount:
     # This value defines additional annotations for the controller service account. This should be formatted as a

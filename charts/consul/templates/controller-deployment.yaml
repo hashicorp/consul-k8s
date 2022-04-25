@@ -117,7 +117,7 @@ spec:
             -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
-            -webhook-tls-cert-dir={{ .Values.controller.tlsCertDir }} \
+            -webhook-tls-cert-dir={{ .Values.controller.tlsCert.dir }} \
             -datacenter={{ .Values.global.datacenter }} \
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
@@ -189,7 +189,7 @@ spec:
           name: consul-data
           readOnly: true
         {{- if not .Values.global.secretsBackend.vault.enabled }}
-        - mountPath: {{ .Values.controller.tlsCertDir }}
+        - mountPath: {{ .Values.controller.tlsCert.dir }}
           name: cert
           readOnly: true
         {{- end }}

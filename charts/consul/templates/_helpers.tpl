@@ -53,6 +53,22 @@ as well as the global.name setting.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.connectInjectWebhookTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.connectInject.tlsCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.connectInjectWebhookTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.connectInject.tlsCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
