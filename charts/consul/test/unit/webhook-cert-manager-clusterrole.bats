@@ -58,3 +58,18 @@ load _helpers
   local actual=$(echo $object | yq -r '.resourceNames[0]' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-webhook-cert-manager" ]
 }
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "webhookCertManager/ClusterRole: disabled when global.secretsBackend.vault.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/webhook-cert-manager-clusterrole.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      .
+}

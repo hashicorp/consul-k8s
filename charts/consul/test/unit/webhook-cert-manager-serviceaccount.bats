@@ -60,3 +60,18 @@ load _helpers
       yq -r '.imagePullSecrets[1].name' | tee /dev/stderr)
   [ "${actual}" = "my-secret2" ]
 }
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "webhookCertManager/ServiceAccount: disabled when global.secretsBackend.vault.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/webhook-cert-manager-serviceaccount.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      .
+}

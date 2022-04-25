@@ -1,4 +1,4 @@
-{{- if and (or .Values.controller.enabled .Values.connectInject.enabled) .Values.global.enablePodSecurityPolicies }}
+{{- if and (or .Values.controller.enabled .Values.connectInject.enabled) .Values.global.enablePodSecurityPolicies (not .Values.global.secretsBackend.vault.enabled)}}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:

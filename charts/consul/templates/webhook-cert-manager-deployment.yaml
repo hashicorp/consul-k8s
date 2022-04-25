@@ -1,4 +1,4 @@
-{{- if or .Values.connectInject.enabled .Values.controller.enabled}}
+{{- if (and (or .Values.connectInject.enabled .Values.controller.enabled) (not .Values.global.secretsBackend.vault.enabled)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

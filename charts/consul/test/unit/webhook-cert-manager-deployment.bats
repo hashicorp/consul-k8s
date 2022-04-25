@@ -62,3 +62,18 @@ load _helpers
       yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "webhookCertManager/Deployment: disabled when global.secretsBackend.vault.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/webhook-cert-manager-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      .
+}

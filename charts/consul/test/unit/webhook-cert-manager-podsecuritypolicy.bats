@@ -28,7 +28,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "webhookCertManager/Configmap: enabled with connectInject.enabled=true, controller.enabled=false and global.enablePodSecurityPolicies=true" {
+@test "webhookCertManager/PodSecurityPolicy: enabled with connectInject.enabled=true, controller.enabled=false and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
@@ -39,7 +39,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "webhookCertManager/Configmap: enabled with connectInject.enabled=true, controller.enabled=true and global.enablePodSecurityPolicies=true" {
+@test "webhookCertManager/PodSecurityPolicy: enabled with connectInject.enabled=true, controller.enabled=true and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
@@ -49,4 +49,20 @@ load _helpers
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "webhookCertManager/PodSecurityPolicy: disabled when global.secretsBackend.vault.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      .
 }

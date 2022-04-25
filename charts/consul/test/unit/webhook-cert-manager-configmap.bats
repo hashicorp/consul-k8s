@@ -91,3 +91,18 @@ load _helpers
   local actual=$(echo $cfg | jq '.[1].name | contains("controller")')
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "webhookCertManager/Configmap: disabled when global.secretsBackend.vault.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/webhook-cert-manager-configmap.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      .
+}
