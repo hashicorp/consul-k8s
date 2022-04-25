@@ -117,7 +117,7 @@ spec:
             -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
-            -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
+            -webhook-tls-cert-dir={{ .Values.controller.tlsCertDir }} \
             -datacenter={{ .Values.global.datacenter }} \
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
@@ -188,9 +188,11 @@ spec:
         - mountPath: /consul/login
           name: consul-data
           readOnly: true
-        - mountPath: /tmp/controller-webhook/certs
+        {{- if not .Values.global.secretsBackend.vault.enabled }}
+        - mountPath: {{ .Values.controller.tlsCertDir }}
           name: cert
           readOnly: true
+        {{- end }}
         {{- if .Values.global.tls.enabled }}
         {{- if .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
@@ -202,10 +204,12 @@ spec:
         {{- end }}
       terminationGracePeriodSeconds: 10
       volumes:
+      {{- if not .Values.global.secretsBackend.vault.enabled }}
       - name: cert
         secret:
           defaultMode: 420
           secretName: {{ template "consul.fullname" . }}-controller-webhook-cert
+      {{- end }}
       {{- if .Values.global.tls.enabled }}
       {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert

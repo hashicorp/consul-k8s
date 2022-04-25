@@ -934,6 +934,40 @@ load _helpers
   [ "${actual}" = "test" ]
 }
 
+@test "controller/Deployment: vault does not add cert volume when global.tls.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name == "cert")' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}
+
+@test "controller/Deployment: vault does not add cert volumeMounts when global.tls.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cert")' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}
+
 #--------------------------------------------------------------------
 # Vault agent annotations
 

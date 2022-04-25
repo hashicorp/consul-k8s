@@ -168,7 +168,7 @@ spec:
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
-                -tls-cert-dir=/etc/connect-injector/certs \
+                -tls-cert-dir={{ .Values.connectInject.tlsCertDir }} \
                 {{- $resources := .Values.connectInject.sidecarProxy.resources }}
                 {{- /* kindIs is used here to differentiate between null and 0 */}}
                 {{- if not (kindIs "invalid" $resources.limits.memory) }}
@@ -252,9 +252,11 @@ spec:
             successThreshold: 1
             timeoutSeconds: 5
           volumeMounts:
+          {{- if not .Values.global.secretsBackend.vault.enabled }}
           - name: certs
-            mountPath: /etc/connect-injector/certs
+            mountPath: {{ .Values.connectInject.tlsCertDir }}
             readOnly: true
+          {{- end}}
           - mountPath: /consul/login
             name: consul-data
             readOnly: true
@@ -272,10 +274,12 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+      {{- if not .Values.global.secretsBackend.vault.enabled }}
       - name: certs
         secret:
           defaultMode: 420
           secretName: {{ template "consul.fullname" . }}-connect-inject-webhook-cert
+      {{- end }}
       - name: consul-data
         emptyDir:
           medium: "Memory"
