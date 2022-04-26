@@ -2055,8 +2055,6 @@ connectInject:
   # ConnectInject
   tlsCert: 
     # @type: string
-    dir: /etc/connect-injector/certs
-    # @type: string
     secretName: nil
 # Controller handles config entry custom resources.
 # Requires consul >= 1.8.4.
@@ -2076,8 +2074,6 @@ controller:
   # deletion, and update, to get TLS certificates used to send webhooks to
   # the controller.
   tlsCert:
-    # @type: string
-    dir: /tmp/controller-webhook/certs
     # @type: string
     secretName: nil
 

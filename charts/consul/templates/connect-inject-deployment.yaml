@@ -172,7 +172,11 @@ spec:
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
+                {{- if .Values.global.secretsBackend.vault.enabled }}
                 -tls-cert-dir=/vault/secrets \
+                {{- else }}
+                -tls-cert-dir=/etc/connect-injector/certs \
+                {{- end }}
                 {{- $resources := .Values.connectInject.sidecarProxy.resources }}
                 {{- /* kindIs is used here to differentiate between null and 0 */}}
                 {{- if not (kindIs "invalid" $resources.limits.memory) }}

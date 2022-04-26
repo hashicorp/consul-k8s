@@ -121,7 +121,11 @@ spec:
             -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
+            {{- if .Values.global.secretsBackend.vault.enabled }}
             -webhook-tls-cert-dir=/vault/secrets \
+            {{- else }}
+            -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
+            {{- end }}
             -datacenter={{ .Values.global.datacenter }} \
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
