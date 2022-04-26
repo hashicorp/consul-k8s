@@ -1948,7 +1948,7 @@ EOF
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=server.dc1.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=localhost,release-name-consul-connect-injector,*.release-name-consul-connect-injector,*.release-name-consul-connect-injector.default,release-name-consul-connect-injector.default,*.release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc,*.connect-injector.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $cmd |
@@ -1957,7 +1957,7 @@ EOF
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=server.dc1.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=localhost,release-name-consul-connect-injector,*.release-name-consul-connect-injector,*.release-name-consul-connect-injector.default,release-name-consul-connect-injector.default,*.release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc,*.connect-injector.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
 }

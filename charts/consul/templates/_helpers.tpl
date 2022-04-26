@@ -55,16 +55,16 @@ as well as the global.name setting.
 
 {{- define "consul.connectInjectWebhookTLSCertTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.connectInject.tlsCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .Values.connectInject.tlsCert.secretName }}" "{{ printf "common_name=connect-injector.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
 {{- define "consul.connectInjectWebhookTLSKeyTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.connectInject.tlsCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .Values.connectInject.tlsCert.secretName }}" "{{ printf "common_name=connect-injector.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -81,6 +81,12 @@ as well as the global.name setting.
 
 {{- define "consul.serverAdditionalIPSANs" -}}
 {{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.global.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}
+{{- end -}}
+
+{{- define "consul.connectInjectorTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "localhost,%s-connect-injector,*.%s-connect-injector,*.%s-connect-injector.%s,%s-connect-injector.%s,*.%s-connect-injector.%s.svc,%s-connect-injector.%s.svc,*.connect-injector.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
 {{- end -}}
 
 {{- define "consul.vaultReplicationTokenTemplate" -}}
