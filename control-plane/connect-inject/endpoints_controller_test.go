@@ -3670,7 +3670,7 @@ func TestReconcileUnreachableClient(t *testing.T) {
 			})
 
 			//using concat (+) instead of fmt.Sprintf because string has lots of %s in it that cause issues
-			expectedError := "1 error occurred:\n\t* Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": dial tcp 126.0.0.1:31794: i/o timeout (Client.Timeout exceeded while awaiting headers)\n\n"
+			expectedError := "1 error occurred:\n\t* Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n\n"
 
 			require.EqualError(t, err, expectedError)
 			require.False(t, resp.Requeue)
