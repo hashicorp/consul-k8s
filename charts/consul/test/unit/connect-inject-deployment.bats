@@ -1914,6 +1914,7 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.enabled=true' \
+      --set 'connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
@@ -1940,6 +1941,25 @@ EOF
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
   [ "${actual}" = "test" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-tls.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki/issue/connect-webhook-cert-dc1" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=server.dc1.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-tls.key"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki/issue/connect-webhook-cert-dc1" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.key"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=server.dc1.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
 }
 
 @test "connectInject/Deployment: vault does not add tls-ca-cert volume when global.tls.enabled is true" {
@@ -1971,6 +1991,22 @@ EOF
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" == "" ]
 }
+
+@test "connectInject/Deployment: vault tls-cert-dir flag is set to /vault/secrets" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+            . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-dir=/vault/secrets"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # Vault agent annotations
 
