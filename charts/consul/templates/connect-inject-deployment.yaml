@@ -262,7 +262,7 @@ spec:
           volumeMounts:
           {{- if not .Values.global.secretsBackend.vault.enabled }}
           - name: certs
-            mountPath: {{ .Values.connectInject.tlsCert.dir }}
+            mountPath: /etc/connect-injector/certs
             readOnly: true
           {{- end}}
           - mountPath: /consul/login
