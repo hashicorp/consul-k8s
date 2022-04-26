@@ -197,7 +197,7 @@ spec:
           name: consul-data
           readOnly: true
         {{- if not .Values.global.secretsBackend.vault.enabled }}
-        - mountPath: {{ .Values.controller.tlsCert.dir }}
+        - mountPath: /tmp/controller-webhook/certs
           name: cert
           readOnly: true
         {{- end }}
