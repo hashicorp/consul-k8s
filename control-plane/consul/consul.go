@@ -14,7 +14,7 @@ import (
 func NewClient(config *capi.Config) (*capi.Client, error) {
 	if config.HttpClient == nil {
 		config.HttpClient = &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 2 * time.Second,
 		}
 	}
 	err := capi.SetClientConfig(config)
