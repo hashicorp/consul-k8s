@@ -4,8 +4,8 @@ on:
 
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  CONSUL_VERSION: 1.11.4 # Consul's OSS version to use in tests
-  CONSUL_ENT_VERSION: 1.11.4+ent # Consul's enterprise version to use in tests
+  CONSUL_VERSION: 1.12.0 # Consul's OSS version to use in tests
+  CONSUL_ENT_VERSION: 1.12.0+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.6.4 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 jobs:
