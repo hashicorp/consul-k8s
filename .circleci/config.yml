@@ -889,7 +889,7 @@ workflows:
      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
      # be moved
       - build-distro:
-          OS: "linux"
+          OS: "darwin freebsd linux solaris windows"
           ARCH: "amd64"
           name: build-distros-amd64
       - dev-upload-docker:
@@ -915,10 +915,13 @@ workflows:
                 - main
     jobs:
       - build-distro:
-          OS: "darwin freebsd linux solaris windows"
+          OS: "linux"
           ARCH: "amd64"
           name: build-distros-amd64
-      - nightly-dev-upload-docker
+      - nightly-dev-upload-docker:
+          context: consul-ci
+          requires:
+            - build-distros-amd64
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources
