@@ -914,6 +914,10 @@ workflows:
               only:
                 - main
     jobs:
+      - build-distro:
+          OS: "darwin freebsd linux solaris windows"
+          ARCH: "amd64"
+          name: build-distros-amd64
       - nightly-dev-upload-docker
       - cleanup-gcp-resources
       - cleanup-azure-resources
