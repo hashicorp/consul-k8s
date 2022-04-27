@@ -212,7 +212,7 @@ func (c *Command) Run(args []string) int {
 		c.http.MergeOntoConfig(consulCfg)
 
 		var err error
-		c.consulClient, err = consul.NewClient(consulCfg)
+		c.consulClient, err = consul.NewClient(consulCfg, c.http.ConsulAPITimeout())
 		if err != nil {
 			logger.Error("Error creating consul client", "err", err)
 			return 1

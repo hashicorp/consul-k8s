@@ -132,7 +132,7 @@ func (c *Command) Run(args []string) int {
 
 	cfg := api.DefaultConfig()
 	c.httpFlags.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.httpFlags.ConsulAPITimeout())
 	if err != nil {
 		setupLog.Error(err, "connecting to Consul agent")
 		return 1

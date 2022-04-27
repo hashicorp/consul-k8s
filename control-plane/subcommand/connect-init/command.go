@@ -113,7 +113,7 @@ func (c *Command) Run(args []string) int {
 	cfg := api.DefaultConfig()
 	cfg.Namespace = c.flagConsulServiceNamespace
 	c.http.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
@@ -151,7 +151,7 @@ func (c *Command) Run(args []string) int {
 	var errServiceNameMismatch error
 	// We need a new client so that we can use the ACL token that was fetched during login to do the next bit,
 	// otherwise `consulClient` will still be using the bearerToken that was passed in.
-	consulClient, err = consul.NewClient(cfg)
+	consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.logger.Error("Unable to update client connection", "error", err)
 		return 1

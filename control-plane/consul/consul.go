@@ -11,10 +11,13 @@ import (
 
 // NewClient returns a Consul API client. It adds a required User-Agent
 // header that describes the version of consul-k8s making the call.
-func NewClient(config *capi.Config) (*capi.Client, error) {
+func NewClient(config *capi.Config, consulAPITimeout int) (*capi.Client, error) {
+	if consulAPITimeout <= 0 {
+		consulAPITimeout = 5
+	}
 	if config.HttpClient == nil {
 		config.HttpClient = &http.Client{
-			Timeout: 2 * time.Second,
+			Timeout: time.Duration(consulAPITimeout) * time.Second,
 		}
 	}
 	err := capi.SetClientConfig(config)

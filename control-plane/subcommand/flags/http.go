@@ -2,7 +2,9 @@ package flags
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -15,15 +17,16 @@ import (
 
 // HTTPFlags are flags used to configure communication with a Consul agent.
 type HTTPFlags struct {
-	address       StringValue
-	token         StringValue
-	tokenFile     StringValue
-	caFile        StringValue
-	caPath        StringValue
-	certFile      StringValue
-	keyFile       StringValue
-	tlsServerName StringValue
-	partition     StringValue
+	address          StringValue
+	token            StringValue
+	tokenFile        StringValue
+	caFile           StringValue
+	caPath           StringValue
+	certFile         StringValue
+	keyFile          StringValue
+	tlsServerName    StringValue
+	partition        StringValue
+	consulAPITimeout IntValue
 }
 
 func (f *HTTPFlags) Flags() *flag.FlagSet {
@@ -59,11 +62,17 @@ func (f *HTTPFlags) Flags() *flag.FlagSet {
 			"can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
 	fs.Var(&f.partition, "partition",
 		"[Enterprise Only] Name of the Consul Admin Partition to query. Default to \"default\" if Admin Partitions are enabled.")
+	fs.Var(&f.consulAPITimeout, "consul-api-timeout",
+		"The time in seconds that the consul API client will wait for a response from the API before timing out.")
 	return fs
 }
 
 func (f *HTTPFlags) Addr() string {
 	return f.address.String()
+}
+
+func (f *HTTPFlags) ConsulAPITimeout() int {
+	return *f.consulAPITimeout.v
 }
 
 func (f *HTTPFlags) Token() string {
@@ -105,7 +114,7 @@ func (f *HTTPFlags) APIClient() (*api.Client, error) {
 
 	f.MergeOntoConfig(c)
 
-	return consul.NewClient(c)
+	return consul.NewClient(c, *f.consulAPITimeout.v)
 }
 
 func (f *HTTPFlags) MergeOntoConfig(c *api.Config) {
@@ -160,4 +169,28 @@ func (s *StringValue) String() string {
 		current = *(s.v)
 	}
 	return current
+}
+
+// IntValue provides a flag value that's aware if it has been set.
+type IntValue struct {
+	v *int
+}
+
+// Set implements the flag.Value interface.
+func (i *IntValue) Set(v string) error {
+	if i.v == nil {
+		i.v = new(int)
+	}
+	parsed, err := strconv.ParseUint(v, 0, 64)
+	*(i.v) = (int)(parsed)
+	return err
+}
+
+// String implements the flag.Value interface.
+func (i *IntValue) String() string {
+	var current int
+	if i.v != nil {
+		current = *(i.v)
+	}
+	return fmt.Sprintf("%v", current)
 }

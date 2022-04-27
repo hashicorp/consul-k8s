@@ -30,7 +30,7 @@ func TestNewClient(t *testing.T) {
 	}))
 	defer consulServer.Close()
 
-	client, err := NewClient(&capi.Config{Address: consulServer.URL})
+	client, err := NewClient(&capi.Config{Address: consulServer.URL}, 0)
 	require.NoError(t, err)
 	leader, err := client.Status().Leader()
 	require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestNewClient_httpClientDefaultTimeout(t *testing.T) {
-	client, err := NewClient(&capi.Config{Address: "http://126.0.0.1"})
+	client, err := NewClient(&capi.Config{Address: "http://126.0.0.1"}, 0)
 	require.NoError(t, err)
 	// arbitrarily calling /agent/checks.  This could be any call.  We are
 	// really testing the unreachable address

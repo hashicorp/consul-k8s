@@ -69,7 +69,7 @@ func (c *Command) Run(args []string) int {
 
 	cfg := api.DefaultConfig()
 	c.http.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1

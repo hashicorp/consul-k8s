@@ -45,7 +45,7 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 				Address: c.flagConsulTLSServerName,
 				CAFile:  c.flagConsulCACert,
 			},
-		})
+		}, c.flagConsulAPITimeout)
 		if err != nil {
 			return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 		}
@@ -68,7 +68,7 @@ func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootToken
 			Address: c.flagConsulTLSServerName,
 			CAFile:  c.flagConsulCACert,
 		},
-	})
+	}, c.flagConsulAPITimeout)
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 	}
@@ -151,7 +151,7 @@ func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []st
 				Address: c.flagConsulTLSServerName,
 				CAFile:  c.flagConsulCACert,
 			},
-		})
+		}, c.flagConsulAPITimeout)
 		if err != nil {
 			return err
 		}

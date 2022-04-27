@@ -132,7 +132,7 @@ func (c *Command) Run(args []string) int {
 	cfg.Address = serverAddr
 	cfg.Scheme = scheme
 	c.http.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1

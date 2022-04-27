@@ -66,6 +66,7 @@ type Command struct {
 	flagConsulCACert        string
 	flagConsulTLSServerName string
 	flagUseHTTPS            bool
+	flagConsulAPITimeout    int
 
 	// Flags for ACL replication.
 	flagCreateACLReplicationToken bool
@@ -216,6 +217,9 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
+	c.flags.IntVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
+		"The time in seconds that the consul API client will wait for a response from the API before timing out.")
+
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
@@ -358,7 +362,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagEnablePartitions {
 		clientConfig.Partition = c.flagPartitionName
 	}
-	consulClient, err := consul.NewClient(clientConfig)
+	consulClient, err := consul.NewClient(clientConfig, c.flagConsulAPITimeout)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
@@ -475,7 +479,7 @@ func (c *Command) Run(args []string) int {
 		if c.flagEnablePartitions {
 			anonTokenConfig.Partition = consulDefaultPartition
 		}
-		anonTokenClient, err := consul.NewClient(anonTokenConfig)
+		anonTokenClient, err := consul.NewClient(anonTokenConfig, c.flagConsulAPITimeout)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -967,6 +971,11 @@ func (c *Command) validateFlags() error {
 	if !c.flagEnablePartitions && c.flagPartitionName != "" {
 		return errors.New("-enable-partitions must be 'true' if -partition is set")
 	}
+
+	if c.flagConsulAPITimeout <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+
 	return nil
 }
 

@@ -3642,7 +3642,7 @@ func TestReconcileUnreachableClient(t *testing.T) {
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
 			}
-			consulClient, err := cpconsul.NewClient(cfg)
+			consulClient, err := cpconsul.NewClient(cfg, 0)
 			require.NoError(t, err)
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]

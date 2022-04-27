@@ -27,13 +27,14 @@ type Command struct {
 
 	flags *flag.FlagSet
 
-	flagOutputFile    string
-	flagServerAddr    string
-	flagServerPort    string
-	flagCAFile        string
-	flagTLSServerName string
-	flagLogLevel      string
-	flagLogJSON       bool
+	flagOutputFile       string
+	flagServerAddr       string
+	flagServerPort       string
+	flagCAFile           string
+	flagTLSServerName    string
+	flagConsulAPITimeout int
+	flagLogLevel         string
+	flagLogJSON          bool
 
 	once sync.Once
 	help string
@@ -60,7 +61,8 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-
+	c.flags.IntVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
+		"The time in seconds that the consul API client will wait for a response from the API before timing out.")
 	c.help = flags.Usage(help, c.flags)
 }
 
@@ -81,6 +83,11 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagServerAddr == "" {
 		c.UI.Error("-server-addr must be set")
+		return 1
+	}
+
+	if c.flagConsulAPITimeout <= 0 {
+		c.UI.Error("-consul-api-timeout must be set to a value greater than 0")
 		return 1
 	}
 
@@ -153,7 +160,7 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 		cfg.TLSConfig.Address = c.flagTLSServerName
 	}
 
-	return consul.NewClient(cfg)
+	return consul.NewClient(cfg, c.flagConsulAPITimeout)
 }
 
 // consulServerAddr returns the consul server address

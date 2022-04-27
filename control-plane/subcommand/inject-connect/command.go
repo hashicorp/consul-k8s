@@ -359,7 +359,7 @@ func (c *Command) Run(args []string) int {
 	// Set up Consul client.
 	if c.consulClient == nil {
 		var err error
-		c.consulClient, err = consul.NewClient(cfg)
+		c.consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("error connecting to Consul agent: %s", err))
 			return 1

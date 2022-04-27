@@ -181,7 +181,7 @@ func (c *Command) Run(args []string) int {
 			cfg.Scheme = scheme
 		}
 
-		c.consulClient, err = consul.NewClient(cfg)
+		c.consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
 		if err != nil {
 			c.logger.Error("Unable to get client connection", "error", err)
 			return 1

@@ -109,7 +109,7 @@ func Test_RunUsingLogin(t *testing.T) {
 		Scheme:  "http",
 		Token:   masterToken,
 	}
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, 0)
 	require.NoError(t, err)
 
 	// We are not setting up the Component Auth Method here because testing logout
