@@ -3,4 +3,10 @@ kind: Peering
 metadata:
   name: peering-sample
 spec:
-  # TODO(user): Add fields here
+  peer:
+    generator:
+      secret:
+        name: "foo"
+        key: "bar"
+        backend: "boop"
+

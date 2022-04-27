@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -18,7 +19,6 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +116,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(batchv1.AddToScheme(scheme))
+	// We need v1alpha1 here to add the peering api to the scheme
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

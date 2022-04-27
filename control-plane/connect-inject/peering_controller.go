@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +37,15 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_ = r.Log.WithValues("peering", req.NamespacedName)
 
 	// TODO(user): your logic here
+
+	fmt.Printf("Got a req: %s\n", req.Name)
+	r.Log.Info("Got a req:", "name", req.Name)
+	token := &consulv1alpha1.Peering{}
+	err := r.Get(ctx, req.NamespacedName, token)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	r.Log.Info("found token:", "token", token.Name)
 
 	return ctrl.Result{}, nil
 }
