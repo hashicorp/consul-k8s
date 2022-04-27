@@ -1,4 +1,4 @@
-package controllers
+package connectinject
 
 import (
 	"context"
@@ -11,11 +11,12 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// PeeringReconciler reconciles a Peering object
-type PeeringReconciler struct {
+// PeeringController reconciles a Peering object
+type PeeringController struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	context.Context
 }
 
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peerings,verbs=get;list;watch;create;update;patch;delete
@@ -30,7 +31,7 @@ type PeeringReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.6.4/pkg/reconcile
-func (r *PeeringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("peering", req.NamespacedName)
 
@@ -40,7 +41,7 @@ func (r *PeeringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PeeringReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PeeringController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&consulv1alpha1.Peering{}).
 		Complete(r)

@@ -425,6 +425,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if err = (&connectinject.PeeringController{
+		Client:  mgr.GetClient(),
+		Log:     ctrl.Log.WithName("controller").WithName("peering"),
+		Scheme:  mgr.GetScheme(),
+		Context: ctx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "peering")
+		return 1
+	}
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
