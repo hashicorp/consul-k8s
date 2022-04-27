@@ -1,0 +1,24 @@
+# permissions for end users to edit peerings.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: peering-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - peerings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - peerings/status
+  verbs:
+  - get
