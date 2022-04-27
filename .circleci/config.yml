@@ -914,7 +914,14 @@ workflows:
               only:
                 - main
     jobs:
-      - nightly-dev-upload-docker
+      - build-distro:
+          OS: "linux"
+          ARCH: "amd64"
+          name: build-distros-amd64
+      - nightly-dev-upload-docker:
+          context: consul-ci
+          requires:
+            - build-distros-amd64
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources
