@@ -85,8 +85,7 @@ spec:
                     type: string
                 type: object
               secret:
-                description: Secret shows any errors during the last reconciliation
-                  of this resource.
+                description: SecretRef shows the status of the secret.
                 properties:
                   backend:
                     description: 'Backend is where the generated secret is stored.
@@ -96,7 +95,7 @@ spec:
                     description: Key is the key of the secret generated.
                     type: string
                   latestHash:
-                    description: LatestHash is the SHA256 sum of the secret generated.
+                    description: ResourceVersion is the resource version for the secret.
                     type: string
                   name:
                     description: Name is the name of the secret generated.
