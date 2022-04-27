@@ -65,8 +65,8 @@ type PeeringStatus struct {
 
 	// LastReconcileTime is the last time the resource was reconciled.
 	// +optional
-	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
-	Secret            *SecretStatus
+	LastReconcileTime *metav1.Time  `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
+	Secret            *SecretStatus `json:"secret,omitempty"`
 }
 type SecretStatus struct {
 	// TODO(peering): add additional status fields
