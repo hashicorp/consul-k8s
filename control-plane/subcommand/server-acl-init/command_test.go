@@ -58,11 +58,26 @@ func TestRun_FlagValidation(t *testing.T) {
 			ExpErr: "-resource-prefix must be set",
 		},
 		{
-			Flags:  []string{"-acl-replication-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
+			Flags: []string{
+				"-acl-replication-token-file=/notexist",
+				"-server-address=localhost",
+				"-resource-prefix=prefix"},
+			ExpErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+		{
+			Flags: []string{
+				"-acl-replication-token-file=/notexist",
+				"-server-address=localhost",
+				"-resource-prefix=prefix",
+				"-consul-api-timeout=5"},
 			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 		{
-			Flags:  []string{"-bootstrap-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
+			Flags: []string{
+				"-bootstrap-token-file=/notexist",
+				"-server-address=localhost",
+				"-resource-prefix=prefix",
+				"-consul-api-timeout=5"},
 			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 		{

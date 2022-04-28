@@ -67,6 +67,18 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-server-ca-key-file=file",
 				"-ca-file", f.Name(),
 				"-mesh-gateway-service-name=name",
+			},
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+		{
+			flags: []string{
+				"-resource-prefix=prefix",
+				"-k8s-namespace=default",
+				"-server-ca-cert-file=file",
+				"-server-ca-key-file=file",
+				"-ca-file", f.Name(),
+				"-mesh-gateway-service-name=name",
+				"-consul-api-timeout=5",
 				"-log-level=invalid",
 			},
 			expErr: "unknown log level: invalid",

@@ -1,6 +1,7 @@
 package getconsulclientca
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -71,23 +72,10 @@ func (c *Command) Run(args []string) int {
 	if err := c.flags.Parse(args); err != nil {
 		return 1
 	}
-	if len(c.flags.Args()) > 0 {
-		c.UI.Error("Should have no non-flag arguments.")
-		return 1
-	}
 
-	if c.flagOutputFile == "" {
-		c.UI.Error("-output-file must be set")
-		return 1
-	}
-
-	if c.flagServerAddr == "" {
-		c.UI.Error("-server-addr must be set")
-		return 1
-	}
-
-	if c.flagConsulAPITimeout <= 0 {
-		c.UI.Error("-consul-api-timeout must be set to a value greater than 0")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -210,6 +198,26 @@ func getActiveRoot(roots *api.CARootList) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("none of the roots were active")
+}
+
+func (c *Command) validateFlags() error {
+	if len(c.flags.Args()) > 0 {
+		return errors.New("Should have no non-flag arguments.")
+	}
+
+	if c.flagOutputFile == "" {
+		return errors.New("-output-file must be set")
+	}
+
+	if c.flagServerAddr == "" {
+		return errors.New("-server-addr must be set")
+	}
+
+	if c.flagConsulAPITimeout <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

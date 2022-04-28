@@ -42,6 +42,14 @@ func TestRun_FlagsValidation(t *testing.T) {
 			flags: []string{
 				"-output-file=output.pem",
 				"-server-addr=foo.com",
+			},
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+		{
+			flags: []string{
+				"-output-file=output.pem",
+				"-server-addr=foo.com",
+				"-consul-api-timeout=5",
 				"-log-level=invalid-log-level",
 			},
 			expErr: "unknown log level: invalid-log-level",

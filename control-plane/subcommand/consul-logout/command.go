@@ -52,6 +52,12 @@ func (c *Command) Run(args []string) int {
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
+
+	if c.http.ConsulAPITimeout() <= 0 {
+		c.UI.Error("-consul-api-timeout must be set to a value greater than 0")
+		return 1
+	}
+
 	if c.logger == nil {
 		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
 		if err != nil {

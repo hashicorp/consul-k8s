@@ -35,11 +35,28 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-pod-namespace must be set",
 		},
 		{
-			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", test.AuthMethod},
+			flags: []string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-acl-auth-method", test.AuthMethod},
 			expErr: "-service-account-name must be set when ACLs are enabled",
 		},
 		{
-			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", test.AuthMethod, "-service-account-name", "foo", "-log-level", "invalid"},
+			flags: []string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-acl-auth-method", test.AuthMethod,
+				"-service-account-name", "foo"},
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+		{
+			flags: []string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-acl-auth-method", test.AuthMethod,
+				"-service-account-name", "foo",
+				"-consul-api-timeout", "5",
+				"-log-level", "invalid"},
 			expErr: "unknown log level: invalid",
 		},
 	}

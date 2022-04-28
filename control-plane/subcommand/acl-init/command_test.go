@@ -26,6 +26,30 @@ const (
 	componentAuthMethod = "consul-k8s-component-auth-method"
 )
 
+func TestRun_FlagValidation(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		flags  []string
+		expErr string
+	}{
+		{
+			flags:  []string{},
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.expErr, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+			code := cmd.Run(c.flags)
+			require.Equal(t, 1, code)
+			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
+		})
+	}
+}
+
 // Test that we write the secret data to a file.
 func TestRun_TokenSinkFile(t *testing.T) {
 	t.Parallel()

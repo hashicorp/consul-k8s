@@ -284,6 +284,9 @@ func (c *Command) validateFlags(args []string) error {
 	if err := c.validateCAFileFlag(); err != nil {
 		return err
 	}
+	if c.http.ConsulAPITimeout() <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
 	return nil
 }
 
