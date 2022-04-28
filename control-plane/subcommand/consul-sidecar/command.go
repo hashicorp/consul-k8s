@@ -358,6 +358,9 @@ func (c *Command) validateFlags() error {
 		if c.flagConsulBinary == "" {
 			return errors.New("-consul-binary must be set")
 		}
+		if c.http.ConsulAPITimeout() <= 0 {
+			return errors.New("-consul-api-timeout must be set to a value greater than 0")
+		}
 		_, err := os.Stat(c.flagServiceConfig)
 		if os.IsNotExist(err) {
 			return fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
