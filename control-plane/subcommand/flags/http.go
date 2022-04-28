@@ -72,7 +72,7 @@ func (f *HTTPFlags) Addr() string {
 }
 
 func (f *HTTPFlags) ConsulAPITimeout() int {
-	return *f.consulAPITimeout.v
+	return f.consulAPITimeout.Int()
 }
 
 func (f *HTTPFlags) Token() string {
@@ -193,4 +193,13 @@ func (i *IntValue) String() string {
 		current = *(i.v)
 	}
 	return fmt.Sprintf("%v", current)
+}
+
+// String implements the flag.Value interface.
+func (i *IntValue) Int() int {
+	var current int
+	if i.v != nil {
+		current = *(i.v)
+	}
+	return current
 }
