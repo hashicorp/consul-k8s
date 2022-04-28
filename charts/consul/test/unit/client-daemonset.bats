@@ -1302,7 +1302,7 @@ local actual=$(echo $object |
   [ "${actual}" = "false" ]
 }
 
-@test "client/DaemonSet: Adds consul ca cert volumeMount to acl-init init container when tls is not enabled" {
+@test "client/DaemonSet: Does not add consul ca cert volumeMount to acl-init init container when tls is not enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
