@@ -218,7 +218,12 @@ func TestRun_ValidationConsulHTTPAddr(t *testing.T) {
 		UI:        ui,
 		clientset: k8sClient,
 	}
-	flags := []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0"}
+	flags := []string{
+		"-consul-k8s-image", "hashicorp/consul-k8s",
+		"-consul-image", "foo",
+		"-envoy-image", "envoy:1.16.0",
+		"-consul-api-timeout", "5",
+	}
 
 	os.Setenv(api.HTTPAddrEnvName, "%")
 	code := cmd.Run(flags)

@@ -135,6 +135,7 @@ func TestRun_Defaults(t *testing.T) {
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 		"-resource-prefix=" + resourcePrefix,
+		"-consul-api-timeout", "5",
 	}
 	responseCode := cmd.Run(args)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -213,6 +214,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
@@ -287,6 +289,7 @@ func TestRun_ReplicationTokenPrimaryDC_WithProvidedSecretID(t *testing.T) {
 		"-resource-prefix=" + resourcePrefix,
 		"-create-acl-replication-token",
 		"-acl-replication-token-file", replicationTokenFile.Name(),
+		"-consul-api-timeout", "5",
 	}
 
 	responseCode := cmd.Run(cmdArgs)
@@ -368,6 +371,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				"-server-address", strings.Split(secondaryAddr, ":")[0],
 				"-server-port", strings.Split(secondaryAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
@@ -442,6 +446,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 				"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix", resourcePrefix,
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
@@ -545,6 +550,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
 				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+				"-consul-api-timeout", "5",
 			}, flags...)
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -636,6 +642,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-acl-binding-rule-selector=" + bindingRuleSelector,
+				"-consul-api-timeout", "5",
 			}
 			cmdArgs = append(cmdArgs, c.flags...)
 			responseCode := cmd.Run(cmdArgs)
@@ -707,6 +714,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 		"-connect-inject",
 		"-acl-binding-rule-selector=" + bindingRuleSelector,
+		"-consul-api-timeout", "5",
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -751,6 +759,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 		"-acl-binding-rule-selector=" + bindingRuleSelector,
 		"-connect-inject",
 		"-auth-method-host=" + kubernetesHost,
+		"-consul-api-timeout", "5",
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -785,6 +794,7 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 		"-connect-inject",
+		"-consul-api-timeout", "5",
 	}
 	firstRunArgs := append(commonArgs,
 		"-acl-binding-rule-selector=serviceaccount.name!=default",
@@ -859,6 +869,7 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 		"-sync-catalog",
+		"-consul-api-timeout", "5",
 	}
 	firstRunArgs := append(commonArgs,
 		"-sync-consul-node-name=k8s-sync",
@@ -968,6 +979,7 @@ func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
 		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
 		"-sync-catalog",
+		"-consul-api-timeout", "5",
 	}
 	responseCode := cmd.Run(cmdArgs)
 
@@ -1008,6 +1020,7 @@ func TestRun_DelayedServers(t *testing.T) {
 			"-k8s-namespace=" + ns,
 			"-server-address=127.0.0.1",
 			"-server-port=" + strconv.Itoa(randomPorts[1]),
+			"-consul-api-timeout", "5",
 		})
 		close(done)
 	}()
@@ -1151,6 +1164,7 @@ func TestRun_NoLeader(t *testing.T) {
 			"-k8s-namespace=" + ns,
 			"-server-address=" + serverURL.Hostname(),
 			"-server-port=" + serverURL.Port(),
+			"-consul-api-timeout", "5",
 		})
 		close(done)
 	}()
@@ -1400,6 +1414,7 @@ func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address=" + serverURL.Hostname(),
 		"-server-port=" + serverURL.Port(),
+		"-consul-api-timeout", "5",
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -1525,6 +1540,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-server-address=" + serverURL.Hostname(),
 				"-server-port=" + serverURL.Port(),
+				"-consul-api-timeout", "5",
 			}
 
 			// Create the bootstrap secret.
@@ -1654,6 +1670,7 @@ func TestRun_AlreadyBootstrapped_ServerTokenExists(t *testing.T) {
 				"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix", resourcePrefix,
+				"-consul-api-timeout", "5",
 			}
 
 			if tokenInK8sSecret {
@@ -1780,6 +1797,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		"-bootstrap-token-file=" + tokenFile,
 		"-set-server-tokens=false",
 		"-client=false", // disable client token, so there are fewer calls
+		"-consul-api-timeout", "5",
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -1813,6 +1831,7 @@ func TestRun_Timeout(t *testing.T) {
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address=foo",
+		"-consul-api-timeout", "5",
 	})
 	require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
 }
@@ -1852,6 +1871,7 @@ func TestRun_HTTPS(t *testing.T) {
 		"-consul-ca-cert", caFile,
 		"-server-address=" + strings.Split(srv.HTTPSAddr, ":")[0],
 		"-server-port=" + strings.Split(srv.HTTPSAddr, ":")[1],
+		"-consul-api-timeout", "5",
 	})
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -1893,6 +1913,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 		"-auth-method-host=" + "https://my-kube.com",
 		"-client",
 		"-mesh-gateway",
+		"-consul-api-timeout", "5",
 	}
 	responseCode := secondaryCmd.Run(secondaryCmdArgs)
 	require.Equal(t, 0, responseCode, secondaryUI.ErrorWriter.String())
@@ -1945,6 +1966,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 				"-server-address", strings.Split(serverAddr, ":")[0],
 				"-server-port", strings.Split(serverAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
+				"-consul-api-timeout", "5",
 			}, flag)
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -1991,6 +2013,7 @@ func TestRun_CloudAutoJoin(t *testing.T) {
 		"-resource-prefix=" + resourcePrefix,
 		"-server-address", "provider=mock",
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-consul-api-timeout", "5",
 	}
 	responseCode := cmd.Run(args)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -2062,6 +2085,7 @@ func TestRun_GatewayErrors(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-consul-api-timeout", "5",
 			}
 			cmdArgs = append(cmdArgs, c.flags...)
 			responseCode := cmd.Run(cmdArgs)
@@ -2169,6 +2193,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -2340,6 +2365,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 				"-acl-replication-token-file", tokenFile,
 				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
 				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -2508,6 +2534,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 				"-auth-method-host=" + k8sMockServer.URL,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -2664,6 +2691,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 				"-auth-method-host=" + k8sMockServer.URL,
 				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
 				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+				"-consul-api-timeout", "5",
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -2717,7 +2745,9 @@ func TestRun_PrimaryDatacenter_ComponentAuthMethod(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-resource-prefix=" + resourcePrefix}
+		"-resource-prefix=" + resourcePrefix,
+		"-consul-api-timeout", "5",
+	}
 
 	responseCode := cmd.Run(cmdArgs)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -2760,7 +2790,9 @@ func TestRun_SecondaryDatacenter_ComponentAuthMethod(t *testing.T) {
 		"-acl-replication-token-file", tokenFile,
 		"-server-address", strings.Split(consulHTTPAddr, ":")[0],
 		"-server-port", strings.Split(consulHTTPAddr, ":")[1],
-		"-resource-prefix=" + resourcePrefix}
+		"-resource-prefix=" + resourcePrefix,
+		"-consul-api-timeout", "5",
+	}
 
 	responseCode := cmd.Run(cmdArgs)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -2866,6 +2898,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 			"-server-port", strings.Split(primarySvr.HTTPAddr, ":")[1],
 			"-resource-prefix=" + resourcePrefix,
 			"-create-acl-replication-token",
+			"-consul-api-timeout", "5",
 		}
 		responseCode := primaryCmd.Run(primaryCmdArgs)
 		require.Equal(t, 0, responseCode, primaryUI.ErrorWriter.String())

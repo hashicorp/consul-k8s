@@ -73,6 +73,7 @@ func TestRun_PartitionCreate(t *testing.T) {
 		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
 		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
 		"-partition-name", partitionName,
+		"-consul-api-timeout", "5",
 	}
 
 	responseCode := cmd.Run(args)
@@ -111,6 +112,7 @@ func TestRun_PartitionExists(t *testing.T) {
 		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
 		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
 		"-partition-name", partitionName,
+		"-consul-api-timeout", "5",
 	}
 
 	responseCode := cmd.Run(args)
@@ -140,6 +142,7 @@ func TestRun_ExitsAfterTimeout(t *testing.T) {
 		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
 		"-partition-name", partitionName,
 		"-timeout", "500ms",
+		"-consul-api-timeout", "5",
 	}
 	server.Stop()
 	startTime := time.Now()

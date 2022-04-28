@@ -203,6 +203,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-acl-token-sink", tokenFile,
 				"-proxy-id-file", proxyFile,
 				"-multiport=" + strconv.FormatBool(tt.multiport),
+				"-consul-api-timeout=5",
 			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
 			if tt.tls {
@@ -321,7 +322,8 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
 				"-multiport=" + strconv.FormatBool(tt.multiport),
-				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
+				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+				"-consul-api-timeout", "5"}
 
 			// In a multiport case, the service name will be passed in to the test.
 			if tt.serviceName != "" {
@@ -523,6 +525,7 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
+				"-consul-api-timeout", "5",
 			}
 
 			code := cmd.Run(flags)
@@ -567,6 +570,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		"-pod-namespace", testPodNamespace,
 		"-http-addr", server.HTTPAddr,
 		"-proxy-id-file", proxyFile,
+		"-consul-api-timeout", "5",
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 0, code)
@@ -607,6 +611,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 		"-pod-namespace", testPodNamespace,
 		"-http-addr", server.HTTPAddr,
 		"-proxy-id-file", randFileName,
+		"-consul-api-timeout", "5",
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
@@ -677,7 +682,9 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				"-service-account-name", testServiceAccountName,
 				"-bearer-token-file", bearerFile,
 				"-acl-token-sink", tokenFile,
-				"-http-addr", serverURL.String()}
+				"-http-addr", serverURL.String(),
+				"-consul-api-timeout", "5",
+			}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
 			// We use the counter to ensure we failed at ACL Login (when counter = 0) or proceeded to the service get portion of the command.
@@ -751,7 +758,9 @@ func TestRun_LoginWithRetries(t *testing.T) {
 				"-acl-token-sink", tokenFile,
 				"-bearer-token-file", bearerFile,
 				"-proxy-id-file", proxyFile,
-				"-http-addr", serverURL.String()})
+				"-http-addr", serverURL.String(),
+				"-consul-api-timeout", "5",
+			})
 			fmt.Println(ui.ErrorWriter.String())
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
@@ -830,7 +839,9 @@ func TestRun_EnsureTokenExists(t *testing.T) {
 				"-acl-token-sink", tokenFile,
 				"-bearer-token-file", bearerFile,
 				"-proxy-id-file", proxyFile,
-				"-http-addr", serverURL.String()})
+				"-http-addr", serverURL.String(),
+				"-consul-api-timeout", "5",
+			})
 			if c.neverSucceed {
 				require.Equal(t, 1, code)
 			} else {
