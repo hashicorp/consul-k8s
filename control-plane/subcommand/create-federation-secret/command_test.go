@@ -948,6 +948,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 			"-server-ca-cert-file", caFile,
 			"-server-ca-key-file", keyFile,
 			"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+			"-consul-api-timeout", "5",
 		})
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 

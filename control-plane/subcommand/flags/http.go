@@ -186,6 +186,13 @@ func (i *IntValue) Set(v string) error {
 	return err
 }
 
+// Merge will overlay this value if it has been set.
+func (i *IntValue) Merge(onto *int) {
+	if i.v != nil {
+		*onto = *(i.v)
+	}
+}
+
 // String implements the flag.Value interface.
 func (i *IntValue) String() string {
 	var current int

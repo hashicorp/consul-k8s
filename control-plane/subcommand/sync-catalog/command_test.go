@@ -71,6 +71,7 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
 		"-http-addr", testServer.HTTPAddr,
+		"-consul-api-timeout", "5",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -107,6 +108,7 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 
 		exitChan := runCommandAsynchronously(&cmd, []string{
 			"-http-addr", testServer.HTTPAddr,
+			"-consul-api-timeout", "5",
 		})
 		cmd.sendSignal(sig)
 
