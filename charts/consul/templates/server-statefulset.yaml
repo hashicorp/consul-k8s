@@ -261,7 +261,7 @@ spec:
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
-              
+
               {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
               {{ template "consul.recursors" }}
               {{- end }}
@@ -371,6 +371,10 @@ spec:
               containerPort: 8600
               protocol: "UDP"
           readinessProbe:
+            {{- if .Values.server.readinessProbe.path }}
+            httpGet:
+              path: {{ .Values.server.readinessProbe.path }}
+            {{- else }}
             # NOTE(mitchellh): when our HTTP status endpoints support the
             # proper status codes, we should switch to that. This is temporary.
             exec:
@@ -385,11 +389,12 @@ spec:
                   curl http://127.0.0.1:8500/v1/status/leader \
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
-            failureThreshold: 2
-            initialDelaySeconds: 5
-            periodSeconds: 3
-            successThreshold: 1
-            timeoutSeconds: 5
+            {{- end }}
+            failureThreshold: {{ .Values.server.readinessProbe.failureThreshold }}
+            initialDelaySeconds: {{ .Values.server.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.readinessProbe.periodSeconds }}
+            successThreshold: {{ .Values.server.readinessProbe.successThreshold }}
+            timeoutSeconds: {{ .Values.server.readinessProbe.timeoutSeconds }}
           {{- if .Values.server.resources }}
           resources:
             {{- if eq (typeOf .Values.server.resources) "string" }}
