@@ -24,7 +24,7 @@ const staticServerNamespace = "ns1"
 const staticClientNamespace = "ns2"
 
 // Test that Connect works in a default and ACLsAndAutoEncryptEnabled installations for X-Partition and in-partition networking.
-func TestPartitions(t *testing.T) {
+func TestPartitions_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -138,19 +138,19 @@ func TestPartitions(t *testing.T) {
 			caKeySecretName := fmt.Sprintf("%s-consul-ca-key", releaseName)
 
 			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
-			moveSecret(t, serverClusterContext, clientClusterContext, caCertSecretName)
+			copySecret(t, serverClusterContext, clientClusterContext, caCertSecretName)
 
 			if !c.ACLsAndAutoEncryptEnabled {
 				// When auto-encrypt is disabled, we need both
 				// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
 				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
-				moveSecret(t, serverClusterContext, clientClusterContext, caKeySecretName)
+				copySecret(t, serverClusterContext, clientClusterContext, caKeySecretName)
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
 			if c.ACLsAndAutoEncryptEnabled {
 				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
-				moveSecret(t, serverClusterContext, clientClusterContext, partitionToken)
+				copySecret(t, serverClusterContext, clientClusterContext, partitionToken)
 			}
 
 			partitionServiceName := fmt.Sprintf("%s-consul-partition", releaseName)
@@ -630,7 +630,7 @@ func TestPartitions(t *testing.T) {
 	}
 }
 
-func moveSecret(t *testing.T, sourceContext, destContext environment.TestContext, secretName string) {
+func copySecret(t *testing.T, sourceContext, destContext environment.TestContext, secretName string) {
 	t.Helper()
 
 	secret, err := sourceContext.KubernetesClient(t).CoreV1().Secrets(sourceContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})

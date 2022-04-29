@@ -190,9 +190,9 @@ spec:
 
                 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
                 -connect-inject=true \
+                {{- end }}
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
                 -auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
-                {{- end }}
                 {{- end }}
 
                 {{- if .Values.global.federation.k8sAuthMethodHost }}
