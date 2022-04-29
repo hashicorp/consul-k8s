@@ -114,6 +114,7 @@ spec:
         - "-ec"
         - |
           consul-k8s-control-plane controller \
+            -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
