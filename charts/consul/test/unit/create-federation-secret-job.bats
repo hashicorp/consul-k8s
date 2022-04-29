@@ -92,6 +92,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "createFederationSecet/Job: sets -consul-api-timeout" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.consulServiceName=my-service-name' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr | yq '.spec.template.spec.containers[0].command | any(contains("-consul-api-timeout=5"))')
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls
 
