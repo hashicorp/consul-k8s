@@ -4,6 +4,7 @@ BUG FIXES:
 * Helm
   * Update client-daemonset to include ca-cert volumeMount only when tls is enabled. [[GH-1194](https://github.com/hashicorp/consul-k8s/pull/1194)]
   * Update create-federation-secret-job to look up the automatically generated gossip encryption key by the right name when global.name is unset or set to something other than consul. [[GH-1196](https://github.com/hashicorp/consul-k8s/pull/1196)]
+  * Add Admin Partitions support to Sync Catalog **(Consul Enterprise only)**. [[GH-1180](https://github.com/hashicorp/consul-k8s/pull/1190)]
 
 ## 0.43.0 (April 21, 2022)
 

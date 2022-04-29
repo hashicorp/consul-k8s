@@ -170,6 +170,9 @@ spec:
                 {{- if .Values.syncCatalog.consulNodeName }}
                 -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
                 {{- end }}
+                {{- if .Values.global.adminPartitions.enabled }}
+                -partition={{ .Values.global.adminPartitions.name }} \
+                {{- end }}
                 {{- if .Values.syncCatalog.consulPrefix}}
                 -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
                 {{- end}}
