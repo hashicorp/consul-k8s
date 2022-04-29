@@ -62,6 +62,23 @@ load _helpers
   [ "${actual}" = "bar" ]
 }
 
+@test "syncCatalog/Deployment: command defaults" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+  
+  local actual=$(echo $object |
+      yq -r ' any(contains("consul-k8s-control-plane sync-catalog"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r ' any(contains("consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # default sync
 
