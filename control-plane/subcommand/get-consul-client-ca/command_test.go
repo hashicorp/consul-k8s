@@ -49,7 +49,7 @@ func TestRun_FlagsValidation(t *testing.T) {
 			flags: []string{
 				"-output-file=output.pem",
 				"-server-addr=foo.com",
-				"-consul-api-timeout=5",
+				"-consul-api-timeout=5s",
 				"-log-level=invalid-log-level",
 			},
 			expErr: "unknown log level: invalid-log-level",
@@ -104,7 +104,7 @@ func TestRun(t *testing.T) {
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
@@ -187,7 +187,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		"-server-port", fmt.Sprintf("%d", randomPorts[2]),
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
@@ -278,7 +278,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, exitCode)
 
@@ -346,7 +346,7 @@ func TestRun_WithProvider(t *testing.T) {
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-output-file", outputFile.Name(),
 		"-ca-file", caFile,
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 

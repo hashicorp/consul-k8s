@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -149,9 +150,9 @@ type Handler struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
-	// ConsulAPITimeout is the time in seconds that the consul API client will
+	// ConsulAPITimeout is the duration that the consul API client will
 	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout int
+	ConsulAPITimeout time.Duration
 
 	// Log
 	Log logr.Logger

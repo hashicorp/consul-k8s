@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -110,9 +111,9 @@ type EndpointsController struct {
 	// will delete any tokens associated with this auth method
 	// whenever service instances are deregistered.
 	AuthMethod string
-	// ConsulAPITimeout is the time in seconds that the consul API client will
+	// ConsulAPITimeout is the duration that the consul API client will
 	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout int
+	ConsulAPITimeout time.Duration
 
 	MetricsConfig MetricsConfig
 	Log           logr.Logger

@@ -2,10 +2,9 @@ package flags
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
@@ -26,7 +25,7 @@ type HTTPFlags struct {
 	keyFile          StringValue
 	tlsServerName    StringValue
 	partition        StringValue
-	consulAPITimeout IntValue
+	consulAPITimeout DurationValue
 }
 
 func (f *HTTPFlags) Flags() *flag.FlagSet {
@@ -71,8 +70,8 @@ func (f *HTTPFlags) Addr() string {
 	return f.address.String()
 }
 
-func (f *HTTPFlags) ConsulAPITimeout() int {
-	return f.consulAPITimeout.Int()
+func (f *HTTPFlags) ConsulAPITimeout() time.Duration {
+	return f.consulAPITimeout.Duration()
 }
 
 func (f *HTTPFlags) Token() string {
@@ -171,42 +170,42 @@ func (s *StringValue) String() string {
 	return current
 }
 
-// IntValue provides a flag value that's aware if it has been set.
-type IntValue struct {
-	v *int
-}
-
-// Set implements the flag.Value interface.
-func (i *IntValue) Set(v string) error {
-	if i.v == nil {
-		i.v = new(int)
-	}
-	parsed, err := strconv.ParseUint(v, 0, 64)
-	*(i.v) = (int)(parsed)
-	return err
+// DurationValue provides a flag value that's aware if it has been set.
+type DurationValue struct {
+	v *time.Duration
 }
 
 // Merge will overlay this value if it has been set.
-func (i *IntValue) Merge(onto *int) {
-	if i.v != nil {
-		*onto = *(i.v)
+func (d *DurationValue) Merge(onto *time.Duration) {
+	if d.v != nil {
+		*onto = *(d.v)
 	}
 }
 
-// String implements the flag.Value interface.
-func (i *IntValue) String() string {
-	var current int
-	if i.v != nil {
-		current = *(i.v)
+// Set implements the flag.Value interface.
+func (d *DurationValue) Set(v string) error {
+	if d.v == nil {
+		d.v = new(time.Duration)
 	}
-	return fmt.Sprintf("%v", current)
+	var err error
+	*(d.v), err = time.ParseDuration(v)
+	return err
 }
 
 // String implements the flag.Value interface.
-func (i *IntValue) Int() int {
-	var current int
-	if i.v != nil {
-		current = *(i.v)
+func (d *DurationValue) String() string {
+	var current time.Duration
+	if d.v != nil {
+		current = *(d.v)
+	}
+	return current.String()
+}
+
+// String implements the flag.Value interface.
+func (d *DurationValue) Duration() time.Duration {
+	var current time.Duration
+	if d.v != nil {
+		current = *(d.v)
 	}
 	return current
 }

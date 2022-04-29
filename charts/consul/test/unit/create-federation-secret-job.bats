@@ -102,7 +102,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'meshGateway.consulServiceName=my-service-name' \
       --set 'global.federation.createFederationSecret=true' \
-      . | tee /dev/stderr | yq '.spec.template.spec.containers[0].command | any(contains("-consul-api-timeout=5"))')
+      . | tee /dev/stderr | yq '.spec.template.spec.containers[0].command | any(contains("-consul-api-timeout=5s"))')
   [ "${actual}" = "true" ]
 }
 
@@ -404,6 +404,6 @@ load _helpers
   [ "${actual}" = "true" ]
 
   # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5")')
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }

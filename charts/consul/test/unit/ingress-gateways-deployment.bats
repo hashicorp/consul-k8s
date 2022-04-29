@@ -319,7 +319,7 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s '[.[0].spec.template.spec.containers[1].command[6]] | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -s '[.[0].spec.template.spec.containers[1].command[6]] | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1400,7 +1400,7 @@ EOF
   -component-name=ingress-gateway/release-name-consul-ingress-gateway \
   -acl-auth-method=release-name-consul-k8s-component-auth-method \
   -token-sink-file=/consul/service/acl-token \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -log-level=info \
   -log-json=false
 
@@ -1678,7 +1678,7 @@ EOF
   [ "${actual}" = "true" ]
 
   # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5")')
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }
 

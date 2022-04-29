@@ -92,7 +92,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="an-auth-method" \
   -service-account-name="a-service-account-name" \
   -service-name="web" \
@@ -487,7 +487,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -consul-service-namespace="default" \
 
 # Generate the envoy bootstrap code
@@ -512,7 +512,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -partition="default" \
   -consul-service-namespace="default" \
 
@@ -539,7 +539,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
@@ -564,7 +564,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -partition="non-default-part" \
   -consul-service-namespace="non-default" \
 
@@ -592,7 +592,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="" \
@@ -627,7 +627,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="" \
@@ -661,7 +661,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -consul-service-namespace="default" \
 
 # Generate the envoy bootstrap code
@@ -693,7 +693,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -partition="default" \
   -consul-service-namespace="non-default" \
 
@@ -731,7 +731,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="web" \
@@ -843,7 +843,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web \
   -service-name="web" \
@@ -858,7 +858,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
   -service-name="web-admin" \
@@ -894,7 +894,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="web" \
@@ -914,7 +914,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="auth-method" \
   -service-account-name="web-admin" \
   -service-name="web-admin" \
@@ -982,7 +982,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -acl-auth-method="release-name-consul-k8s-auth-method"`)
 	require.Contains(actual, `
 # Generate the envoy bootstrap code

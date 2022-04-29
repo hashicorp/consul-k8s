@@ -228,7 +228,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -264,7 +264,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -311,7 +311,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -348,7 +348,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -670,7 +670,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 
   # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5")')
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }
 

@@ -110,13 +110,13 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: sets -consul-api-timeout=5" {
+@test "serverACLInit/Job: sets -consul-api-timeout=5s" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command[2] | contains("-consul-api-timeout=5")' |
+      yq '.spec.template.spec.containers[0].command[2] | contains("-consul-api-timeout=5s")' |
       tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

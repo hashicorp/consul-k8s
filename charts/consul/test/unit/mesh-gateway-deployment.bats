@@ -27,7 +27,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 #--------------------------------------------------------------------
@@ -661,7 +661,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -698,7 +698,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -746,7 +746,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -784,7 +784,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -835,7 +835,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1143,7 +1143,7 @@ EOF
   -component-name=mesh-gateway \
   -token-sink-file=/consul/service/acl-token \
   -acl-auth-method=release-name-consul-k8s-component-auth-method \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=5s \
   -log-level=info \
   -log-json=false
 
@@ -1790,7 +1790,7 @@ EOF
   [ "${actual}" = "true" ]
 
   # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5")')
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }
 

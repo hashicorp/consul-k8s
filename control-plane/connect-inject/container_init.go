@@ -85,7 +85,7 @@ type initContainerCommandData struct {
 	// multi port Pod.
 	BearerTokenFile string
 
-	// ConsulAPITimeout is the time in seconds that the consul API client will
+	// ConsulAPITimeout is the duration that the consul API client will
 	// wait for a response from the API before cancelling the request.
 	ConsulAPITimeout int
 }

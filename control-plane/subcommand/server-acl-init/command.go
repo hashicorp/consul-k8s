@@ -66,7 +66,7 @@ type Command struct {
 	flagConsulCACert        string
 	flagConsulTLSServerName string
 	flagUseHTTPS            bool
-	flagConsulAPITimeout    int
+	flagConsulAPITimeout    time.Duration
 
 	// Flags for ACL replication.
 	flagCreateACLReplicationToken bool
@@ -217,7 +217,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	c.flags.IntVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
+	c.flags.DurationVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
 		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
 
 	c.k8s = &k8sflags.K8SFlags{}

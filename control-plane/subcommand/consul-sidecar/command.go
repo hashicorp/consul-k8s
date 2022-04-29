@@ -393,6 +393,7 @@ func serviceMetricSuccess(success bool) []byte {
 func (c *Command) parseConsulFlags() []string {
 	var consulCommandFlags []string
 	c.http.Flags().VisitAll(func(f *flag.Flag) {
+		// not adding -consul-api-timeout since consul does not use this flag
 		if f.Value.String() != "" && f.Name != "consul-api-timeout" {
 			consulCommandFlags = append(consulCommandFlags, fmt.Sprintf("-%s=%s", f.Name, f.Value.String()))
 		}

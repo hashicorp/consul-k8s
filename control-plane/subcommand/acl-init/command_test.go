@@ -87,7 +87,7 @@ func TestRun_TokenSinkFile(t *testing.T) {
 	code := cmd.Run([]string{
 		"-token-sink-file", sinkFile,
 		"-secret-name", secretName,
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(0, code, ui.ErrorWriter.String())
 	bytes, err := ioutil.ReadFile(sinkFile)
@@ -128,7 +128,7 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 	code := cmd.Run([]string{
 		"-token-sink-file", "/this/filepath/does/not/exist",
 		"-secret-name", secretName,
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 
 	require.Equal(1, code)
@@ -176,7 +176,7 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		code := cmd.Run([]string{
 			"-token-sink-file", sinkFile,
 			"-secret-name", secretName,
-			"-consul-api-timeout", "5",
+			"-consul-api-timeout", "5s",
 		})
 		require.Equal(0, code, ui.ErrorWriter.String())
 
@@ -229,7 +229,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 		"-acl-auth-method", componentAuthMethod,
 		"-component-name", "foo",
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 	// Validate the Token got written.
@@ -294,7 +294,7 @@ func TestRun_WithAclAuthMethodDefined_WritesConfigJson_WithTokenMatchingSinkFile
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-init-type", "client",
 		"-acl-dir", tmpDir,
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 	// Validate the ACL Config file got written.
@@ -358,7 +358,7 @@ func TestRun_WithoutAclAuthMethodDefined_WritesConfigJsonWithTokenMatchingSinkFi
 		"-secret-name", secretName,
 		"-init-type", "client",
 		"-acl-dir", tmpDir,
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	// Validate the ACL Config file got written.
 	aclConfigBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/acl-config.json", tmpDir))

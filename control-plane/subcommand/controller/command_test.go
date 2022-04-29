@@ -32,7 +32,7 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{"-webhook-tls-cert-dir", "/foo", "-datacenter", "foo",
-				"-consul-api-timeout", "5", "-log-level", "invalid"},
+				"-consul-api-timeout", "5s", "-log-level", "invalid"},
 			expErr: `unknown log level "invalid": unrecognized level: "invalid"`,
 		},
 	}

@@ -87,7 +87,7 @@ load _helpers
   actual=$(echo $command | jq -r '. | any(contains("consul-k8s-control-plane partition-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  actual=$(echo $command | jq -r '. | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

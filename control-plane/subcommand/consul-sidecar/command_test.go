@@ -59,7 +59,7 @@ func TestRunSignalHandlingRegistrationOnly(t *testing.T) {
 				"-service-config", configFile,
 				"-http-addr", a.HTTPAddr,
 				"-sync-period", "1s",
-				"-consul-api-timeout", "5",
+				"-consul-api-timeout", "5s",
 			})
 			cmd.sendSignal(signal)
 
@@ -100,7 +100,7 @@ func TestRunSignalHandlingMetricsOnly(t *testing.T) {
 				"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
 				"-service-metrics-port", "8080",
 				"-service-metrics-path", "/metrics",
-				"-consul-api-timeout", "5",
+				"-consul-api-timeout", "5s",
 			})
 
 			// Keep an open connection to the server by continuously sending bytes
@@ -174,7 +174,7 @@ func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
 				"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
 				"-service-metrics-port", "8080",
 				"-service-metrics-path", "/metrics",
-				"-consul-api-timeout", "5",
+				"-consul-api-timeout", "5s",
 			})
 
 			// Keep an open connection to the server by continuously sending bytes
@@ -405,7 +405,7 @@ func TestRun_FlagValidation_ServiceConfigFileMissing(t *testing.T) {
 	cmd := Command{
 		UI: ui,
 	}
-	responseCode := cmd.Run([]string{"-service-config=/does/not/exist", "-consul-binary=/not/a/valid/path", "-consul-api-timeout=5"})
+	responseCode := cmd.Run([]string{"-service-config=/does/not/exist", "-consul-binary=/not/a/valid/path", "-consul-api-timeout=5s"})
 	require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "-service-config file \"/does/not/exist\" not found")
 }
@@ -423,7 +423,7 @@ func TestRun_FlagValidation_ConsulBinaryMissing(t *testing.T) {
 
 	configFlag := "-service-config=" + configFile
 
-	responseCode := cmd.Run([]string{configFlag, "-consul-binary=/not/a/valid/path", "-consul-api-timeout=5"})
+	responseCode := cmd.Run([]string{configFlag, "-consul-binary=/not/a/valid/path", "-consul-api-timeout=5s"})
 	require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "-consul-binary \"/not/a/valid/path\" not found")
 }
@@ -438,7 +438,7 @@ func TestRun_FlagValidation_InvalidLogLevel(t *testing.T) {
 	cmd := Command{
 		UI: ui,
 	}
-	responseCode := cmd.Run([]string{"-service-config", configFile, "-consul-binary=consul", "-log-level=foo", "-consul-api-timeout=5"})
+	responseCode := cmd.Run([]string{"-service-config", configFile, "-consul-binary=consul", "-log-level=foo", "-consul-api-timeout=5s"})
 	require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "unknown log level: foo")
 }
@@ -464,7 +464,7 @@ func TestRun_ServicesRegistration(t *testing.T) {
 		"-http-addr", a.HTTPAddr,
 		"-service-config", configFile,
 		"-sync-period", "100ms",
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -505,7 +505,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 		"-http-addr", fmt.Sprintf("127.0.0.1:%d", randomPorts[1]),
 		"-service-config", configFile,
 		"-sync-period", "100ms",
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -566,7 +566,7 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-token-file=/token/file",
 		"-ca-file=/ca/file",
 		"-ca-path=/ca/path",
-		"-consul-api-timeout", "5",
+		"-consul-api-timeout", "5s",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 

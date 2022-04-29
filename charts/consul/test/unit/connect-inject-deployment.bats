@@ -92,7 +92,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -949,7 +949,7 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul-k8s-control-plane consul-logout -consul-api-timeout=5"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul-k8s-control-plane consul-logout -consul-api-timeout=5s"))' | tee /dev/stderr)
 
   [ "${object}" = "true" ]
 }
@@ -1002,7 +1002,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1038,7 +1038,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1085,7 +1085,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1122,7 +1122,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1809,7 +1809,7 @@ EOF
   [ "${actual}" = "true" ]
 
   # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5")')
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }
 
