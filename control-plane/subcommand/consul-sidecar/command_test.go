@@ -505,6 +505,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 		"-http-addr", fmt.Sprintf("127.0.0.1:%d", randomPorts[1]),
 		"-service-config", configFile,
 		"-sync-period", "100ms",
+		"-consul-api-timeout", "5",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -577,7 +578,6 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-token-file=/token/file",
 		"-ca-file=/ca/file",
 		"-ca-path=/ca/path",
-		"-consul-api-timeout=5",
 		configFile,
 	}
 	retry.Run(t, func(r *retry.R) {

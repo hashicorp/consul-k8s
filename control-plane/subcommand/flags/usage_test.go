@@ -41,7 +41,7 @@ HTTP API Options
 
   -consul-api-timeout=<value>
      The time in seconds that the consul API client will wait for a
-     response from the API before timing out.
+     response from the API before cancelling the request.
 
   -http-addr=<address>
      The $address$ and port of the Consul HTTP agent. The value can be
