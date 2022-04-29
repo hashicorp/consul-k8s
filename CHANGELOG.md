@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Helm
+  * Update client-daemonset to include ca-cert volumeMount only when tls is enabled. [[GH-1194](https://github.com/hashicorp/consul-k8s/pull/1194)]
+
 ## 0.43.0 (April 21, 2022)
 
 BREAKING CHANGES:

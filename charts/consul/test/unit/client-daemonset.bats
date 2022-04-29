@@ -1308,19 +1308,8 @@ local actual=$(echo $object |
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=false' \
-      . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "consul-ca-cert" ]
-
-  local actual=$(echo $object |
-      yq -r '.mountPath' | tee /dev/stderr)
-  [ "${actual}" = "/consul/tls/ca" ]
-
-  local actual=$(echo $object |
-      yq -r '.readOnly' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" == "" ]
 }
 
 @test "client/DaemonSet: fail when externalServers is enabled but the externalServers.hosts is not provided" {
