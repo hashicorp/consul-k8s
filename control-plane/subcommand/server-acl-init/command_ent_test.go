@@ -63,7 +63,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			consul, err := api.NewClient(&api.Config{
 				Address: testAgent.HTTPAddr,
 				Token:   bootToken,
-			})
+			}, 5)
 			require.NoError(err)
 
 			// Ensure there's only one auth method.

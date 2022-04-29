@@ -30,9 +30,9 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-partition-name must be set",
 		},
 		{
-			Flags: []string{
+			flags: []string{
 				"-server-address", "foo", "-partition-name", "bar"},
-			ExpErr: "-consul-api-timeout must be set to a value greater than 0",
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
 		},
 		{
 			flags:  []string{"-server-address", "foo", "-partition-name", "bar", "-log-level", "invalid"},
