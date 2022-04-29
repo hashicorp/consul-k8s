@@ -3669,10 +3669,16 @@ func TestReconcileUnreachableClient(t *testing.T) {
 				NamespacedName: namespacedName,
 			})
 
-			//using concat (+) instead of fmt.Sprintf because string has lots of %s in it that cause issues
-			expectedError := "1 error occurred:\n\t* Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n\n"
+			// using concat (+) instead of fmt.Sprintf because string has lots of %s in it that cause issues
+			expectedErrorFragment := "Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\""
+			expectedErrorFragmentTwo := "(Client.Timeout exceeded while awaiting headers)"
 
-			require.EqualError(t, err, expectedError)
+			// Splitting this into two asserts on fragments of the error because the error thrown
+			// can be either of the two below and matching on the whole string causes the test tobe flakey
+			// "1 error occurred:\n\t* Get \"http://126.0.0.1:31200/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n\n"
+			// "1 error occurred:\n\t* Get \"http://126.0.0.1:31200/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": dial tcp 126.0.0.1:31200: i/o timeout (Client.Timeout exceeded while awaiting headers)\n\n"
+			require.Contains(t, err.Error(), expectedErrorFragment)
+			require.Contains(t, err.Error(), expectedErrorFragmentTwo)
 			require.False(t, resp.Requeue)
 
 		})
