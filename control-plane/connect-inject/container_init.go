@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -87,7 +88,7 @@ type initContainerCommandData struct {
 
 	// ConsulAPITimeout is the duration that the consul API client will
 	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout int
+	ConsulAPITimeout time.Duration
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
