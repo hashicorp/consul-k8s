@@ -321,6 +321,7 @@ load _helpers
       --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.consulAPITimeout=5' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
 
@@ -344,6 +345,11 @@ load _helpers
   local actual=$(echo $object |
       yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
 }
 
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
@@ -388,6 +394,10 @@ load _helpers
   local actual=$(echo $object |
       yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
@@ -421,6 +431,10 @@ load _helpers
 
   local actual=$(echo $object |
       yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

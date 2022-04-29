@@ -218,7 +218,7 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 
 	c.flags.IntVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
-		"The time in seconds that the consul API client will wait for a response from the API before timing out.")
+		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
 
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())

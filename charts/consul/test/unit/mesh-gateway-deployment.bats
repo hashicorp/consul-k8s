@@ -649,6 +649,10 @@ key2: value2' \
       yq '[.env[2].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
@@ -681,6 +685,10 @@ key2: value2' \
 
   local actual=$(echo $object |
       yq '.volumeMounts[2] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -726,6 +734,10 @@ key2: value2' \
   local actual=$(echo $object |
       yq '.volumeMounts[2] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
@@ -759,6 +771,10 @@ key2: value2' \
 
   local actual=$(echo $object |
       yq '.volumeMounts[2] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -806,6 +822,10 @@ key2: value2' \
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

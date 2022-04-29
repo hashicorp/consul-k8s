@@ -63,7 +63,7 @@ func (f *HTTPFlags) Flags() *flag.FlagSet {
 	fs.Var(&f.partition, "partition",
 		"[Enterprise Only] Name of the Consul Admin Partition to query. Default to \"default\" if Admin Partitions are enabled.")
 	fs.Var(&f.consulAPITimeout, "consul-api-timeout",
-		"The time in seconds that the consul API client will wait for a response from the API before timing out.")
+		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
 	return fs
 }
 

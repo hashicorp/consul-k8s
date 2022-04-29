@@ -1389,6 +1389,7 @@ EOF
   -component-name=ingress-gateway/release-name-consul-ingress-gateway \
   -acl-auth-method=release-name-consul-k8s-component-auth-method \
   -token-sink-file=/consul/service/acl-token \
+  -consul-api-timeout=5 \
   -log-level=info \
   -log-json=false
 
