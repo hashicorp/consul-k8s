@@ -308,7 +308,18 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -s '[.[0].spec.template.spec.containers[1].command[6]] | any(contains("-token-file=/consul/service/acl-token"))' | tee /dev/stderr)
+      yq -s '[.[0].spec.template.spec.containers[1].command[7]] | any(contains("-token-file=/consul/service/acl-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: consul-sidecar uses -consul-api-timeout flag" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s '[.[0].spec.template.spec.containers[1].command[6]] | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

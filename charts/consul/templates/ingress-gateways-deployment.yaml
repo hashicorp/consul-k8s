@@ -469,6 +469,7 @@ spec:
             - -log-json={{ $root.Values.global.logJSON }}
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
+            - -consul-api-timeout={{ $root.Values.global.consulAPITimeout }}
             {{- if $root.Values.global.acls.manageSystemACLs }}
             - -token-file=/consul/service/acl-token
             {{- end }}

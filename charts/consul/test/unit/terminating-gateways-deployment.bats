@@ -48,6 +48,18 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "terminatingGateways/Deployment: consul-sidecar uses -consul-api-timeout" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # prerequisites
 

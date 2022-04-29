@@ -20,6 +20,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "meshGateway/Deployment: consul-sidecar uses -consul-api-timeout" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-consul-api-timeout=5"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 #--------------------------------------------------------------------
 # prerequisites
 
@@ -1133,6 +1143,7 @@ EOF
   -component-name=mesh-gateway \
   -token-sink-file=/consul/service/acl-token \
   -acl-auth-method=release-name-consul-k8s-component-auth-method \
+  -consul-api-timeout=5 \
   -log-level=info \
   -log-json=false
 
