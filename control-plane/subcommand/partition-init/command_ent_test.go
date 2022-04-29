@@ -35,7 +35,12 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-consul-api-timeout must be set to a value greater than 0",
 		},
 		{
-			flags:  []string{"-server-address", "foo", "-partition-name", "bar", "-log-level", "invalid"},
+			flags: []string{
+				"-server-address", "foo",
+				"-partition-name", "bar",
+				"-consul-api-timeout", "5",
+				"-log-level", "invalid",
+			},
 			expErr: "unknown log level: invalid",
 		},
 	}

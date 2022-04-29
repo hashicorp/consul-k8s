@@ -63,7 +63,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			consul, err := api.NewClient(&api.Config{
 				Address: testAgent.HTTPAddr,
 				Token:   bootToken,
-			}, 5)
+			})
 			require.NoError(err)
 
 			// Ensure there's only one auth method.
@@ -1278,7 +1278,7 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) (*te
 	serverAPIClient, err := consul.NewClient(&api.Config{
 		Address: server.HTTPAddr,
 		Token:   bootToken,
-	})
+	}, 5)
 	require.NoError(t, err)
 
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
