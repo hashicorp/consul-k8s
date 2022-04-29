@@ -90,6 +90,46 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# readinessProbe
+
+@test "server/StatefulSet: readinessProbe defaults" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].readinessProbe' | tee /dev/stderr)
+  # Splitting into variables to not compare entire object
+  local actualFailureThreshold=$(echo "$actual" | yq -r '.failureThreshold')
+  local actualInitialDelaySeconds=$(echo "$actual" | yq -r '.initialDelaySeconds')
+  local actualPeriodSeconds=$(echo "$actual" | yq -r '.periodSeconds')
+  local actualSuccessThreshold=$(echo "$actual" | yq -r '.successThreshold')
+  local actualTimeoutSeconds=$(echo "$actual" | yq -r '.timeoutSeconds')
+  [ "${actualFailureThreshold}" = 2 ]
+  [ "${actualInitialDelaySeconds}" = 5 ]
+  [ "${actualPeriodSeconds}" = 3 ]
+  [ "${actualSuccessThreshold}" = 1 ]
+  [ "${actualTimeoutSeconds}" = 5 ]
+}
+
+@test "server/StatefulSet: readinessProbe values can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set server.readinessProbe.initialDelaySeconds=123456 \
+      --set server.readinessProbe.successThreshold=654321 \
+      --set server.readinessProbe.path='/v1/health' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].readinessProbe' | tee /dev/stderr)
+  # Splitting into variables to not compare entire object
+  local actualHTTPPath=$(echo "$actual" | yq -r '.httpGet.path')
+  local actualInitialDelaySeconds=$(echo "$actual" | yq -r '.initialDelaySeconds')
+  local actualSuccessThreshold=$(echo "$actual" | yq -r '.successThreshold')
+  [ "${actualHTTPPath}" = "/v1/health" ]
+  [ "${actualInitialDelaySeconds}" = 123456 ]
+  [ "${actualSuccessThreshold}" = 654321 ]
+}
+
+#--------------------------------------------------------------------
 # resources
 
 @test "server/StatefulSet: resources defined by default" {
