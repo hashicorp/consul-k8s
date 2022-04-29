@@ -149,6 +149,10 @@ type Handler struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
+	// ConsulAPITimeout is the time in seconds that the consul API client will
+	// wait for a response from the API before cancelling the request.
+	ConsulAPITimeout int
+
 	// Log
 	Log logr.Logger
 	// Log settings for consul-sidecar

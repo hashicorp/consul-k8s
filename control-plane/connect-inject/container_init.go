@@ -84,6 +84,10 @@ type initContainerCommandData struct {
 	// BearerTokenFile configures where the service account token can be found. This will be unique per service in a
 	// multi port Pod.
 	BearerTokenFile string
+
+	// ConsulAPITimeout is the time in seconds that the consul API client will
+	// wait for a response from the API before cancelling the request.
+	ConsulAPITimeout int
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -158,6 +162,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 		EnvoyUID:                   envoyUserAndGroupID,
 		MultiPort:                  multiPort,
 		EnvoyAdminPort:             19000 + mpi.serviceIndex,
+		ConsulAPITimeout:           h.ConsulAPITimeout,
 	}
 
 	// Create expected volume mounts
@@ -351,6 +356,7 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 {{- end}}
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-api-timeout={{ .ConsulAPITimeout }} \
   {{- if .AuthMethod }}
   -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \

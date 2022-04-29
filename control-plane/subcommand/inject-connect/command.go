@@ -460,6 +460,7 @@ func (c *Command) Run(args []string) int {
 			Log:                           ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                      c.flagLogLevel,
 			LogJSON:                       c.flagLogJSON,
+			ConsulAPITimeout:              c.http.ConsulAPITimeout(),
 		}})
 
 	if err := mgr.Start(ctx); err != nil {
