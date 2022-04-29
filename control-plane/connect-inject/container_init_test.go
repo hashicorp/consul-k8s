@@ -62,7 +62,7 @@ func TestHandlerContainerInit(t *testing.T) {
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=5 \
+  -consul-api-timeout=0 \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
@@ -85,7 +85,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				return pod
 			},
 			Handler{
-				AuthMethod: "an-auth-method",
+				AuthMethod:       "an-auth-method",
+				ConsulAPITimeout: 5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -116,7 +117,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
-			Handler{},
+			Handler{
+				ConsulAPITimeout: 5,
+			},
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
@@ -283,7 +286,10 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{EnableTransparentProxy: c.globalEnabled}
+			h := Handler{
+				EnableTransparentProxy: c.globalEnabled,
+				ConsulAPITimeout:       5,
+			}
 			pod := minimal()
 			pod.Annotations = c.annotations
 
@@ -377,7 +383,12 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{EnableConsulDNS: c.globalEnabled, EnableTransparentProxy: true, ResourcePrefix: "consul-consul"}
+			h := Handler{
+				EnableConsulDNS:        c.globalEnabled,
+				EnableTransparentProxy: true,
+				ResourcePrefix:         "consul-consul",
+				ConsulAPITimeout:       5,
+			}
 			os.Setenv("CONSUL_CONSUL_DNS_SERVICE_HOST", "10.0.34.16")
 			defer os.Unsetenv("CONSUL_CONSUL_DNS_SERVICE_HOST")
 
@@ -416,7 +427,7 @@ func TestHandler_constructDNSServiceHostName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.prefix, func(t *testing.T) {
-			h := Handler{ResourcePrefix: c.prefix}
+			h := Handler{ResourcePrefix: c.prefix, ConsulAPITimeout: 5}
 			require.Equal(t, c.result, h.constructDNSServiceHostName())
 		})
 	}
@@ -470,6 +481,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -494,6 +506,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -520,6 +533,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -544,6 +558,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -571,6 +586,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "default",
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -605,6 +621,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				ConsulPartition:            "non-default",
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -638,6 +655,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
 				EnableTransparentProxy:     true,
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -669,6 +687,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "default",
 				ConsulDestinationNamespace: "non-default",
 				EnableTransparentProxy:     true,
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -706,6 +725,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				EnableTransparentProxy:     true,
+				ConsulAPITimeout:           5,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -807,7 +827,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			Handler{},
+			Handler{ConsulAPITimeout: 5},
 			2,
 			[]multiPortInfo{
 				{
@@ -856,7 +876,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				return pod
 			},
 			Handler{
-				AuthMethod: "auth-method",
+				AuthMethod:       "auth-method",
+				ConsulAPITimeout: 5,
 			},
 			2,
 			[]multiPortInfo{
@@ -930,7 +951,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		AuthMethod: "release-name-consul-k8s-auth-method",
+		AuthMethod:       "release-name-consul-k8s-auth-method",
+		ConsulAPITimeout: 5,
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -976,7 +998,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		ConsulCACert: "consul-ca-cert",
+		ConsulCACert:     "consul-ca-cert",
+		ConsulAPITimeout: 5,
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1021,6 +1044,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 				corev1.ResourceMemory: resource.MustParse("25Mi"),
 			},
 		},
+		ConsulAPITimeout: 5,
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1057,7 +1081,7 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 
 	for _, openShiftEnabled := range openShiftEnabledCases {
 		t.Run(fmt.Sprintf("openshift enabled: %t", openShiftEnabled), func(t *testing.T) {
-			h := Handler{EnableOpenShift: openShiftEnabled}
+			h := Handler{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5}
 
 			container := h.initCopyContainer()
 
