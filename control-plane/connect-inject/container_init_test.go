@@ -63,7 +63,7 @@ func TestHandlerContainerInit(t *testing.T) {
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout=0 \
+  -consul-api-timeout=0s \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
@@ -289,7 +289,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			h := Handler{
 				EnableTransparentProxy: c.globalEnabled,
-				ConsulAPITimeout:       5,
+				ConsulAPITimeout:       5 * time.Second,
 			}
 			pod := minimal()
 			pod.Annotations = c.annotations
@@ -388,7 +388,7 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 				EnableConsulDNS:        c.globalEnabled,
 				EnableTransparentProxy: true,
 				ResourcePrefix:         "consul-consul",
-				ConsulAPITimeout:       5,
+				ConsulAPITimeout:       5 * time.Second,
 			}
 			os.Setenv("CONSUL_CONSUL_DNS_SERVICE_HOST", "10.0.34.16")
 			defer os.Unsetenv("CONSUL_CONSUL_DNS_SERVICE_HOST")
@@ -482,7 +482,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -507,7 +507,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -534,7 +534,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -559,7 +559,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -587,7 +587,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "default",
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -622,7 +622,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				ConsulPartition:            "non-default",
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -656,7 +656,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
 				EnableTransparentProxy:     true,
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -688,7 +688,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "default",
 				ConsulDestinationNamespace: "non-default",
 				EnableTransparentProxy:     true,
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -726,7 +726,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				EnableTransparentProxy:     true,
-				ConsulAPITimeout:           5,
+				ConsulAPITimeout:           5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
