@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			},
 			Handler{
 				AuthMethod:       "an-auth-method",
-				ConsulAPITimeout: 5,
+				ConsulAPITimeout: 5 * time.Second,
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -118,7 +119,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				return pod
 			},
 			Handler{
-				ConsulAPITimeout: 5,
+				ConsulAPITimeout: 5 * time.Second,
 			},
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
@@ -427,7 +428,7 @@ func TestHandler_constructDNSServiceHostName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.prefix, func(t *testing.T) {
-			h := Handler{ResourcePrefix: c.prefix, ConsulAPITimeout: 5}
+			h := Handler{ResourcePrefix: c.prefix, ConsulAPITimeout: 5 * time.Second}
 			require.Equal(t, c.result, h.constructDNSServiceHostName())
 		})
 	}
@@ -827,7 +828,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			Handler{ConsulAPITimeout: 5},
+			Handler{ConsulAPITimeout: 5 * time.Second},
 			2,
 			[]multiPortInfo{
 				{
@@ -877,7 +878,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			},
 			Handler{
 				AuthMethod:       "auth-method",
-				ConsulAPITimeout: 5,
+				ConsulAPITimeout: 5 * time.Second,
 			},
 			2,
 			[]multiPortInfo{
@@ -952,7 +953,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
 		AuthMethod:       "release-name-consul-k8s-auth-method",
-		ConsulAPITimeout: 5,
+		ConsulAPITimeout: 5 * time.Second,
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -999,7 +1000,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
 		ConsulCACert:     "consul-ca-cert",
-		ConsulAPITimeout: 5,
+		ConsulAPITimeout: 5 * time.Second,
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1044,7 +1045,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 				corev1.ResourceMemory: resource.MustParse("25Mi"),
 			},
 		},
-		ConsulAPITimeout: 5,
+		ConsulAPITimeout: 5 * time.Second,
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1081,7 +1082,7 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 
 	for _, openShiftEnabled := range openShiftEnabledCases {
 		t.Run(fmt.Sprintf("openshift enabled: %t", openShiftEnabled), func(t *testing.T) {
-			h := Handler{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5}
+			h := Handler{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5 * time.Second}
 
 			container := h.initCopyContainer()
 
