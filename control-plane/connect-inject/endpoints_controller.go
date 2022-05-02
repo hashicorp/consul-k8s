@@ -928,7 +928,7 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig := r.ConsulClientCfg
 	localConfig.Address = newAddr
 	localConfig.Namespace = namespace
-	return consul.NewClient(localConfig, 0)
+	return consul.NewClient(localConfig, r.ConsulAPITimeout)
 }
 
 // shouldIgnore ignores namespaces where we don't connect-inject.

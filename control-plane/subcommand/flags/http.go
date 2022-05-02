@@ -113,7 +113,7 @@ func (f *HTTPFlags) APIClient() (*api.Client, error) {
 
 	f.MergeOntoConfig(c)
 
-	return consul.NewClient(c, *f.consulAPITimeout.v)
+	return consul.NewClient(c, f.ConsulAPITimeout())
 }
 
 func (f *HTTPFlags) MergeOntoConfig(c *api.Config) {

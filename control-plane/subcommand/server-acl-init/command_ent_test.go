@@ -303,7 +303,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-terminating-gateway-name=tgw",
 				"-terminating-gateway-name=anothertgw",
 				"-controller",
-				"-consul-api-timeout=30s",
+				"-consul-api-timeout=5s",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -1288,7 +1288,7 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) (*te
 	serverAPIClient, err := consul.NewClient(&api.Config{
 		Address: server.HTTPAddr,
 		Token:   bootToken,
-	}, 5)
+	}, 5*time.Second)
 	require.NoError(t, err)
 
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
