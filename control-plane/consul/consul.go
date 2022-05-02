@@ -13,6 +13,8 @@ import (
 // header that describes the version of consul-k8s making the call.
 func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Client, error) {
 	if consulAPITimeout <= 0 {
+		// This is only here as a last resort scenario.  This should not get
+		// triggered because all components should pass the value.
 		consulAPITimeout = 5 * time.Second
 	}
 	if config.HttpClient == nil {
