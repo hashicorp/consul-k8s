@@ -303,7 +303,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-terminating-gateway-name=tgw",
 				"-terminating-gateway-name=anothertgw",
 				"-controller",
-				"-consul-api-timeout=10s",
+				"-consul-api-timeout=30s",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
