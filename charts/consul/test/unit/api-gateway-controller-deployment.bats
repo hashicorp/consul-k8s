@@ -321,7 +321,7 @@ load _helpers
       --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.consulAPITimeout=5' \
+      --set 'global.consulAPITimeout=5s' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
 
