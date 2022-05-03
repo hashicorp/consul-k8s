@@ -1,6 +1,8 @@
 ## UNRELEASED
 
 BUG FIXES:
+* Security 
+  * Bump golang.org/x/crypto and golang.org/x/text dependencies to address CVE-2022-27291 and CVE-2021-38561 respectively on both CLI and Control Plane. There's no known exposure within Consul on Kubernetes as the dependencies are not invoked. [[GH-1189](https://github.com/hashicorp/consul-k8s/pull/1189)]
 * Helm
   * Update client-daemonset to include ca-cert volumeMount only when tls is enabled. [[GH-1194](https://github.com/hashicorp/consul-k8s/pull/1194)]
   * Update create-federation-secret-job to look up the automatically generated gossip encryption key by the right name when global.name is unset or set to something other than consul. [[GH-1196](https://github.com/hashicorp/consul-k8s/pull/1196)]
