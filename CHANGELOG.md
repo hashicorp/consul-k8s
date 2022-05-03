@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Helm
+  * Enable the ability to `configure global.consulAPITimeout` to configure how long requests to the Consul API will wait to resolve before canceling.  The default value is 5 seconds. [[GH-1178](https://github.com/hashicorp/consul-k8s/pull/1178)]
+
 BUG FIXES:
 * Helm
   * Update client-daemonset to include ca-cert volumeMount only when tls is enabled. [[GH-1194](https://github.com/hashicorp/consul-k8s/pull/1194)]
