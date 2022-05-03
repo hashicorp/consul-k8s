@@ -349,14 +349,13 @@ func (c *Command) Run(args []string) int {
 
 	// For all of the next operations we'll need a Consul client.
 	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	clientConfig := &api.Config{
-		Address: serverAddr,
-		Scheme:  scheme,
-		Token:   bootstrapToken,
-		TLSConfig: api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		},
+	clientConfig := api.DefaultConfig()
+	clientConfig.Address = serverAddr
+	clientConfig.Scheme = scheme
+	clientConfig.Token = bootstrapToken
+	clientConfig.TLSConfig = api.TLSConfig{
+		Address: c.flagConsulTLSServerName,
+		CAFile:  c.flagConsulCACert,
 	}
 
 	if c.flagEnablePartitions {

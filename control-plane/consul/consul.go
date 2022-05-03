@@ -23,7 +23,7 @@ func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Clien
 		}
 	}
 
-	if config.Transport.TLSClientConfig == nil {
+	if config.Transport != nil && config.Transport.TLSClientConfig == nil {
 		tlsClientConfig, err := capi.SetupTLSConfig(&config.TLSConfig)
 
 		if err != nil {
