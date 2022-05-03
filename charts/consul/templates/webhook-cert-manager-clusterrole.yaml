@@ -48,13 +48,5 @@ rules:
   - {{ template "consul.fullname" . }}-webhook-cert-manager
   verbs:
   - use
-- apiGroups:
-  - policy
-  resources:
-  - podsecuritypolicies
-  resourceNames:
-  - {{ template "consul.fullname" . }}-connect-injector
-  verbs:
-  - use
 {{- end }}
 {{- end }}
