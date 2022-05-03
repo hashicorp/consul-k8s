@@ -23,36 +23,6 @@ func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Clien
 		}
 	}
 
-	defConfig := capi.DefaultConfig()
-
-	if config.Transport == nil {
-		config.Transport = defConfig.Transport
-	}
-
-	if config.TLSConfig.Address == "" {
-		config.TLSConfig.Address = defConfig.TLSConfig.Address
-	}
-
-	if config.TLSConfig.CAFile == "" {
-		config.TLSConfig.CAFile = defConfig.TLSConfig.CAFile
-	}
-
-	if config.TLSConfig.CAPath == "" {
-		config.TLSConfig.CAPath = defConfig.TLSConfig.CAPath
-	}
-
-	if config.TLSConfig.CertFile == "" {
-		config.TLSConfig.CertFile = defConfig.TLSConfig.CertFile
-	}
-
-	if config.TLSConfig.KeyFile == "" {
-		config.TLSConfig.KeyFile = defConfig.TLSConfig.KeyFile
-	}
-
-	if !config.TLSConfig.InsecureSkipVerify {
-		config.TLSConfig.InsecureSkipVerify = defConfig.TLSConfig.InsecureSkipVerify
-	}
-
 	if config.Transport.TLSClientConfig == nil {
 		tlsClientConfig, err := capi.SetupTLSConfig(&config.TLSConfig)
 
