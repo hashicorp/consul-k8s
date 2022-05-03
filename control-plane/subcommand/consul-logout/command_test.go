@@ -131,11 +131,10 @@ func Test_RunUsingLogin(t *testing.T) {
 	require.NoError(t, err)
 	defer server.Stop()
 	server.WaitForLeader(t)
-	cfg := &api.Config{
-		Address: server.HTTPAddr,
-		Scheme:  "http",
-		Token:   masterToken,
-	}
+	cfg := api.DefaultConfig()
+	cfg.Address = server.HTTPAddr
+	cfg.Scheme = "http"
+	cfg.Token = masterToken
 	consulClient, err := consul.NewClient(cfg, 0)
 	require.NoError(t, err)
 

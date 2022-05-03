@@ -29,8 +29,9 @@ func TestNewClient(t *testing.T) {
 		fmt.Fprintln(w, "\"leader\"")
 	}))
 	defer consulServer.Close()
-
-	client, err := NewClient(&capi.Config{Address: consulServer.URL}, 0)
+	cfg := capi.DefaultConfig()
+	cfg.Address = consulServer.URL
+	client, err := NewClient(cfg, 0)
 	require.NoError(t, err)
 	leader, err := client.Status().Leader()
 	require.NoError(t, err)
