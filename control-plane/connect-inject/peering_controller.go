@@ -10,13 +10,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul/api"
 )
 
 // PeeringController reconciles a Peering object
 type PeeringController struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	// ConsulClient points at the agent local to the connect-inject deployment pod.
+	ConsulClient *api.Client
+	// ConsulClientCfg is the client config used by the ConsulClient when calling NewClient().
+	ConsulClientCfg *api.Config
+	// ConsulScheme is the scheme to use when making API calls to Consul,
+	// i.e. "http" or "https".
+	ConsulScheme string
+	// ConsulPort is the port to make HTTP API calls to Consul agents on.
+	ConsulPort string
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
 	context.Context
 }
 
@@ -45,6 +56,7 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	r.ConsulClient.Peerings().GenerateToken()
 	r.Log.Info("found token:", "token", token.Name)
 
 	return ctrl.Result{}, nil
@@ -55,4 +67,13 @@ func (r *PeeringController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&consulv1alpha1.Peering{}).
 		Complete(r)
+}
+
+// remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.
+func (r *PeeringController) remoteConsulClient(ip string, namespace string) (*api.Client, error) {
+	newAddr := fmt.Sprintf("%s://%s:%s", r.ConsulScheme, ip, r.ConsulPort)
+	localConfig := r.ConsulClientCfg
+	localConfig.Address = newAddr
+	localConfig.Namespace = namespace
+	return consul.NewClient(localConfig)
 }
