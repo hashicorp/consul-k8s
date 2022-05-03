@@ -43,13 +43,34 @@ load _helpers
 #--------------------------------------------------------------------
 # global.enablePodSecurityPolicies
 
-@test "webhookCertManager/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
+@test "webhookCertManager/ClusterRole: allows podsecuritypolicies access for webhook-cert-manager with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
       --set 'controller.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[3].resources[0]' | tee /dev/stderr)
+      yq -r '.rules[3]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
   [ "${actual}" = "podsecuritypolicies" ]
+
+  local actual=$(echo $object | yq -r '.resourceNames[0]' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-webhook-cert-manager" ]
+}
+
+@test "webhookCertManager/ClusterRole: allows podsecuritypolicies access for connect-injector with global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/webhook-cert-manager-clusterrole.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[4]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
+  [ "${actual}" = "podsecuritypolicies" ]
+
+  local actual=$(echo $object | yq -r '.resourceNames[0]' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-connect-injector" ]
 }
