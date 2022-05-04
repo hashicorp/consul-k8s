@@ -132,6 +132,7 @@ spec:
             - "-ec"
             - |
               consul-k8s-control-plane sync-catalog \
+                -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
                 -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -k8s-default-sync={{ .Values.syncCatalog.default }} \
@@ -202,7 +203,7 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  consul-k8s-control-plane consul-logout
+                  consul-k8s-control-plane consul-logout -consul-api-timeout={{ .Values.global.consulAPITimeout }}
           {{- end }}
           livenessProbe:
             httpGet:
@@ -279,6 +280,7 @@ spec:
               {{- if .Values.global.adminPartitions.enabled }}
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
+              -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
               -log-json={{ .Values.global.logJSON }}
         resources:

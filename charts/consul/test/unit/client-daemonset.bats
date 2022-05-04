@@ -1194,6 +1194,10 @@ local actual=$(echo $object |
   local actual=$(echo $object |
       yq -r '.command | any(contains("partition=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "client/DaemonSet: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {

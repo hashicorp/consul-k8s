@@ -496,6 +496,7 @@ spec:
               -tls-server-name={{ .Values.externalServers.tlsServerName }} \
               {{- end }}
               {{- end }}
+              -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -init-type="client"
         volumeMounts:
           - name: aclconfig

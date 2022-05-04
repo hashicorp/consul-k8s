@@ -19,6 +19,23 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "controller/Deployment: command defaults" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("consul-k8s-control-plane controller"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # replicas
 
@@ -53,7 +70,7 @@ load _helpers
       --set 'controller.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul-k8s-control-plane consul-logout"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul-k8s-control-plane consul-logout -consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -103,6 +120,10 @@ load _helpers
       yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
@@ -134,6 +155,10 @@ load _helpers
 
   local actual=$(echo $object |
       yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -178,6 +203,10 @@ load _helpers
   local actual=$(echo $object |
       yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
@@ -210,6 +239,10 @@ load _helpers
 
   local actual=$(echo $object |
       yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -739,6 +772,36 @@ load _helpers
 
   local actual=$(echo "$cmd" |
     yq '.initContainers[0].command | any(contains("-log-level=error"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# get-auto-encrypt-client-ca
+
+@test "controller/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
+  [ "${actual}" = "true" ]
+
+  # check server port
+  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+
+  # check consul-api-timeout
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }
 

@@ -207,6 +207,7 @@ spec:
                   -partition={{ $root.Values.global.adminPartitions.name }} \
                   {{- end }}
                   -token-sink-file=/consul/service/acl-token \
+                  -consul-api-timeout={{ $root.Values.global.consulAPITimeout }} \
                   -log-level={{ default $root.Values.global.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }}
                 {{- end }}
@@ -419,6 +420,7 @@ spec:
             - -log-json={{ $root.Values.global.logJSON }}
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
+            - -consul-api-timeout={{ $root.Values.global.consulAPITimeout }}
             {{- if $root.Values.global.acls.manageSystemACLs }}
             - -token-file=/consul/service/acl-token
             {{- end }}

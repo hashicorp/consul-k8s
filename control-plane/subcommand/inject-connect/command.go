@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -218,35 +219,9 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Validate flags.
-	if c.flagConsulK8sImage == "" {
-		c.UI.Error("-consul-k8s-image must be set")
-		return 1
-	}
-	if c.flagConsulImage == "" {
-		c.UI.Error("-consul-image must be set")
-		return 1
-	}
-	if c.flagEnvoyImage == "" {
-		c.UI.Error("-envoy-image must be set")
-		return 1
-	}
-	if c.flagWriteServiceDefaults {
-		c.UI.Error("-enable-central-config is no longer supported")
-		return 1
-	}
-	if c.flagDefaultProtocol != "" {
-		c.UI.Error("-default-protocol is no longer supported")
-		return 1
-	}
-
-	if c.flagEnablePartitions && c.http.Partition() == "" {
-		c.UI.Error("-partition-name must set if -enable-partitions is set to 'true'")
-		return 1
-	}
-
-	if c.http.Partition() != "" && !c.flagEnablePartitions {
-		c.UI.Error("-enable-partitions must be set to 'true' if -partition-name is set")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -359,7 +334,7 @@ func (c *Command) Run(args []string) int {
 	// Set up Consul client.
 	if c.consulClient == nil {
 		var err error
-		c.consulClient, err = consul.NewClient(cfg)
+		c.consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("error connecting to Consul agent: %s", err))
 			return 1
@@ -439,6 +414,7 @@ func (c *Command) Run(args []string) int {
 		ReleaseName:                c.flagReleaseName,
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		Context:                    ctx,
+		ConsulAPITimeout:           c.http.ConsulAPITimeout(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 		return 1
@@ -485,6 +461,7 @@ func (c *Command) Run(args []string) int {
 			Log:                           ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                      c.flagLogLevel,
 			LogJSON:                       c.flagLogJSON,
+			ConsulAPITimeout:              c.http.ConsulAPITimeout(),
 		}})
 
 	if err := mgr.Start(ctx); err != nil {
@@ -495,6 +472,37 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+func (c *Command) validateFlags() error {
+	if c.flagConsulK8sImage == "" {
+		return errors.New("-consul-k8s-image must be set")
+
+	}
+	if c.flagConsulImage == "" {
+		return errors.New("-consul-image must be set")
+	}
+	if c.flagEnvoyImage == "" {
+		return errors.New("-envoy-image must be set")
+	}
+	if c.flagWriteServiceDefaults {
+		return errors.New("-enable-central-config is no longer supported")
+	}
+	if c.flagDefaultProtocol != "" {
+		return errors.New("-default-protocol is no longer supported")
+	}
+
+	if c.flagEnablePartitions && c.http.Partition() == "" {
+		return errors.New("-partition-name must set if -enable-partitions is set to 'true'")
+	}
+
+	if c.http.Partition() != "" && !c.flagEnablePartitions {
+		return errors.New("-enable-partitions must be set to 'true' if -partition-name is set")
+	}
+
+	if c.http.ConsulAPITimeout() <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+	return nil
+}
 func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, corev1.ResourceRequirements, error) {
 	// Init container
 	var initContainerCPULimit, initContainerCPURequest, initContainerMemoryLimit, initContainerMemoryRequest resource.Quantity
