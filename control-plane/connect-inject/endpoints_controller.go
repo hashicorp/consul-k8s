@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -110,6 +111,9 @@ type EndpointsController struct {
 	// will delete any tokens associated with this auth method
 	// whenever service instances are deregistered.
 	AuthMethod string
+	// ConsulAPITimeout is the duration that the consul API client will
+	// wait for a response from the API before cancelling the request.
+	ConsulAPITimeout time.Duration
 
 	MetricsConfig MetricsConfig
 	Log           logr.Logger
@@ -924,7 +928,7 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig := r.ConsulClientCfg
 	localConfig.Address = newAddr
 	localConfig.Namespace = namespace
-	return consul.NewClient(localConfig)
+	return consul.NewClient(localConfig, r.ConsulAPITimeout)
 }
 
 // shouldIgnore ignores namespaces where we don't connect-inject.

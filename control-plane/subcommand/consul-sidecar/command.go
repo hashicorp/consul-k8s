@@ -358,6 +358,9 @@ func (c *Command) validateFlags() error {
 		if c.flagConsulBinary == "" {
 			return errors.New("-consul-binary must be set")
 		}
+		if c.http.ConsulAPITimeout() <= 0 {
+			return errors.New("-consul-api-timeout must be set to a value greater than 0")
+		}
 		_, err := os.Stat(c.flagServiceConfig)
 		if os.IsNotExist(err) {
 			return fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
@@ -390,7 +393,8 @@ func serviceMetricSuccess(success bool) []byte {
 func (c *Command) parseConsulFlags() []string {
 	var consulCommandFlags []string
 	c.http.Flags().VisitAll(func(f *flag.Flag) {
-		if f.Value.String() != "" {
+		// not adding -consul-api-timeout since consul does not use this flag
+		if f.Value.String() != "" && f.Name != "consul-api-timeout" {
 			consulCommandFlags = append(consulCommandFlags, fmt.Sprintf("-%s=%s", f.Name, f.Value.String()))
 		}
 	})

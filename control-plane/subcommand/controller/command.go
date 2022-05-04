@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"sync"
@@ -97,16 +98,9 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Parsing flagset: %s", err.Error()))
 		return 1
 	}
-	if len(c.flagSet.Args()) > 0 {
-		c.UI.Error("Invalid arguments: should have no non-flag arguments")
-		return 1
-	}
-	if c.flagEnableWebhooks && c.flagWebhookTLSCertDir == "" {
-		c.UI.Error("Invalid arguments: -webhook-tls-cert-dir must be set")
-		return 1
-	}
-	if c.flagDatacenter == "" {
-		c.UI.Error("Invalid arguments: -datacenter must be set")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -132,7 +126,7 @@ func (c *Command) Run(args []string) int {
 
 	cfg := api.DefaultConfig()
 	c.httpFlags.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.httpFlags.ConsulAPITimeout())
 	if err != nil {
 		setupLog.Error(err, "connecting to Consul agent")
 		return 1
@@ -335,6 +329,22 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+func (c *Command) validateFlags() error {
+	if len(c.flagSet.Args()) > 0 {
+		return errors.New("Invalid arguments: should have no non-flag arguments")
+	}
+	if c.flagEnableWebhooks && c.flagWebhookTLSCertDir == "" {
+		return errors.New("Invalid arguments: -webhook-tls-cert-dir must be set")
+	}
+	if c.flagDatacenter == "" {
+		return errors.New("Invalid arguments: -datacenter must be set")
+	}
+	if c.httpFlags.ConsulAPITimeout() <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+
+	return nil
+}
 func (c *Command) Help() string {
 	c.once.Do(c.init)
 	return c.help

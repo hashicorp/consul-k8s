@@ -14,6 +14,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRun_FlagValidation(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		flags  []string
+		expErr string
+	}{
+		{
+			flags:  []string{},
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.expErr, func(tt *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+			exitCode := cmd.Run(c.flags)
+			require.Equal(tt, 1, exitCode, ui.ErrorWriter.String())
+			require.Contains(tt, ui.ErrorWriter.String(), c.expErr)
+		})
+	}
+}
+
 // TestRun_InvalidSinkFile validates that we correctly fail in case the token sink file
 // does not exist.
 func TestRun_InvalidSinkFile(t *testing.T) {
@@ -26,6 +51,7 @@ func TestRun_InvalidSinkFile(t *testing.T) {
 	}
 	code := cmd.Run([]string{
 		"-token-file", randFileName,
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 1, code)
 }
@@ -78,6 +104,7 @@ func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 	code := cmd.Run([]string{
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-token-file", tokenFile,
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 1, code, ui.ErrorWriter.String())
 	require.Contains(t, "Unexpected response code: 403 (ACL not found)", ui.ErrorWriter.String())
@@ -104,12 +131,11 @@ func Test_RunUsingLogin(t *testing.T) {
 	require.NoError(t, err)
 	defer server.Stop()
 	server.WaitForLeader(t)
-	cfg := &api.Config{
-		Address: server.HTTPAddr,
-		Scheme:  "http",
-		Token:   masterToken,
-	}
-	consulClient, err := consul.NewClient(cfg)
+	cfg := api.DefaultConfig()
+	cfg.Address = server.HTTPAddr
+	cfg.Scheme = "http"
+	cfg.Token = masterToken
+	consulClient, err := consul.NewClient(cfg, 0)
 	require.NoError(t, err)
 
 	// We are not setting up the Component Auth Method here because testing logout
@@ -143,6 +169,7 @@ func Test_RunUsingLogin(t *testing.T) {
 	code := cmd.Run([]string{
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-token-file", tokenFile,
+		"-consul-api-timeout", "5s",
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 

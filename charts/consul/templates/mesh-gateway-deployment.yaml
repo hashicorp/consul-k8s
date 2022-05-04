@@ -159,6 +159,7 @@ spec:
                   {{- if .Values.global.adminPartitions.enabled }}
                   -partition={{ .Values.global.adminPartitions.name }} \
                   {{- end }}
+                  -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
                   -log-level={{ default .Values.global.logLevel }} \
                   -log-json={{ .Values.global.logJSON }}
                 {{ end }}
@@ -404,6 +405,7 @@ spec:
             - -log-json={{ .Values.global.logJSON }}
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
+            - -consul-api-timeout={{ .Values.global.consulAPITimeout }}
             {{- if .Values.global.acls.manageSystemACLs }}
             - -token-file=/consul/service/acl-token
             {{- end }}

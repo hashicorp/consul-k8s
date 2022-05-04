@@ -37,15 +37,17 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 
 		// Override our original client with a new one that has the bootstrap token
 		// set.
-		consulClient, err := consul.NewClient(&api.Config{
-			Address: firstServerAddr,
-			Scheme:  scheme,
-			Token:   bootstrapToken,
-			TLSConfig: api.TLSConfig{
-				Address: c.flagConsulTLSServerName,
-				CAFile:  c.flagConsulCACert,
-			},
-		})
+		clientConfig := api.DefaultConfig()
+		clientConfig.Address = firstServerAddr
+		clientConfig.Scheme = scheme
+		clientConfig.Token = bootstrapToken
+		clientConfig.TLSConfig = api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		}
+
+		consulClient, err := consul.NewClient(clientConfig,
+			c.flagConsulAPITimeout)
 		if err != nil {
 			return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 		}
@@ -61,14 +63,16 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 // bootstrapACLs makes the ACL bootstrap API call and writes the bootstrap token
 // to a kube secret.
 func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootTokenSecretName string) (string, error) {
-	consulClient, err := consul.NewClient(&api.Config{
-		Address: firstServerAddr,
-		Scheme:  scheme,
-		TLSConfig: api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		},
-	})
+	clientConfig := api.DefaultConfig()
+	clientConfig.Address = firstServerAddr
+	clientConfig.Scheme = scheme
+	clientConfig.TLSConfig = api.TLSConfig{
+		Address: c.flagConsulTLSServerName,
+		CAFile:  c.flagConsulCACert,
+	}
+	consulClient, err := consul.NewClient(clientConfig,
+		c.flagConsulAPITimeout)
+
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 	}
@@ -143,15 +147,17 @@ func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []st
 
 		// We create a new client for each server because we need to call each
 		// server specifically.
-		serverClient, err := consul.NewClient(&api.Config{
-			Address: fmt.Sprintf("%s:%d", host, c.flagServerPort),
-			Scheme:  scheme,
-			Token:   bootstrapToken,
-			TLSConfig: api.TLSConfig{
-				Address: c.flagConsulTLSServerName,
-				CAFile:  c.flagConsulCACert,
-			},
-		})
+		clientConfig := api.DefaultConfig()
+		clientConfig.Address = fmt.Sprintf("%s:%d", host, c.flagServerPort)
+		clientConfig.Scheme = scheme
+		clientConfig.Token = bootstrapToken
+		clientConfig.TLSConfig = api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		}
+
+		serverClient, err := consul.NewClient(clientConfig,
+			c.flagConsulAPITimeout)
 		if err != nil {
 			return err
 		}

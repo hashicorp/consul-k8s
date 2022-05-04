@@ -565,6 +565,10 @@ global:
     # its components on OpenShift.
     enabled: false
 
+  # The time in seconds that the consul API client will wait for a response from 
+  # the API before cancelling the request.
+  consulAPITimeout: 5s
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.

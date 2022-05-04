@@ -104,6 +104,7 @@ spec:
             - "-ec"
             - |
               consul-k8s-control-plane partition-init \
+                -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
                 -log-level={{ .Values.global.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
 

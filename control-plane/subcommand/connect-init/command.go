@@ -1,6 +1,7 @@
 package connectinit
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -88,16 +89,9 @@ func (c *Command) Run(args []string) int {
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
-	if c.flagPodName == "" {
-		c.UI.Error("-pod-name must be set")
-		return 1
-	}
-	if c.flagPodNamespace == "" {
-		c.UI.Error("-pod-namespace must be set")
-		return 1
-	}
-	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
-		c.UI.Error("-service-account-name must be set when ACLs are enabled")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -113,7 +107,7 @@ func (c *Command) Run(args []string) int {
 	cfg := api.DefaultConfig()
 	cfg.Namespace = c.flagConsulServiceNamespace
 	c.http.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
@@ -151,7 +145,7 @@ func (c *Command) Run(args []string) int {
 	var errServiceNameMismatch error
 	// We need a new client so that we can use the ACL token that was fetched during login to do the next bit,
 	// otherwise `consulClient` will still be using the bearerToken that was passed in.
-	consulClient, err = consul.NewClient(cfg)
+	consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.logger.Error("Unable to update client connection", "error", err)
 		return 1
@@ -232,6 +226,23 @@ func (c *Command) Run(args []string) int {
 	}
 	c.logger.Info("Connect initialization completed")
 	return 0
+}
+
+func (c *Command) validateFlags() error {
+	if c.flagPodName == "" {
+		return errors.New("-pod-name must be set")
+	}
+	if c.flagPodNamespace == "" {
+		return errors.New("-pod-namespace must be set")
+	}
+	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
+		return errors.New("-service-account-name must be set when ACLs are enabled")
+	}
+
+	if c.http.ConsulAPITimeout() <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

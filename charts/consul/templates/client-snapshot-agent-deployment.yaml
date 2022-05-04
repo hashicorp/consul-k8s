@@ -246,6 +246,7 @@ spec:
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
               -token-sink-file=/consul/login/acl-token \
+              -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -log-level={{ default .Values.global.logLevel }} \
               -log-json={{ .Values.global.logJSON }}
         resources:
