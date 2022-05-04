@@ -48,6 +48,11 @@ module "vpc" {
   }
 
   tags = var.tags
+
+  timeouts {
+    create = "20m"
+    delete = "20m"
+  }
 }
 
 module "eks" {
