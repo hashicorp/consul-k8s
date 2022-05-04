@@ -99,8 +99,6 @@ func TestPartitions_Sync(t *testing.T) {
 				"syncCatalog.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 				"syncCatalog.addK8SNamespaceSuffix":                       "false",
 
-				"controller.enabled": "true",
-
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
