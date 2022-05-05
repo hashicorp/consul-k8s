@@ -36,10 +36,10 @@ spec:
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.connectInject.tlsCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-tls.crt": {{ include "consul.connectInjectWebhookTLSCertTemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-tls.key": {{ .Values.connectInject.tlsCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-tls.key": {{ include "consul.connectInjectWebhookTLSKeyTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.controller.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-tls.crt": {{ include "consul.controllerWebhookTLSCertTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-tls.key": {{ .Values.controller.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-tls.key": {{ include "consul.controllerWebhookTLSKeyTemplate" . }}
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
         "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
@@ -121,6 +121,7 @@ spec:
             -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
+            -resource-prefix={{ template "consul.fullname" . }} \
             {{- if .Values.global.secretsBackend.vault.enabled }}
             -webhook-tls-cert-dir=/vault/secrets \
             {{- else }}

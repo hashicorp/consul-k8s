@@ -69,6 +69,22 @@ as well as the global.name setting.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.controllerWebhookTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.controller.tlsCert.secretName }}" "{{ printf "common_name=controller-webhook.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.controller.tlsCert.secretName }}" "{{ printf "common_name=controller-webhook.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
@@ -87,6 +103,12 @@ as well as the global.name setting.
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
 {{ printf "localhost,%s-connect-injector,*.%s-connect-injector,*.%s-connect-injector.%s,%s-connect-injector.%s,*.%s-connect-injector.%s.svc,%s-connect-injector.%s.svc,*.connect-injector.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "localhost,%s-controller-webhook,*.%s-controller-webhook,*.%s-controller-webhook.%s,%s-controller-webhook.%s,*.%s-controller-webhook.%s.svc,%s-controller-webhook.%s.svc,*.controller-webhook.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
 {{- end -}}
 
 {{- define "consul.vaultReplicationTokenTemplate" -}}

@@ -2,6 +2,8 @@ package connectinject
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,7 +23,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -464,9 +468,47 @@ func (c *Command) Run(args []string) int {
 			ConsulAPITimeout:              c.http.ConsulAPITimeout(),
 		}})
 
+	consulCACert, err = ioutil.ReadFile("/vault/secrets/serverca.crt")
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
+		return 1
+	}
+	if len(consulCACert) == 0 {
+		setupLog.Error(err, "no CA certificate in the bundle")
+	}
+	value := base64.StdEncoding.EncodeToString(consulCACert)
+	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "connect-injector")
+	webhookCfg, err := c.clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
+	setupLog.Info(fmt.Sprintf("Webhook Config: %+v\n", webhookCfg))
+
+	if err != nil {
+		setupLog.Error(err, "problem getting mutating webhook configurations")
+	}
+	type patch struct {
+		Op    string `json:"op,omitempty"`
+		Path  string `json:"path,omitempty"`
+		Value string `json:"value,omitempty"`
+	}
+
+	var patches []patch
+	for i := range webhookCfg.Webhooks {
+		patches = append(patches, patch{
+			Op:    "add",
+			Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
+			Value: value,
+		})
+	}
+	patchesJson, err := json.Marshal(patches)
+	if err != nil {
+		setupLog.Error(err, "problem mashalling webhook patch")
+	}
+
+	if _, err = c.clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, webhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
+		setupLog.Error(err, "problem patching webhook")
+	}
+
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
-		return 1
 	}
 	c.UI.Info("shutting down")
 	return 0

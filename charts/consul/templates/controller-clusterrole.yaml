@@ -57,6 +57,15 @@ rules:
   - get
   - list
   - update
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]

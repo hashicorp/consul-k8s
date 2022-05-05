@@ -1,9 +1,13 @@
 package controller
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -15,9 +19,13 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -35,6 +43,7 @@ type Command struct {
 	flagDatacenter           string
 	flagLogLevel             string
 	flagLogJSON              bool
+	flagResourcePrefix       string
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -81,6 +90,8 @@ func (c *Command) init() {
 		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 	c.flagSet.BoolVar(&c.flagEnableWebhooks, "enable-webhooks", true,
 		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
+	c.flagSet.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
+		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -321,6 +332,62 @@ func (c *Command) Run(args []string) int {
 	}
 	// +kubebuilder:scaffold:builder
 
+	// Create a context to be used by the processes started in this command.
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error loading in-cluster K8S config: %s", err))
+		return 1
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error creating K8S client: %s", err))
+		return 1
+	}
+
+	consulCACert, err := ioutil.ReadFile("/vault/secrets/serverca.crt")
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
+		return 1
+	}
+	if len(consulCACert) == 0 {
+		setupLog.Error(err, "no CA certificate in the bundle")
+	}
+	value := base64.StdEncoding.EncodeToString(consulCACert)
+	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "controller")
+	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
+	setupLog.Info(fmt.Sprintf("Webhook Config: %+v\n", webhookCfg))
+
+	if err != nil {
+		setupLog.Error(err, "problem getting mutating webhook configurations")
+	}
+	type patch struct {
+		Op    string `json:"op,omitempty"`
+		Path  string `json:"path,omitempty"`
+		Value string `json:"value,omitempty"`
+	}
+
+	var patches []patch
+	for i := range webhookCfg.Webhooks {
+		patches = append(patches, patch{
+			Op:    "add",
+			Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
+			Value: value,
+		})
+	}
+	patchesJson, err := json.Marshal(patches)
+	if err != nil {
+		setupLog.Error(err, "problem mashalling webhook patch")
+	}
+
+	if _, err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, webhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
+		setupLog.Error(err, "problem patching webhook")
+	}
+
+	if err := mgr.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+	}
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

@@ -906,7 +906,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.enabled=true' \
-      --set 'connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'controller.tlsCert.secretName=pki/issue/controller-webhook-cert-dc1' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
@@ -936,20 +936,20 @@ load _helpers
 
     local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-tls.crt"]' | tee /dev/stderr)"
-  [ "${actual}" = "pki/issue/connect-webhook-cert-dc1" ]
+  [ "${actual}" = "pki/issue/controller-webhook-cert-dc1" ]
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=localhost,release-name-consul-connect-injector,*.release-name-consul-connect-injector,*.release-name-consul-connect-injector.default,release-name-consul-connect-injector.default,*.release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc,*.connect-injector.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=localhost,release-name-consul-controller-webhook,*.release-name-consul-controller-webhook,*.release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default,*.release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc,*.controller-webhook.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-tls.key"]' | tee /dev/stderr)"
-  [ "${actual}" = "pki/issue/connect-webhook-cert-dc1" ]
+  [ "${actual}" = "pki/issue/controller-webhook-cert-dc1" ]
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=localhost,release-name-consul-connect-injector,*.release-name-consul-connect-injector,*.release-name-consul-connect-injector.default,release-name-consul-connect-injector.default,*.release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc,*.connect-injector.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=localhost,release-name-consul-controller-webhook,*.release-name-consul-controller-webhook,*.release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default,*.release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc,*.controller-webhook.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
