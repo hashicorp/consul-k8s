@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm
+  * Using the Vault integration requires Consul 1.12.0+.
+
 IMPROVEMENTS:
 * Helm
   * Enable the ability to `configure global.consulAPITimeout` to configure how long requests to the Consul API will wait to resolve before canceling.  The default value is 5 seconds. [[GH-1178](https://github.com/hashicorp/consul-k8s/pull/1178)]
@@ -12,6 +16,7 @@ BUG FIXES:
   * Update create-federation-secret-job to look up the automatically generated gossip encryption key by the right name when global.name is unset or set to something other than consul. [[GH-1196](https://github.com/hashicorp/consul-k8s/pull/1196)]
   * Add Admin Partitions support to Sync Catalog **(Consul Enterprise only)**. [[GH-1180](https://github.com/hashicorp/consul-k8s/pull/1190)]
   * Correct webhook-cert-manager-clusterrole to utilize the web-cert-manager podsecuritypolicy rather than connect-injectors when `global.enablePodSecurityPolicies` is true. [[GH-1202](https://github.com/hashicorp/consul-k8s/pull/1202)]
+  * Enable Consul auto-reload-config only when Vault is enabled. [[GH-1213](https://github.com/hashicorp/consul-k8s/pull/1213)]
 
 ## 0.43.0 (April 21, 2022)
 

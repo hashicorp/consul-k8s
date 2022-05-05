@@ -799,12 +799,26 @@ load _helpers
 #--------------------------------------------------------------------
 # auto_reload_config
 
-@test "server/ConfigMap: auto reload config is set to true" {
+@test "server/ConfigMap: auto reload config is set to true when Vault is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: auto reload config is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
 
-  [ "${actual}" = "true" ]
+  [ "${actual}" = null ]
 }
