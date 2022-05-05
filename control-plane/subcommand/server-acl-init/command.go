@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -360,6 +361,9 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagEnablePartitions {
 		clientConfig.Partition = c.flagPartitionName
+	}
+	clientConfig.HttpClient = &http.Client{
+		Timeout: 5 * time.Minute,
 	}
 	consulClient, err := consul.NewClient(clientConfig, c.flagConsulAPITimeout)
 	if err != nil {
