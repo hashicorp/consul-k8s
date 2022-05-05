@@ -919,7 +919,6 @@ workflows:
           ARCH: "amd64"
           name: build-distros-amd64
       - nightly-dev-upload-docker:
-          context: consul-ci
           requires:
             - build-distros-amd64
       - cleanup-gcp-resources
