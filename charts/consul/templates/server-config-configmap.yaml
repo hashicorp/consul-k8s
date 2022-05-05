@@ -14,7 +14,9 @@ metadata:
 data:
   server.json: |
     {
+      {{- if and .Values.global.secretsBackend.vault.enabled }}
       "auto_reload_config": true,
+      {{- end }}
       "bind_addr": "0.0.0.0",
       "bootstrap_expect": {{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }},
       "client_addr": "0.0.0.0",
