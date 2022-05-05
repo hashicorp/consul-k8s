@@ -2,8 +2,6 @@ package controller
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,14 +12,13 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	cmdCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -346,44 +343,14 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	consulCACert, err := ioutil.ReadFile("/vault/secrets/serverca.crt")
+	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "controller")
+	caPath := "/vault/secrets/serverca.crt"
+	caCert, err := ioutil.ReadFile(caPath)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
+		setupLog.Error(err, "problem getting CA Cert")
 		return 1
 	}
-	if len(consulCACert) == 0 {
-		setupLog.Error(err, "no CA certificate in the bundle")
-	}
-	value := base64.StdEncoding.EncodeToString(consulCACert)
-	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "controller")
-	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
-	setupLog.Info(fmt.Sprintf("Webhook Config: %+v\n", webhookCfg))
-
-	if err != nil {
-		setupLog.Error(err, "problem getting mutating webhook configurations")
-	}
-	type patch struct {
-		Op    string `json:"op,omitempty"`
-		Path  string `json:"path,omitempty"`
-		Value string `json:"value,omitempty"`
-	}
-
-	var patches []patch
-	for i := range webhookCfg.Webhooks {
-		patches = append(patches, patch{
-			Op:    "add",
-			Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
-			Value: value,
-		})
-	}
-	patchesJson, err := json.Marshal(patches)
-	if err != nil {
-		setupLog.Error(err, "problem mashalling webhook patch")
-	}
-
-	if _, err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, webhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
-		setupLog.Error(err, "problem patching webhook")
-	}
+	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, webhookConfigName, caCert)
 
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
