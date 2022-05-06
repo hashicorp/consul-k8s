@@ -3,7 +3,9 @@ package serveraclinit
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
@@ -69,6 +71,9 @@ func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootToken
 	clientConfig.TLSConfig = api.TLSConfig{
 		Address: c.flagConsulTLSServerName,
 		CAFile:  c.flagConsulCACert,
+	}
+	clientConfig.HttpClient = &http.Client{
+		Timeout: 5 * time.Minute,
 	}
 	consulClient, err := consul.NewClient(clientConfig,
 		c.flagConsulAPITimeout)
