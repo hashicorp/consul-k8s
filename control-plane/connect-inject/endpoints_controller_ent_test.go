@@ -5,6 +5,7 @@ package connectinject
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/discovery/v1"
 	"strings"
 	"testing"
 
@@ -90,37 +91,41 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPodWithNamespace("pod1", test.SourceKubeNS, "1.2.3.4", true, true)
 				pod2 := createPodWithNamespace("pod2", test.SourceKubeNS, "2.2.3.4", true, true)
-				endpointWithTwoAddresses := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
-						Namespace: test.SourceKubeNS,
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: test.SourceKubeNS,
-									},
-								},
-								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: test.SourceKubeNS,
-									},
-								},
-							},
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
 						},
 					},
+					Endpoints: []v1.Endpoint{
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+						{
+							Addresses:  []string{"2.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: nil,
 				}
-				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+				return []runtime.Object{pod1, pod2, endpointslice}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 2,
@@ -391,28 +396,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, false)
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "1.2.3.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"1.2.3.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, endpoint}
+					return []runtime.Object{pod1, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -467,28 +473,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "4.4.4.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"4.4.4.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, endpoint}
+					return []runtime.Object{pod1, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -533,28 +540,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
 					pod1.Annotations[annotationService] = "different-consul-svc-name"
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "4.4.4.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"4.4.4.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, endpoint}
+					return []runtime.Object{pod1, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -599,37 +607,40 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "2.2.3.4", true, true)
-					endpointWithTwoAddresses := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "1.2.3.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
-									{
-										IP:       "2.2.3.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod2",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"1.2.3.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
+							},
+							{
+								Addresses:  []string{"2.2.3.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod2",
+									Namespace: "default",
+								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+					return []runtime.Object{pod1, pod2, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -683,28 +694,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "1.2.3.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"1.2.3.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, endpoint}
+					return []runtime.Object{pod1, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -771,28 +783,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					pod1.Annotations[annotationService] = "different-consul-svc-name"
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "1.2.3.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"1.2.3.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, endpoint}
+					return []runtime.Object{pod1, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -859,13 +872,17 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
+						Endpoints: []v1.Endpoint{},
 					}
-					return []runtime.Object{endpoint}
+					return []runtime.Object{endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -920,13 +937,17 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Different Consul service name: Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 				consulSvcName: "different-consul-svc-name",
 				k8sObjects: func() []runtime.Object {
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
+						Endpoints: []v1.Endpoint{},
 					}
-					return []runtime.Object{endpoint}
+					return []runtime.Object{endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -980,28 +1001,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "4.4.4.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "4.4.4.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod2",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"4.4.4.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod2",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod2, endpoint}
+					return []runtime.Object{pod2, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
@@ -1057,28 +1079,29 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							OwnerReferences: []metav1.OwnerReference{
+								metav1.OwnerReference{Name: "service-updated"},
+							},
 						},
-						Subsets: []corev1.EndpointSubset{
+						Endpoints: []v1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP:       "1.2.3.4",
-										NodeName: &nodeName,
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Addresses:  []string{"1.2.3.4"},
+								Conditions: v1.EndpointConditions{},
+								Hostname:   &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
+								NodeName: &nodeName,
 							},
 						},
 					}
-					return []runtime.Object{pod1, endpoint}
+					return []runtime.Object{pod1, endpointslice}
 				},
 				initialConsulSvcs: []*api.AgentServiceRegistration{
 					{
