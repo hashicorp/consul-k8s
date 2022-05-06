@@ -3,7 +3,9 @@ package serveraclinit
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
@@ -69,6 +71,17 @@ func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootToken
 	clientConfig.TLSConfig = api.TLSConfig{
 		Address: c.flagConsulTLSServerName,
 		CAFile:  c.flagConsulCACert,
+	}
+	// Exempting this particular use of the http client from using global.consulAPITimeout
+	// which defaults to 5 seconds.  In acceptance tests, we saw that the call
+	// to /v1/acl/bootstrap taking 5-7 seconds and when it does, the request times
+	// out without returning the bootstrap token, but the bootstrapping does complete.
+	// This would leave cases where server-acl-init job would get a 403 that it had
+	// already bootstrapped and would not be able to complete.
+	// Since this is an area where we have to wait and can't retry, we are setting it
+	// to a large number like 5 minutes since previously this had no timeout.
+	clientConfig.HttpClient = &http.Client{
+		Timeout: 5 * time.Minute,
 	}
 	consulClient, err := consul.NewClient(clientConfig,
 		c.flagConsulAPITimeout)
