@@ -3943,7 +3943,8 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
 					},
 				},
 			},
@@ -3992,7 +3993,8 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
 					},
 				},
 			},
@@ -4043,7 +4045,8 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
 					},
 				},
 			},
@@ -4160,12 +4163,14 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
 					},
 				},
 				{
 					NamespacedName: types.NamespacedName{
-						Name: "endpoint-3",
+						Name:      "endpoint-3",
+						Namespace: "default",
 					},
 				},
 			},
@@ -4491,7 +4496,8 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger := logrtest.TestLogger{T: t}
 			s := runtime.NewScheme()
-			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{}, &v1.EndpointSlice{}, &v1.EndpointSliceList{})
+			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{})
+			s.AddKnownTypes(v1.SchemeGroupVersion, &v1.EndpointSlice{}, &v1.EndpointSliceList{})
 			var objects []runtime.Object
 			if test.agentPod != nil {
 				objects = append(objects, test.agentPod)
