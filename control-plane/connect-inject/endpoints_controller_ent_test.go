@@ -96,7 +96,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-created",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -401,7 +401,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -478,7 +478,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -545,7 +545,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -612,7 +612,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -699,7 +699,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -788,7 +788,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -877,7 +877,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{},
@@ -942,7 +942,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{},
@@ -1006,7 +1006,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{
@@ -1084,7 +1084,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
-								metav1.OwnerReference{Name: "service-updated"},
+								{Name: "service-updated"},
 							},
 						},
 						Endpoints: []v1.Endpoint{

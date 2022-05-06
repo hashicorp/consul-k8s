@@ -175,7 +175,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 			Name:      "svcname_name",
 			Namespace: "default",
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{Name: "svcname"},
+				{Name: "svcname"},
 			},
 		},
 		Endpoints: []v1.Endpoint{},
@@ -542,7 +542,7 @@ func TestProcessUpstreams(t *testing.T) {
 					Name:      "svcname_name",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{Name: "svcname"},
+						{Name: "svcname"},
 					},
 				},
 				Endpoints: []v1.Endpoint{},
@@ -579,7 +579,7 @@ func TestGetServiceName(t *testing.T) {
 					Name:      "svcname_name",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{Name: "not-web"},
+						{Name: "not-web"},
 					},
 				},
 				Endpoints: []v1.Endpoint{},
@@ -598,7 +598,7 @@ func TestGetServiceName(t *testing.T) {
 					Name:      "svcname_name",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{Name: "ep-name"},
+						{Name: "ep-name"},
 					},
 				},
 				Endpoints: []v1.Endpoint{},
@@ -619,7 +619,7 @@ func TestGetServiceName(t *testing.T) {
 					Name:      "svcname_name",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{Name: "ep-name-multiport"},
+						{Name: "ep-name-multiport"},
 					},
 				},
 				Endpoints: []v1.Endpoint{},
@@ -664,7 +664,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						Name:      "web",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "web"},
+							{Name: "web"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -687,7 +687,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						Name:      "web-admin",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "web-admin"},
+							{Name: "web-admin"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -976,7 +976,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Name:      "web",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{},
@@ -1000,7 +1000,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Name:      "service-created",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1071,7 +1071,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Name:      "service-created",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1187,7 +1187,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Name:      "service-created",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1323,7 +1323,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Name:      "service-created",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1424,7 +1424,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Name:      "service-created",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-created"},
+							{Name: "service-created"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1661,7 +1661,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1733,7 +1733,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					AddressType: "",
@@ -1808,7 +1808,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1890,7 +1890,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -1970,7 +1970,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2052,7 +2052,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2136,7 +2136,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2210,7 +2210,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2284,7 +2284,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2385,7 +2385,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2468,7 +2468,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2551,7 +2551,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{},
@@ -2612,7 +2612,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{},
@@ -2672,7 +2672,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2758,7 +2758,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -2877,7 +2877,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Name:      "service-updated",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "service-updated"},
+							{Name: "service-updated"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -3422,7 +3422,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					Name:      serviceName,
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{Name: serviceName},
+						{Name: serviceName},
 					},
 					Labels: tt.serviceLabels,
 				},
@@ -3530,7 +3530,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 			Name:      "not-in-mesh",
 			Namespace: "default",
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{Name: "not-in-mesh"},
+				{Name: "not-in-mesh"},
 			},
 		},
 		Endpoints: []v1.Endpoint{
@@ -3552,7 +3552,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 			Name:      "in-mesh",
 			Namespace: "default",
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{Name: "in-mesh"},
+				{Name: "in-mesh"},
 			},
 		},
 		Endpoints: []v1.Endpoint{
@@ -3909,7 +3909,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -3973,7 +3973,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4023,7 +4023,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4075,7 +4075,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4199,7 +4199,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4234,7 +4234,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-2",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-2"},
+							{Name: "endpoint-2"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4269,7 +4269,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-3",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-3"},
+							{Name: "endpoint-3"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4326,7 +4326,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4349,7 +4349,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-3",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-3"},
+							{Name: "endpoint-3"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4394,7 +4394,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4417,7 +4417,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-3",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-3"},
+							{Name: "endpoint-3"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4446,7 +4446,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-1",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-1"},
+							{Name: "endpoint-1"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -4469,7 +4469,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						Name:      "endpoint-3",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
-							metav1.OwnerReference{Name: "endpoint-3"},
+							{Name: "endpoint-3"},
 						},
 					},
 					Endpoints: []v1.Endpoint{
@@ -5904,7 +5904,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 					Name:      serviceName,
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{Name: serviceName},
+						{Name: serviceName},
 					},
 				},
 				Endpoints: []v1.Endpoint{
