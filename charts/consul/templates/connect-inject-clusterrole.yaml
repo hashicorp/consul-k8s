@@ -19,11 +19,14 @@ rules:
   - get
 {{- end }}
 - apiGroups: [ "" ]
-  resources: [ "pods", "endpoints", "services", "namespaces" ]
+  resources: [ "pods", "services", "namespaces" ]
   verbs:
   - "get"
   - "list"
   - "watch"
+- apiGroups: [ "discovery.k8s.io" ]
+  resources: [ "endpointslices" ]
+  verbs: [ "get", "list", "watch" ]
 - apiGroups:
   - coordination.k8s.io
   resources:

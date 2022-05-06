@@ -3,6 +3,13 @@ package connectinject
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"strings"
 	"testing"
 
@@ -17,12 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
@@ -169,14 +170,18 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	pod := createPod("pod1", "1.2.3.4", true, true)
 	pod.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 
-	upstreams, err := ep.processUpstreams(*pod, corev1.Endpoints{
+	esl := v1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "svcname",
-			Namespace:   "default",
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Name:      "svcname_name",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				metav1.OwnerReference{Name: "svcname"},
+			},
 		},
-	})
+		Endpoints: []v1.Endpoint{},
+		Ports:     nil,
+	}
+	upstreams, err := ep.processUpstreams(*pod, esl)
 	require.NoError(t, err)
 
 	expected := []api.Upstream{
@@ -532,14 +537,18 @@ func TestProcessUpstreams(t *testing.T) {
 				EnableConsulPartitions: tt.consulPartitionsEnabled,
 			}
 
-			upstreams, err := ep.processUpstreams(*tt.pod(), corev1.Endpoints{
+			esl := v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "svcname",
-					Namespace:   "default",
-					Labels:      map[string]string{},
-					Annotations: map[string]string{},
+					Name:      "svcname_name",
+					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						metav1.OwnerReference{Name: "svcname"},
+					},
 				},
-			})
+				Endpoints: []v1.Endpoint{},
+				Ports:     nil,
+			}
+			upstreams, err := ep.processUpstreams(*tt.pod(), esl)
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {
@@ -553,10 +562,10 @@ func TestProcessUpstreams(t *testing.T) {
 func TestGetServiceName(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		pod        func() *corev1.Pod
-		endpoint   *corev1.Endpoints
-		expSvcName string
+		name          string
+		pod           func() *corev1.Pod
+		endpointslice *v1.EndpointSlice
+		expSvcName    string
 	}{
 		{
 			name: "single port, with annotation",
@@ -565,11 +574,16 @@ func TestGetServiceName(t *testing.T) {
 				pod1.Annotations[annotationService] = "web"
 				return pod1
 			},
-			endpoint: &corev1.Endpoints{
+			endpointslice: &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "not-web",
+					Name:      "svcname_name",
 					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						metav1.OwnerReference{Name: "not-web"},
+					},
 				},
+				Endpoints: []v1.Endpoint{},
+				Ports:     nil,
 			},
 			expSvcName: "web",
 		},
@@ -579,11 +593,16 @@ func TestGetServiceName(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				return pod1
 			},
-			endpoint: &corev1.Endpoints{
+			endpointslice: &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ep-name",
+					Name:      "svcname_name",
 					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						metav1.OwnerReference{Name: "ep-name"},
+					},
 				},
+				Endpoints: []v1.Endpoint{},
+				Ports:     nil,
 			},
 			expSvcName: "ep-name",
 		},
@@ -594,11 +613,17 @@ func TestGetServiceName(t *testing.T) {
 				pod1.Annotations[annotationService] = "web,web-admin"
 				return pod1
 			},
-			endpoint: &corev1.Endpoints{
+			// TODO: Investigate multiport
+			endpointslice: &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ep-name-multiport",
+					Name:      "svcname_name",
 					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						metav1.OwnerReference{Name: "ep-name-multiport"},
+					},
 				},
+				Endpoints: []v1.Endpoint{},
+				Ports:     nil,
 			},
 			expSvcName: "ep-name-multiport",
 		},
@@ -606,7 +631,7 @@ func TestGetServiceName(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 
-			svcName := getServiceName(*tt.pod(), *tt.endpoint)
+			svcName := getServiceName(*tt.pod(), *tt.endpointslice)
 			require.Equal(t, tt.expSvcName, svcName)
 
 		})
@@ -634,49 +659,53 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 				pod1.Annotations[annotationPort] = "8080,9090"
 				pod1.Annotations[annotationService] = "web,web-admin"
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
-				endpoint1 := &corev1.Endpoints{
+				endpointslice1 := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web",
 						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
-							},
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "web"},
 						},
 					},
+					Endpoints: []v1.Endpoint{
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: nil,
 				}
-				endpoint2 := &corev1.Endpoints{
+				endpointslice2 := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web-admin",
 						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
-							},
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "web-admin"},
 						},
 					},
+					Endpoints: []v1.Endpoint{
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: nil,
 				}
-				return []runtime.Object{pod1, endpoint1, endpoint2}
+				return []runtime.Object{pod1, endpointslice1, endpointslice2}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 1,
@@ -942,18 +971,18 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Empty endpoints",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "web",
 						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{},
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
 						},
 					},
+					Endpoints: []v1.Endpoint{},
+					Ports:     nil,
 				}
-				return []runtime.Object{endpoint}
+				return []runtime.Object{endpointslice}
 			},
 			initialConsulSvcs:          []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances:    0,
@@ -966,28 +995,30 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
-							},
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
 						},
 					},
+					Endpoints: []v1.Endpoint{
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: nil,
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 1,
@@ -1035,37 +1066,41 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
-				endpointWithTwoAddresses := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
-								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: "default",
-									},
-								},
-							},
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
 						},
 					},
+					Endpoints: []v1.Endpoint{
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+						{
+							Addresses:  []string{"2.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: nil,
 				}
-				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+				return []runtime.Object{pod1, pod2, endpointslice}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 2,
@@ -1147,48 +1182,54 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
-				endpointWithTwoAddresses := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{
-								// This is an invalid address because pod3 will not exist in k8s.
-								{
-									IP:       "9.9.9.9",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod3",
-										Namespace: "default",
-									},
-								},
-								// The next two are valid addresses.
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
-								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: "default",
-									},
-								},
-							},
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
 						},
 					},
+					Endpoints: []v1.Endpoint{
+						{
+							// This is an invalid address because pod3 will not exist in k8s.
+							Addresses:  []string{"9.9.9.9"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod3",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+						// The next two are valid addresses.
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+						{
+							Addresses:  []string{"2.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: nil,
 				}
-				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+				return []runtime.Object{pod1, pod2, endpointslice}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 2,
@@ -1277,28 +1318,29 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
 				pod1.Annotations[annotationEnableMetrics] = "true"
 				pod1.Annotations[annotationPrometheusScrapePort] = "12345"
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 1,
@@ -1377,37 +1419,40 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 				// NOTE: the order of the addresses is important. The non-mesh pod must be first to correctly
 				// reproduce the bug where we were exiting the loop early if any pod was non-mesh.
-				endpointWithTwoAddresses := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-created"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "2.3.4.5",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: "default",
-									},
-								},
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"2.3.4.5"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
+						},
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+				return []runtime.Object{pod1, pod2, endpointslice}
 			},
 			initialConsulSvcs:       []*api.AgentServiceRegistration{},
 			expectedNumSvcInstances: 1,
@@ -1611,28 +1656,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -1682,28 +1728,32 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: "",
+					Endpoints: []v1.Endpoint{
 						{
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
 							},
+							Hostname: &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -1753,28 +1803,31 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
 							},
+							Hostname: &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -1832,28 +1885,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -1911,28 +1965,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -1992,28 +2047,31 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
 							},
+							Hostname: &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2073,28 +2131,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "4.4.4.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "4.4.4.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"4.4.4.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2146,28 +2205,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "4.4.4.4", true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "4.4.4.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"4.4.4.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2219,37 +2279,40 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
-				endpointWithTwoAddresses := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
-								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
+						},
+						{
+							Addresses:  []string{"2.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
+							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+				return []runtime.Object{pod1, pod2, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2317,28 +2380,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2399,28 +2463,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2481,13 +2546,17 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
+					Endpoints: []v1.Endpoint{},
 				}
-				return []runtime.Object{endpoint}
+				return []runtime.Object{endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2538,13 +2607,17 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Different Consul service name: Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
+					Endpoints: []v1.Endpoint{},
 				}
-				return []runtime.Object{endpoint}
+				return []runtime.Object{endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2594,28 +2667,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod2 := createPod("pod2", "4.4.4.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "4.4.4.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"4.4.4.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod2, endpoint}
+				return []runtime.Object{pod2, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2679,28 +2753,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -2797,28 +2872,29 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod2 := createPod("pod2", "2.3.4.5", false, false)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "service-updated"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "2.3.4.5",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"2.3.4.5"},
+							Conditions: v1.EndpointConditions{},
+							Hostname:   &nodeName,
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod2, endpoint}
+				return []runtime.Object{pod2, endpointslice}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -3330,12 +3406,10 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 		},
 		"Registered endpoint without label is unaffected": {
 			svcInitiallyRegistered:  true,
-			serviceLabels:           map[string]string{},
 			expectedNumSvcInstances: 1,
 		},
 		"Not registered endpoint without label is registered": {
 			svcInitiallyRegistered:  false,
-			serviceLabels:           map[string]string{},
 			expectedNumSvcInstances: 1,
 		},
 	}
@@ -3343,25 +3417,26 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
-			endpoint := &corev1.Endpoints{
+			endpointslice := &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
-					Namespace: namespace,
-					Labels:    tt.serviceLabels,
+					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						metav1.OwnerReference{Name: serviceName},
+					},
+					Labels: tt.serviceLabels,
 				},
-				Subsets: []corev1.EndpointSubset{
+				Endpoints: []v1.Endpoint{
 					{
-						Addresses: []corev1.EndpointAddress{
-							{
-								IP:       "1.2.3.4",
-								NodeName: &nodeName,
-								TargetRef: &corev1.ObjectReference{
-									Kind:      "Pod",
-									Name:      "pod1",
-									Namespace: namespace,
-								},
-							},
+						Addresses:  []string{"1.2.3.4"},
+						Conditions: v1.EndpointConditions{},
+						Hostname:   &nodeName,
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      "pod1",
+							Namespace: "default",
 						},
+						NodeName: &nodeName,
 					},
 				},
 			}
@@ -3369,7 +3444,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-			k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
+			k8sObjects := []runtime.Object{endpointslice, pod1, fakeClientPod, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test Consul server.
@@ -3450,54 +3525,56 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	namespace := "default"
 
 	// Set up the fake Kubernetes client with a few endpoints, pod, consul client, and the default namespace.
-	badEndpoint := &corev1.Endpoints{
+	badendpointslice := &v1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-in-mesh",
-			Namespace: namespace,
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				metav1.OwnerReference{Name: "not-in-mesh"},
+			},
 		},
-		Subsets: []corev1.EndpointSubset{
+		Endpoints: []v1.Endpoint{
 			{
-				Addresses: []corev1.EndpointAddress{
-					{
-						IP:       "1.2.3.4",
-						NodeName: &nodeName,
-						TargetRef: &corev1.ObjectReference{
-							Kind:      "Pod",
-							Name:      "pod1",
-							Namespace: namespace,
-						},
-					},
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: v1.EndpointConditions{},
+				Hostname:   &nodeName,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "pod1",
+					Namespace: "default",
 				},
+				NodeName: &nodeName,
 			},
 		},
 	}
-	endpoint := &corev1.Endpoints{
+	endpointslice := &v1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "in-mesh",
-			Namespace: namespace,
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				metav1.OwnerReference{Name: "in-mesh"},
+			},
 		},
-		Subsets: []corev1.EndpointSubset{
+		Endpoints: []v1.Endpoint{
 			{
-				Addresses: []corev1.EndpointAddress{
-					{
-						IP:       "1.2.3.4",
-						NodeName: &nodeName,
-						TargetRef: &corev1.ObjectReference{
-							Kind:      "Pod",
-							Name:      "pod1",
-							Namespace: namespace,
-						},
-					},
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: v1.EndpointConditions{},
+				Hostname:   &nodeName,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "pod1",
+					Namespace: "default",
 				},
+				NodeName: &nodeName,
 			},
 		},
 	}
 	pod1 := createPod("pod1", "1.2.3.4", true, true)
-	pod1.Annotations[annotationKubernetesService] = endpoint.Name
+	pod1.Annotations[annotationKubernetesService] = endpointslice.Name
 	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, fakeClientPod, &ns}
+	k8sObjects := []runtime.Object{badendpointslice, endpointslice, pod1, fakeClientPod, &ns}
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 	// Create test Consul server.
@@ -3525,7 +3602,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		ConsulClientCfg:       cfg,
 	}
 
-	serviceName := badEndpoint.Name
+	serviceName := badendpointslice.Name
 
 	// Initially register the pod with the bad endpoint
 	err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
@@ -3546,7 +3623,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, serviceInstances, 1)
 
 	// Run the reconcile process to check service deregistration.
-	namespacedName := types.NamespacedName{Namespace: badEndpoint.Namespace, Name: serviceName}
+	namespacedName := types.NamespacedName{Namespace: badendpointslice.Namespace, Name: serviceName}
 	resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
@@ -3560,8 +3637,8 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, proxyServiceInstances, 0)
 
 	// Run the reconcile again with the service we want to register.
-	serviceName = endpoint.Name
-	namespacedName = types.NamespacedName{Namespace: endpoint.Namespace, Name: serviceName}
+	serviceName = endpointslice.Name
+	namespacedName = types.NamespacedName{Namespace: endpointslice.Namespace, Name: serviceName}
 	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
@@ -3804,9 +3881,9 @@ func TestFilterAgentPods(t *testing.T) {
 func TestRequestsForRunningAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
-		agentPod          *corev1.Pod
-		existingEndpoints []*corev1.Endpoints
-		expectedRequests  []ctrl.Request
+		agentPod         *corev1.Pod
+		endpointslices   []*v1.EndpointSlice
+		expectedRequests []ctrl.Request
 	}{
 		"pod=running, all endpoints need to be reconciled": {
 			agentPod: &corev1.Pod{
@@ -3826,23 +3903,39 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-bar"),
-								},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-foo"),
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
+							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-bar"),
 						},
 					},
 				},
@@ -3873,18 +3966,25 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
@@ -3915,18 +4015,27 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
@@ -3957,61 +4066,93 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-bar"),
-								},
+							NodeName: toStringPtr("node-foo"),
+						},
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-bar"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-2",
+						Name:      "endpoint-2",
+						Namespace: "default",
+						Labels:    map[string]string{"kubernetes.io/service-name": "endpoint-2"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-other"),
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-baz"),
-								},
+							NodeName: toStringPtr("node-baz"),
+						},
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-bar"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-3",
+						Name:      "endpoint-3",
+						Namespace: "default",
+						Labels:    map[string]string{"kubernetes.io/service-name": "endpoint-3"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-baz"),
-								},
+							NodeName: toStringPtr("node-foo"),
+						},
+						{
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-bar"),
 						},
 					},
 				},
@@ -4047,61 +4188,109 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-baz"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-bar"),
-								},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-baz"),
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
+							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-bar"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-2",
+						Name:      "endpoint-2",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-2"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-bar"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-baz"),
-								},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-bar"),
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
+							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-baz"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-3",
+						Name:      "endpoint-3",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-3"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-bar"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
-							NotReadyAddresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-baz"),
-								},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: toStringPtr("node-bar"),
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(false),
+							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-baz"),
 						},
 					},
 				},
@@ -4126,32 +4315,50 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-baz"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-3",
+						Name:      "endpoint-3",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-3"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
@@ -4176,32 +4383,50 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodUnknown,
 				},
 			},
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-3",
+						Name:      "endpoint-3",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-3"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
@@ -4210,32 +4435,50 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 		},
 		"pod is deleted, no endpoints need to be reconciled": {
 			agentPod: nil,
-			existingEndpoints: []*corev1.Endpoints{
+			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-1",
+						Name:      "endpoint-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-1"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "endpoint-3",
+						Name:      "endpoint-3",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							metav1.OwnerReference{Name: "endpoint-3"},
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []v1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									NodeName: toStringPtr("node-foo"),
-								},
+							Addresses: []string{"1.2.3.4"},
+							Conditions: v1.EndpointConditions{
+								Ready: toBoolPtr(true),
 							},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
+							},
+							NodeName: toStringPtr("node-foo"),
 						},
 					},
 				},
@@ -4248,12 +4491,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger := logrtest.TestLogger{T: t}
 			s := runtime.NewScheme()
-			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{}, &corev1.Endpoints{}, &corev1.EndpointsList{})
+			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{}, &v1.EndpointSlice{}, &v1.EndpointSliceList{})
 			var objects []runtime.Object
 			if test.agentPod != nil {
 				objects = append(objects, test.agentPod)
 			}
-			for _, endpoint := range test.existingEndpoints {
+			for _, endpoint := range test.endpointslices {
 				objects = append(objects, endpoint)
 			}
 
@@ -5650,25 +5893,26 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			// need these values to determine which port to use for the service registration.
 			pod.Annotations[annotationPort] = "tcp"
 
-			endpoints := &corev1.Endpoints{
+			endpointslice := &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
 					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						metav1.OwnerReference{Name: serviceName},
+					},
 				},
-				Subsets: []corev1.EndpointSubset{
+				Endpoints: []v1.Endpoint{
 					{
-						Addresses: []corev1.EndpointAddress{
-							{
-								IP: "1.2.3.4",
-								TargetRef: &corev1.ObjectReference{
-									Kind:      "Pod",
-									Name:      pod.Name,
-									Namespace: pod.Namespace,
-								},
-							},
+						Addresses:  []string{"1.2.3.4"},
+						Conditions: v1.EndpointConditions{},
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      pod.Name,
+							Namespace: pod.Namespace,
 						},
 					},
 				},
+				Ports: nil,
 			}
 			// Add the pod's namespace.
 			ns := corev1.Namespace{
@@ -5676,9 +5920,9 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			}
 			var fakeClient client.Client
 			if c.service != nil {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, c.service, &ns).Build()
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpointslice, c.service, &ns).Build()
 			} else {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, &ns).Build()
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpointslice, &ns).Build()
 			}
 
 			epCtrl := EndpointsController{
@@ -5688,7 +5932,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				Log:                    logrtest.TestLogger{T: t},
 			}
 
-			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints)
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpointslice)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
@@ -5728,74 +5972,6 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 	}
 }
 
-func TestMapAddresses(t *testing.T) {
-	t.Parallel()
-	cases := map[string]struct {
-		addresses corev1.EndpointSubset
-		expected  map[corev1.EndpointAddress]string
-	}{
-		"ready and not ready addresses": {
-			addresses: corev1.EndpointSubset{
-				Addresses: []corev1.EndpointAddress{
-					{Hostname: "host1"},
-					{Hostname: "host2"},
-				},
-				NotReadyAddresses: []corev1.EndpointAddress{
-					{Hostname: "host3"},
-					{Hostname: "host4"},
-				},
-			},
-			expected: map[corev1.EndpointAddress]string{
-				{Hostname: "host1"}: api.HealthPassing,
-				{Hostname: "host2"}: api.HealthPassing,
-				{Hostname: "host3"}: api.HealthCritical,
-				{Hostname: "host4"}: api.HealthCritical,
-			},
-		},
-		"ready addresses only": {
-			addresses: corev1.EndpointSubset{
-				Addresses: []corev1.EndpointAddress{
-					{Hostname: "host1"},
-					{Hostname: "host2"},
-					{Hostname: "host3"},
-					{Hostname: "host4"},
-				},
-				NotReadyAddresses: []corev1.EndpointAddress{},
-			},
-			expected: map[corev1.EndpointAddress]string{
-				{Hostname: "host1"}: api.HealthPassing,
-				{Hostname: "host2"}: api.HealthPassing,
-				{Hostname: "host3"}: api.HealthPassing,
-				{Hostname: "host4"}: api.HealthPassing,
-			},
-		},
-		"not ready addresses only": {
-			addresses: corev1.EndpointSubset{
-				Addresses: []corev1.EndpointAddress{},
-				NotReadyAddresses: []corev1.EndpointAddress{
-					{Hostname: "host1"},
-					{Hostname: "host2"},
-					{Hostname: "host3"},
-					{Hostname: "host4"},
-				},
-			},
-			expected: map[corev1.EndpointAddress]string{
-				{Hostname: "host1"}: api.HealthCritical,
-				{Hostname: "host2"}: api.HealthCritical,
-				{Hostname: "host3"}: api.HealthCritical,
-				{Hostname: "host4"}: api.HealthCritical,
-			},
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			actual := mapAddresses(c.addresses)
-			require.Equal(t, c.expected, actual)
-		})
-	}
-}
-
 func createPod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -5826,5 +6002,9 @@ func createPod(name, ip string, inject bool, managedByEndpointsController bool) 
 }
 
 func toStringPtr(input string) *string {
+	return &input
+}
+
+func toBoolPtr(input bool) *bool {
 	return &input
 }
