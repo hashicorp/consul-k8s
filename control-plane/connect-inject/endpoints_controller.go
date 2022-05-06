@@ -177,7 +177,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 		// indicates an unknown state. In most cases consumers should interpret this
 		// unknown state as ready. For compatibility reasons, ready should never be
 		// "true" for terminating endpoints.
-		if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready == true {
+		if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
 			healthStatus = api.HealthPassing
 		}
 		if endpoint.TargetRef != nil && endpoint.TargetRef.Kind == "Pod" {
