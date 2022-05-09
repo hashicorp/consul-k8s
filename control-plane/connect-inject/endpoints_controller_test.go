@@ -3642,7 +3642,6 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 
 	// Check that the correct services are registered with Consul.
 	serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
-	svc, _, err := consulClient.Catalog().Services(nil)
 	require.NoError(t, err)
 	require.Len(t, serviceInstances, 1)
 	proxyServiceInstances, _, err = consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
