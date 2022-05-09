@@ -368,7 +368,9 @@ func (c *Command) configureCABundleUpdate() error {
 		return err
 	}
 	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, webhookConfigName, caCert)
-
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

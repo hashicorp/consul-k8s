@@ -491,7 +491,9 @@ func (c *Command) configureCABundleUpdate(ctx context.Context) error {
 		return err
 	}
 	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, webhookConfigName, caCert)
-
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (c *Command) validateFlags() error {
