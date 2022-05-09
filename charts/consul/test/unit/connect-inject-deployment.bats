@@ -1948,7 +1948,7 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.enabled=true' \
-      --set 'connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \

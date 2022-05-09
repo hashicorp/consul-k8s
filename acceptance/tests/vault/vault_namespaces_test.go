@@ -186,11 +186,11 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled":            "true",
-		"connectInject.replicas":           "1",
-		"connectInject.tlsCert.secretName": pathForConnectInjectWebookCerts,
-		"controller.enabled":               "true",
-		"controller.tlsCert.secretName":    pathForControllerWebookCerts,
+		"connectInject.enabled":                                 "true",
+		"connectInject.replicas":                                "1",
+		"secretsBackend.vault.connectInject.tlsCert.secretName": pathForConnectInjectWebookCerts,
+		"controller.enabled":                                    "true",
+		"secretsBackend.vault.controller.tlsCert.secretName":    pathForControllerWebookCerts,
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,

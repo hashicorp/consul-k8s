@@ -263,6 +263,22 @@ global:
         additionalConfig: |
           {}
 
+      controller:
+        # The directory that Kubernetes will use on Kubernetes CRD creation, 
+        # deletion, and update, to get TLS certificates used issued from vault
+        # to send webhooks to the controller.
+        tlsCert:
+          # @type: string
+          secretName: nil
+      
+      connectInject:
+        # The directory that Kubernetes will use on Kubernetes CRD creation, 
+        # deletion, and update, to get TLS certificates used issued from vault
+        # to send webhooks to ConnectInject
+        tlsCert: 
+          # @type: string
+          secretName: nil
+
   # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://www.consul.io/docs/agent/config/cli-flags#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
@@ -2050,12 +2066,6 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
-  # The directory that Kubernetes will use on Kubernetes service creation, 
-  # deletion, and update, to get TLS certificates used to send webhooks to
-  # ConnectInject
-  tlsCert: 
-    # @type: string
-    secretName: nil
 # Controller handles config entry custom resources.
 # Requires consul >= 1.8.4.
 # ServiceIntentions require consul 1.9+.
@@ -2069,13 +2079,6 @@ controller:
   # Log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
-
-  # The directory that Kubernetes will use on Kubernetes CRD creation, 
-  # deletion, and update, to get TLS certificates used to send webhooks to
-  # the controller.
-  tlsCert:
-    # @type: string
-    secretName: nil
 
   serviceAccount:
     # This value defines additional annotations for the controller service account. This should be formatted as a
