@@ -37,6 +37,20 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# resourcePrefix
+
+@test "controller/Deployment: resource-prefix flag is set on command" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-resource-prefix=release-name-consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # replicas
 
 @test "controller/Deployment: replicas defaults to 1" {
