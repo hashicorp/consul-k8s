@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
-// object. The cases test a basic endpoints object with two addresses. This test verifies that the services and their TTL
+// TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the EndpointSlice
+// object. The cases test a basic endpointslice object with two endpoints. This test verifies that the services and their TTL
 // health checks are created in the expected Consul namespace for various combinations of namespace flags.
 // This test covers EndpointsController.createServiceRegistrations.
 func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
@@ -93,7 +93,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 				pod2 := createPodWithNamespace("pod2", test.SourceKubeNS, "2.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -257,7 +257,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: test.SourceKubeNS,
-				Name:      "service-created",
+				Name:      "service-created-123456",
 			}
 
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
@@ -321,7 +321,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 	}
 }
 
-// Tests updating an Endpoints object when Consul namespaces are enabled.
+// Tests updating an EndpointSlice object when Consul namespaces are enabled.
 //   - Tests updates via the register codepath:
 //     - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated in the correct Consul namespace.
 //     - When an address is added to an Endpoint, an additional service instance in Consul is registered in the correct Consul namespace.
@@ -398,7 +398,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, false)
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -475,7 +475,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -542,7 +542,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod1.Annotations[annotationService] = "different-consul-svc-name"
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -609,7 +609,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "2.2.3.4", true, true)
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -696,7 +696,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -785,7 +785,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod1.Annotations[annotationService] = "different-consul-svc-name"
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -874,7 +874,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -939,7 +939,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -1003,7 +1003,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "4.4.4.4", true, true)
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -1081,7 +1081,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					endpointslice := &v1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "service-updated",
+							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
 							OwnerReferences: []metav1.OwnerReference{
 								{Name: "service-updated"},
@@ -1298,7 +1298,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				}
 				namespacedName := types.NamespacedName{
 					Namespace: ts.SourceKubeNS,
-					Name:      "service-updated",
+					Name:      "service-updated-123456",
 				}
 
 				resp, err := ep.Reconcile(context.Background(), ctrl.Request{
@@ -1370,7 +1370,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 	}
 }
 
-// Tests deleting an Endpoints object, with and without matching Consul and K8s service names when Consul namespaces are enabled.
+// Tests deleting an EndpointSlice object, with and without matching Consul and K8s service names when Consul namespaces are enabled.
 // This test covers EndpointsController.deregisterServiceOnAllAgents when the map is nil (not selectively deregistered).
 func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 	t.Parallel()
@@ -1608,10 +1608,10 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 					ep.AuthMethod = test.AuthMethod
 				}
 
-				// Set up the Endpoint that will be reconciled, and reconcile.
+				// Set up the EndpointSlice that will be reconciled, and reconcile.
 				namespacedName := types.NamespacedName{
 					Namespace: ts.SourceKubeNS,
-					Name:      "service-deleted",
+					Name:      "service-deleted-123456",
 				}
 				resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,

@@ -172,7 +172,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 
 	esl := v1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svcname_name",
+			Name:      "svcname-123456",
 			Namespace: "default",
 			OwnerReferences: []metav1.OwnerReference{
 				{Name: "svcname"},
@@ -539,7 +539,7 @@ func TestProcessUpstreams(t *testing.T) {
 
 			esl := v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "svcname_name",
+					Name:      "svcname-123456",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
 						{Name: "svcname"},
@@ -576,7 +576,7 @@ func TestGetServiceName(t *testing.T) {
 			},
 			endpointslice: &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "svcname_name",
+					Name:      "not-web-123456",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
 						{Name: "not-web"},
@@ -595,7 +595,7 @@ func TestGetServiceName(t *testing.T) {
 			},
 			endpointslice: &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "svcname_name",
+					Name:      "ep-name-123456",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
 						{Name: "ep-name"},
@@ -613,10 +613,9 @@ func TestGetServiceName(t *testing.T) {
 				pod1.Annotations[annotationService] = "web,web-admin"
 				return pod1
 			},
-			// TODO: Investigate multiport
 			endpointslice: &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "svcname_name",
+					Name:      "ep-name-multiport-123456",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
 						{Name: "ep-name-multiport"},
@@ -661,7 +660,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
 				endpointslice1 := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "web",
+						Name:      "web-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "web"},
@@ -684,7 +683,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 				}
 				endpointslice2 := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "web-admin",
+						Name:      "web-admin-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "web-admin"},
@@ -867,11 +866,11 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
-				Name:      "web",
+				Name:      "web-123456",
 			}
 			namespacedName2 := types.NamespacedName{
 				Namespace: "default",
-				Name:      "web-admin",
+				Name:      "web-admin-123456",
 			}
 
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
@@ -973,7 +972,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "web",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -997,7 +996,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -1068,7 +1067,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -1184,7 +1183,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -1320,7 +1319,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationPrometheusScrapePort] = "12345"
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -1421,7 +1420,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				// reproduce the bug where we were exiting the loop early if any pod was non-mesh.
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
@@ -1548,7 +1547,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
-				Name:      "service-created",
+				Name:      "service-created-123456",
 			}
 
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
@@ -1658,7 +1657,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -1730,7 +1729,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -1805,7 +1804,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -1887,7 +1886,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -1967,7 +1966,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2049,7 +2048,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2133,7 +2132,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "4.4.4.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2207,7 +2206,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2281,7 +2280,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2382,7 +2381,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2465,7 +2464,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2548,7 +2547,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2609,7 +2608,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2669,7 +2668,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod2 := createPod("pod2", "4.4.4.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2755,7 +2754,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -2874,7 +2873,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				pod2 := createPod("pod2", "2.3.4.5", false, false)
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-updated",
+						Name:      "service-updated-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-updated"},
@@ -3027,7 +3026,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			if tt.enableACLs {
 				ep.AuthMethod = test.AuthMethod
 			}
-			namespacedName := types.NamespacedName{Namespace: "default", Name: "service-updated"}
+			namespacedName := types.NamespacedName{Namespace: "default", Name: "service-updated-123456"}
 
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 			require.NoError(t, err)
@@ -3054,7 +3053,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
 					check, err := consulClient.Agent().ChecksWithFilter(filter)
 					require.NoError(t, err)
-					require.EqualValues(t, len(check), 1)
+					require.EqualValues(t, 1, len(check))
 					// Ignoring Namespace because the response from ENT includes it and OSS does not.
 					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
@@ -3343,10 +3342,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				ep.AuthMethod = test.AuthMethod
 			}
 
-			// Set up the Endpoint that will be reconciled, and reconcile
+			// Set up the EndpointSlice that will be reconciled, and reconcile.
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
-				Name:      "service-deleted",
+				Name:      "service-deleted-123456",
 			}
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
@@ -3419,7 +3418,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
 			endpointslice := &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
+					Name:      serviceName + "-123456",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
 						{Name: serviceName},
@@ -3502,7 +3501,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			}
 
 			// Run the reconcile process to deregister the service if it was registered before.
-			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
+			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName + "-123456"}
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
@@ -3527,8 +3526,8 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	// Set up the fake Kubernetes client with a few endpoints, pod, consul client, and the default namespace.
 	badendpointslice := &v1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "not-in-mesh",
-			Namespace: "default",
+			Name:      "not-in-mesh-123456",
+			Namespace: namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{Name: "not-in-mesh"},
 			},
@@ -3541,7 +3540,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Name:      "pod1",
-					Namespace: "default",
+					Namespace: namespace,
 				},
 				NodeName: &nodeName,
 			},
@@ -3549,8 +3548,8 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	}
 	endpointslice := &v1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "in-mesh",
-			Namespace: "default",
+			Name:      "in-mesh-123456",
+			Namespace: namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{Name: "in-mesh"},
 			},
@@ -3563,14 +3562,14 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Name:      "pod1",
-					Namespace: "default",
+					Namespace: namespace,
 				},
 				NodeName: &nodeName,
 			},
 		},
 	}
 	pod1 := createPod("pod1", "1.2.3.4", true, true)
-	pod1.Annotations[annotationKubernetesService] = endpointslice.Name
+	pod1.Annotations[annotationKubernetesService] = endpointslice.OwnerReferences[0].Name
 	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
@@ -3601,9 +3600,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		ReleaseNamespace:      namespace,
 		ConsulClientCfg:       cfg,
 	}
-
-	serviceName := badendpointslice.Name
-
+	serviceName := "not-in-mesh"
 	// Initially register the pod with the bad endpoint
 	err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
 		ID:      "pod1-" + serviceName,
@@ -3623,7 +3620,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, serviceInstances, 1)
 
 	// Run the reconcile process to check service deregistration.
-	namespacedName := types.NamespacedName{Namespace: badendpointslice.Namespace, Name: serviceName}
+	namespacedName := types.NamespacedName{Namespace: badendpointslice.Namespace, Name: serviceName + "-123456"}
 	resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
@@ -3637,14 +3634,15 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, proxyServiceInstances, 0)
 
 	// Run the reconcile again with the service we want to register.
-	serviceName = endpointslice.Name
-	namespacedName = types.NamespacedName{Namespace: endpointslice.Namespace, Name: serviceName}
+	serviceName = endpointslice.OwnerReferences[0].Name
+	namespacedName = types.NamespacedName{Namespace: endpointslice.Namespace, Name: endpointslice.Name}
 	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
 	// Check that the correct services are registered with Consul.
 	serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
+	svc, _, err := consulClient.Catalog().Services(nil)
 	require.NoError(t, err)
 	require.Len(t, serviceInstances, 1)
 	proxyServiceInstances, _, err = consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
@@ -3670,7 +3668,7 @@ func TestReconcileUnreachableClient(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
+						Name:      "service-created-123456",
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
@@ -3739,7 +3737,7 @@ func TestReconcileUnreachableClient(t *testing.T) {
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
-				Name:      "service-created",
+				Name:      "service-created-123456",
 			}
 
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
@@ -3906,7 +3904,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -3943,7 +3941,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 					},
 				},
@@ -3970,7 +3968,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -3993,7 +3991,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 					},
 				},
@@ -4020,7 +4018,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -4045,7 +4043,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 					},
 				},
@@ -4072,7 +4070,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -4103,9 +4101,11 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-2",
+						Name:      "endpoint-2-123456",
 						Namespace: "default",
-						Labels:    map[string]string{"kubernetes.io/service-name": "endpoint-2"},
+						OwnerReferences: []metav1.OwnerReference{
+							{Name: "endpoint-2"},
+						},
 					},
 					Endpoints: []v1.Endpoint{
 						{
@@ -4132,9 +4132,11 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-3",
+						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						Labels:    map[string]string{"kubernetes.io/service-name": "endpoint-3"},
+						OwnerReferences: []metav1.OwnerReference{
+							{Name: "endpoint-3"},
+						},
 					},
 					Endpoints: []v1.Endpoint{
 						{
@@ -4163,13 +4165,13 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			expectedRequests: []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 					},
 				},
 				{
 					NamespacedName: types.NamespacedName{
-						Name:      "endpoint-3",
+						Name:      "endpoint-3-123456",
 						Namespace: "default",
 					},
 				},
@@ -4196,7 +4198,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -4231,7 +4233,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-2",
+						Name:      "endpoint-2-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-2"},
@@ -4266,7 +4268,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-3",
+						Name:      "endpoint-3-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-3"},
@@ -4323,7 +4325,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -4346,7 +4348,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-3",
+						Name:      "endpoint-3-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-3"},
@@ -4391,7 +4393,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -4414,7 +4416,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-3",
+						Name:      "endpoint-3-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-3"},
@@ -4443,7 +4445,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			endpointslices: []*v1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-1",
+						Name:      "endpoint-1-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-1"},
@@ -4466,7 +4468,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "endpoint-3",
+						Name:      "endpoint-3-123456",
 						Namespace: "default",
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "endpoint-3"},
@@ -5901,7 +5903,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 
 			endpointslice := &v1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
+					Name:      serviceName + "-123456",
 					Namespace: "default",
 					OwnerReferences: []metav1.OwnerReference{
 						{Name: serviceName},
