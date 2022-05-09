@@ -950,7 +950,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.enabled=true' \
-      --set 'secretsBackend.vault.controller.tlsCert.secretName=pki/issue/controller-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=pki/issue/controller-webhook-cert-dc1' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \

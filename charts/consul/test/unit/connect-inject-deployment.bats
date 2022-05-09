@@ -1840,7 +1840,8 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-webhook-ca-update"))' | tee /dev/stderr)
@@ -1861,7 +1862,8 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test2' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -1882,7 +1884,8 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test2' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1904,7 +1907,8 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test2' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1926,7 +1930,8 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test2' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
@@ -1946,9 +1951,10 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'global.tls.enabled=true' \
-      --set 'secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
@@ -2003,7 +2009,8 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -2018,7 +2025,8 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -2034,8 +2042,9 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
-            . | tee /dev/stderr |
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
+                 . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-dir=/vault/secrets"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
@@ -2054,6 +2063,7 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=connectinjectcarole' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
@@ -2071,6 +2081,7 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=connectinjectcarole' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)

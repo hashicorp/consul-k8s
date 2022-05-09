@@ -37,6 +37,7 @@ func TestUpdateWithCABundle_patchesExistingConfiguration(t *testing.T) {
 	mwcCreated, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(ctx, mwc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	err = UpdateWithCABundle(ctx, clientset, mwcCreated.Name, caBundleOne)
+	require.NoError(t, err)
 	mwcFetched, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, mwc.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	require.Equal(t, caBundleOne, mwcFetched.Webhooks[0].ClientConfig.CABundle)

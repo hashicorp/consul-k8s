@@ -41,13 +41,15 @@ spec:
         {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/agent-inject": "true"
-        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulConnectInjectCARole }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.secretsBackend.vault.connectInject.tlsCert.secretName }}
+        {{- if .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-tls.crt": {{ include "consul.connectInjectWebhookTLSCertTemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-tls.key": {{ .Values.secretsBackend.vault.connectInject.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-secret-tls.key": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-tls.key": {{ include "consul.connectInjectWebhookTLSKeyTemplate" . }}
+        {{- end }}
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
         "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
@@ -172,7 +174,7 @@ spec:
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
-                {{- if .Values.global.secretsBackend.vault.enabled }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
                 -tls-cert-dir=/vault/secrets \
                 -enable-webhook-ca-update \
                 {{- else }}
