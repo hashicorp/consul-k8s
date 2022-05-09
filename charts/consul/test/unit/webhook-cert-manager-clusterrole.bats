@@ -48,7 +48,6 @@ load _helpers
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
       --set 'controller.enabled=true' \
-      --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0]' | tee /dev/stderr)
 
@@ -85,7 +84,6 @@ load _helpers
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
       --set 'controller.enabled=true' \
-      --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[1]' | tee /dev/stderr)
 
@@ -113,7 +111,6 @@ load _helpers
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
       --set 'controller.enabled=true' \
-      --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[2]' | tee /dev/stderr)
 
