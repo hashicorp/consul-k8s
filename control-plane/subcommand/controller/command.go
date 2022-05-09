@@ -34,13 +34,14 @@ type Command struct {
 	flagSet   *flag.FlagSet
 	httpFlags *flags.HTTPFlags
 
-	flagWebhookTLSCertDir    string
-	flagEnableLeaderElection bool
-	flagEnableWebhooks       bool
-	flagDatacenter           string
-	flagLogLevel             string
-	flagLogJSON              bool
-	flagResourcePrefix       string
+	flagWebhookTLSCertDir     string
+	flagEnableLeaderElection  bool
+	flagEnableWebhooks        bool
+	flagDatacenter            string
+	flagLogLevel              string
+	flagLogJSON               bool
+	flagResourcePrefix        string
+	flagEnableWebhookCAUpdate bool
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -89,6 +90,8 @@ func (c *Command) init() {
 		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
 	c.flagSet.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
+	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
+		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -329,38 +332,44 @@ func (c *Command) Run(args []string) int {
 	}
 	// +kubebuilder:scaffold:builder
 
-	// Create a context to be used by the processes started in this command.
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("error loading in-cluster K8S config: %s", err))
-		return 1
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("error creating K8S client: %s", err))
-		return 1
+	if c.flagEnableWebhookCAUpdate {
+		err := c.configureCABundleUpdate()
+		if err != nil {
+			setupLog.Error(err, "problem getting CA Cert")
+			return 1
+		}
 	}
 
-	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "controller")
-	caPath := "/vault/secrets/serverca.crt"
-	caCert, err := ioutil.ReadFile(caPath)
-	if err != nil {
-		setupLog.Error(err, "problem getting CA Cert")
-		return 1
-	}
-	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, webhookConfigName, caCert)
-
-	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
-	}
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		return 1
 	}
 	return 0
+}
+
+func (c *Command) configureCABundleUpdate() error {
+	// Create a context to be used by the processes started in this command.
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "controller")
+	caPath := fmt.Sprintf("%s/%s", c.flagWebhookTLSCertDir, "serverca.crt")
+	caCert, err := ioutil.ReadFile(caPath)
+	if err != nil {
+		return err
+	}
+	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, webhookConfigName, caCert)
+
+	return nil
 }
 
 func (c *Command) validateFlags() error {

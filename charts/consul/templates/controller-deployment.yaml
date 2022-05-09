@@ -123,6 +123,7 @@ spec:
             -log-json={{ .Values.global.logJSON }} \
             -resource-prefix={{ template "consul.fullname" . }} \
             {{- if .Values.global.secretsBackend.vault.enabled }}
+            -enable-webhook-ca-update \
             -webhook-tls-cert-dir=/vault/secrets \
             {{- else }}
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
