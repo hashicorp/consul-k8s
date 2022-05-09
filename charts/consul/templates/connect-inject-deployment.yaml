@@ -174,6 +174,7 @@ spec:
                 {{- end }}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
                 -tls-cert-dir=/vault/secrets \
+                -enable-webhook-ca-update \
                 {{- else }}
                 -tls-cert-dir=/etc/connect-injector/certs \
                 {{- end }}

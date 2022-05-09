@@ -35,19 +35,20 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flagListen               string
-	flagCertDir              string // Directory with TLS certs for listening (PEM)
-	flagDefaultInject        bool   // True to inject by default
-	flagConsulImage          string // Docker image for Consul
-	flagEnvoyImage           string // Docker image for Envoy
-	flagConsulK8sImage       string // Docker image for consul-k8s
-	flagACLAuthMethod        string // Auth Method to use for ACLs, if enabled
-	flagWriteServiceDefaults bool   // True to enable central config injection
-	flagDefaultProtocol      string // Default protocol for use with central config
-	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
-	flagEnvoyExtraArgs       string // Extra envoy args when starting envoy
-	flagLogLevel             string
-	flagLogJSON              bool
+	flagListen                string
+	flagCertDir               string // Directory with TLS certs for listening (PEM)
+	flagDefaultInject         bool   // True to inject by default
+	flagConsulImage           string // Docker image for Consul
+	flagEnvoyImage            string // Docker image for Envoy
+	flagConsulK8sImage        string // Docker image for consul-k8s
+	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
+	flagWriteServiceDefaults  bool   // True to enable central config injection
+	flagDefaultProtocol       string // Default protocol for use with central config
+	flagConsulCACert          string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
+	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
+	flagEnableWebhookCAUpdate bool
+	flagLogLevel              string
+	flagLogJSON               bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -173,6 +174,8 @@ func (c *Command) init() {
 		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
 	c.flagSet.BoolVar(&c.flagEnableOpenShift, "enable-openshift", false,
 		"Indicates that the command runs in an OpenShift cluster.")
+	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
+		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -465,14 +468,13 @@ func (c *Command) Run(args []string) int {
 			ConsulAPITimeout:              c.http.ConsulAPITimeout(),
 		}})
 
-	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "connect-injector")
-	caPath := "/vault/secrets/serverca.crt"
-	caCert, err := ioutil.ReadFile(caPath)
-	if err != nil {
-		setupLog.Error(err, "problem getting CA Cert")
-		return 1
+	if c.flagEnableWebhookCAUpdate {
+		err := c.configureCABundleUpdate(ctx)
+		if err != nil {
+			setupLog.Error(err, "problem getting CA Cert")
+			return 1
+		}
 	}
-	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, webhookConfigName, caCert)
 
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
@@ -481,6 +483,17 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+func (c *Command) configureCABundleUpdate(ctx context.Context) error {
+	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "connect-injector")
+	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, "serverca.crt")
+	caCert, err := ioutil.ReadFile(caPath)
+	if err != nil {
+		return err
+	}
+	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, webhookConfigName, caCert)
+
+	return nil
+}
 func (c *Command) validateFlags() error {
 	if c.flagConsulK8sImage == "" {
 		return errors.New("-consul-k8s-image must be set")
