@@ -5,7 +5,6 @@ package connectinject
 import (
 	"context"
 	"fmt"
-	v1 "k8s.io/api/discovery/v1"
 	"strings"
 	"testing"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,11 +26,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the EndpointSlice
+// TestReconcileCreateEndpointSlice tests the logic to create service instances in Consul from the addresses in the EndpointSlice
 // object. The cases test a basic endpointslice object with two endpoints. This test verifies that the services and their TTL
 // health checks are created in the expected Consul namespace for various combinations of namespace flags.
 // This test covers EndpointsController.createServiceRegistrations.
-func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
+func TestReconcileCreateEndpointSliceWithNamespaces(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := map[string]struct {
@@ -94,7 +94,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 				endpointslice := &v1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
-						Namespace: "default",
+						Namespace: test.SourceKubeNS,
 						OwnerReferences: []metav1.OwnerReference{
 							{Name: "service-created"},
 						},
@@ -107,7 +107,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
-								Namespace: "default",
+								Namespace: test.SourceKubeNS,
 							},
 							NodeName: &nodeName,
 						},
@@ -118,7 +118,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod2",
-								Namespace: "default",
+								Namespace: test.SourceKubeNS,
 							},
 							NodeName: &nodeName,
 						},
@@ -634,7 +634,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 								TargetRef: &corev1.ObjectReference{
 									Kind:      "Pod",
 									Name:      "pod2",
-									Namespace: "default",
+									Namespace: ts.SourceKubeNS,
 								},
 								NodeName: &nodeName,
 							},
