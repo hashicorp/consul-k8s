@@ -106,14 +106,10 @@ func TestVault(t *testing.T) {
 	}
 	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-<<<<<<< HEAD
 	// -------------------------
 	// Additional Auth Roles
 	// -------------------------
 	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
-=======
-	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
->>>>>>> 9b5a11d1 (Adding logic to tests for controller tls cert.  also adding snapshot agent and vault namespaces tests)
 	if cfg.EnableEnterprise {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
@@ -163,12 +159,12 @@ func TestVault(t *testing.T) {
 	}
 	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
-	pathForConnectInjectWebookCerts :=
-		vault.ConfigurePKICertificatesForConnectInjectWebhook(t, vaultClient,
-			consulReleaseName, ns, "dc1", "1h")
-	pathForControllerWebookCerts :=
-		vault.ConfigurePKICertificatesForControllerWebhook(t, vaultClient,
-			consulReleaseName, ns, "dc1", "1h")
+	// pathForConnectInjectWebookCerts :=
+	// 	vault.ConfigurePKICertificatesForConnectInjectWebhook(t, vaultClient,
+	// 		consulReleaseName, ns, "dc1", "1h")
+	// pathForControllerWebookCerts :=
+	// 	vault.ConfigurePKICertificatesForControllerWebhook(t, vaultClient,
+	// 		consulReleaseName, ns, "dc1", "1h")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
@@ -177,11 +173,11 @@ func TestVault(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled":                                 "true",
-		"connectInject.replicas":                                "1",
-		"secretsBackend.vault.connectInject.tlsCert.secretName": pathForConnectInjectWebookCerts,
-		"controller.enabled":                                    "true",
-		"secretsBackend.vault.controller.tlsCert.secretName":    pathForControllerWebookCerts,
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		// "secretsBackend.vault.connectInject.tlsCert.secretName": pathForConnectInjectWebookCerts,
+		"controller.enabled": "true",
+		// "secretsBackend.vault.controller.tlsCert.secretName":    pathForControllerWebookCerts,
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,

@@ -948,7 +948,8 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
+      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
       --set 'global.tls.enabled=true' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=pki/issue/controller-webhook-cert-dc1' \
       --set 'global.tls.enableAutoEncrypt=true' \
