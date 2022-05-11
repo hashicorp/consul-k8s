@@ -447,6 +447,13 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Port:      80,
 						Address:   "1.2.3.4",
 						Namespace: ts.ExpConsulNS,
+						Meta: map[string]string{
+							MetaKeyPodName:           "pod1",
+							MetaKeyKubeServiceName:   "service-updated",
+							MetaKeyKubeNS:            ts.SourceKubeNS,
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "service-updated-123456",
+						},
 					},
 					{
 						Kind:    api.ServiceKindConnectProxy,
@@ -457,6 +464,13 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod1-service-updated",
+						},
+						Meta: map[string]string{
+							MetaKeyPodName:           "pod1",
+							MetaKeyKubeServiceName:   "service-updated",
+							MetaKeyKubeNS:            ts.SourceKubeNS,
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "service-updated-123456",
 						},
 						Namespace: ts.ExpConsulNS,
 					},
@@ -772,11 +786,16 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Namespace: ts.ExpConsulNS,
 					},
 					{
-						ID:        "pod2-service-updated",
-						Name:      "service-updated",
-						Port:      80,
-						Address:   "2.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
+						ID:      "pod2-service-updated",
+						Name:    "service-updated",
+						Port:    80,
+						Address: "2.2.3.4",
+						Meta: map[string]string{
+							MetaKeyKubeServiceName:   "service-updated",
+							MetaKeyKubeNS:            ts.SourceKubeNS,
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "service-updated-123456",
+						},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -874,11 +893,16 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Namespace: ts.ExpConsulNS,
 					},
 					{
-						ID:        "pod2-different-consul-svc-name",
-						Name:      "different-consul-svc-name",
-						Port:      80,
-						Address:   "2.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
+						ID:      "pod2-different-consul-svc-name",
+						Name:    "different-consul-svc-name",
+						Port:    80,
+						Address: "2.2.3.4",
+						Meta: map[string]string{
+							MetaKeyKubeServiceName:   "service-updated",
+							MetaKeyKubeNS:            ts.SourceKubeNS,
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "service-updated-123456",
+						},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
