@@ -6125,6 +6125,183 @@ func createPod(name, ip string, inject bool, managedByEndpointsController bool) 
 	return pod
 }
 
+// TestReconcileMultipleEndpointSlices_AddAndDelete tests the case where a Kube service
+// has multiple endpointslices associated with it that each front a consul service instance.
+// The test validates that Adding multiple endpointslices results in valid behaviour,
+// and also deleting these endpointslices results in only the correct service instances being deregistered.
+func TestReconcileMultipleEndpointSlices_AddAndDelete(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	pod1 := createPod("pod1", "1.2.3.4", true, true)
+	pod2 := createPod("pod2", "2.2.3.4", true, true)
+	endpointslice1 := &discv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web-1",
+			Namespace: "default",
+			Labels:    map[string]string{annotationKubeService: "web"},
+		},
+		Endpoints: []discv1.Endpoint{
+			{
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: discv1.EndpointConditions{},
+				Hostname:   &nodeName,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "pod1",
+					Namespace: "default",
+				},
+				NodeName: &nodeName,
+			},
+		},
+		Ports: nil,
+	}
+	endpointslice2 := &discv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web-2",
+			Namespace: "default",
+			Labels:    map[string]string{annotationKubeService: "web"},
+		},
+		Endpoints: []discv1.Endpoint{
+			{
+				Addresses:  []string{"2.2.3.4"},
+				Conditions: discv1.EndpointConditions{},
+				Hostname:   &nodeName,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "pod2",
+					Namespace: "default",
+				},
+				NodeName: &nodeName,
+			},
+		},
+		Ports: nil,
+	}
+	// The agent pod needs to have the address 127.0.0.1 so when the
+	// code gets the agent pods via the label component=client, and
+	// makes requests against the agent API, it will actually hit the
+	// test server we have on localhost.
+	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+
+	// Add the default namespace.
+	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	// Create fake k8s client
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod1, pod2, endpointslice2, endpointslice1, fakeClientPod, &ns).Build()
+
+	// Create test consul server
+	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.NodeName = nodeName
+	})
+	require.NoError(t, err)
+	defer consul.Stop()
+	consul.WaitForServiceIntentions(t)
+
+	cfg := &api.Config{
+		Address: consul.HTTPAddr,
+	}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+	addr := strings.Split(consul.HTTPAddr, ":")
+	consulPort := addr[1]
+
+	// Create the endpoints controller
+	ep := &EndpointsController{
+		Client:                fakeClient,
+		Log:                   logrtest.TestLogger{T: t},
+		ConsulClient:          consulClient,
+		ConsulPort:            consulPort,
+		ConsulScheme:          "http",
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSetWith(),
+		ReleaseName:           "consul",
+		ReleaseNamespace:      "default",
+		ConsulClientCfg:       cfg,
+	}
+	namespacedName1 := types.NamespacedName{
+		Namespace: "default",
+		Name:      "web-1",
+	}
+	namespacedName2 := types.NamespacedName{
+		Namespace: "default",
+		Name:      "web-2",
+	}
+
+	// Setup is complete, now Reconcile the first endpointslice.
+	resp, err := ep.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: namespacedName1,
+	})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Validate that only 1 service instance is registered.
+	svcs, _, err := consulClient.Catalog().Services(nil)
+	require.NoError(t, err)
+	// We are expecting the consul, web and web-sidecar proxy services.
+	require.Len(t, svcs, 3)
+	require.NotNil(t, svcs["consul"])
+	require.NotNil(t, svcs["web"])
+	require.NotNil(t, svcs["web-sidecar-proxy"])
+
+	// Validate that the currently registered service instance is against the correct endpointslice.
+	webSvc, _, err := consulClient.Catalog().Service("web", "", nil)
+	require.NoError(t, err)
+	require.Len(t, webSvc, 1)
+	require.Equal(t, webSvc[0].ServiceMeta[MetaKeyEndpointSliceName], "web-1")
+	require.Equal(t, webSvc[0].ServiceMeta[MetaKeyPodName], "pod1")
+
+	// Reconcile the second endpointslice for this service.
+	resp, err = ep.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: namespacedName2,
+	})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Validate that there are 2 service instances for this service registered
+	// and each has its own MetaKeyEndpointSliceName set correctly.
+	webSvc, _, err = consulClient.Catalog().Service("web", "", nil)
+	require.NoError(t, err)
+	require.Len(t, webSvc, 2)
+	require.Equal(t, webSvc[0].ServiceMeta[MetaKeyEndpointSliceName], "web-1")
+	require.Equal(t, webSvc[0].ServiceMeta[MetaKeyPodName], "pod1")
+	require.Equal(t, webSvc[1].ServiceMeta[MetaKeyEndpointSliceName], "web-2")
+	require.Equal(t, webSvc[1].ServiceMeta[MetaKeyPodName], "pod2")
+
+	// Delete the 2nd endpointslice object.
+	err = fakeClient.Delete(context.Background(), endpointslice2)
+	require.NoError(t, err)
+
+	// Reconcile, this should cause service instances to be deleted only related to endpointslice2.
+	resp, err = ep.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: namespacedName2,
+	})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Validate that there is 1 service instances for this service registered remaining.
+	// and that it has MetaKeyEndpointSliceName set correctly.
+	webSvc, _, err = consulClient.Catalog().Service("web", "", nil)
+	require.NoError(t, err)
+	require.Len(t, webSvc, 1)
+	require.Equal(t, webSvc[0].ServiceMeta[MetaKeyEndpointSliceName], "web-1")
+	require.Equal(t, webSvc[0].ServiceMeta[MetaKeyPodName], "pod1")
+
+	// Delete the first endpointslice object leaving no service instances left.
+	err = fakeClient.Delete(context.Background(), endpointslice1)
+	require.NoError(t, err)
+
+	// Reconcile again.
+	resp, err = ep.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: namespacedName1,
+	})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Validate that it has no service instances left.
+	webSvc, _, err = consulClient.Catalog().Service("web", "", nil)
+	require.NoError(t, err)
+	require.Len(t, webSvc, 0)
+}
+
 func toStringPtr(input string) *string {
 	return &input
 }
