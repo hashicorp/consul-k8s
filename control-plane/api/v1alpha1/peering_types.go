@@ -43,8 +43,9 @@ type PeeringSpec struct {
 }
 
 type Peer struct {
-	Generator *Generator `json:"generator,omitempty"`
-	Requester *Requester `json:"requester,omitempty"`
+	Secret *Secret `json:"secret,omitempty"`
+	//Generator *Generator `json:"generator,omitempty"`
+	//Requester *Requester `json:"requester,omitempty"`
 }
 type Generator struct {
 	Secret *Secret `json:"secret,omitempty"`

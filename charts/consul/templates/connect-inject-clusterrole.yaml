@@ -24,6 +24,13 @@ rules:
   - "get"
   - "list"
   - "watch"
+- apiGroups: [ "" ]
+  resources: ["secrets"]
+  verbs:
+    - "get"
+    - "list"
+    - "watch"
+    - "create"
 - apiGroups:
   - coordination.k8s.io
   resources:

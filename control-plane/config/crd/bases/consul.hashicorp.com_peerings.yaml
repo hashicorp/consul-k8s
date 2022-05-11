@@ -43,29 +43,14 @@ spec:
               peer:
                 description: Peer describes the information needed to create a peering.
                 properties:
-                  generator:
+                  secret:
                     properties:
-                      secret:
-                        properties:
-                          backend:
-                            type: string
-                          key:
-                            type: string
-                          name:
-                            type: string
-                        type: object
-                    type: object
-                  requester:
-                    properties:
-                      secret:
-                        properties:
-                          backend:
-                            type: string
-                          key:
-                            type: string
-                          name:
-                            type: string
-                        type: object
+                      backend:
+                        type: string
+                      key:
+                        type: string
+                      name:
+                        type: string
                     type: object
                 type: object
             required:

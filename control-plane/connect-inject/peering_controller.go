@@ -2,9 +2,14 @@ package connectinject
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,19 +52,75 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_ = context.Background()
 	_ = r.Log.WithValues("peering", req.NamespacedName)
 
-	// TODO(user): your logic here
+	r.Log.Info("received request for PeeringAcceptor:", "name", req.Name, "ns", req.Namespace)
 
-	fmt.Printf("Got a req: %s\n", req.Name)
-	r.Log.Info("Got a req:", "name", req.Name)
 	token := &consulv1alpha1.Peering{}
-	err := r.Get(ctx, req.NamespacedName, token)
-	if err != nil {
+	err := r.Client.Get(ctx, req.NamespacedName, token)
+	// If the PeeringAcceptor object has been deleted (and we get an IsNotFound
+	// error), we need to delete it in Consul.
+	if k8serrors.IsNotFound(err) {
+		// TODO(peering): currently deletion doesn't work because token.Name is empty when deleted. Do I need to list and figure out what to delete?
+		deleteReq := api.PeeringRequest{
+			Name: token.Name,
+		}
+		_, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to delete Peering from Consul", "name", req.Name)
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		r.Log.Error(err, "failed to get PeeringAcceptor", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
 	}
-	r.ConsulClient.Peerings().GenerateToken()
+
+	// Read the peering from Consul.
+	// Todo(peering) do we need to pass in partition?
+	peering, _, err := r.ConsulClient.Peerings().Read(ctx, token.Name, nil)
+	var statusErr api.StatusError
+	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound {
+		r.Log.Info("peering doesn't exist in Consul", "name", token.Name)
+	} else if err != nil {
+		r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
+		return ctrl.Result{}, err
+	}
+
+	// If the peering doesn't exist in Consul, we should generate a new token.
+	if peering == nil {
+		r.Log.Info("peering doesn't exist in Consul", "name", token.Name)
+		req := api.PeeringGenerateTokenRequest{
+			PeerName: token.Name,
+		}
+		resp, _, err := r.ConsulClient.Peerings().GenerateToken(ctx, req, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to get generate token", "err", err)
+			return ctrl.Result{}, err
+		}
+
+		if token.Spec.Peer.Secret.Backend == "kubernetes" {
+			secret := createSecret(token.Spec.Peer.Secret.Name, token.Namespace, token.Spec.Peer.Secret.Key, resp.PeeringToken)
+			err = r.Client.Create(ctx, secret)
+		}
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	r.Log.Info("found token:", "token", token.Name)
 
 	return ctrl.Result{}, nil
+}
+
+func createSecret(name, namespace, key, value string) *corev1.Secret {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		StringData: map[string]string{
+			key: value,
+		},
+	}
+	return secret
 }
 
 // SetupWithManager sets up the controller with the Manager.

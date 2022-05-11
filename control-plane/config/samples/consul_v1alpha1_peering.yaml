@@ -1,12 +1,11 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: Peering
 metadata:
-  name: peering-sample
+  name: peeraaaaa
 spec:
   peer:
-    generator:
-      secret:
-        name: "foo"
-        key: "bar"
-        backend: "boop"
+    secret:
+      name: "foo"
+      key: "bar"
+      backend: "kubernetes"
 
