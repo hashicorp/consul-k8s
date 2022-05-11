@@ -86,32 +86,24 @@ data:
   {{- if .Values.global.tls.enabled }}
   tls-config.json: |-
     {
-      "tls": {
-        {{- if .Values.global.tls.verify }}
-        "internal_rpc": {
-          "verify_incoming": true,
-          "verify_server_hostname": true
-        },
-        {{- end }}
-        "defaults": {
-          {{- if .Values.global.tls.verify }}
-          "verify_outgoing": true,
-          {{- end }}
-          {{- if .Values.global.secretsBackend.vault.enabled }}
-          "ca_file": "/vault/secrets/serverca.crt",
-          "cert_file": "/vault/secrets/servercert.crt",
-          "key_file": "/vault/secrets/servercert.key"
-          {{- else }}
-          "ca_file": "/consul/tls/ca/tls.crt",
-          "cert_file": "/consul/tls/server/tls.crt",
-          "key_file": "/consul/tls/server/tls.key"
-          {{- end }}
-        }
-      },
+       {{- if .Values.global.secretsBackend.vault.enabled }}
+       "ca_file": "/vault/secrets/serverca.crt",
+       "cert_file": "/vault/secrets/servercert.crt",
+       "key_file": "/vault/secrets/servercert.key",
+       {{- else }}
+       "ca_file": "/consul/tls/ca/tls.crt",
+       "cert_file": "/consul/tls/server/tls.crt",
+       "key_file": "/consul/tls/server/tls.key",
+       {{- end }}
       {{- if .Values.global.tls.enableAutoEncrypt }}
       "auto_encrypt": {
         "allow_tls": true
       },
+      {{- end }}
+      {{- if .Values.global.tls.verify }}
+      "verify_incoming_rpc": true,
+      "verify_outgoing": true,
+      "verify_server_hostname": true,
       {{- end }}
       "ports": {
         {{- if .Values.global.tls.httpsOnly }}
