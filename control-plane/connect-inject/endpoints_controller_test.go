@@ -3,13 +3,6 @@ package connectinject
 import (
 	"context"
 	"fmt"
-	v1 "k8s.io/api/discovery/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"strings"
 	"testing"
 
@@ -23,7 +16,14 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	discv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
@@ -170,15 +170,13 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	pod := createPod("pod1", "1.2.3.4", true, true)
 	pod.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 
-	esl := v1.EndpointSlice{
+	esl := discv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "svcname-123456",
 			Namespace: "default",
-			OwnerReferences: []metav1.OwnerReference{
-				{Name: "svcname"},
-			},
+			Labels:    map[string]string{annotationKubeService: "svcname"},
 		},
-		Endpoints: []v1.Endpoint{},
+		Endpoints: []discv1.Endpoint{},
 		Ports:     nil,
 	}
 	upstreams, err := ep.processUpstreams(*pod, esl)
@@ -537,15 +535,13 @@ func TestProcessUpstreams(t *testing.T) {
 				EnableConsulPartitions: tt.consulPartitionsEnabled,
 			}
 
-			esl := v1.EndpointSlice{
+			esl := discv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "svcname-123456",
 					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						{Name: "svcname"},
-					},
+					Labels:    map[string]string{annotationKubeService: "svcname"},
 				},
-				Endpoints: []v1.Endpoint{},
+				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
 			}
 			upstreams, err := ep.processUpstreams(*tt.pod(), esl)
@@ -564,7 +560,7 @@ func TestGetServiceName(t *testing.T) {
 	cases := []struct {
 		name          string
 		pod           func() *corev1.Pod
-		endpointslice *v1.EndpointSlice
+		endpointslice *discv1.EndpointSlice
 		expSvcName    string
 	}{
 		{
@@ -574,15 +570,13 @@ func TestGetServiceName(t *testing.T) {
 				pod1.Annotations[annotationService] = "web"
 				return pod1
 			},
-			endpointslice: &v1.EndpointSlice{
+			endpointslice: &discv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "not-web-123456",
 					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						{Name: "not-web"},
-					},
+					Labels:    map[string]string{annotationKubeService: "not-web"},
 				},
-				Endpoints: []v1.Endpoint{},
+				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
 			},
 			expSvcName: "web",
@@ -593,15 +587,13 @@ func TestGetServiceName(t *testing.T) {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				return pod1
 			},
-			endpointslice: &v1.EndpointSlice{
+			endpointslice: &discv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ep-name-123456",
 					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						{Name: "ep-name"},
-					},
+					Labels:    map[string]string{annotationKubeService: "ep-name"},
 				},
-				Endpoints: []v1.Endpoint{},
+				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
 			},
 			expSvcName: "ep-name",
@@ -613,15 +605,13 @@ func TestGetServiceName(t *testing.T) {
 				pod1.Annotations[annotationService] = "web,web-admin"
 				return pod1
 			},
-			endpointslice: &v1.EndpointSlice{
+			endpointslice: &discv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ep-name-multiport-123456",
 					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						{Name: "ep-name-multiport"},
-					},
+					Labels:    map[string]string{annotationKubeService: "ep-name-multiport"},
 				},
-				Endpoints: []v1.Endpoint{},
+				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
 			},
 			expSvcName: "ep-name-multiport",
@@ -658,18 +648,16 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 				pod1.Annotations[annotationPort] = "8080,9090"
 				pod1.Annotations[annotationService] = "web,web-admin"
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
-				endpointslice1 := &v1.EndpointSlice{
+				endpointslice1 := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "web"},
-						},
+						Labels:    map[string]string{annotationKubeService: "web"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -681,18 +669,16 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 					},
 					Ports: nil,
 				}
-				endpointslice2 := &v1.EndpointSlice{
+				endpointslice2 := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web-admin-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "web-admin"},
-						},
+						Labels:    map[string]string{annotationKubeService: "web-admin"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -716,10 +702,11 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						ServiceAddress: "1.2.3.4",
 						ServicePort:    8080,
 						ServiceMeta: map[string]string{
-							MetaKeyPodName:         "pod1",
-							MetaKeyKubeServiceName: "web",
-							MetaKeyKubeNS:          "default",
-							MetaKeyManagedBy:       managedByValue,
+							MetaKeyPodName:           "pod1",
+							MetaKeyKubeServiceName:   "web",
+							MetaKeyKubeNS:            "default",
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "web-123456",
 						},
 						ServiceTags: []string{},
 					},
@@ -731,10 +718,11 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						ServiceAddress: "1.2.3.4",
 						ServicePort:    9090,
 						ServiceMeta: map[string]string{
-							MetaKeyPodName:         "pod1",
-							MetaKeyKubeServiceName: "web-admin",
-							MetaKeyKubeNS:          "default",
-							MetaKeyManagedBy:       managedByValue,
+							MetaKeyPodName:           "pod1",
+							MetaKeyKubeServiceName:   "web-admin",
+							MetaKeyKubeNS:            "default",
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "web-admin-123456",
 						},
 						ServiceTags: []string{},
 					},
@@ -761,10 +749,11 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 							},
 						},
 						ServiceMeta: map[string]string{
-							MetaKeyPodName:         "pod1",
-							MetaKeyKubeServiceName: "web",
-							MetaKeyKubeNS:          "default",
-							MetaKeyManagedBy:       managedByValue,
+							MetaKeyPodName:           "pod1",
+							MetaKeyKubeServiceName:   "web",
+							MetaKeyKubeNS:            "default",
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "web-123456",
 						},
 						ServiceTags: []string{},
 					},
@@ -782,10 +771,11 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 							LocalServicePort:       9090,
 						},
 						ServiceMeta: map[string]string{
-							MetaKeyPodName:         "pod1",
-							MetaKeyKubeServiceName: "web-admin",
-							MetaKeyKubeNS:          "default",
-							MetaKeyManagedBy:       managedByValue,
+							MetaKeyPodName:           "pod1",
+							MetaKeyKubeServiceName:   "web-admin",
+							MetaKeyKubeNS:            "default",
+							MetaKeyManagedBy:         managedByValue,
+							MetaKeyEndpointSliceName: "web-admin-123456",
 						},
 						ServiceTags: []string{},
 					},
@@ -970,15 +960,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Empty endpoints",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-created"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Endpoints: []v1.Endpoint{},
+					Endpoints: []discv1.Endpoint{},
 					Ports:     nil,
 				}
 				return []runtime.Object{endpointslice}
@@ -994,18 +982,16 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-created"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1027,8 +1013,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
+					ServiceTags: []string{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1043,7 +1035,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
 					ServiceTags: []string{},
 				},
 			},
@@ -1065,18 +1063,16 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-created"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1087,7 +1083,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"2.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1109,16 +1105,28 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
+					ServiceTags: []string{},
 				},
 				{
 					ServiceID:      "pod2-service-created",
 					ServiceName:    "service-created",
 					ServiceAddress: "2.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod2",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
+					ServiceTags: []string{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1133,7 +1141,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
 					ServiceTags: []string{},
 				},
 				{
@@ -1147,7 +1161,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod2",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
 					ServiceTags: []string{},
 				},
 			},
@@ -1181,19 +1201,17 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-created"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							// This is an invalid address because pod3 will not exist in k8s.
 							Addresses:  []string{"9.9.9.9"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1205,7 +1223,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						// The next two are valid addresses.
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1216,7 +1234,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"2.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1238,16 +1256,28 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
+					ServiceTags: []string{},
 				},
 				{
 					ServiceID:      "pod2-service-created",
 					ServiceName:    "service-created",
 					ServiceAddress: "2.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod2",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
+					ServiceTags: []string{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1262,7 +1292,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
 					ServiceTags: []string{},
 				},
 				{
@@ -1276,7 +1312,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod2",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
 					ServiceTags: []string{},
 				},
 			},
@@ -1317,18 +1359,16 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
 				pod1.Annotations[annotationEnableMetrics] = "true"
 				pod1.Annotations[annotationPrometheusScrapePort] = "12345"
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-created"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1350,13 +1390,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    1234,
 					ServiceMeta: map[string]string{
-						"name":                 "abc",
-						"version":              "2",
-						"pod_name":             "pod1",
-						MetaKeyPodName:         "pod1",
-						MetaKeyKubeServiceName: "service-created",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
+						"name":                   "abc",
+						"version":                "2",
+						"pod_name":               "pod1",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
 					},
 					ServiceTags: []string{"abc", "123", "pod1", "def", "456", "pod1"},
 				},
@@ -1384,13 +1425,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 					ServiceMeta: map[string]string{
-						"name":                 "abc",
-						"version":              "2",
-						"pod_name":             "pod1",
-						MetaKeyPodName:         "pod1",
-						MetaKeyKubeServiceName: "service-created",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
+						"name":                   "abc",
+						"version":                "2",
+						"pod_name":               "pod1",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
 					},
 					ServiceTags: []string{"abc", "123", "pod1", "def", "456", "pod1"},
 				},
@@ -1418,18 +1460,16 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 				// NOTE: the order of the addresses is important. The non-mesh pod must be first to correctly
 				// reproduce the bug where we were exiting the loop early if any pod was non-mesh.
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-created"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"2.3.4.5"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1440,7 +1480,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1461,8 +1501,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
+					ServiceTags: []string{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1477,7 +1523,13 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-created",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-created-123456",
+					},
 					ServiceTags: []string{},
 				},
 			},
@@ -1655,18 +1707,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1727,19 +1777,17 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
 					AddressType: "",
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							Hostname: &nodeName,
@@ -1802,18 +1850,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							Hostname: &nodeName,
@@ -1884,18 +1930,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, false)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -1964,18 +2008,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2046,18 +2088,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							Hostname: &nodeName,
@@ -2130,18 +2170,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "4.4.4.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"4.4.4.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2204,18 +2242,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "4.4.4.4", true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"4.4.4.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2278,18 +2314,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod2 := createPod("pod2", "2.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2300,7 +2334,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"2.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2379,18 +2413,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2409,7 +2441,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2421,14 +2458,24 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					ID:      "pod2-service-updated",
 					Name:    "service-updated",
 					Port:    80,
 					Address: "2.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2440,7 +2487,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod2-service-updated",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
@@ -2462,18 +2514,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2492,7 +2542,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2504,14 +2559,24 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					ID:      "pod2-different-consul-svc-name",
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "2.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2523,7 +2588,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod2-different-consul-svc-name",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
@@ -2545,15 +2615,13 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{},
+					Endpoints: []discv1.Endpoint{},
 				}
 				return []runtime.Object{endpointslice}
 			},
@@ -2563,7 +2631,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2575,14 +2648,24 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					ID:      "pod2-service-updated",
 					Name:    "service-updated",
 					Port:    80,
 					Address: "2.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2594,7 +2677,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod2-service-updated",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{},
@@ -2606,15 +2694,13 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Different Consul service name: Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{},
+					Endpoints: []discv1.Endpoint{},
 				}
 				return []runtime.Object{endpointslice}
 			},
@@ -2624,7 +2710,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2636,14 +2727,24 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					ID:      "pod2-different-consul-svc-name",
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "2.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -2655,7 +2756,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod2-different-consul-svc-name",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
+					},
 				},
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{},
@@ -2666,18 +2772,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod2 := createPod("pod2", "4.4.4.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"4.4.4.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2697,10 +2801,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Port:    80,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeNS:          "default",
-						MetaKeyPodName:         "pod1",
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyManagedBy:       managedByValue,
+						MetaKeyKubeNS:            "default",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 				{
@@ -2710,10 +2815,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Port:    20000,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeNS:          "default",
-						MetaKeyPodName:         "pod1",
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyManagedBy:       managedByValue,
+						MetaKeyKubeNS:            "default",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
@@ -2726,10 +2832,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceID:      "pod2-service-updated",
 					ServiceAddress: "4.4.4.4",
 					ServiceMeta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod2",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod2",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 			},
@@ -2738,10 +2845,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceID:      "pod2-service-updated-sidecar-proxy",
 					ServiceAddress: "4.4.4.4",
 					ServiceMeta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod2",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod2",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 			},
@@ -2752,18 +2860,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2783,10 +2889,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Port:    80,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 				{
@@ -2800,10 +2907,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-updated",
 					},
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 				{
@@ -2812,10 +2920,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Port:    80,
 					Address: "2.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod2",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod2",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 				{
@@ -2829,10 +2938,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod2-service-updated",
 					},
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod2",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod2",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 			},
@@ -2842,10 +2952,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceName:    "service-updated",
 					ServiceAddress: "1.2.3.4",
 					ServiceMeta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 			},
@@ -2855,10 +2966,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceName:    "service-updated-sidecar-proxy",
 					ServiceAddress: "1.2.3.4",
 					ServiceMeta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 			},
@@ -2871,18 +2983,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod2 := createPod("pod2", "2.3.4.5", false, false)
-				endpointslice := &v1.EndpointSlice{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "service-updated"},
-						},
+						Labels:    map[string]string{annotationKubeService: "service-updated"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"2.3.4.5"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							Hostname:   &nodeName,
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
@@ -2902,10 +3012,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Port:    80,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 				{
@@ -2919,10 +3030,11 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-updated",
 					},
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-updated",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-updated",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-updated-123456",
 					},
 				},
 			},
@@ -3116,7 +3228,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Name:    "service-deleted",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
+					Meta: map[string]string{
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-deleted",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -3128,7 +3244,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						DestinationServiceName: "service-deleted",
 						DestinationServiceID:   "pod1-service-deleted",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
+					Meta: map[string]string{
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-deleted",
+					},
 				},
 			},
 			consulClientReady: true,
@@ -3143,7 +3263,13 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Name:    "service-deleted",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeNS:            "default",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-deleted-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -3155,7 +3281,13 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						DestinationServiceName: "service-deleted",
 						DestinationServiceID:   "pod1-service-deleted",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeNS:            "default",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-deleted-123456",
+					},
 				},
 			},
 			consulClientReady: true,
@@ -3170,7 +3302,13 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeNS:            "default",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-deleted-123456",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -3182,7 +3320,13 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
 					},
-					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
+					Meta: map[string]string{
+						MetaKeyKubeNS:            "default",
+						MetaKeyPodName:           "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyEndpointSliceName: "service-deleted-123456",
+					},
 				},
 			},
 			consulClientReady: true,
@@ -3198,10 +3342,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Port:    80,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-deleted",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-deleted-123456",
 					},
 				},
 				{
@@ -3215,10 +3360,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-deleted",
 					},
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-deleted",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-deleted-123456",
 					},
 				},
 			},
@@ -3236,10 +3382,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Port:    80,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-deleted",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-deleted-123456",
 					},
 				},
 				{
@@ -3253,10 +3400,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-deleted",
 					},
 					Meta: map[string]string{
-						MetaKeyKubeServiceName: "service-deleted",
-						MetaKeyKubeNS:          "default",
-						MetaKeyManagedBy:       managedByValue,
-						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName:   "service-deleted",
+						MetaKeyKubeNS:            "default",
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: "service-deleted-123456",
 					},
 				},
 			},
@@ -3392,23 +3540,31 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 		"Registered endpoint with label is deregistered.": {
 			svcInitiallyRegistered: true,
 			serviceLabels: map[string]string{
-				labelServiceIgnore: "true",
+				labelServiceIgnore:    "true",
+				annotationKubeService: serviceName,
 			},
 			expectedNumSvcInstances: 0,
 		},
 		"Not registered endpoint with label is never registered": {
 			svcInitiallyRegistered: false,
 			serviceLabels: map[string]string{
-				labelServiceIgnore: "true",
+				labelServiceIgnore:    "true",
+				annotationKubeService: serviceName,
 			},
 			expectedNumSvcInstances: 0,
 		},
 		"Registered endpoint without label is unaffected": {
-			svcInitiallyRegistered:  true,
+			svcInitiallyRegistered: true,
+			serviceLabels: map[string]string{
+				annotationKubeService: serviceName,
+			},
 			expectedNumSvcInstances: 1,
 		},
 		"Not registered endpoint without label is registered": {
-			svcInitiallyRegistered:  false,
+			svcInitiallyRegistered: false,
+			serviceLabels: map[string]string{
+				annotationKubeService: serviceName,
+			},
 			expectedNumSvcInstances: 1,
 		},
 	}
@@ -3416,19 +3572,16 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
-			endpointslice := &v1.EndpointSlice{
+			endpointslice := &discv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName + "-123456",
 					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						{Name: serviceName},
-					},
-					Labels: tt.serviceLabels,
+					Labels:    tt.serviceLabels,
 				},
-				Endpoints: []v1.Endpoint{
+				Endpoints: []discv1.Endpoint{
 					{
 						Addresses:  []string{"1.2.3.4"},
-						Conditions: v1.EndpointConditions{},
+						Conditions: discv1.EndpointConditions{},
 						Hostname:   &nodeName,
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
@@ -3465,10 +3618,11 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					Port:    0,
 					Address: "1.2.3.4",
 					Meta: map[string]string{
-						"k8s-namespace":    namespace,
-						"k8s-service-name": serviceName,
-						"managed-by":       "consul-k8s-endpoints-controller",
-						"pod-name":         "pod1",
+						MetaKeyKubeNS:            namespace,
+						MetaKeyKubeServiceName:   serviceName,
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: endpointslice.Name,
 					},
 				})
 				require.NoError(t, err)
@@ -3477,10 +3631,11 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					Name: serviceName + "-sidecar-proxy",
 					Port: 0,
 					Meta: map[string]string{
-						"k8s-namespace":    namespace,
-						"k8s-service-name": serviceName,
-						"managed-by":       "consul-k8s-endpoints-controller",
-						"pod-name":         "pod1",
+						MetaKeyKubeNS:            namespace,
+						MetaKeyKubeServiceName:   serviceName,
+						MetaKeyManagedBy:         managedByValue,
+						MetaKeyPodName:           "pod1",
+						MetaKeyEndpointSliceName: endpointslice.Name,
 					},
 				})
 				require.NoError(t, err)
@@ -3524,18 +3679,16 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	namespace := "default"
 
 	// Set up the fake Kubernetes client with a few endpoints, pod, consul client, and the default namespace.
-	badendpointslice := &v1.EndpointSlice{
+	badendpointslice := &discv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-in-mesh-123456",
 			Namespace: namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{Name: "not-in-mesh"},
-			},
+			Labels:    map[string]string{annotationKubeService: "not-in-mesh"},
 		},
-		Endpoints: []v1.Endpoint{
+		Endpoints: []discv1.Endpoint{
 			{
 				Addresses:  []string{"1.2.3.4"},
-				Conditions: v1.EndpointConditions{},
+				Conditions: discv1.EndpointConditions{},
 				Hostname:   &nodeName,
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
@@ -3546,18 +3699,16 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 			},
 		},
 	}
-	endpointslice := &v1.EndpointSlice{
+	endpointslice := &discv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "in-mesh-123456",
 			Namespace: namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{Name: "in-mesh"},
-			},
+			Labels:    map[string]string{annotationKubeService: "in-mesh"},
 		},
-		Endpoints: []v1.Endpoint{
+		Endpoints: []discv1.Endpoint{
 			{
 				Addresses:  []string{"1.2.3.4"},
-				Conditions: v1.EndpointConditions{},
+				Conditions: discv1.EndpointConditions{},
 				Hostname:   &nodeName,
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
@@ -3569,7 +3720,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		},
 	}
 	pod1 := createPod("pod1", "1.2.3.4", true, true)
-	pod1.Annotations[annotationKubernetesService] = endpointslice.OwnerReferences[0].Name
+	pod1.Annotations[annotationKubernetesService] = endpointslice.Labels[annotationKubeService]
 	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
@@ -3608,10 +3759,11 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		Port:    0,
 		Address: "1.2.3.4",
 		Meta: map[string]string{
-			"k8s-namespace":    namespace,
-			"k8s-service-name": serviceName,
-			"managed-by":       "consul-k8s-endpoints-controller",
-			"pod-name":         "pod1",
+			MetaKeyKubeNS:            namespace,
+			MetaKeyKubeServiceName:   serviceName,
+			MetaKeyManagedBy:         managedByValue,
+			MetaKeyPodName:           "pod1",
+			MetaKeyEndpointSliceName: "not-in-mesh-123456",
 		},
 	})
 	require.NoError(t, err)
@@ -3634,7 +3786,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, proxyServiceInstances, 0)
 
 	// Run the reconcile again with the service we want to register.
-	serviceName = endpointslice.OwnerReferences[0].Name
+	serviceName = endpointslice.Labels[annotationKubeService]
 	namespacedName = types.NamespacedName{Namespace: endpointslice.Namespace, Name: endpointslice.Name}
 	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
@@ -3665,28 +3817,26 @@ func TestReconcileUnreachableClient(t *testing.T) {
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				endpointslice := &discv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
+						Labels:    map[string]string{annotationKubeService: "service-created"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []discv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: discv1.EndpointConditions{},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
+							NodeName: &nodeName,
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, endpointslice}
 			},
 		},
 	}
@@ -3744,9 +3894,8 @@ func TestReconcileUnreachableClient(t *testing.T) {
 			})
 
 			// using concat (+) instead of fmt.Sprintf because string has lots of %s in it that cause issues
-			expectedErrorFragment := "Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\""
+			expectedErrorFragment := "Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22+and+Meta%5B%22endpointslice-name%22%5D+%3D%3D+%22service-created-123456%22"
 			expectedErrorFragmentTwo := "(Client.Timeout exceeded while awaiting headers)"
-
 			// Splitting this into two asserts on fragments of the error because the error thrown
 			// can be either of the two below and matching on the whole string causes the test tobe flakey
 			// "1 error occurred:\n\t* Get \"http://126.0.0.1:31200/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n\n"
@@ -3879,7 +4028,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		agentPod         *corev1.Pod
-		endpointslices   []*v1.EndpointSlice
+		endpointslices   []*discv1.EndpointSlice
 		expectedRequests []ctrl.Request
 	}{
 		"pod=running, all endpoints need to be reconciled": {
@@ -3900,19 +4049,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -3924,7 +4071,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -3964,19 +4111,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4014,19 +4159,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4066,19 +4209,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4088,7 +4229,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4102,14 +4243,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-2-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-2"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-2"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4119,7 +4258,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4133,14 +4272,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-3"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4150,7 +4287,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses:  []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{},
+							Conditions: discv1.EndpointConditions{},
 							TargetRef: &corev1.ObjectReference{
 								Kind:      "Pod",
 								Name:      "pod1",
@@ -4194,19 +4331,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4218,7 +4353,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4234,14 +4369,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-2-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-2"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-2"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4253,7 +4386,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4269,14 +4402,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-3"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4288,7 +4419,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 						},
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(false),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4321,19 +4452,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4349,14 +4478,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-3"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4389,19 +4516,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					Phase: corev1.PodUnknown,
 				},
 			},
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4417,14 +4542,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-3"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4441,19 +4564,17 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 		},
 		"pod is deleted, no endpoints need to be reconciled": {
 			agentPod: nil,
-			endpointslices: []*v1.EndpointSlice{
+			endpointslices: []*discv1.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-1"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4469,14 +4590,12 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{Name: "endpoint-3"},
-						},
+						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
 					},
-					Endpoints: []v1.Endpoint{
+					Endpoints: []discv1.Endpoint{
 						{
 							Addresses: []string{"1.2.3.4"},
-							Conditions: v1.EndpointConditions{
+							Conditions: discv1.EndpointConditions{
 								Ready: toBoolPtr(true),
 							},
 							TargetRef: &corev1.ObjectReference{
@@ -4498,7 +4617,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 			logger := logrtest.TestLogger{T: t}
 			s := runtime.NewScheme()
 			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{})
-			s.AddKnownTypes(v1.SchemeGroupVersion, &v1.EndpointSlice{}, &v1.EndpointSliceList{})
+			s.AddKnownTypes(discv1.SchemeGroupVersion, &discv1.EndpointSlice{}, &discv1.EndpointSliceList{})
 			var objects []runtime.Object
 			if test.agentPod != nil {
 				objects = append(objects, test.agentPod)
@@ -4635,7 +4754,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvc, k8sNS, consulClient)
+			svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvc, k8sNS, "", consulClient)
 			require.NoError(t, err)
 			if len(svcs) > 0 {
 				require.Len(t, svcs, 2)
@@ -5900,18 +6019,16 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			// need these values to determine which port to use for the service registration.
 			pod.Annotations[annotationPort] = "tcp"
 
-			endpointslice := &v1.EndpointSlice{
+			endpointslice := &discv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName + "-123456",
 					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						{Name: serviceName},
-					},
+					Labels:    map[string]string{annotationKubeService: serviceName},
 				},
-				Endpoints: []v1.Endpoint{
+				Endpoints: []discv1.Endpoint{
 					{
 						Addresses:  []string{"1.2.3.4"},
-						Conditions: v1.EndpointConditions{},
+						Conditions: discv1.EndpointConditions{},
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Name:      pod.Name,

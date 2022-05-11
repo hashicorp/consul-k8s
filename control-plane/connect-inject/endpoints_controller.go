@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/discovery/v1"
+	discv1 "k8s.io/api/discovery/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,6 +38,7 @@ const (
 	MetaKeyKubeServiceName     = "k8s-service-name"
 	MetaKeyKubeNS              = "k8s-namespace"
 	MetaKeyManagedBy           = "managed-by"
+	MetaKeyEndpointSliceName   = "endpointslice-name"
 	TokenMetaPodNameKey        = "pod"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
@@ -58,6 +59,10 @@ const (
 	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
+
+	// annotationKubeService is the Label that the EndpointSlice is assigned by Kubernetes that
+	// references it's Kube Service.
+	annotationKubeService = "kubernetes.io/service-name"
 )
 
 type EndpointsController struct {
@@ -127,7 +132,7 @@ type EndpointsController struct {
 // correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
-	var serviceEndpointSlice v1.EndpointSlice
+	var serviceEndpointSlice discv1.EndpointSlice
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
 	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
@@ -147,11 +152,11 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
 		// The following grabs the k8s servicename from the name of the endpointslice by trimming the trailing
-		// hypen text from the endpointslice object name: `my-endpointslice-qxrzz` yields a service name of `my-endpointslice`.
+		// hyphen text from the endpointslice object name: `my-endpointslice-qxrzz` yields a service name of `my-endpointslice`.
 		reqName := strings.Split(req.Name, "-")
 		reqName = reqName[:len(reqName)-1]
 		svcName := strings.Join(reqName, "-")
-		err = r.deregisterServiceOnAllAgents(ctx, svcName, req.Namespace, nil)
+		err = r.deregisterServiceOnAllAgents(ctx, svcName, req.Namespace, req.Name, nil)
 		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get EndpointSlice", "name", req.Name, "ns", req.Namespace)
@@ -160,15 +165,15 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	r.Log.Info("retrieved", "name", serviceEndpointSlice.Name, "ns", serviceEndpointSlice.Namespace)
 
+	// Get the Kubernetes Service name that this EndpointSlice represents.
+	endpointServiceName := getServiceNameFromEndpointSlice(serviceEndpointSlice)
 	// If the endpointSlice object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpointSlice object references pods which have never been registered, in which case deregistration is a no-op.
 	if isLabeledIgnore(serviceEndpointSlice.Labels) {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		r.Log.Info("Ignoring endpointSlice labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
 		// Only attempt to deregister if we have a Service to reference.
-		if serviceEndpointSlice.OwnerReferences != nil && len(serviceEndpointSlice.OwnerReferences) > 0 {
-			err = r.deregisterServiceOnAllAgents(ctx, serviceEndpointSlice.OwnerReferences[0].Name, req.Namespace, nil)
-		}
+		err = r.deregisterServiceOnAllAgents(ctx, endpointServiceName, req.Namespace, req.Name, nil)
 		return ctrl.Result{}, err
 	}
 
@@ -176,7 +181,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// against service instances in Consul to deregister them if they are not in the map.
 	endpointSliceAddressMap := map[string]bool{}
 
-	// Register all addresses of this EndpointSlice object as service instances in Consul.
+	// Register all Endpoints of this EndpointSlice object as service instances in Consul.
 	for _, endpoint := range serviceEndpointSlice.Endpoints {
 		// All Addresses in an Endpoint have the same Condition/Readiness state.
 		healthStatus := api.HealthCritical
@@ -198,7 +203,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 
 			serviceName, ok := pod.Annotations[annotationKubernetesService]
-			if ok && serviceEndpointSlice.OwnerReferences[0].Name != serviceName {
+			if ok && endpointServiceName != serviceName {
 				r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", endpoint.TargetRef.Name, "ns", endpoint.TargetRef.Namespace)
 				// deregistration for service instances that don't match the annotation happens later because we don't add this pod to the endpointSliceAddressMap.
 				continue
@@ -216,13 +221,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses endpointSliceAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
-	svcName := serviceEndpointSlice.Name
-	// We will use the OwnerReferences of the endpointSlice which is the k8s service name.
-	if serviceEndpointSlice.OwnerReferences != nil && len(serviceEndpointSlice.OwnerReferences) > 0 {
-		svcName = serviceEndpointSlice.OwnerReferences[0].Name
-	}
-	if err = r.deregisterServiceOnAllAgents(ctx, svcName, serviceEndpointSlice.Namespace, endpointSliceAddressMap); err != nil {
-		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", svcName, "ns", serviceEndpointSlice.Namespace)
+	if err = r.deregisterServiceOnAllAgents(ctx, endpointServiceName, serviceEndpointSlice.Namespace, serviceEndpointSlice.Name, endpointSliceAddressMap); err != nil {
+		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", endpointServiceName, "ns", serviceEndpointSlice.Namespace)
 		errs = multierror.Append(errs, err)
 	}
 
@@ -235,7 +235,7 @@ func (r *EndpointsController) Logger(name types.NamespacedName) logr.Logger {
 
 func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.EndpointSlice{}).
+		For(&discv1.EndpointSlice{}).
 		Watches(
 			&source.Kind{Type: &corev1.Pod{}},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForRunningAgentPods),
@@ -245,7 +245,7 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice, healthStatus string, endpointSliceAddressMap map[string]bool) error {
+func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice, healthStatus string, endpointSliceAddressMap map[string]bool) error {
 	podHostIP := pod.Status.HostIP
 
 	if hasBeenInjected(pod) {
@@ -398,8 +398,8 @@ func (r *EndpointsController) upsertHealthCheck(pod corev1.Pod, client *api.Clie
 // service, it defaults to the endpoints name, but can be overridden by a pod annotation. In a multi port service, the
 // endpoints name is always used since the pod annotation will have multiple service names listed (one per port).
 // Changing the Consul service name via annotations is not supported for multi port services.
-func getServiceName(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) string {
-	serviceName := serviceEndpointSlice.ObjectMeta.OwnerReferences[0].Name
+func getServiceName(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice) string {
+	serviceName := getServiceNameFromEndpointSlice(serviceEndpointSlice)
 	// If the annotation has a comma, it is a multi port Pod. In that case we always use the name of the endpoint.
 	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
 		serviceName = serviceNameFromAnnotation
@@ -407,23 +407,23 @@ func getServiceName(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) strin
 	return serviceName
 }
 
-func getServiceID(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) string {
+func getServiceID(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice) string {
 	return fmt.Sprintf("%s-%s", pod.Name, getServiceName(pod, serviceEndpointSlice))
 }
 
-func getProxyServiceName(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) string {
+func getProxyServiceName(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice) string {
 	serviceName := getServiceName(pod, serviceEndpointSlice)
 	return fmt.Sprintf("%s-sidecar-proxy", serviceName)
 }
 
-func getProxyServiceID(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) string {
+func getProxyServiceID(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice) string {
 	proxyServiceName := getProxyServiceName(pod, serviceEndpointSlice)
 	return fmt.Sprintf("%s-%s", pod.Name, proxyServiceName)
 }
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
+func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	// The handler will always set the port annotation if one is not provided on the pod.
@@ -451,10 +451,11 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	serviceID := getServiceID(pod, serviceEndpointSlice)
 
 	meta := map[string]string{
-		MetaKeyPodName:         pod.Name,
-		MetaKeyKubeServiceName: serviceEndpointSlice.ObjectMeta.OwnerReferences[0].Name,
-		MetaKeyKubeNS:          serviceEndpointSlice.Namespace,
-		MetaKeyManagedBy:       managedByValue,
+		MetaKeyPodName:           pod.Name,
+		MetaKeyKubeServiceName:   getServiceNameFromEndpointSlice(serviceEndpointSlice),
+		MetaKeyKubeNS:            serviceEndpointSlice.Namespace,
+		MetaKeyManagedBy:         managedByValue,
+		MetaKeyEndpointSliceName: serviceEndpointSlice.Name,
 	}
 	for k, v := range pod.Annotations {
 		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
@@ -557,7 +558,8 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	if tproxyEnabled {
 		var k8sService corev1.Service
 
-		err := r.Client.Get(r.Context, types.NamespacedName{Name: serviceEndpointSlice.OwnerReferences[0].Name, Namespace: serviceEndpointSlice.Namespace}, &k8sService)
+		svcName := getServiceNameFromEndpointSlice(serviceEndpointSlice)
+		err := r.Client.Get(r.Context, types.NamespacedName{Name: svcName, Namespace: serviceEndpointSlice.Namespace}, &k8sService)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -703,7 +705,7 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // The argument endpointSliceAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointSliceAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointSliceAddressesMap map[string]bool) error {
+func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace, endpointSliceName string, endpointSliceAddressesMap map[string]bool) error {
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	agents := corev1.PodList{}
 	listOptions := client.ListOptions{
@@ -740,7 +742,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 		}
 
 		// Get services matching metadata.
-		svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvcName, k8sSvcNamespace, client)
+		svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvcName, k8sSvcNamespace, endpointSliceName, client)
 		if err != nil {
 			r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
 			return err
@@ -848,16 +850,19 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 }
 
 // serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list
-// of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
-func serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNamespace string, client *api.Client) (map[string]*api.AgentService, error) {
+// of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata
+// which also match the endpointslice. Matching the endpointslice is important because a kube service can
+// have multiple endpoint slices and we want to select only those service instances which are for this
+// endpointslice.
+func serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNamespace, endpointSliceName string, client *api.Client) (map[string]*api.AgentService, error) {
 	return client.Agent().ServicesWithFilter(
-		fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
-			MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, managedByValue))
+		fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
+			MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, managedByValue, MetaKeyEndpointSliceName, endpointSliceName))
 }
 
 // processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
 // objects.
-func (r *EndpointsController) processUpstreams(pod corev1.Pod, endpoints v1.EndpointSlice) ([]api.Upstream, error) {
+func (r *EndpointsController) processUpstreams(pod corev1.Pod, endpoints discv1.EndpointSlice) ([]api.Upstream, error) {
 	// In a multiport pod, only the first service's proxy should have upstreams configured. This skips configuring
 	// upstreams on additional services on the pod.
 	mpIdx := getMultiPortIdx(pod, endpoints)
@@ -1033,7 +1038,7 @@ func (r *EndpointsController) requestsForRunningAgentPods(object client.Object) 
 	}
 
 	// Get the list of all EndpointSlices.
-	var endpointsSliceList v1.EndpointSliceList
+	var endpointsSliceList discv1.EndpointSliceList
 	err = r.Client.List(r.Context, &endpointsSliceList)
 	if err != nil {
 		r.Log.Error(err, "failed to list endpoints")
@@ -1058,6 +1063,10 @@ func (r *EndpointsController) requestsForRunningAgentPods(object client.Object) 
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
 func (r *EndpointsController) consulNamespace(namespace string) string {
 	return namespaces.ConsulNamespace(namespace, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
+}
+
+func getServiceNameFromEndpointSlice(endpointSlice discv1.EndpointSlice) string {
+	return endpointSlice.Labels[annotationKubeService]
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
@@ -1103,7 +1112,7 @@ func consulTags(pod corev1.Pod) []string {
 	return interpolatedTags
 }
 
-func getMultiPortIdx(pod corev1.Pod, serviceEndpointSlice v1.EndpointSlice) int {
+func getMultiPortIdx(pod corev1.Pod, serviceEndpointSlice discv1.EndpointSlice) int {
 	for i, name := range strings.Split(pod.Annotations[annotationService], ",") {
 		if name == getServiceName(pod, serviceEndpointSlice) {
 			return i
