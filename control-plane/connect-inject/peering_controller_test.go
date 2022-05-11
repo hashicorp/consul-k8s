@@ -30,7 +30,7 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 		name                   string
 		k8sObjects             func() []runtime.Object
 		expectedConsulPeerings []*api.Peering
-		expectedK8sSecrets     func() []runtime.Object
+		expectedK8sSecrets     func() []*corev1.Secret
 		expErr                 string
 	}{
 		{
@@ -58,7 +58,7 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 					Name: "acceptor-created",
 				},
 			},
-			expectedK8sSecrets: func() []runtime.Object {
+			expectedK8sSecrets: func() []*corev1.Secret {
 				secret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "acceptor-created-secret",
@@ -68,7 +68,7 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 						"data": "tokenstub",
 					},
 				}
-				return []runtime.Object{secret}
+				return []*corev1.Secret{secret}
 			},
 		},
 	}
@@ -109,8 +109,8 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 				ConsulClientCfg: cfg,
 			}
 			namespacedName := types.NamespacedName{
-				Namespace: "default",
 				Name:      "acceptor-created",
+				Namespace: "default",
 			}
 
 			resp, err := pac.Reconcile(context.Background(), ctrl.Request{
@@ -126,7 +126,19 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 			// After reconciliation, Consul should have the peering.
 			peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-created", nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedConsulPeerings[0], peering)
+			require.Equal(t, tt.expectedConsulPeerings[0].Name, peering.Name)
+			require.NotEmpty(t, peering.ID)
+
+			// Make assertions on the created secret.
+			createdSecret := &corev1.Secret{}
+			createdSecretName := types.NamespacedName{
+				Name:      "acceptor-created-secret",
+				Namespace: "default",
+			}
+			err = fakeClient.Get(context.Background(), createdSecretName, createdSecret)
+			require.NoError(t, err)
+			expSecrets := tt.expectedK8sSecrets()
+			require.Equal(t, expSecrets[0].Name, createdSecret.Name)
 
 		})
 	}
