@@ -3,7 +3,6 @@ package connectinject
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
@@ -15,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -130,11 +128,11 @@ func (r *PeeringController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.
-func (r *PeeringController) remoteConsulClient(ip string, namespace string) (*api.Client, error) {
-	newAddr := fmt.Sprintf("%s://%s:%s", r.ConsulScheme, ip, r.ConsulPort)
-	localConfig := r.ConsulClientCfg
-	localConfig.Address = newAddr
-	localConfig.Namespace = namespace
-	return consul.NewClient(localConfig)
-}
+//// remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.
+//func (r *PeeringController) remoteConsulClient(ip string, namespace string) (*api.Client, error) {
+//	newAddr := fmt.Sprintf("%s://%s:%s", r.ConsulScheme, ip, r.ConsulPort)
+//	localConfig := r.ConsulClientCfg
+//	localConfig.Address = newAddr
+//	localConfig.Namespace = namespace
+//	return consul.NewClient(localConfig)
+//}
