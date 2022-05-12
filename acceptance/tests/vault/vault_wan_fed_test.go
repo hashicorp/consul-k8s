@@ -118,7 +118,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Configure Policy for Connect CA
 	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
-	//Configure Server PKI
+	// Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy",
@@ -140,7 +140,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Configure Policy for Connect CA
 	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicySecondary, connectCARootPathSecondary, connectCAIntermediatePathSecondary)
 
-	//Configure Server PKI
+	// Configure Server PKI
 	serverPKIConfigSecondary := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy-dc2",
@@ -158,7 +158,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// -------------------------
 	// KV2 secrets
 	// -------------------------
-	//Gossip key
+	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
 	gossipSecret := &vault.SaveVaultSecretConfiguration{
@@ -169,7 +169,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, gossipSecret)
 
-	//License
+	// License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
@@ -180,7 +180,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		vault.SaveSecret(t, vaultClient, licenseSecret)
 	}
 
-	//Bootstrap Token
+	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
 	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
@@ -191,7 +191,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
 
-	//Replication Token
+	// Replication Token
 	replicationToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
 	replicationTokenSecret := &vault.SaveVaultSecretConfiguration{
@@ -210,7 +210,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// --------------------------------------------
 	// Additional Auth Roles for Primary Datacenter
 	// --------------------------------------------
-	//server
+	// server
 	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
 	if cfg.EnableEnterprise {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
@@ -224,7 +224,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		PolicyNames:         serverPolicies,
 	})
 
-	//client
+	// client
 	consulClientRole := "client"
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
@@ -235,7 +235,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		PolicyNames:         gossipSecret.PolicyName,
 	})
 
-	//manageSystemACLs
+	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
@@ -258,7 +258,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// --------------------------------------------
 	// Additional Auth Roles for Secondary Datacenter
 	// --------------------------------------------
-	//server
+	// server
 	secondaryServerPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicySecondary, serverPKIConfigSecondary.PolicyName, replicationTokenSecret.PolicyName)
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
@@ -268,7 +268,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		PolicyNames:         secondaryServerPolicies,
 	})
 
-	//client
+	// client
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
@@ -277,7 +277,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		PolicyNames:         gossipSecret.PolicyName,
 	})
 
-	//manageSystemACLs
+	// manageSystemACLs
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
