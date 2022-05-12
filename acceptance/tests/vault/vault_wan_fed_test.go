@@ -209,9 +209,86 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	replicationTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-	commonServerPolicies := "gossip"
+	// -------------------------
+	// PKI
+	// -------------------------
+	// Configure Service Mesh CA
+	// dc1
+	connectCAPolicy := "connect-ca-dc1"
+	connectCARootPath := "connect_root"
+	connectCAIntermediatePath := "dc1/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
+
+	// dc2
+	connectCAPolicySecondary := "connect-ca-dc2"
+	connectCARootPathSecondary := "connect_root"
+	connectCAIntermediatePathSecondary := "dc2/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicySecondary, connectCARootPathSecondary, connectCAIntermediatePathSecondary)
+
+	// Configure Server PKI
+	// dc1
+	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy",
+		RoleName:            "consul-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      "kubernetes",
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+	// dc2
+	serverPKIConfigSecondary := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy-dc2",
+		RoleName:            "consul-ca-role-dc2",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc2",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		SkipMountPKIEngine:  true,
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfigSecondary)
+
+	// -------------------------
+	// KV2 secrets
+	// -------------------------
+	// Gossip key
+	gossipKey, err := vault.GenerateGossipSecret()
+	require.NoError(t, err)
+	gossipSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/gossip",
+		Key:        "gossip",
+		Value:      gossipKey,
+		PolicyName: "gossip",
+	}
+	vault.SaveSecret(t, vaultClient, gossipSecret)
+
+	// License
+	licenseSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/license",
+		Key:        "license",
+		Value:      cfg.EnterpriseLicense,
+		PolicyName: "license",
+	}
 	if cfg.EnableEnterprise {
-		commonServerPolicies += ",license"
+		vault.SaveSecret(t, vaultClient, licenseSecret)
+	}
+
+	// Bootstrap Token
+	bootstrapToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/bootstrap",
+		Key:        "token",
+		Value:      bootstrapToken,
+		PolicyName: "bootstrap",
 	}
 
 	// --------------------------------------------
