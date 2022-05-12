@@ -41,7 +41,7 @@ func TestVault(t *testing.T) {
 	connectCARootPath := "connect_root"
 	connectCAIntermediatePath := "dc1/connect_inter"
 	// Configure Policy for Connect CA
-	vault.CreateConnectCARootAndIntermediatePIKPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
 	//Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{

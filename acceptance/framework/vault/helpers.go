@@ -407,7 +407,7 @@ func SaveSecret(t *testing.T, vaultClient *vapi.Client, config *SaveVaultSecretC
 }
 
 // CreateConnectCAPolicyForDatacenter creates the Vault Policy for the connect-ca in a given datacenter.
-func CreateConnectCARootAndIntermediatePIKPolicy(t *testing.T, vaultClient *vapi.Client, policyName, rootPath, intermediatePath string) {
+func CreateConnectCARootAndIntermediatePKIPolicy(t *testing.T, vaultClient *vapi.Client, policyName, rootPath, intermediatePath string) {
 	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
 	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
 	connectCAPolicyTemplate := `
