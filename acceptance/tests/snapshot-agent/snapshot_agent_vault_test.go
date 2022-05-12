@@ -51,7 +51,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Configure Policy for Connect CA
 	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
-	//Configure Server PKI
+	// Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy",
@@ -68,7 +68,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// -------------------------
 	// KV2 secrets
 	// -------------------------
-	//Gossip key
+	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
 	gossipSecret := &vault.SaveVaultSecretConfiguration{
@@ -79,7 +79,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, gossipSecret)
 
-	//License
+	// License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
@@ -90,7 +90,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		vault.SaveSecret(t, vaultClient, licenseSecret)
 	}
 
-	//Bootstrap Token
+	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
 	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
@@ -101,16 +101,16 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
 
-	//Snapshot config
-	config := generateSnapshotAgentConfig(t, bootstrapToken)
+	// Snapshot Agent config
+	snapshotAgentConfig := generateSnapshotAgentConfig(t, bootstrapToken)
 	require.NoError(t, err)
-	snapshotConfigSecret := &vault.SaveVaultSecretConfiguration{
+	snapshotAgentConfigSecret := &vault.SaveVaultSecretConfiguration{
 		Path:       "consul/data/secret/snapshot-agent-config",
 		Key:        "config",
-		Value:      config,
+		Value:      snapshotAgentConfig,
 		PolicyName: "snapshot-agent-config",
 	}
-	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
+	vault.SaveSecret(t, vaultClient, snapshotAgentConfigSecret)
 
 	// -------------------------
 	// Additional Auth Roles
@@ -120,7 +120,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
 
-	//server
+	// server
 	consulServerRole := "server"
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
@@ -130,7 +130,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		PolicyNames:         serverPolicies,
 	})
 
-	//client
+	// client
 	consulClientRole := "client"
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
@@ -141,7 +141,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		PolicyNames:         gossipSecret.PolicyName,
 	})
 
-	//manageSystemACLs
+	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
@@ -161,15 +161,15 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		PolicyNames:         serverPKIConfig.PolicyName,
 	})
 
-	//snapshot-agent
-	snapshotAgentRole := "snapshot-agent"
-	snapshotAgentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "snapshot-agent")
+	// snapshot agent config
+	snapAgentRole := "snapshot-agent"
+	snapAgentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "snapshot-agent")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  snapshotAgentServiceAccountName,
+		ServiceAccountName:  snapAgentServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
-		RoleName:            snapshotAgentRole,
-		PolicyNames:         fmt.Sprintf("%s,%s", snapshotConfigSecret.PolicyName, licenseSecret.PolicyName),
+		RoleName:            snapAgentRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", licenseSecret.PolicyName, snapshotAgentConfigSecret.PolicyName),
 	})
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
@@ -206,9 +206,9 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		"global.tls.enableAutoEncrypt": "true",
 
 		"client.snapshotAgent.enabled":                        "true",
-		"client.snapshotAgent.configSecret.secretName":        snapshotConfigSecret.Path,
-		"client.snapshotAgent.configSecret.secretKey":         snapshotConfigSecret.Key,
-		"global.secretsBackend.vault.consulSnapshotAgentRole": snapshotAgentRole,
+		"client.snapshotAgent.configSecret.secretName":        snapshotAgentConfigSecret.Path,
+		"client.snapshotAgent.configSecret.secretKey":         snapshotAgentConfigSecret.Key,
+		"global.secretsBackend.vault.consulSnapshotAgentRole": snapAgentRole,
 	}
 
 	if cfg.EnableEnterprise {
@@ -229,7 +229,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, len(podList.Items) > 0)
 
-	// Wait for 10seconds to allow snapsot to write.
+	// Wait for 10 seconds to allow snapshot to write.
 	time.Sleep(10 * time.Second)
 
 	// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.

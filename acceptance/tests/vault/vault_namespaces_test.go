@@ -59,7 +59,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	// Configure Policy for Connect CA
 	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
-	//Configure Server PKI
+	// Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy",
@@ -76,7 +76,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	// -------------------------
 	// KV2 secrets
 	// -------------------------
-	//Gossip key
+	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
 	gossipSecret := &vault.SaveVaultSecretConfiguration{
@@ -87,7 +87,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, gossipSecret)
 
-	//License
+	// License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
@@ -117,7 +117,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
 
-	//server
+	// server
 	consulServerRole := "server"
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
@@ -127,7 +127,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 		PolicyNames:         serverPolicies,
 	})
 
-	//client
+	// client
 	consulClientRole := "client"
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
@@ -138,7 +138,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 		PolicyNames:         gossipSecret.PolicyName,
 	})
 
-	//manageSystemACLs
+	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
