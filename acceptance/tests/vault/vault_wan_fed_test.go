@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -66,12 +67,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	vaultClient := primaryVaultCluster.VaultClient(t)
 
-	vault.ConfigureGossipVaultSecret(t, vaultClient)
-
-	if cfg.EnableEnterprise {
-		vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
-	}
-
+	secondaryDatacenterAuthMethod := "kubernetes-dc2"
 	// Configure Vault Kubernetes auth method for the secondary datacenter.
 	{
 		// Create auth method service account and ClusterRoleBinding. The Vault server
@@ -108,36 +104,194 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryCtx)
 
 		// Now, configure the auth method in Vault.
-		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-dc2", k8sAuthMethodHost, authMethodRBACName, ns)
+		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, secondaryDatacenterAuthMethod, k8sAuthMethodHost, authMethodRBACName, ns)
 	}
 
-	commonServerPolicies := "gossip"
+	// -------------------------
+	// PKI
+	// -------------------------
+	// Configure Service Mesh CA
+	// dc1
+	connectCAPolicy := "connect-ca-dc1"
+	connectCARootPath := "connect_root"
+	connectCAIntermediatePath := "dc1/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
+
+	// dc2
+	connectCAPolicySecondary := "connect-ca-dc2"
+	connectCARootPathSecondary := "connect_root"
+	connectCAIntermediatePathSecondary := "dc2/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicySecondary, connectCARootPathSecondary, connectCAIntermediatePathSecondary)
+
+	// Configure Server PKI
+	// dc1
+	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy",
+		RoleName:            "consul-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      "kubernetes",
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+	// dc2
+	serverPKIConfigSecondary := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy-dc2",
+		RoleName:            "consul-ca-role-dc2",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc2",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		SkipMountPKIEngine:  true,
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfigSecondary)
+
+	// -------------------------
+	// KV2 secrets
+	// -------------------------
+	// Gossip key
+	gossipKey, err := vault.GenerateGossipSecret()
+	require.NoError(t, err)
+	gossipSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/gossip",
+		Key:        "gossip",
+		Value:      gossipKey,
+		PolicyName: "gossip",
+	}
+	vault.SaveSecret(t, vaultClient, gossipSecret)
+
+	// License
+	licenseSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/license",
+		Key:        "license",
+		Value:      cfg.EnterpriseLicense,
+		PolicyName: "license",
+	}
 	if cfg.EnableEnterprise {
-		commonServerPolicies += ",license"
+		vault.SaveSecret(t, vaultClient, licenseSecret)
 	}
-	primaryServerPolicies := commonServerPolicies + ",connect-ca-dc1,server-cert-dc1,bootstrap-token"
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", primaryServerPolicies)
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,replication-token")
-	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
 
+	// Bootstrap Token
+	bootstrapToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/bootstrap",
+		Key:        "token",
+		Value:      bootstrapToken,
+		PolicyName: "bootstrap",
+	}
+	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
+
+	// Replication Token
+	replicationToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	replicationTokenSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/replication",
+		Key:        "token",
+		Value:      replicationToken,
+		PolicyName: "replication",
+	}
+	vault.SaveSecret(t, vaultClient, replicationTokenSecret)
+
+	// -------------------------------------------
+	// Additional Auth Roles in Primary Datacenter
+	// -------------------------------------------
+	commonServerPolicies := gossipSecret.PolicyName
+	if cfg.EnableEnterprise {
+		commonServerPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+	}
+
+	primaryServerPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+
+	//server
+	consulServerRole := "server"
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            consulServerRole,
+		PolicyNames:         primaryServerPolicies,
+	})
+
+	//client
+	consulClientRole := "client"
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  consulClientServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            consulClientRole,
+		PolicyNames:         gossipSecret.PolicyName,
+	})
+
+	//manageSystemACLs
+	manageSystemACLsRole := "server-acl-init"
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  manageSystemACLsServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            manageSystemACLsRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, replicationTokenSecret.PolicyName),
+	})
+
+	// allow all components to access server ca
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  "*",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            serverPKIConfig.RoleName,
+		PolicyNames:         serverPKIConfig.PolicyName,
+	})
+
+	// ---------------------------------------------
+	// Additional Auth Roles in Secondary Datacenter
+	// ---------------------------------------------
 	secondaryServerPolicies := commonServerPolicies + ",connect-ca-dc2,server-cert-dc2,replication-token"
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server", secondaryServerPolicies)
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "client", "gossip")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-dc2", "server-acl-init", "replication-token")
-	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-dc2")
 
-	// Generate a CA and create PKI roles for the primary and secondary Consul servers.
-	vault.ConfigurePKICA(t, vaultClient)
-	primaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
-	secondaryCertPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc2", "1h")
+	//server
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		RoleName:            consulServerRole,
+		PolicyNames:         secondaryServerPolicies,
+	})
 
-	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
-	replicationToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "replication")
+	//client
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  consulClientServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		RoleName:            consulClientRole,
+		PolicyNames:         gossipSecret.PolicyName,
+	})
 
-	// Create the Vault Policy for the Connect CA in both datacenters.
-	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
-	vault.CreateConnectCAPolicy(t, vaultClient, "dc2")
+	//manageSystemACLs
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  manageSystemACLsServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		RoleName:            manageSystemACLsRole,
+		PolicyNames:         replicationTokenSecret.PolicyName,
+	})
+
+	// allow all components to access server ca
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  "*",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		RoleName:            serverPKIConfig.RoleName,
+		PolicyNames:         serverPKIConfig.PolicyName,
+	})
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
@@ -160,20 +314,20 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// TLS config.
 		"global.tls.enabled":           "true",
 		"global.tls.enableAutoEncrypt": "true",
-		"global.tls.caCert.secretName": "pki/cert/ca",
-		"server.serverCert.secretName": primaryCertPath,
+		"global.tls.caCert.secretName": serverPKIConfig.CAPath,
+		"server.serverCert.secretName": serverPKIConfig.CertPath,
 
 		// Gossip config.
-		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
-		"global.gossipEncryption.secretKey":  "gossip",
+		"global.gossipEncryption.secretName": gossipSecret.Path,
+		"global.gossipEncryption.secretKey":  gossipSecret.Path,
 
 		// ACL config.
 		"global.acls.manageSystemACLs":            "true",
-		"global.acls.bootstrapToken.secretName":   "consul/data/secret/bootstrap",
-		"global.acls.bootstrapToken.secretKey":    "token",
+		"global.acls.bootstrapToken.secretName":   bootstrapTokenSecret.Key,
+		"global.acls.bootstrapToken.secretKey":    bootstrapTokenSecret.Key,
 		"global.acls.createReplicationToken":      "true",
-		"global.acls.replicationToken.secretName": "consul/data/secret/replication",
-		"global.acls.replicationToken.secretKey":  "token",
+		"global.acls.replicationToken.secretName": replicationTokenSecret.Path,
+		"global.acls.replicationToken.secretKey":  replicationTokenSecret.Key,
 
 		// Mesh config.
 		"connectInject.enabled": "true",
@@ -188,20 +342,20 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Vault config.
 		"global.secretsBackend.vault.enabled":                       "true",
-		"global.secretsBackend.vault.consulServerRole":              "server",
-		"global.secretsBackend.vault.consulClientRole":              "client",
-		"global.secretsBackend.vault.consulCARole":                  "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole":          "server-acl-init",
+		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
+		"global.secretsBackend.vault.consulClientRole":              consulClientRole,
+		"global.secretsBackend.vault.consulCARole":                  serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole":          manageSystemACLsRole,
 		"global.secretsBackend.vault.ca.secretName":                 vaultCASecretName,
 		"global.secretsBackend.vault.ca.secretKey":                  "tls.crt",
 		"global.secretsBackend.vault.connectCA.address":             primaryVaultCluster.Address(),
-		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
 	}
 
 	if cfg.EnableEnterprise {
-		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
-		primaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "license"
+		primaryConsulHelmValues["global.enterpriseLicense.secretName"] = licenseSecret.Path
+		primaryConsulHelmValues["global.enterpriseLicense.secretKey"] = licenseSecret.Key
 	}
 
 	if cfg.UseKind {
@@ -238,17 +392,17 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// TLS config.
 		"global.tls.enabled":           "true",
 		"global.tls.enableAutoEncrypt": "true",
-		"global.tls.caCert.secretName": "pki/cert/ca",
-		"server.serverCert.secretName": secondaryCertPath,
+		"global.tls.caCert.secretName": serverPKIConfigSecondary.CAPath,
+		"server.serverCert.secretName": serverPKIConfigSecondary.CertPath,
 
 		// Gossip config.
-		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
-		"global.gossipEncryption.secretKey":  "gossip",
+		"global.gossipEncryption.secretName": gossipSecret.Path,
+		"global.gossipEncryption.secretKey":  gossipSecret.Key,
 
 		// ACL config.
 		"global.acls.manageSystemACLs":            "true",
-		"global.acls.replicationToken.secretName": "consul/data/secret/replication",
-		"global.acls.replicationToken.secretKey":  "token",
+		"global.acls.replicationToken.secretName": replicationTokenSecret.Path,
+		"global.acls.replicationToken.secretKey":  replicationTokenSecret.Key,
 
 		// Mesh config.
 		"connectInject.enabled": "true",
@@ -262,23 +416,23 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Vault config.
 		"global.secretsBackend.vault.enabled":                       "true",
-		"global.secretsBackend.vault.consulServerRole":              "server",
-		"global.secretsBackend.vault.consulClientRole":              "client",
-		"global.secretsBackend.vault.consulCARole":                  "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole":          "server-acl-init",
+		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
+		"global.secretsBackend.vault.consulClientRole":              consulClientRole,
+		"global.secretsBackend.vault.consulCARole":                  serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole":          manageSystemACLsRole,
 		"global.secretsBackend.vault.ca.secretName":                 vaultCASecretName,
 		"global.secretsBackend.vault.ca.secretKey":                  "tls.crt",
 		"global.secretsBackend.vault.agentAnnotations":              fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 		"global.secretsBackend.vault.connectCA.address":             externalVaultAddress,
-		"global.secretsBackend.vault.connectCA.authMethodPath":      "kubernetes-dc2",
-		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc2/connect_inter",
+		"global.secretsBackend.vault.connectCA.authMethodPath":      secondaryDatacenterAuthMethod,
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPathSecondary,
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePathSecondary,
 		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{"connect": [{"ca_config": [{"tls_server_name": "%s-vault"}]}]}"`, vaultReleaseName),
 	}
 
 	if cfg.EnableEnterprise {
-		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
-		secondaryConsulHelmValues["global.enterpriseLicense.secretKey"] = "license"
+		secondaryConsulHelmValues["global.enterpriseLicense.secretName"] = licenseSecret.Path
+		secondaryConsulHelmValues["global.enterpriseLicense.secretKey"] = licenseSecret.Key
 	}
 
 	if cfg.UseKind {

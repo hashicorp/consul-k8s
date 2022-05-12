@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,28 +41,136 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
-	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
+	// -------------------------
+	// PKI
+	// -------------------------
+	// Configure Service Mesh CA
+	connectCAPolicy := "connect-ca-dc1"
+	connectCARootPath := "connect_root"
+	connectCAIntermediatePath := "dc1/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
+
+	//Configure Server PKI
+	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy",
+		RoleName:            "consul-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      "kubernetes",
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+
+	// -------------------------
+	// KV2 secrets
+	// -------------------------
+	//Gossip key
+	gossipKey, err := vault.GenerateGossipSecret()
+	require.NoError(t, err)
+	gossipSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/gossip",
+		Key:        "gossip",
+		Value:      gossipKey,
+		PolicyName: "gossip",
+	}
+	vault.SaveSecret(t, vaultClient, gossipSecret)
+
+	//License
+	licenseSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/license",
+		Key:        "license",
+		Value:      cfg.EnterpriseLicense,
+		PolicyName: "license",
+	}
 	if cfg.EnableEnterprise {
-		vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
+		vault.SaveSecret(t, vaultClient, licenseSecret)
 	}
 
-	bootstrapToken := vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
+	//Bootstrap Token
+	bootstrapToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/bootstrap",
+		Key:        "token",
+		Value:      bootstrapToken,
+		PolicyName: "bootstrap",
+	}
+	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
 
+	//Snapshot config
 	config := generateSnapshotAgentConfig(t, bootstrapToken)
-	vault.ConfigureSnapshotAgentSecret(t, vaultClient, cfg, config)
-
-	serverPolicies := "gossip,connect-ca-dc1,server-cert-dc1,bootstrap-token"
-	if cfg.EnableEnterprise {
-		serverPolicies += ",license"
+	require.NoError(t, err)
+	snapshotConfigSecret := &vault.SaveVaultSecretConfiguration{
+		Path:       "consul/data/secret/snapshot-agent-config",
+		Key:        "config",
+		Value:      config,
+		PolicyName: "snapshot-agent-config",
 	}
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "snapshot-agent", "snapshot-agent-config,license")
-	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
 
-	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
+	// -------------------------
+	// Additional Auth Roles
+	// -------------------------
+	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+	if cfg.EnableEnterprise {
+		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+	}
+
+	//server
+	consulServerRole := "server"
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            consulServerRole,
+		PolicyNames:         serverPolicies,
+	})
+
+	//client
+	consulClientRole := "client"
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  consulClientServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            consulClientRole,
+		PolicyNames:         gossipSecret.PolicyName,
+	})
+
+	//manageSystemACLs
+	manageSystemACLsRole := "server-acl-init"
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  manageSystemACLsServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            manageSystemACLsRole,
+		PolicyNames:         bootstrapTokenSecret.PolicyName,
+	})
+
+	// allow all components to access server ca
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  "*",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            serverPKIConfig.RoleName,
+		PolicyNames:         serverPKIConfig.PolicyName,
+	})
+
+	//snapshot-agent
+	snapshotAgentRole := "snapshot-agent"
+	snapshotAgentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "snapshot-agent")
+	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  snapshotAgentServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      "kubernetes",
+		RoleName:            snapshotAgentRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", snapshotConfigSecret.PolicyName, licenseSecret.PolicyName),
+	})
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
@@ -75,36 +184,36 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulServerRole":     "server",
-		"global.secretsBackend.vault.consulClientRole":     "client",
-		"global.secretsBackend.vault.consulCARole":         "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
+		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
+		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
+		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
 
 		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
-		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
 
 		"global.acls.manageSystemACLs":          "true",
-		"global.acls.bootstrapToken.secretName": "consul/data/secret/bootstrap",
-		"global.acls.bootstrapToken.secretKey":  "token",
+		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
+		"global.acls.bootstrapToken.secretKey":  bootstrapTokenSecret.Key,
 		"global.tls.enabled":                    "true",
 
-		"server.serverCert.secretName": certPath,
-		"global.tls.caCert.secretName": "pki/cert/ca",
+		"server.serverCert.secretName": serverPKIConfig.CertPath,
+		"global.tls.caCert.secretName": serverPKIConfig.CAPath,
 		"global.tls.enableAutoEncrypt": "true",
 
 		"client.snapshotAgent.enabled":                        "true",
-		"client.snapshotAgent.configSecret.secretName":        "consul/data/secret/snapshot-agent-config",
-		"client.snapshotAgent.configSecret.secretKey":         "config",
-		"global.secretsBackend.vault.consulSnapshotAgentRole": "snapshot-agent",
+		"client.snapshotAgent.configSecret.secretName":        snapshotConfigSecret.Path,
+		"client.snapshotAgent.configSecret.secretKey":         snapshotConfigSecret.Key,
+		"global.secretsBackend.vault.consulSnapshotAgentRole": snapshotAgentRole,
 	}
 
 	if cfg.EnableEnterprise {
-		consulHelmValues["global.enterpriseLicense.secretName"] = "consul/data/secret/license"
-		consulHelmValues["global.enterpriseLicense.secretKey"] = "license"
+		consulHelmValues["global.enterpriseLicense.secretName"] = licenseSecret.Path
+		consulHelmValues["global.enterpriseLicense.secretKey"] = licenseSecret.Key
 	}
 
 	logger.Log(t, "Installing Consul")
