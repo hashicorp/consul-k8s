@@ -67,7 +67,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	vaultClient := primaryVaultCluster.VaultClient(t)
 
-	secondaryDatacenterAuthMethod := "kubernetes-dc2"
+	secondaryAuthMethodName := "kubernetes-dc2"
+
 	// Configure Vault Kubernetes auth method for the secondary datacenter.
 	{
 		// Create auth method service account and ClusterRoleBinding. The Vault server
@@ -104,29 +105,20 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryCtx)
 
 		// Now, configure the auth method in Vault.
-		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, secondaryDatacenterAuthMethod, k8sAuthMethodHost, authMethodRBACName, ns)
+		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, secondaryAuthMethodName, k8sAuthMethodHost, authMethodRBACName, ns)
 	}
-
 	// -------------------------
 	// PKI
 	// -------------------------
-	// Configure Service Mesh CA
 	// dc1
+	// Configure Service Mesh CA
 	connectCAPolicy := "connect-ca-dc1"
 	connectCARootPath := "connect_root"
 	connectCAIntermediatePath := "dc1/connect_inter"
 	// Configure Policy for Connect CA
 	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
-	// dc2
-	connectCAPolicySecondary := "connect-ca-dc2"
-	connectCARootPathSecondary := "connect_root"
-	connectCAIntermediatePathSecondary := "dc2/connect_inter"
-	// Configure Policy for Connect CA
-	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicySecondary, connectCARootPathSecondary, connectCAIntermediatePathSecondary)
-
-	// Configure Server PKI
-	// dc1
+	//Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy",
@@ -139,7 +131,16 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		AuthMethodPath:      "kubernetes",
 	}
 	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+
 	// dc2
+	// Configure Service Mesh CA
+	connectCAPolicySecondary := "connect-ca-dc2"
+	connectCARootPathSecondary := "connect_root"
+	connectCAIntermediatePathSecondary := "dc2/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicySecondary, connectCARootPathSecondary, connectCAIntermediatePathSecondary)
+
+	//Configure Server PKI
 	serverPKIConfigSecondary := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy-dc2",
@@ -149,15 +150,15 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
 		MaxTTL:              "1h",
-		AuthMethodPath:      secondaryDatacenterAuthMethod,
-		SkipMountPKIEngine:  true,
+		AuthMethodPath:      secondaryAuthMethodName,
+		SkipPKIMount:        true,
 	}
 	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfigSecondary)
 
 	// -------------------------
 	// KV2 secrets
 	// -------------------------
-	// Gossip key
+	//Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
 	gossipSecret := &vault.SaveVaultSecretConfiguration{
@@ -168,7 +169,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, gossipSecret)
 
-	// License
+	//License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
@@ -179,7 +180,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		vault.SaveSecret(t, vaultClient, licenseSecret)
 	}
 
-	// Bootstrap Token
+	//Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
 	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
@@ -190,7 +191,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
 
-	// Replication Token
+	//Replication Token
 	replicationToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
 	replicationTokenSecret := &vault.SaveVaultSecretConfiguration{
@@ -201,24 +202,26 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	vault.SaveSecret(t, vaultClient, replicationTokenSecret)
 
-	// -------------------------------------------
-	// Additional Auth Roles in Primary Datacenter
-	// -------------------------------------------
-	commonServerPolicies := gossipSecret.PolicyName
+	commonServerPolicies := "gossip"
 	if cfg.EnableEnterprise {
-		commonServerPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+		commonServerPolicies += ",license"
 	}
 
-	primaryServerPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
-
+	// --------------------------------------------
+	// Additional Auth Roles for Primary Datacenter
+	// --------------------------------------------
 	//server
+	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+	if cfg.EnableEnterprise {
+		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+	}
 	consulServerRole := "server"
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulServerRole,
-		PolicyNames:         primaryServerPolicies,
+		PolicyNames:         serverPolicies,
 	})
 
 	//client
@@ -252,16 +255,15 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		PolicyNames:         serverPKIConfig.PolicyName,
 	})
 
-	// ---------------------------------------------
-	// Additional Auth Roles in Secondary Datacenter
-	// ---------------------------------------------
-	secondaryServerPolicies := commonServerPolicies + ",connect-ca-dc2,server-cert-dc2,replication-token"
-
+	// --------------------------------------------
+	// Additional Auth Roles for Secondary Datacenter
+	// --------------------------------------------
 	//server
+	secondaryServerPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicySecondary, serverPKIConfigSecondary.PolicyName, replicationTokenSecret.PolicyName)
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            consulServerRole,
 		PolicyNames:         secondaryServerPolicies,
 	})
@@ -270,7 +272,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
 	})
@@ -279,7 +281,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         replicationTokenSecret.PolicyName,
 	})
@@ -288,13 +290,13 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
-		AuthMethodPath:      secondaryDatacenterAuthMethod,
+		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
 	})
 
-	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
-	// secondary cluster.
+	// // Move Vault CA secret from primary to secondary so that we can mount it to pods in the
+	// // secondary cluster.
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
 	vaultCASecret, err := primaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
@@ -319,11 +321,11 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Gossip config.
 		"global.gossipEncryption.secretName": gossipSecret.Path,
-		"global.gossipEncryption.secretKey":  gossipSecret.Path,
+		"global.gossipEncryption.secretKey":  gossipSecret.Key,
 
 		// ACL config.
 		"global.acls.manageSystemACLs":            "true",
-		"global.acls.bootstrapToken.secretName":   bootstrapTokenSecret.Key,
+		"global.acls.bootstrapToken.secretName":   bootstrapTokenSecret.Path,
 		"global.acls.bootstrapToken.secretKey":    bootstrapTokenSecret.Key,
 		"global.acls.createReplicationToken":      "true",
 		"global.acls.replicationToken.secretName": replicationTokenSecret.Path,
@@ -424,7 +426,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.ca.secretKey":                  "tls.crt",
 		"global.secretsBackend.vault.agentAnnotations":              fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 		"global.secretsBackend.vault.connectCA.address":             externalVaultAddress,
-		"global.secretsBackend.vault.connectCA.authMethodPath":      secondaryDatacenterAuthMethod,
+		"global.secretsBackend.vault.connectCA.authMethodPath":      secondaryAuthMethodName,
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPathSecondary,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePathSecondary,
 		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{"connect": [{"ca_config": [{"tls_server_name": "%s-vault"}]}]}"`, vaultReleaseName),

@@ -11,56 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	gossipPolicy = `
-path "consul/data/secret/gossip" {
-  capabilities = ["read"]
-}`
-
-	tokenPolicyTemplate = `
-path "consul/data/secret/%s" {
-  capabilities = ["read"]
-}`
-
-	enterpriseLicensePolicy = `
-path "consul/data/secret/license" {
-  capabilities = ["read"]
-}`
-
-	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
-	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
-	connectCAPolicyTemplate = `
-path "/sys/mounts" {
-  capabilities = [ "read" ]
-}
-
-path "/sys/mounts/connect_root" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-
-path "/sys/mounts/%s/connect_inter" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-
-path "/connect_root/*" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-
-path "/%s/connect_inter/*" {
-  capabilities = [ "create", "read", "update", "delete", "list" ]
-}
-`
-	caPolicy = `
-path "pki/cert/ca" {
-  capabilities = ["read"]
-}`
-
-	snapshotAgentPolicy = `
-path "consul/data/secret/snapshot-agent-config" {
-  capabilities = ["read"]
-}`
-)
-
 // GenerateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
 func GenerateGossipSecret() (string, error) {
 	// This code was copied from Consul's Keygen command:
@@ -112,14 +62,14 @@ func ConfigurePKICerts(t *testing.T,
 }
 
 // ConfigurePKI generates a CA in Vault at a given path with a given policyName.
-func ConfigurePKI(t *testing.T, vaultClient *vapi.Client, baseUrl, policyName, commonName string, skipMountPKIEngine bool) {
-	if !skipMountPKIEngine {
+func ConfigurePKI(t *testing.T, vaultClient *vapi.Client, baseUrl, policyName, commonName string, skipPKIMount bool) {
+	if !skipPKIMount {
 		// Mount the PKI Secrets engine at the baseUrl.
-		mountError := vaultClient.Sys().Mount(baseUrl, &vapi.MountInput{
+		mountErr := vaultClient.Sys().Mount(baseUrl, &vapi.MountInput{
 			Type:   "pki",
 			Config: vapi.MountConfigInput{},
 		})
-		require.NoError(t, mountError)
+		require.NoError(t, mountErr)
 		// Create root CA to issue Consul server certificates and the `consul-server` PKI role.
 		// See https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls.
 		// Generate the root CA.
@@ -127,9 +77,10 @@ func ConfigurePKI(t *testing.T, vaultClient *vapi.Client, baseUrl, policyName, c
 			"common_name": commonName,
 			"ttl":         "24h",
 		}
-		_, err := vaultClient.Logical().Write(fmt.Sprintf("%s/root/generate/internal", baseUrl), params)
-		require.NoError(t, err)
+		_, mountErr = vaultClient.Logical().Write(fmt.Sprintf("%s/root/generate/internal", baseUrl), params)
+		require.NoError(t, mountErr)
 	}
+
 	policy := fmt.Sprintf(`path "%s/cert/ca" {
 		capabilities = ["read"]
 	  }`, baseUrl)
@@ -178,14 +129,14 @@ type PKIAndAuthRoleConfiguration struct {
 	MaxTTL              string
 	AuthMethodPath      string
 	AllowedSubdomain    string
-	SkipMountPKIEngine  bool
+	SkipPKIMount        bool
 }
 
 func ConfigurePKIAndAuthRole(t *testing.T, vaultClient *vapi.Client, config *PKIAndAuthRoleConfiguration) {
 	config.CAPath = fmt.Sprintf("%s/cert/ca", config.BaseURL)
 	// Configure role with read access to <baseURL>/cert/ca
 	ConfigurePKI(t, vaultClient, config.BaseURL, config.PolicyName,
-		config.CommonName, config.SkipMountPKIEngine)
+		config.CommonName, config.SkipPKIMount)
 	// Configure role with create and update access to issue certs at
 	// <baseURL>/issue/<roleName>
 	config.CertPath = ConfigurePKICerts(t, vaultClient, config.BaseURL,
@@ -221,7 +172,7 @@ func SaveSecret(t *testing.T, vaultClient *vapi.Client, config *SaveVaultSecretC
 	require.NoError(t, err)
 
 	// Create the gossip secret.
-	logger.Log(t, "Creating the gossip secret")
+	logger.Logf(t, "Creating the %s secret", config.Path)
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
 			config.Key: config.Value,
