@@ -70,6 +70,34 @@ func TestVault(t *testing.T) {
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
+	// Configure controller webhook PKI
+	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "controller",
+		PolicyName:          "controller-ca-policy",
+		RoleName:            "controller-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      "kubernetes",
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, controllerWebhookPKIConfig)
+
+	// Configure controller webhook PKI
+	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "connect",
+		PolicyName:          "connect-ca-policy",
+		RoleName:            "connect-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      "kubernetes",
+	}
+	vault.ConfigurePKIAndAuthRole(t, vaultClient, connectInjectorWebhookPKIConfig)
+
 	// -------------------------
 	// KV2 secrets
 	// -------------------------
@@ -175,15 +203,19 @@ func TestVault(t *testing.T) {
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
-		// "secretsBackend.vault.connectInject.tlsCert.secretName": pathForConnectInjectWebookCerts,
-		"controller.enabled": "true",
-		// "secretsBackend.vault.controller.tlsCert.secretName":    pathForControllerWebookCerts,
+		"controller.enabled":     "true",
+		"global.secretsBackend.vault.connectInject.tlsCert.secretName": connectInjectorWebhookPKIConfig.CertPath,
+		"global.secretsBackend.vault.connectInject.caCert.secretName":  connectInjectorWebhookPKIConfig.CAPath,
+		"global.secretsBackend.vault.controller.tlsCert.secretName":    controllerWebhookPKIConfig.CertPath,
+		"global.secretsBackend.vault.controller.caCert.secretName":     controllerWebhookPKIConfig.CAPath,
 
-		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
-		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
-		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
-		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+		"global.secretsBackend.vault.enabled":                   "true",
+		"global.secretsBackend.vault.consulServerRole":          consulServerRole,
+		"global.secretsBackend.vault.consulClientRole":          consulClientRole,
+		"global.secretsBackend.vault.consulCARole":              serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.consulConnectInjectCARole": connectInjectorWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.consulControllerCARole":    controllerWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole":      manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
