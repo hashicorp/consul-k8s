@@ -22,6 +22,13 @@ as well as the global.name setting.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.vaultCATemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{- define "consul.serverTLSCATemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.global.tls.caCert.secretName }}" -{{ "}}" }}

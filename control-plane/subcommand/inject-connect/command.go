@@ -485,7 +485,7 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) configureCABundleUpdate(ctx context.Context) error {
 	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "connect-injector")
-	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, "serverca.crt")
+	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, "ca.crt")
 	caCert, err := ioutil.ReadFile(caPath)
 	if err != nil {
 		return err

@@ -44,6 +44,12 @@ spec:
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulConnectInjectCARole }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if .Values.global.secretsBackend.vault.connectInject.caCert.secretName }}
+        {{- with .Values.global.secretsBackend.vault.connectInject.caCert }}
+        "vault.hashicorp.com/agent-inject-secret-ca.crt": {{ .secretName }}
+        "vault.hashicorp.com/agent-inject-template-ca.crt": {{ template "consul.vaultCATemplate" . }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-tls.crt": {{ include "consul.connectInjectWebhookTLSCertTemplate" . }}

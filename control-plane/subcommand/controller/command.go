@@ -362,7 +362,7 @@ func (c *Command) configureCABundleUpdate() error {
 	}
 
 	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "controller")
-	caPath := fmt.Sprintf("%s/%s", c.flagWebhookTLSCertDir, "serverca.crt")
+	caPath := fmt.Sprintf("%s/%s", c.flagWebhookTLSCertDir, "ca.crt")
 	caCert, err := ioutil.ReadFile(caPath)
 	if err != nil {
 		return err
