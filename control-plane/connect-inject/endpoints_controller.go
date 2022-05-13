@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	discv1 "k8s.io/api/discovery/v1"
+	discv1beta1 "k8s.io/api/discovery/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,10 +60,6 @@ const (
 	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
-
-	// annotationKubeService is the Label that the EndpointSlice is assigned by Kubernetes that
-	// references it's Kube Service.
-	annotationKubeService = "kubernetes.io/service-name"
 )
 
 type EndpointsController struct {
@@ -1066,7 +1063,7 @@ func (r *EndpointsController) consulNamespace(namespace string) string {
 }
 
 func getServiceNameFromEndpointSlice(endpointSlice discv1.EndpointSlice) string {
-	return endpointSlice.Labels[annotationKubeService]
+	return endpointSlice.Labels[discv1beta1.LabelServiceName]
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.

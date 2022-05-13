@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	discv1 "k8s.io/api/discovery/v1"
+	discv1beta1 "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -95,7 +96,7 @@ func TestReconcileCreateEndpointSliceWithNamespaces(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: test.SourceKubeNS,
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -422,7 +423,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -511,7 +512,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -579,7 +580,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -647,7 +648,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -735,7 +736,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -842,7 +843,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -949,7 +950,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{},
 					}
@@ -1032,7 +1033,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{},
 					}
@@ -1114,7 +1115,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{
@@ -1192,7 +1193,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated-123456",
 							Namespace: ts.SourceKubeNS,
-							Labels:    map[string]string{annotationKubeService: "service-updated"},
+							Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 						},
 						Endpoints: []discv1.Endpoint{
 							{

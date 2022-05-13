@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	discv1 "k8s.io/api/discovery/v1"
+	discv1beta1 "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -174,7 +175,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "svcname-123456",
 			Namespace: "default",
-			Labels:    map[string]string{annotationKubeService: "svcname"},
+			Labels:    map[string]string{discv1beta1.LabelServiceName: "svcname"},
 		},
 		Endpoints: []discv1.Endpoint{},
 		Ports:     nil,
@@ -539,7 +540,7 @@ func TestProcessUpstreams(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "svcname-123456",
 					Namespace: "default",
-					Labels:    map[string]string{annotationKubeService: "svcname"},
+					Labels:    map[string]string{discv1beta1.LabelServiceName: "svcname"},
 				},
 				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
@@ -574,7 +575,7 @@ func TestGetServiceName(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "not-web-123456",
 					Namespace: "default",
-					Labels:    map[string]string{annotationKubeService: "not-web"},
+					Labels:    map[string]string{discv1beta1.LabelServiceName: "not-web"},
 				},
 				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
@@ -591,7 +592,7 @@ func TestGetServiceName(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ep-name-123456",
 					Namespace: "default",
-					Labels:    map[string]string{annotationKubeService: "ep-name"},
+					Labels:    map[string]string{discv1beta1.LabelServiceName: "ep-name"},
 				},
 				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
@@ -609,7 +610,7 @@ func TestGetServiceName(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ep-name-multiport-123456",
 					Namespace: "default",
-					Labels:    map[string]string{annotationKubeService: "ep-name-multiport"},
+					Labels:    map[string]string{discv1beta1.LabelServiceName: "ep-name-multiport"},
 				},
 				Endpoints: []discv1.Endpoint{},
 				Ports:     nil,
@@ -652,7 +653,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "web"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "web"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -673,7 +674,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web-admin-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "web-admin"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "web-admin"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -964,7 +965,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{},
 					Ports:     nil,
@@ -986,7 +987,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1067,7 +1068,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1205,7 +1206,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1363,7 +1364,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1464,7 +1465,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1711,7 +1712,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1781,7 +1782,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					AddressType: "",
 					Endpoints: []discv1.Endpoint{
@@ -1854,7 +1855,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -1934,7 +1935,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2012,7 +2013,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2092,7 +2093,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2174,7 +2175,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2246,7 +2247,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2318,7 +2319,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2417,7 +2418,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2518,7 +2519,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2619,7 +2620,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{},
 				}
@@ -2698,7 +2699,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{},
 				}
@@ -2776,7 +2777,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2864,7 +2865,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -2987,7 +2988,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-updated"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-updated"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -3540,30 +3541,30 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 		"Registered endpoint with label is deregistered.": {
 			svcInitiallyRegistered: true,
 			serviceLabels: map[string]string{
-				labelServiceIgnore:    "true",
-				annotationKubeService: serviceName,
+				labelServiceIgnore:           "true",
+				discv1beta1.LabelServiceName: serviceName,
 			},
 			expectedNumSvcInstances: 0,
 		},
 		"Not registered endpoint with label is never registered": {
 			svcInitiallyRegistered: false,
 			serviceLabels: map[string]string{
-				labelServiceIgnore:    "true",
-				annotationKubeService: serviceName,
+				labelServiceIgnore:           "true",
+				discv1beta1.LabelServiceName: serviceName,
 			},
 			expectedNumSvcInstances: 0,
 		},
 		"Registered endpoint without label is unaffected": {
 			svcInitiallyRegistered: true,
 			serviceLabels: map[string]string{
-				annotationKubeService: serviceName,
+				discv1beta1.LabelServiceName: serviceName,
 			},
 			expectedNumSvcInstances: 1,
 		},
 		"Not registered endpoint without label is registered": {
 			svcInitiallyRegistered: false,
 			serviceLabels: map[string]string{
-				annotationKubeService: serviceName,
+				discv1beta1.LabelServiceName: serviceName,
 			},
 			expectedNumSvcInstances: 1,
 		},
@@ -3683,7 +3684,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-in-mesh-123456",
 			Namespace: namespace,
-			Labels:    map[string]string{annotationKubeService: "not-in-mesh"},
+			Labels:    map[string]string{discv1beta1.LabelServiceName: "not-in-mesh"},
 		},
 		Endpoints: []discv1.Endpoint{
 			{
@@ -3703,7 +3704,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "in-mesh-123456",
 			Namespace: namespace,
-			Labels:    map[string]string{annotationKubeService: "in-mesh"},
+			Labels:    map[string]string{discv1beta1.LabelServiceName: "in-mesh"},
 		},
 		Endpoints: []discv1.Endpoint{
 			{
@@ -3720,7 +3721,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 		},
 	}
 	pod1 := createPod("pod1", "1.2.3.4", true, true)
-	pod1.Annotations[annotationKubernetesService] = endpointslice.Labels[annotationKubeService]
+	pod1.Annotations[annotationKubernetesService] = endpointslice.Labels[discv1beta1.LabelServiceName]
 	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
@@ -3786,7 +3787,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	require.Len(t, proxyServiceInstances, 0)
 
 	// Run the reconcile again with the service we want to register.
-	serviceName = endpointslice.Labels[annotationKubeService]
+	serviceName = endpointslice.Labels[discv1beta1.LabelServiceName]
 	namespacedName = types.NamespacedName{Namespace: endpointslice.Namespace, Name: endpointslice.Name}
 	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
@@ -3821,7 +3822,7 @@ func TestReconcileUnreachableClient(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "service-created"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "service-created"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4054,7 +4055,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4116,7 +4117,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4164,7 +4165,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4214,7 +4215,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4243,7 +4244,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-2-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-2"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-2"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4272,7 +4273,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-3"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4336,7 +4337,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4369,7 +4370,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-2-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-2"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-2"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4402,7 +4403,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-3"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4457,7 +4458,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4478,7 +4479,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-3"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4521,7 +4522,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4542,7 +4543,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-3"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4569,7 +4570,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-1-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-1"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-1"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -4590,7 +4591,7 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "endpoint-3-123456",
 						Namespace: "default",
-						Labels:    map[string]string{annotationKubeService: "endpoint-3"},
+						Labels:    map[string]string{discv1beta1.LabelServiceName: "endpoint-3"},
 					},
 					Endpoints: []discv1.Endpoint{
 						{
@@ -6023,7 +6024,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName + "-123456",
 					Namespace: "default",
-					Labels:    map[string]string{annotationKubeService: serviceName},
+					Labels:    map[string]string{discv1beta1.LabelServiceName: serviceName},
 				},
 				Endpoints: []discv1.Endpoint{
 					{
@@ -6138,7 +6139,7 @@ func TestReconcileMultipleEndpointSlices_AddAndDelete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "web-1",
 			Namespace: "default",
-			Labels:    map[string]string{annotationKubeService: "web"},
+			Labels:    map[string]string{discv1beta1.LabelServiceName: "web"},
 		},
 		Endpoints: []discv1.Endpoint{
 			{
@@ -6159,7 +6160,7 @@ func TestReconcileMultipleEndpointSlices_AddAndDelete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "web-2",
 			Namespace: "default",
-			Labels:    map[string]string{annotationKubeService: "web"},
+			Labels:    map[string]string{discv1beta1.LabelServiceName: "web"},
 		},
 		Endpoints: []discv1.Endpoint{
 			{
