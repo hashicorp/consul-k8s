@@ -2,19 +2,22 @@ package connectinject
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-logr/logr"
+	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // PeeringController reconciles a Peering object
@@ -22,50 +25,40 @@ type PeeringController struct {
 	client.Client
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
 	ConsulClient *api.Client
-	// ConsulClientCfg is the client config used by the ConsulClient when calling NewClient().
-	ConsulClientCfg *api.Config
-	// ConsulScheme is the scheme to use when making API calls to Consul,
-	// i.e. "http" or "https".
-	ConsulScheme string
-	// ConsulPort is the port to make HTTP API calls to Consul agents on.
-	ConsulPort string
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
+	Log          logr.Logger
+	Scheme       *runtime.Scheme
 	context.Context
 }
 
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peerings,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peerings/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=apps,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=secrets/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Peering object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.6.4/pkg/reconcile
 func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("peering", req.NamespacedName)
 
 	r.Log.Info("received request for PeeringAcceptor:", "name", req.Name, "ns", req.Namespace)
 
-	token := &consulv1alpha1.Peering{}
-	err := r.Client.Get(ctx, req.NamespacedName, token)
-	// If the PeeringAcceptor object has been deleted (and we get an IsNotFound
+	// Get the PeeringAcceptor resource.
+	peeringAcceptor := &consulv1alpha1.Peering{}
+	err := r.Client.Get(ctx, req.NamespacedName, peeringAcceptor)
+
+	// If the PeeringAcceptor resource has been deleted (and we get an IsNotFound
 	// error), we need to delete it in Consul.
 	if k8serrors.IsNotFound(err) {
-		// TODO(peering): currently deletion doesn't work because token.Name is empty when deleted. Do I need to list and figure out what to delete?
+		r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
 		deleteReq := api.PeeringRequest{
-			Name: token.Name,
+			Name: req.Name,
 		}
-		_, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil)
-		if err != nil {
+		if _, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil); err != nil {
 			r.Log.Error(err, "failed to delete Peering from Consul", "name", req.Name)
 			return ctrl.Result{}, err
 		}
+		return ctrl.Result{}, nil
 	} else if err != nil {
 		r.Log.Error(err, "failed to get PeeringAcceptor", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
@@ -73,39 +66,99 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Read the peering from Consul.
 	// Todo(peering) do we need to pass in partition?
-	peering, _, err := r.ConsulClient.Peerings().Read(ctx, token.Name, nil)
+	peering, _, err := r.ConsulClient.Peerings().Read(ctx, peeringAcceptor.Name, nil)
 	var statusErr api.StatusError
-	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound {
-		r.Log.Info("peering doesn't exist in Consul", "name", token.Name)
+
+	// If the peering doesn't exist in Consul, generate a new token, and store it in the specified backend. Store the
+	// current state in the status.
+	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound && peering == nil {
+		r.Log.Info("peering doesn't exist in Consul", "name", peeringAcceptor.Name)
+
+		// Generate and store the peering token.
+		var resp *api.PeeringGenerateTokenResponse
+		if resp, err = r.generateToken(ctx, peeringAcceptor.Name); err != nil {
+			return ctrl.Result{}, err
+		}
+		if peeringAcceptor.Spec.Peer.Secret.Backend == "kubernetes" {
+			if err := r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		// Store the state in the status.
+		err := r.updateStatus(ctx, peeringAcceptor, resp)
+		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
 		return ctrl.Result{}, err
 	}
 
-	// If the peering doesn't exist in Consul, we should generate a new token.
-	if peering == nil {
-		r.Log.Info("peering doesn't exist in Consul", "name", token.Name)
-		req := api.PeeringGenerateTokenRequest{
-			PeerName: token.Name,
-		}
-		resp, _, err := r.ConsulClient.Peerings().GenerateToken(ctx, req, nil)
-		if err != nil {
-			r.Log.Error(err, "failed to get generate token", "err", err)
-			return ctrl.Result{}, err
-		}
+	// If the peering does exist in Consul, compare the existing status to the spec, and decide whether to make updates.
+	r.shouldGenerateToken(peeringAcceptor)
 
-		if token.Spec.Peer.Secret.Backend == "kubernetes" {
-			secret := createSecret(token.Spec.Peer.Secret.Name, token.Namespace, token.Spec.Peer.Secret.Key, resp.PeeringToken)
-			err = r.Client.Create(ctx, secret)
-		}
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	r.Log.Info("found token:", "token", token.Name)
+	r.Log.Info("found peeringAcceptor:", "peeringAcceptor", peeringAcceptor.Name)
 
 	return ctrl.Result{}, nil
+}
+func (r *PeeringController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.Peering) (bool, error) {
+	if peeringAcceptor.Status.Secret == nil || peeringAcceptor.Status.LastReconcileTime == nil {
+		return false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
+	}
+	// Compare the existing name, key, and backend.
+	if peeringAcceptor.Status.Secret.Name != peeringAcceptor.Spec.Peer.Secret.Name {
+		return true, nil
+	}
+	if peeringAcceptor.Status.Secret.Key != peeringAcceptor.Spec.Peer.Secret.Key {
+		return true, nil
+	}
+	// TODO(peering): remove this when validation webhook exists.
+	if peeringAcceptor.Status.Secret.Backend != peeringAcceptor.Spec.Peer.Secret.Backend {
+		return false, errors.New("PeeringAcceptor backend cannot be changed")
+	}
+	// Compare the existing secret hash.
+	// get the secret specified by the status, make sure it matches the status' latest hash
+	peeringTokenHash := sha256.Sum256([]byte(resp.PeeringToken))
+	peeringAcceptor.Status.Secret.LatestHash = hex.EncodeToString(peeringTokenHash[:])
+	peeringAcceptor.Status.Secret
+}
+func (r *PeeringController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering, resp *api.PeeringGenerateTokenResponse) error {
+	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
+		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
+		Key:     peeringAcceptor.Spec.Peer.Secret.Key,
+		Backend: peeringAcceptor.Spec.Peer.Secret.Backend,
+	}
+
+	peeringTokenHash := sha256.Sum256([]byte(resp.PeeringToken))
+	peeringAcceptor.Status.Secret.LatestHash = hex.EncodeToString(peeringTokenHash[:])
+
+	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
+	err := r.Status().Update(ctx, peeringAcceptor)
+	if err != nil {
+		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", peeringAcceptor.Name, "namespace", peeringAcceptor.Namespace)
+	}
+	return err
+}
+
+func (r *PeeringController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
+	req := api.PeeringGenerateTokenRequest{
+		PeerName: peerName,
+	}
+	resp, _, err := r.ConsulClient.Peerings().GenerateToken(ctx, req, nil)
+	if err != nil {
+		r.Log.Error(err, "failed to get generate token", "err", err)
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (r *PeeringController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering, resp *api.PeeringGenerateTokenResponse) error {
+	secret := createSecret(peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
+	if err := controllerutil.SetControllerReference(peeringAcceptor, secret, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Client.Create(ctx, secret); err != nil {
+		return err
+	}
+	return nil
 }
 
 func createSecret(name, namespace, key, value string) *corev1.Secret {

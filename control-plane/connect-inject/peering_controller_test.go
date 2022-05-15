@@ -2,7 +2,7 @@ package connectinject
 
 import (
 	"context"
-	"strings"
+	"net/http"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
@@ -19,10 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
-// object. The cases test an empty endpoints object, a basic endpoints object with one address, a basic endpoints object
-// with two addresses, and an endpoints object with every possible customization.
-// This test covers EndpointsController.createServiceRegistrations.
+// TestReconcileCreatePeeringAcceptor creates a peering acceptor
 func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
@@ -96,17 +93,13 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
-			addr := strings.Split(consul.HTTPAddr, ":")
-			consulPort := addr[1]
 
 			// Create the peering acceptor controller
 			pac := &PeeringController{
-				Client:          fakeClient,
-				Log:             logrtest.TestLogger{T: t},
-				ConsulClient:    consulClient,
-				ConsulPort:      consulPort,
-				ConsulScheme:    "http",
-				ConsulClientCfg: cfg,
+				Client:       fakeClient,
+				Log:          logrtest.TestLogger{T: t},
+				ConsulClient: consulClient,
+				Scheme:       s,
 			}
 			namespacedName := types.NamespacedName{
 				Name:      "acceptor-created",
@@ -140,6 +133,91 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 			expSecrets := tt.expectedK8sSecrets()
 			require.Equal(t, expSecrets[0].Name, createdSecret.Name)
 
+		})
+	}
+}
+
+// TestReconcileDeletePeeringAcceptor creates a peering acceptor
+func TestReconcileDeletePeeringAcceptor(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	cases := []struct {
+		name                   string
+		k8sObjects             func() []runtime.Object
+		initialConsulPeerNames []string
+		expectedConsulPeerings []*api.Peering
+		expErr                 string
+	}{
+		{
+			name: "PeeringAcceptor ",
+			k8sObjects: func() []runtime.Object {
+				return []runtime.Object{}
+			},
+			initialConsulPeerNames: []string{
+				"acceptor-deleted",
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+
+			// Create fake k8s client.
+			k8sObjects := append(tt.k8sObjects(), &ns)
+
+			// Add peering types to the scheme.
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Peering{}, &v1alpha1.PeeringList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consul server.
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: consul.HTTPAddr,
+			}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+
+			// Add the initial peerings into Consul by calling the Generate token endpoint.
+			_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerNames[0]}, nil)
+			require.NoError(t, err)
+
+			// Create the peering acceptor controller.
+			pac := &PeeringController{
+				Client:       fakeClient,
+				Log:          logrtest.TestLogger{T: t},
+				ConsulClient: consulClient,
+				Scheme:       s,
+			}
+			namespacedName := types.NamespacedName{
+				Name:      "acceptor-deleted",
+				Namespace: "default",
+			}
+
+			// Reconcile a resource that is not in K8s, but is still in Consul.
+			resp, err := pac.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.False(t, resp.Requeue)
+
+			// After reconciliation, Consul should not have the peering.
+			peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-deleted", nil)
+			var statusErr api.StatusError
+			require.ErrorAs(t, err, &statusErr)
+			require.Equal(t, http.StatusNotFound, statusErr.Code)
+			require.Nil(t, peering)
 		})
 	}
 }
