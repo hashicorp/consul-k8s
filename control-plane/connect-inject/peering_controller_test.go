@@ -137,22 +137,18 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 	}
 }
 
-// TestReconcileDeletePeeringAcceptor creates a peering acceptor
+// TestReconcileDeletePeeringAcceptor reconciles a PeeringAcceptor resource that is no longer in Kubernetes, but still
+// exists in Consul.
 func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
 		name                   string
-		k8sObjects             func() []runtime.Object
 		initialConsulPeerNames []string
-		expectedConsulPeerings []*api.Peering
 		expErr                 string
 	}{
 		{
 			name: "PeeringAcceptor ",
-			k8sObjects: func() []runtime.Object {
-				return []runtime.Object{}
-			},
 			initialConsulPeerNames: []string{
 				"acceptor-deleted",
 			},
@@ -164,7 +160,7 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 
 			// Create fake k8s client.
-			k8sObjects := append(tt.k8sObjects(), &ns)
+			k8sObjects := []runtime.Object{&ns}
 
 			// Add peering types to the scheme.
 			s := scheme.Scheme
@@ -221,3 +217,7 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 		})
 	}
 }
+
+// test update status
+// test should generate token and error cases
+// test update reconcile

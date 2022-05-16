@@ -15,6 +15,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -93,13 +94,26 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// If the peering does exist in Consul, compare the existing status to the spec, and decide whether to make updates.
-	r.shouldGenerateToken(peeringAcceptor)
-
-	r.Log.Info("found peeringAcceptor:", "peeringAcceptor", peeringAcceptor.Name)
+	shouldGenerate, err := r.shouldGenerateToken(ctx, peeringAcceptor)
+	if shouldGenerate {
+		// Generate and store the peering token.
+		var resp *api.PeeringGenerateTokenResponse
+		if resp, err = r.generateToken(ctx, peeringAcceptor.Name); err != nil {
+			return ctrl.Result{}, err
+		}
+		if peeringAcceptor.Spec.Peer.Secret.Backend == "kubernetes" {
+			if err := r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		// Store the state in the status.
+		err := r.updateStatus(ctx, peeringAcceptor, resp)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
-func (r *PeeringController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.Peering) (bool, error) {
+func (r *PeeringController) shouldGenerateToken(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering) (bool, error) {
 	if peeringAcceptor.Status.Secret == nil || peeringAcceptor.Status.LastReconcileTime == nil {
 		return false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
@@ -115,10 +129,27 @@ func (r *PeeringController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.
 		return false, errors.New("PeeringAcceptor backend cannot be changed")
 	}
 	// Compare the existing secret hash.
-	// get the secret specified by the status, make sure it matches the status' latest hash
-	peeringTokenHash := sha256.Sum256([]byte(resp.PeeringToken))
-	peeringAcceptor.Status.Secret.LatestHash = hex.EncodeToString(peeringTokenHash[:])
-	peeringAcceptor.Status.Secret
+	// Get the secret specified by the status, make sure it matches the status' secret.latestHash.
+	secret := &corev1.Secret{}
+	namespacedName := types.NamespacedName{
+		Name:      peeringAcceptor.Status.Secret.Name,
+		Namespace: peeringAcceptor.Namespace,
+	}
+	err := r.Client.Get(ctx, namespacedName, secret)
+	if k8serrors.IsNotFound(err) {
+		// The secret was deleted, so this is a case to generate a new token.
+		return true, nil
+	} else if err != nil {
+		r.Log.Error(err, "couldn't get secret", "name", peeringAcceptor.Status.Secret.Name, "namespace", peeringAcceptor.Namespace)
+		return false, err
+	}
+	existingSecretHashBytes := sha256.Sum256(secret.Data[peeringAcceptor.Status.Secret.Key])
+	existingSecretHash := hex.EncodeToString(existingSecretHashBytes[:])
+	if existingSecretHash != peeringAcceptor.Status.Secret.LatestHash {
+		r.Log.Info("secret doesn't match status.secret.latestHash, should generate new token")
+		return true, nil
+	}
+	return false, nil
 }
 func (r *PeeringController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering, resp *api.PeeringGenerateTokenResponse) error {
 	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
@@ -180,12 +211,3 @@ func (r *PeeringController) SetupWithManager(mgr ctrl.Manager) error {
 		For(&consulv1alpha1.Peering{}).
 		Complete(r)
 }
-
-//// remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.
-//func (r *PeeringController) remoteConsulClient(ip string, namespace string) (*api.Client, error) {
-//	newAddr := fmt.Sprintf("%s://%s:%s", r.ConsulScheme, ip, r.ConsulPort)
-//	localConfig := r.ConsulClientCfg
-//	localConfig.Address = newAddr
-//	localConfig.Namespace = namespace
-//	return consul.NewClient(localConfig)
-//}
