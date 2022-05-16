@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// PeeringController reconciles a Peering object
-type PeeringController struct {
+// PeeringAcceptorController reconciles a Peering object
+type PeeringAcceptorController struct {
 	client.Client
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
 	ConsulClient *api.Client
@@ -31,21 +31,21 @@ type PeeringController struct {
 	context.Context
 }
 
-//+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peerings,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peerings/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=secrets/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("peering", req.NamespacedName)
 
 	r.Log.Info("received request for PeeringAcceptor:", "name", req.Name, "ns", req.Namespace)
 
 	// Get the PeeringAcceptor resource.
-	peeringAcceptor := &consulv1alpha1.Peering{}
+	peeringAcceptor := &consulv1alpha1.PeeringAcceptor{}
 	err := r.Client.Get(ctx, req.NamespacedName, peeringAcceptor)
 
 	// If the PeeringAcceptor resource has been deleted (and we get an IsNotFound
@@ -114,7 +114,7 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	return ctrl.Result{}, nil
 }
-func (r *PeeringController) shouldGenerateToken(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering) (bool, error) {
+func (r *PeeringAcceptorController) shouldGenerateToken(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor) (bool, error) {
 	if peeringAcceptor.Status.Secret == nil || peeringAcceptor.Status.LastReconcileTime == nil {
 		return false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
@@ -152,7 +152,7 @@ func (r *PeeringController) shouldGenerateToken(ctx context.Context, peeringAcce
 	}
 	return false, nil
 }
-func (r *PeeringController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering, resp *api.PeeringGenerateTokenResponse) error {
+func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
 	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
 		Key:     peeringAcceptor.Spec.Peer.Secret.Key,
@@ -170,7 +170,7 @@ func (r *PeeringController) updateStatus(ctx context.Context, peeringAcceptor *c
 	return err
 }
 
-func (r *PeeringController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
+func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
 	}
@@ -182,7 +182,7 @@ func (r *PeeringController) generateToken(ctx context.Context, peerName string) 
 	return resp, nil
 }
 
-func (r *PeeringController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.Peering, resp *api.PeeringGenerateTokenResponse) error {
+func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
 	secret := createSecret(peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
 	if err := controllerutil.SetControllerReference(peeringAcceptor, secret, r.Scheme); err != nil {
 		return err
@@ -207,8 +207,8 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PeeringController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.Peering{}).
+		For(&consulv1alpha1.PeeringAcceptor{}).
 		Complete(r)
 }

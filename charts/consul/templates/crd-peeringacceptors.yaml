@@ -1,3 +1,4 @@
+{{- if .Values.connectInject.enabled }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -5,25 +6,26 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: peerings.consul.hashicorp.com
+  name: peeringacceptors.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
 spec:
   group: consul.hashicorp.com
   names:
-    kind: Peering
-    listKind: PeeringList
-    plural: peerings
-    singular: peering
+    kind: PeeringAcceptor
+    listKind: PeeringAcceptorList
+    plural: peeringacceptors
+    singular: peeringacceptor
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - description: The age of the resource
-      jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Peering is the Schema for the peerings API
+        description: PeeringAcceptor is the Schema for the peeringacceptors API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -38,7 +40,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: PeeringSpec defines the desired state of Peering
+            description: PeeringAcceptorSpec defines the desired state of PeeringAcceptor
             properties:
               peer:
                 description: Peer describes the information needed to create a peering.
@@ -57,7 +59,7 @@ spec:
             - peer
             type: object
           status:
-            description: PeeringStatus defines the observed state of Peering
+            description: PeeringAcceptorStatus defines the observed state of PeeringAcceptor
             properties:
               lastReconcileTime:
                 description: LastReconcileTime is the last time the resource was reconciled.
@@ -152,3 +154,4 @@ status:
     plural: ""
   conditions: []
   storedVersions: []
+{{- end }}

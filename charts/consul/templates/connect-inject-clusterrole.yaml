@@ -41,7 +41,7 @@ rules:
   - list
   - update
 - apiGroups: ["consul.hashicorp.com"]
-  resources: ["peerings"]
+  resources: ["peeringacceptors"]
   verbs:
     - create
     - delete
@@ -53,7 +53,7 @@ rules:
 - apiGroups:
     - consul.hashicorp.com
   resources:
-    - peerings/status
+    - peeringacceptors/status
   verbs:
     - get
     - patch

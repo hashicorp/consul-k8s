@@ -1,5 +1,5 @@
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: Peering
+kind: PeeringAcceptor
 metadata:
   name: peeraaaaa
 spec:

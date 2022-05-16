@@ -1,13 +1,13 @@
-# permissions for end users to view peerings.
+# permissions for end users to view peeringacceptors.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: peering-viewer-role
+  name: peeringacceptor-viewer-role
 rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
-  - peerings
+  - peeringacceptors
   verbs:
   - get
   - list
@@ -15,6 +15,6 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
-  - peerings/status
+  - peeringacceptors/status
   verbs:
   - get

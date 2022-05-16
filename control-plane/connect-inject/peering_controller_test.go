@@ -33,12 +33,12 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 		{
 			name: "PeeringAcceptor creates a peering in Consul and generates a token",
 			k8sObjects: func() []runtime.Object {
-				endpoint := &v1alpha1.Peering{
+				endpoint := &v1alpha1.PeeringAcceptor{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "acceptor-created",
 						Namespace: "default",
 					},
-					Spec: v1alpha1.PeeringSpec{
+					Spec: v1alpha1.PeeringAcceptorSpec{
 						Peer: &v1alpha1.Peer{
 							Secret: &v1alpha1.Secret{
 								Name:    "acceptor-created-secret",
@@ -77,7 +77,7 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 			k8sObjects := append(tt.k8sObjects(), &ns)
 
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Peering{}, &v1alpha1.PeeringList{})
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server
@@ -95,7 +95,7 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create the peering acceptor controller
-			pac := &PeeringController{
+			pac := &PeeringAcceptorController{
 				Client:       fakeClient,
 				Log:          logrtest.TestLogger{T: t},
 				ConsulClient: consulClient,
@@ -165,7 +165,7 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 
 			// Add peering types to the scheme.
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Peering{}, &v1alpha1.PeeringList{})
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
@@ -187,7 +187,7 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create the peering acceptor controller.
-			pac := &PeeringController{
+			pac := &PeeringAcceptorController{
 				Client:       fakeClient,
 				Log:          logrtest.TestLogger{T: t},
 				ConsulClient: consulClient,

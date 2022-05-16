@@ -426,7 +426,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err = (&connectinject.PeeringController{
+	if err = (&connectinject.PeeringAcceptorController{
 		Client:       mgr.GetClient(),
 		ConsulClient: c.consulClient,
 		Log:          ctrl.Log.WithName("controller").WithName("peering"),

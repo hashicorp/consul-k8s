@@ -65,7 +65,7 @@ resources:
   controller: true
   domain: hashicorp.com
   group: consul
-  kind: Peering
+  kind: PeeringAcceptor
   path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
   version: v1alpha1
 version: "3"
