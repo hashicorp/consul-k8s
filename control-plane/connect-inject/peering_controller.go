@@ -52,7 +52,7 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// error), we need to delete it in Consul.
 	if k8serrors.IsNotFound(err) {
 		r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-		deleteReq := api.PeeringRequest{
+		deleteReq := api.PeeringDeleteRequest{
 			Name: req.Name,
 		}
 		if _, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil); err != nil {
@@ -67,7 +67,8 @@ func (r *PeeringController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Read the peering from Consul.
 	// Todo(peering) do we need to pass in partition?
-	peering, _, err := r.ConsulClient.Peerings().Read(ctx, peeringAcceptor.Name, nil)
+	readReq := api.PeeringReadRequest{Name: peeringAcceptor.Name}
+	peering, _, err := r.ConsulClient.Peerings().Read(ctx, readReq, nil)
 	var statusErr api.StatusError
 
 	// If the peering doesn't exist in Consul, generate a new token, and store it in the specified backend. Store the
