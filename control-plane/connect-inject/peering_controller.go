@@ -107,6 +107,9 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 	shouldGenerate, err := r.shouldGenerateToken(peeringAcceptor, existingSecret)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if shouldGenerate {
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse

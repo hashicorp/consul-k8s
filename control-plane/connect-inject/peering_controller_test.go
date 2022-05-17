@@ -285,6 +285,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			// be replaced.
 			require.Equal(t, "", createdSecret.StringData["some-old-key"])
 			decodedTokenData, err := base64.StdEncoding.DecodeString(createdSecret.StringData["data"])
+			require.NoError(t, err)
 
 			require.Contains(t, string(decodedTokenData), "\"CA\":null")
 			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
