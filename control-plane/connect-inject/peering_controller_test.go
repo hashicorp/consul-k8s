@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"testing"
 
@@ -19,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// TestReconcileCreatePeeringAcceptor creates a peering acceptor
-func TestReconcileCreatePeeringAcceptor(t *testing.T) {
+// TestReconcileCreateUpdatePeeringAcceptor creates a peering acceptor
+func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
@@ -31,9 +32,9 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 		expErr                 string
 	}{
 		{
-			name: "PeeringAcceptor creates a peering in Consul and generates a token",
+			name: "New PeeringAcceptor creates a peering in Consul and generates a token",
 			k8sObjects: func() []runtime.Object {
-				endpoint := &v1alpha1.PeeringAcceptor{
+				peeringAcceptor := &v1alpha1.PeeringAcceptor{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "acceptor-created",
 						Namespace: "default",
@@ -48,7 +49,150 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 						},
 					},
 				}
-				return []runtime.Object{endpoint}
+				return []runtime.Object{peeringAcceptor}
+			},
+			expectedConsulPeerings: []*api.Peering{
+				{
+					Name: "acceptor-created",
+				},
+			},
+			expectedK8sSecrets: func() []*corev1.Secret {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created-secret",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"data": "tokenstub",
+					},
+				}
+				return []*corev1.Secret{secret}
+			},
+		},
+		{
+			name: "When the secret already exists (not created by controller), it is updated with the contents of the new peering token and an owner reference is added",
+			k8sObjects: func() []runtime.Object {
+				peeringAcceptor := &v1alpha1.PeeringAcceptor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.PeeringAcceptorSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "acceptor-created-secret",
+								Key:     "data",
+								Backend: "kubernetes",
+							},
+						},
+					},
+				}
+				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
+				return []runtime.Object{peeringAcceptor, secret}
+			},
+			expectedConsulPeerings: []*api.Peering{
+				{
+					Name: "acceptor-created",
+				},
+			},
+			expectedK8sSecrets: func() []*corev1.Secret {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created-secret",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"data": "tokenstub",
+					},
+				}
+				return []*corev1.Secret{secret}
+			},
+		},
+		{
+			name: "PeeringAcceptor status secret has different contents",
+			k8sObjects: func() []runtime.Object {
+				peeringAcceptor := &v1alpha1.PeeringAcceptor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.PeeringAcceptorSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "acceptor-created-secret",
+								Key:     "data",
+								Backend: "kubernetes",
+							},
+						},
+					},
+					Status: v1alpha1.PeeringAcceptorStatus{
+						Secret: &v1alpha1.SecretStatus{
+							Name:       "acceptor-created-secret",
+							Key:        "some-old-key",
+							Backend:    "kubernetes",
+							LatestHash: "some-old-sha",
+						},
+					},
+				}
+				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
+				secret.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion:         "consul.hashicorp.com/v1alpha1",
+						Kind:               "PeeringAcceptor",
+						Name:               "acceptor-created",
+						UID:                "",
+						Controller:         pointerToBool(true),
+						BlockOwnerDeletion: pointerToBool(true),
+					},
+				}
+				return []runtime.Object{peeringAcceptor, secret}
+			},
+			expectedConsulPeerings: []*api.Peering{
+				{
+					Name: "acceptor-created",
+				},
+			},
+			expectedK8sSecrets: func() []*corev1.Secret {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created-secret",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"data": "tokenstub",
+					},
+				}
+				return []*corev1.Secret{secret}
+			},
+		},
+		{
+			name: "PeeringAcceptor status secret name is changed",
+			k8sObjects: func() []runtime.Object {
+				peeringAcceptor := &v1alpha1.PeeringAcceptor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.PeeringAcceptorSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "acceptor-created-secret",
+								Key:     "data",
+								Backend: "kubernetes",
+							},
+						},
+					},
+					Status: v1alpha1.PeeringAcceptorStatus{
+						Secret: &v1alpha1.SecretStatus{
+							Name:       "some-old-secret",
+							Key:        "some-old-key",
+							Backend:    "kubernetes",
+							LatestHash: "some-old-sha",
+						},
+					},
+				}
+				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
+				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedConsulPeerings: []*api.Peering{
 				{
@@ -133,7 +277,25 @@ func TestReconcileCreatePeeringAcceptor(t *testing.T) {
 			require.NoError(t, err)
 			expSecrets := tt.expectedK8sSecrets()
 			require.Equal(t, expSecrets[0].Name, createdSecret.Name)
+			// This assertion needs to be on StringData rather than Data because in the fake K8s client the contents are
+			// stored in StringData if that's how the secret was initialized in the fake client. In a real cluster, this
+			// StringData is an input only field, and shouldn't be read from.
+			// Before failing at this case, the controller will error at reconcile with "secrets <SECRET> already
+			// exists". Leaving this here documents that the entire contents of an existing secret should
+			// be replaced.
+			require.Equal(t, "", createdSecret.StringData["some-old-key"])
+			decodedTokenData, err := base64.StdEncoding.DecodeString(createdSecret.StringData["data"])
 
+			require.Contains(t, string(decodedTokenData), "\"CA\":null")
+			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
+			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.consul\"")
+			// Assert on the owner reference
+			require.Len(t, createdSecret.OwnerReferences, 1)
+			require.Equal(t, "consul.hashicorp.com/v1alpha1", createdSecret.OwnerReferences[0].APIVersion)
+			require.Equal(t, "PeeringAcceptor", createdSecret.OwnerReferences[0].Kind)
+			require.Equal(t, "acceptor-created", createdSecret.OwnerReferences[0].Name)
+			require.Equal(t, true, *createdSecret.OwnerReferences[0].BlockOwnerDeletion)
+			require.Equal(t, true, *createdSecret.OwnerReferences[0].Controller)
 		})
 	}
 }
@@ -216,6 +378,118 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			require.ErrorAs(t, err, &statusErr)
 			require.Equal(t, http.StatusNotFound, statusErr.Code)
 			require.Nil(t, peering)
+		})
+	}
+}
+
+func TestUpdateStatus(t *testing.T) {
+	cases := []struct {
+		name              string
+		peeringAcceptor   *v1alpha1.PeeringAcceptor
+		generateTokenResp *api.PeeringGenerateTokenResponse
+		expStatus         v1alpha1.PeeringAcceptorStatus
+	}{
+		{
+			name: "updates status when there's no existing status",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+			},
+			generateTokenResp: &api.PeeringGenerateTokenResponse{
+				PeeringToken: "fake",
+			},
+			expStatus: v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:       "acceptor-secret",
+					Key:        "data",
+					Backend:    "kubernetes",
+					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
+				},
+			},
+		},
+		{
+			name: "updates status when there is an existing status",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringAcceptorStatus{
+					Secret: &v1alpha1.SecretStatus{
+						Name:       "old-name",
+						Key:        "old-key",
+						Backend:    "kubernetes",
+						LatestHash: "old-sha",
+					},
+				},
+			},
+			generateTokenResp: &api.PeeringGenerateTokenResponse{
+				PeeringToken: "fake",
+			},
+			expStatus: v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:       "acceptor-secret",
+					Key:        "data",
+					Backend:    "kubernetes",
+					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
+				},
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client.
+			k8sObjects := []runtime.Object{&ns}
+			k8sObjects = append(k8sObjects, tt.peeringAcceptor)
+
+			// Add peering types to the scheme.
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			// Create the peering acceptor controller.
+			pac := &PeeringAcceptorController{
+				Client: fakeClient,
+				Log:    logrtest.TestLogger{T: t},
+				Scheme: s,
+			}
+
+			err := pac.updateStatus(context.Background(), tt.peeringAcceptor, tt.generateTokenResp)
+			require.NoError(t, err)
+
+			peeringAcceptor := &v1alpha1.PeeringAcceptor{}
+			peeringAcceptorName := types.NamespacedName{
+				Name:      "acceptor",
+				Namespace: "default",
+			}
+			err = fakeClient.Get(context.Background(), peeringAcceptorName, peeringAcceptor)
+			require.NoError(t, err)
+			require.Equal(t, tt.expStatus.Secret.Name, peeringAcceptor.Status.Secret.Name)
+			require.Equal(t, tt.expStatus.Secret.Key, peeringAcceptor.Status.Secret.Key)
+			require.Equal(t, tt.expStatus.Secret.Backend, peeringAcceptor.Status.Secret.Backend)
+			require.Equal(t, tt.expStatus.Secret.LatestHash, peeringAcceptor.Status.Secret.LatestHash)
+
 		})
 	}
 }

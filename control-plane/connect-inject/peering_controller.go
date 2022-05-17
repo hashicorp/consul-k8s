@@ -38,6 +38,11 @@ type PeeringAcceptorController struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
+// PeeringAcceptor resources determine whether to generate a new peering token in Consul and store it in the backend
+// specified in the spec. If the resource doesn't exist, the peering should be deleted in Consul. If the resource
+// exists, and a peering doesn't exist in Consul, it should be created. If the resource exists, and a peering does exist
+// in Consul, it should be reconciled. If the status of the resource does not match the current state of the specified
+// secret, generate a new token and store it according to the spec.
 func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("peering", req.NamespacedName)
@@ -52,11 +57,8 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// error), we need to delete it in Consul.
 	if k8serrors.IsNotFound(err) {
 		r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-		deleteReq := api.PeeringDeleteRequest{
-			Name: req.Name,
-		}
-		if _, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil); err != nil {
-			r.Log.Error(err, "failed to delete Peering from Consul", "name", req.Name)
+		_, err := r.deletePeering(ctx, req.Name)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -94,8 +96,17 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	// TODO(peering): Verify that the existing peering in Consul is an acceptor peer. If it is a dialing peer, an error should be thrown.
 	// If the peering does exist in Consul, compare the existing status to the spec, and decide whether to make updates.
-	shouldGenerate, err := r.shouldGenerateToken(ctx, peeringAcceptor)
+
+	// TODO(peering): If the status is empty, then what should be done? This means a peering exists in Consul but hasn't
+	// been reconciled by the controller, or there was an error during a previous reconciliation. I think this means we
+	// should continue and generate a new token and update the status with that.
+	_, existingSecret, err := r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	shouldGenerate, err := r.shouldGenerateToken(peeringAcceptor, existingSecret)
 	if shouldGenerate {
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
@@ -114,7 +125,25 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 
 	return ctrl.Result{}, nil
 }
-func (r *PeeringAcceptorController) shouldGenerateToken(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor) (bool, error) {
+
+func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name string, namespace string) (bool, *corev1.Secret, error) {
+	existingSecret := &corev1.Secret{}
+	namespacedName := types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}
+	err := r.Client.Get(ctx, namespacedName, existingSecret)
+	if k8serrors.IsNotFound(err) {
+		// The secret was deleted.
+		return false, nil, nil
+	} else if err != nil {
+		r.Log.Error(err, "couldn't get secret", "name", name, "namespace", namespace)
+		return false, nil, err
+	}
+	return true, existingSecret, nil
+}
+
+func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (bool, error) {
 	if peeringAcceptor.Status.Secret == nil || peeringAcceptor.Status.LastReconcileTime == nil {
 		return false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
@@ -131,24 +160,14 @@ func (r *PeeringAcceptorController) shouldGenerateToken(ctx context.Context, pee
 	}
 	// Compare the existing secret hash.
 	// Get the secret specified by the status, make sure it matches the status' secret.latestHash.
-	secret := &corev1.Secret{}
-	namespacedName := types.NamespacedName{
-		Name:      peeringAcceptor.Status.Secret.Name,
-		Namespace: peeringAcceptor.Namespace,
-	}
-	err := r.Client.Get(ctx, namespacedName, secret)
-	if k8serrors.IsNotFound(err) {
-		// The secret was deleted, so this is a case to generate a new token.
-		return true, nil
-	} else if err != nil {
-		r.Log.Error(err, "couldn't get secret", "name", peeringAcceptor.Status.Secret.Name, "namespace", peeringAcceptor.Namespace)
-		return false, err
-	}
-	existingSecretHashBytes := sha256.Sum256(secret.Data[peeringAcceptor.Status.Secret.Key])
-	existingSecretHash := hex.EncodeToString(existingSecretHashBytes[:])
-	if existingSecretHash != peeringAcceptor.Status.Secret.LatestHash {
-		r.Log.Info("secret doesn't match status.secret.latestHash, should generate new token")
-		return true, nil
+	if existingSecret != nil {
+		existingSecretHashBytes := sha256.Sum256(existingSecret.Data[peeringAcceptor.Status.Secret.Key])
+		existingSecretHash := hex.EncodeToString(existingSecretHashBytes[:])
+		if existingSecretHash != peeringAcceptor.Status.Secret.LatestHash {
+			r.Log.Info("secret doesn't match status.secret.latestHash, should generate new token")
+			return true, nil
+		}
+
 	}
 	return false, nil
 }
@@ -170,6 +189,35 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 	return err
 }
 
+func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
+	secret := createSecret(peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
+	if err := controllerutil.SetControllerReference(peeringAcceptor, secret, r.Scheme); err != nil {
+		return err
+	}
+	exists, _, err := r.getExistingSecret(ctx, peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace)
+	if err != nil {
+		return err
+	}
+	if exists {
+		if err := r.Client.Update(ctx, secret); err != nil {
+			return err
+		}
+
+	} else {
+		if err := r.Client.Create(ctx, secret); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&consulv1alpha1.PeeringAcceptor{}).
+		Complete(r)
+}
+
 func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
@@ -182,15 +230,16 @@ func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName 
 	return resp, nil
 }
 
-func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
-	secret := createSecret(peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
-	if err := controllerutil.SetControllerReference(peeringAcceptor, secret, r.Scheme); err != nil {
-		return err
+func (r *PeeringAcceptorController) deletePeering(ctx context.Context, peerName string) (*api.PeeringDeleteResponse, error) {
+	deleteReq := api.PeeringDeleteRequest{
+		Name: peerName,
 	}
-	if err := r.Client.Create(ctx, secret); err != nil {
-		return err
+	resp, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil)
+	if err != nil {
+		r.Log.Error(err, "failed to delete Peering from Consul", "name", peerName)
+		return nil, err
 	}
-	return nil
+	return resp, nil
 }
 
 func createSecret(name, namespace, key, value string) *corev1.Secret {
@@ -204,11 +253,4 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 		},
 	}
 	return secret
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.PeeringAcceptor{}).
-		Complete(r)
 }
