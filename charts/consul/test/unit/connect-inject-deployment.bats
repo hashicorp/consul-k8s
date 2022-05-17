@@ -1843,6 +1843,8 @@ EOF
       --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.connectInject.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=foo/tls' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-webhook-ca-update"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1862,7 +1864,6 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
     --set 'global.secretsBackend.vault.consulCARole=test2' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1884,7 +1885,6 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
     --set 'global.secretsBackend.vault.consulCARole=test2' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
@@ -1907,7 +1907,6 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
     --set 'global.secretsBackend.vault.consulCARole=test2' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
@@ -1930,7 +1929,6 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
     --set 'global.secretsBackend.vault.consulCARole=test2' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
@@ -1941,6 +1939,60 @@ EOF
   [ "${actual}" = "ca" ]
   local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
+}
+
+@test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.consulConnectInjectCARole is set but global.secretsBackend.vault.connectInject.tlsCert.secretName and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=connectinjectcarole' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.consulConnectInjectCARole is set. global.secretsBackend.vault.connectInject.tlsCert.secretName and global.secretsBackend.vault.connectInject.caCert.secretName must also be set." ]]
+}
+
+@test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.connectInject.tlsCert.secretName is set but global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=foo/tls' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.connectInject.tlsCert.secretName is set. global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.caCert.secretName must also be set." ]]
+}
+
+@test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.connectInject.caCert.secretName is set but global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.tlsCert.secretName are not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=foo/tls' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.connectInject.caCert.secretName is set. global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.tlsCert.secretName must also be set." ]]
 }
 
 @test "connectInject/Deployment: vault tls annotations are set when tls is enabled" {
@@ -1958,6 +2010,7 @@ EOF
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      --set 'global.secretsBackend.vault.connectInject.caCert.secretName=foo/ca' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -1969,6 +2022,15 @@ EOF
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
   [ "${actual}" = "pki_int/cert/ca" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-ca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"foo/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-ca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "foo/ca" ]
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)"
@@ -2009,7 +2071,6 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -2025,7 +2086,6 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -2042,12 +2102,39 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=test' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
                  . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-dir=/vault/secrets"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: vault ca annotations are set when tls is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/cert/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/cert/ca" ]
 }
 
 #--------------------------------------------------------------------
@@ -2063,7 +2150,6 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=connectinjectcarole' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
@@ -2081,7 +2167,6 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=connectinjectcarole' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)

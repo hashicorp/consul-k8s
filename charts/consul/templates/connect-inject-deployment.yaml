@@ -8,6 +8,7 @@
 {{- if .Values.connectInject.centralConfig }}{{ if .Values.connectInject.centralConfig.proxyDefaults }}{{- if ne (trim .Values.connectInject.centralConfig.proxyDefaults) `{}` }}{{ fail "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.imageEnvoy }}{{ fail "connectInject.imageEnvoy must be specified in global.imageEnvoy" }}{{ end }}
 {{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
+{{- if and .Values.global.secretsBackend.vault.consulConnectInjectCARole (or (not .Values.global.secretsBackend.vault.connectInject.tlsCert) (not .Values.global.secretsBackend.vault.connectInject.caCert)) }}{{ fail "global.secretsBackend.vault.consulConnectInjectCARole is set. global.secretsBackend.vault.connectInject.tlsCert.secretName and global.secretsBackend.vault.connectInject.caCert.secretName must also be set."}}{{ end }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
@@ -44,17 +45,21 @@ spec:
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulConnectInjectCARole }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if .Values.global.secretsBackend.vault.connectInject.caCert }}
         {{- if .Values.global.secretsBackend.vault.connectInject.caCert.secretName }}
         {{- with .Values.global.secretsBackend.vault.connectInject.caCert }}
         "vault.hashicorp.com/agent-inject-secret-ca.crt": {{ .secretName }}
         "vault.hashicorp.com/agent-inject-template-ca.crt": {{ template "consul.vaultCATemplate" . }}
         {{- end }}
         {{- end }}
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.connectInject.tlsCert  }}
         {{- if .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-tls.crt": {{ include "consul.connectInjectWebhookTLSCertTemplate" . }}
         "vault.hashicorp.com/agent-inject-secret-tls.key": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-tls.key": {{ include "consul.connectInjectWebhookTLSKeyTemplate" . }}
+        {{- end }}
         {{- end }}
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
