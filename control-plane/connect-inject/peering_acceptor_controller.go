@@ -140,6 +140,7 @@ func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv
 	if peeringAcceptor.Status.Secret.Key != peeringAcceptor.Spec.Peer.Secret.Key {
 		return true, nil
 	}
+
 	// TODO(peering): remove this when validation webhook exists.
 	if peeringAcceptor.Status.Secret.Backend != peeringAcceptor.Spec.Peer.Secret.Backend {
 		return false, errors.New("PeeringAcceptor backend cannot be changed")
@@ -192,6 +193,9 @@ func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name 
 	return true, existingSecret, nil
 }
 
+// createK8sPeeringTokenSecretWithOwner creates a secret and uses the controller's K8s client to apply the secret. It
+// sets an owner reference to the PeeringAcceptor resource. It also checks if there's an existing secret with the same
+// name and makes sure to update the existing secret if so.
 func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
 	secret := createSecret(peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
 	if err := controllerutil.SetControllerReference(peeringAcceptor, secret, r.Scheme); err != nil {
@@ -221,6 +225,7 @@ func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// generateToken is a helper function that calls the Consul api to generate a token for the peer.
 func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
@@ -233,6 +238,7 @@ func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName 
 	return resp, nil
 }
 
+// deletePeering is a helper function that calls the Consul api to delete a peering.
 func (r *PeeringAcceptorController) deletePeering(ctx context.Context, peerName string) (*api.PeeringDeleteResponse, error) {
 	deleteReq := api.PeeringDeleteRequest{
 		Name: peerName,
@@ -245,6 +251,7 @@ func (r *PeeringAcceptorController) deletePeering(ctx context.Context, peerName 
 	return resp, nil
 }
 
+// createSecret is a helper function that creates a corev1.Secret when provided inputs.
 func createSecret(name, namespace, key, value string) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

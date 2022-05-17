@@ -387,9 +387,45 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 	}
 }
 
-func TestShouldGenerateToken(t *testing.T) {
-
-}
+//func TestShouldGenerateToken(t *testing.T) {
+//	cases := []struct {
+//		name            string
+//		peeringAcceptor *v1alpha1.PeeringAcceptor
+//		existingSecret  func() []runtime.Object
+//		expStatus       v1alpha1.PeeringAcceptorStatus
+//	}{
+//		{
+//			name: "",
+//			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+//				ObjectMeta: metav1.ObjectMeta{
+//					Name:      "acceptor",
+//					Namespace: "default",
+//				},
+//				Spec: v1alpha1.PeeringAcceptorSpec{
+//					Peer: &v1alpha1.Peer{
+//						Secret: &v1alpha1.Secret{
+//							Name:    "acceptor-secret",
+//							Key:     "data",
+//							Backend: "kubernetes",
+//						},
+//					},
+//				},
+//			},
+//			existingSecret: func() []runtime.Object {
+//				secret := createSecret("", "", "", "")
+//				return []runtime.Object{secret}
+//			},
+//			expStatus: v1alpha1.PeeringAcceptorStatus{
+//				Secret: &v1alpha1.SecretStatus{
+//					Name:       "acceptor-secret",
+//					Key:        "data",
+//					Backend:    "kubernetes",
+//					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
+//				},
+//			},
+//		},
+//	}
+//}
 
 func TestUpdateStatus(t *testing.T) {
 	cases := []struct {
@@ -503,6 +539,6 @@ func TestUpdateStatus(t *testing.T) {
 	}
 }
 
-// test update status
-// test should generate token and error cases
-// test update reconcile
+// make assertions on status
+// test should generate token
+// make sure that old secret is deleted if secret name is changed
