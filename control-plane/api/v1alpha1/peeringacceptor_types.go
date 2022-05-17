@@ -14,7 +14,7 @@ func init() {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// PeeringAcceptor is the Schema for the peeringacceptors API
+// PeeringAcceptor is the Schema for the peeringacceptors API.
 type PeeringAcceptor struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -25,14 +25,14 @@ type PeeringAcceptor struct {
 
 //+kubebuilder:object:root=true
 
-// PeeringAcceptorList contains a list of PeeringAcceptor
+// PeeringAcceptorList contains a list of PeeringAcceptor.
 type PeeringAcceptorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PeeringAcceptor `json:"items"`
 }
 
-// PeeringAcceptorSpec defines the desired state of PeeringAcceptor
+// PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
 type PeeringAcceptorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -58,7 +58,7 @@ type Secret struct {
 	Backend string `json:"backend,omitempty"`
 }
 
-// PeeringAcceptorStatus defines the observed state of PeeringAcceptor
+// PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
 type PeeringAcceptorStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

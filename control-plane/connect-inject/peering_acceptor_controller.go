@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// PeeringAcceptorController reconciles a Peering object
+// PeeringAcceptorController reconciles a PeeringAcceptor object.
 type PeeringAcceptorController struct {
 	client.Client
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
