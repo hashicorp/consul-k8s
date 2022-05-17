@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -297,6 +298,8 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			require.Equal(t, "acceptor-created", createdSecret.OwnerReferences[0].Name)
 			require.Equal(t, true, *createdSecret.OwnerReferences[0].BlockOwnerDeletion)
 			require.Equal(t, true, *createdSecret.OwnerReferences[0].Controller)
+			fmt.Println("make status assertions, assert that old secret was deleted")
+			t.Fail()
 		})
 	}
 }
@@ -381,6 +384,10 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			require.Nil(t, peering)
 		})
 	}
+}
+
+func TestShouldGenerateToken(t *testing.T) {
+
 }
 
 func TestUpdateStatus(t *testing.T) {

@@ -129,23 +129,6 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name string, namespace string) (bool, *corev1.Secret, error) {
-	existingSecret := &corev1.Secret{}
-	namespacedName := types.NamespacedName{
-		Name:      name,
-		Namespace: namespace,
-	}
-	err := r.Client.Get(ctx, namespacedName, existingSecret)
-	if k8serrors.IsNotFound(err) {
-		// The secret was deleted.
-		return false, nil, nil
-	} else if err != nil {
-		r.Log.Error(err, "couldn't get secret", "name", name, "namespace", namespace)
-		return false, nil, err
-	}
-	return true, existingSecret, nil
-}
-
 func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (bool, error) {
 	if peeringAcceptor.Status.Secret == nil || peeringAcceptor.Status.LastReconcileTime == nil {
 		return false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
@@ -190,6 +173,23 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", peeringAcceptor.Name, "namespace", peeringAcceptor.Namespace)
 	}
 	return err
+}
+
+func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name string, namespace string) (bool, *corev1.Secret, error) {
+	existingSecret := &corev1.Secret{}
+	namespacedName := types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}
+	err := r.Client.Get(ctx, namespacedName, existingSecret)
+	if k8serrors.IsNotFound(err) {
+		// The secret was deleted.
+		return false, nil, nil
+	} else if err != nil {
+		r.Log.Error(err, "couldn't get secret", "name", name, "namespace", namespace)
+		return false, nil, err
+	}
+	return true, existingSecret, nil
 }
 
 func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
