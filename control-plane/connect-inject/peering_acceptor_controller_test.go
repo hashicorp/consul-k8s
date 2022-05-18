@@ -3,7 +3,6 @@ package connectinject
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +31,9 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 		expectedConsulPeerings []*api.Peering
 		expectedK8sSecrets     func() []*corev1.Secret
 		expErr                 string
+		expectedStatus         *v1alpha1.PeeringAcceptorStatus
+		expectDeletedK8sSecret *types.NamespacedName
+		initialConsulPeerName  string
 	}{
 		{
 			name: "New PeeringAcceptor creates a peering in Consul and generates a token",
@@ -51,6 +54,13 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				return []runtime.Object{peeringAcceptor}
+			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:    "acceptor-created-secret",
+					Key:     "data",
+					Backend: "kubernetes",
+				},
 			},
 			expectedConsulPeerings: []*api.Peering{
 				{
@@ -91,6 +101,13 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
 				return []runtime.Object{peeringAcceptor, secret}
 			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:    "acceptor-created-secret",
+					Key:     "data",
+					Backend: "kubernetes",
+				},
+			},
 			expectedConsulPeerings: []*api.Peering{
 				{
 					Name: "acceptor-created",
@@ -110,7 +127,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			},
 		},
 		{
-			name: "PeeringAcceptor status secret has different contents",
+			name: "PeeringAcceptor status secret exists and has different contents",
 			k8sObjects: func() []runtime.Object {
 				peeringAcceptor := &v1alpha1.PeeringAcceptor{
 					ObjectMeta: metav1.ObjectMeta{
@@ -142,11 +159,18 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 						Kind:               "PeeringAcceptor",
 						Name:               "acceptor-created",
 						UID:                "",
-						Controller:         pointerToBool(true),
-						BlockOwnerDeletion: pointerToBool(true),
+						Controller:         pointerToBool2(true),
+						BlockOwnerDeletion: pointerToBool2(true),
 					},
 				}
 				return []runtime.Object{peeringAcceptor, secret}
+			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:    "acceptor-created-secret",
+					Key:     "data",
+					Backend: "kubernetes",
+				},
 			},
 			expectedConsulPeerings: []*api.Peering{
 				{
@@ -165,9 +189,10 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				}
 				return []*corev1.Secret{secret}
 			},
+			initialConsulPeerName: "acceptor-created",
 		},
 		{
-			name: "PeeringAcceptor status secret name is changed",
+			name: "PeeringAcceptor status secret exists and there's no peering in Consul",
 			k8sObjects: func() []runtime.Object {
 				peeringAcceptor := &v1alpha1.PeeringAcceptor{
 					ObjectMeta: metav1.ObjectMeta{
@@ -195,6 +220,13 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
 				return []runtime.Object{peeringAcceptor, secret}
 			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:    "acceptor-created-secret",
+					Key:     "data",
+					Backend: "kubernetes",
+				},
+			},
 			expectedConsulPeerings: []*api.Peering{
 				{
 					Name: "acceptor-created",
@@ -212,6 +244,69 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				}
 				return []*corev1.Secret{secret}
 			},
+			expectDeletedK8sSecret: &types.NamespacedName{
+				Name:      "some-old-secret",
+				Namespace: "default",
+			},
+		},
+		{
+			name: "PeeringAcceptor status secret name is changed when there is a peering in Consul",
+			k8sObjects: func() []runtime.Object {
+				peeringAcceptor := &v1alpha1.PeeringAcceptor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.PeeringAcceptorSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "acceptor-created-secret",
+								Key:     "data",
+								Backend: "kubernetes",
+							},
+						},
+					},
+					Status: v1alpha1.PeeringAcceptorStatus{
+						Secret: &v1alpha1.SecretStatus{
+							Name:       "some-old-secret",
+							Key:        "some-old-key",
+							Backend:    "kubernetes",
+							LatestHash: "some-old-sha",
+						},
+					},
+				}
+				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
+				return []runtime.Object{peeringAcceptor, secret}
+			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				Secret: &v1alpha1.SecretStatus{
+					Name:    "acceptor-created-secret",
+					Key:     "data",
+					Backend: "kubernetes",
+				},
+			},
+			expectedConsulPeerings: []*api.Peering{
+				{
+					Name: "acceptor-created",
+				},
+			},
+			expectedK8sSecrets: func() []*corev1.Secret {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created-secret",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"data": "tokenstub",
+					},
+				}
+				return []*corev1.Secret{secret}
+			},
+			expectDeletedK8sSecret: &types.NamespacedName{
+				Name:      "some-old-secret",
+				Namespace: "default",
+			},
+			initialConsulPeerName: "acceptor-created",
 		},
 	}
 	for _, tt := range cases {
@@ -238,6 +333,12 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
+
+			if tt.initialConsulPeerName != "" {
+				// Add the initial peerings into Consul by calling the Generate token endpoint.
+				_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerName}, nil)
+				require.NoError(t, err)
+			}
 
 			// Create the peering acceptor controller
 			pac := &PeeringAcceptorController{
@@ -298,9 +399,27 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			require.Equal(t, "acceptor-created", createdSecret.OwnerReferences[0].Name)
 			require.Equal(t, true, *createdSecret.OwnerReferences[0].BlockOwnerDeletion)
 			require.Equal(t, true, *createdSecret.OwnerReferences[0].Controller)
-			fmt.Println("make status assertions, assert that old secret was deleted")
-			// ********************************************
-			//t.Fail()
+
+			// Get the reconciled PeeringAcceptor and make assertions on the status
+			peeringAcceptorReconciled := &v1alpha1.PeeringAcceptor{}
+			err = fakeClient.Get(context.Background(), namespacedName, peeringAcceptorReconciled)
+			require.NoError(t, err)
+			if tt.expectedStatus != nil {
+				require.Equal(t, tt.expectedStatus.Secret.Name, peeringAcceptorReconciled.Status.Secret.Name)
+				require.Equal(t, tt.expectedStatus.Secret.Key, peeringAcceptorReconciled.Status.Secret.Key)
+				require.Equal(t, tt.expectedStatus.Secret.Backend, peeringAcceptorReconciled.Status.Secret.Backend)
+			}
+			// Check that old secret was deleted.
+			if tt.expectDeletedK8sSecret != nil {
+				oldSecret := &corev1.Secret{}
+				err = fakeClient.Get(context.Background(), *tt.expectDeletedK8sSecret, oldSecret)
+				t.Log(err)
+				t.Log(oldSecret)
+				if !k8serrors.IsNotFound(err) {
+					t.Error("old secret should have been deleted but was not")
+				}
+			}
+
 		})
 	}
 }
@@ -311,15 +430,13 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
-		name                   string
-		initialConsulPeerNames []string
-		expErr                 string
+		name                  string
+		initialConsulPeerName string
+		expErr                string
 	}{
 		{
-			name: "PeeringAcceptor ",
-			initialConsulPeerNames: []string{
-				"acceptor-deleted",
-			},
+			name:                  "PeeringAcceptor ",
+			initialConsulPeerName: "acceptor-deleted",
 		},
 	}
 	for _, tt := range cases {
@@ -350,7 +467,7 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			require.NoError(t, err)
 
 			// Add the initial peerings into Consul by calling the Generate token endpoint.
-			_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerNames[0]}, nil)
+			_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerName}, nil)
 			require.NoError(t, err)
 
 			// Create the peering acceptor controller.

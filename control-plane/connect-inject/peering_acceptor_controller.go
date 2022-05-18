@@ -78,13 +78,29 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound && peering == nil {
 		r.Log.Info("peering doesn't exist in Consul", "name", peeringAcceptor.Name)
 
+		if peeringAcceptor.Status.Secret != nil {
+			_, existingSecret, err := r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
+			if err != nil {
+				_ = r.updateStatusError(ctx, peeringAcceptor, err)
+				return ctrl.Result{}, err
+			}
+			if existingSecret != nil {
+				err := r.Client.Delete(ctx, existingSecret)
+				if err != nil {
+					_ = r.updateStatusError(ctx, peeringAcceptor, err)
+					return ctrl.Result{}, err
+				}
+			}
+		}
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
 		if resp, err = r.generateToken(ctx, peeringAcceptor.Name); err != nil {
+			_ = r.updateStatusError(ctx, peeringAcceptor, err)
 			return ctrl.Result{}, err
 		}
 		if peeringAcceptor.Spec.Peer.Secret.Backend == "kubernetes" {
 			if err := r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp); err != nil {
+				_ = r.updateStatusError(ctx, peeringAcceptor, err)
 				return ctrl.Result{}, err
 			}
 		}
@@ -97,19 +113,29 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// TODO(peering): Verify that the existing peering in Consul is an acceptor peer. If it is a dialing peer, an error should be thrown.
-	// If the peering does exist in Consul, compare the existing status to the spec, and decide whether to make updates.
 
-	// TODO(peering): If the status is empty, then what should be done? This means a peering exists in Consul but hasn't
-	// been reconciled by the controller, or there was an error during a previous reconciliation. I think this means we
-	// should continue and generate a new token and update the status with that.
-	_, existingSecret, err := r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
-	if err != nil {
-		return ctrl.Result{}, err
+	// If the peering does exist in Consul, figure out whether to generate and store a new token by comparing the secret
+	// in the status to the actual contents of the secret. If no secret is specified in the status, shouldGenerate will
+	// be set to true.
+	var shouldGenerate bool
+	var nameChanged bool
+	existingSecretName := peeringAcceptor.Status.Secret.Name
+	existingSecret := &corev1.Secret{}
+	if peeringAcceptor.Status.Secret == nil {
+		shouldGenerate = true
+	} else {
+		_, existingSecret, err = r.getExistingSecret(ctx, existingSecretName, peeringAcceptor.Namespace)
+		if err != nil {
+			_ = r.updateStatusError(ctx, peeringAcceptor, err)
+			return ctrl.Result{}, err
+		}
+		shouldGenerate, nameChanged, err = r.shouldGenerateToken(peeringAcceptor, existingSecret)
+		if err != nil {
+			_ = r.updateStatusError(ctx, peeringAcceptor, err)
+			return ctrl.Result{}, err
+		}
 	}
-	shouldGenerate, err := r.shouldGenerateToken(peeringAcceptor, existingSecret)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+
 	if shouldGenerate {
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
@@ -121,6 +147,15 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, err
 			}
 		}
+		// Delete the existing secret if the name changed. This needs to come before updating the status if we do generate a new token.
+		if nameChanged {
+			err := r.Client.Delete(ctx, existingSecret)
+			if err != nil {
+				_ = r.updateStatusError(ctx, peeringAcceptor, err)
+				return ctrl.Result{}, err
+			}
+		}
+
 		// Store the state in the status.
 		err := r.updateStatus(ctx, peeringAcceptor, resp)
 		return ctrl.Result{}, err
@@ -129,21 +164,21 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (bool, error) {
-	if peeringAcceptor.Status.Secret == nil || peeringAcceptor.Status.LastReconcileTime == nil {
-		return false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
+func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
+	if peeringAcceptor.Status.Secret == nil {
+		return false, false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
 	// Compare the existing name, key, and backend.
 	if peeringAcceptor.Status.Secret.Name != peeringAcceptor.Spec.Peer.Secret.Name {
-		return true, nil
+		return true, true, nil
 	}
 	if peeringAcceptor.Status.Secret.Key != peeringAcceptor.Spec.Peer.Secret.Key {
-		return true, nil
+		return true, false, nil
 	}
 
 	// TODO(peering): remove this when validation webhook exists.
 	if peeringAcceptor.Status.Secret.Backend != peeringAcceptor.Spec.Peer.Secret.Backend {
-		return false, errors.New("PeeringAcceptor backend cannot be changed")
+		return false, false, errors.New("PeeringAcceptor backend cannot be changed")
 	}
 	// Compare the existing secret hash.
 	// Get the secret specified by the status, make sure it matches the status' secret.latestHash.
@@ -152,12 +187,13 @@ func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv
 		existingSecretHash := hex.EncodeToString(existingSecretHashBytes[:])
 		if existingSecretHash != peeringAcceptor.Status.Secret.LatestHash {
 			r.Log.Info("secret doesn't match status.secret.latestHash, should generate new token")
-			return true, nil
+			return true, false, nil
 		}
 
 	}
-	return false, nil
+	return false, false, nil
 }
+
 func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
 	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
@@ -167,6 +203,20 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 
 	peeringTokenHash := sha256.Sum256([]byte(resp.PeeringToken))
 	peeringAcceptor.Status.Secret.LatestHash = hex.EncodeToString(peeringTokenHash[:])
+
+	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
+	err := r.Status().Update(ctx, peeringAcceptor)
+	if err != nil {
+		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", peeringAcceptor.Name, "namespace", peeringAcceptor.Namespace)
+	}
+	return err
+}
+
+func (r *PeeringAcceptorController) updateStatusError(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, reconcileErr error) error {
+	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
+		Error:   pointerToBool2(true),
+		Message: pointerToString(reconcileErr.Error()),
+	}
 
 	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
 	err := r.Status().Update(ctx, peeringAcceptor)
@@ -263,4 +313,11 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 		},
 	}
 	return secret
+}
+
+func pointerToString(s string) *string {
+	return &s
+}
+func pointerToBool2(b bool) *bool {
+	return &b
 }
