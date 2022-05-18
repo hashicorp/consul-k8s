@@ -93,7 +93,11 @@ func TestVault_VaultNamespace(t *testing.T) {
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
+<<<<<<< HEAD
 	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+=======
+	gossipSecret.Save(t, vaultClient)
+>>>>>>> 32f54f5e (PR Feedback.  Moving vault helper functions to be on the structs they were taking as arguments.)
 
 	// License
 	licenseSecret := &vault.KV2Secret{
@@ -103,7 +107,11 @@ func TestVault_VaultNamespace(t *testing.T) {
 		PolicyName: "license",
 	}
 	if cfg.EnableEnterprise {
+<<<<<<< HEAD
 		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+=======
+		licenseSecret.Save(t, vaultClient)
+>>>>>>> 32f54f5e (PR Feedback.  Moving vault helper functions to be on the structs they were taking as arguments.)
 	}
 
 	//Bootstrap Token
@@ -115,7 +123,11 @@ func TestVault_VaultNamespace(t *testing.T) {
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
+<<<<<<< HEAD
 	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+=======
+	bootstrapTokenSecret.Save(t, vaultClient)
+>>>>>>> 32f54f5e (PR Feedback.  Moving vault helper functions to be on the structs they were taking as arguments.)
 
 	// -------------------------
 	// Additional Auth Roles
@@ -137,8 +149,13 @@ func TestVault_VaultNamespace(t *testing.T) {
 	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
+<<<<<<< HEAD
 	consulClientRole := ClientRole
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
+=======
+	consulClientRole := "client"
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+>>>>>>> 32f54f5e (PR Feedback.  Moving vault helper functions to be on the structs they were taking as arguments.)
 	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
@@ -149,8 +166,13 @@ func TestVault_VaultNamespace(t *testing.T) {
 	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
+<<<<<<< HEAD
 	manageSystemACLsRole := ManageSystemACLsRole
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
+=======
+	manageSystemACLsRole := "server-acl-init"
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+>>>>>>> 32f54f5e (PR Feedback.  Moving vault helper functions to be on the structs they were taking as arguments.)
 	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
