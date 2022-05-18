@@ -98,7 +98,7 @@ type KubernetesAuthRoleConfiguration struct {
 
 // ConfigureKubernetesAuthRole configures a role in Vault for the component for the Kubernetes auth method
 // that will be used by the test Helm chart installation.
-func ConfigureK8SAuthRole(t *testing.T, vaultClient *vapi.Client, config *KubernetesAuthRoleConfiguration) {
+func (config *KubernetesAuthRoleConfiguration) ConfigureK8SAuthRole(t *testing.T, vaultClient *vapi.Client) {
 	// Create the Auth Roles for the component.
 	// Auth roles bind policies to Kubernetes service accounts, which
 	// then enables the Vault agent init container to call 'vault login'
@@ -132,7 +132,7 @@ type PKIAndAuthRoleConfiguration struct {
 	SkipPKIMount        bool
 }
 
-func ConfigurePKIAndAuthRole(t *testing.T, vaultClient *vapi.Client, config *PKIAndAuthRoleConfiguration) {
+func (config *PKIAndAuthRoleConfiguration) ConfigurePKIAndAuthRole(t *testing.T, vaultClient *vapi.Client) {
 	config.CAPath = fmt.Sprintf("%s/cert/ca", config.BaseURL)
 	// Configure role with read access to <baseURL>/cert/ca
 	ConfigurePKI(t, vaultClient, config.BaseURL, config.PolicyName,
@@ -151,7 +151,7 @@ func ConfigurePKIAndAuthRole(t *testing.T, vaultClient *vapi.Client, config *PKI
 		RoleName:            config.RoleName,
 		PolicyNames:         config.PolicyName,
 	}
-	ConfigureK8SAuthRole(t, vaultClient, authMethodRoleConfig)
+	authMethodRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 }
 
 type SaveVaultSecretConfiguration struct {
@@ -161,7 +161,7 @@ type SaveVaultSecretConfiguration struct {
 	Value      string
 }
 
-func SaveSecret(t *testing.T, vaultClient *vapi.Client, config *SaveVaultSecretConfiguration) {
+func (config *SaveVaultSecretConfiguration) Save(t *testing.T, vaultClient *vapi.Client) {
 	policy := fmt.Sprintf(`
 	path "%s" {
 	  capabilities = ["read"]

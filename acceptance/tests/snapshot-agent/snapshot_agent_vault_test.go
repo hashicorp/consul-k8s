@@ -63,7 +63,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// -------------------------
 	// KV2 secrets
@@ -77,7 +77,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
-	vault.SaveSecret(t, vaultClient, gossipSecret)
+	gossipSecret.Save(t, vaultClient)
 
 	// License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
@@ -87,7 +87,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		PolicyName: "license",
 	}
 	if cfg.EnableEnterprise {
-		vault.SaveSecret(t, vaultClient, licenseSecret)
+		licenseSecret.Save(t, vaultClient)
 	}
 
 	// Bootstrap Token
@@ -99,7 +99,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
+	bootstrapTokenSecret.Save(t, vaultClient)
 
 	// Snapshot Agent config
 	snapshotAgentConfig := generateSnapshotAgentConfig(t, bootstrapToken)
@@ -110,7 +110,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		Value:      snapshotAgentConfig,
 		PolicyName: "snapshot-agent-config",
 	}
-	vault.SaveSecret(t, vaultClient, snapshotAgentConfigSecret)
+	snapshotAgentConfigSecret.Save(t, vaultClient)
 
 	// -------------------------
 	// Additional Auth Roles
@@ -122,55 +122,60 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 
 	// server
 	consulServerRole := "server"
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
-	})
+	}
+	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
 	consulClientRole := "client"
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
-	})
+	}
+	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         bootstrapTokenSecret.PolicyName,
-	})
+	}
+	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// allow all components to access server ca
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
-	})
+	}
+	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// snapshot agent config
 	snapAgentRole := "snapshot-agent"
 	snapAgentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "snapshot-agent")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	saAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  snapAgentServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            snapAgentRole,
 		PolicyNames:         fmt.Sprintf("%s,%s", licenseSecret.PolicyName, snapshotAgentConfigSecret.PolicyName),
-	})
+	}
+	saAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 

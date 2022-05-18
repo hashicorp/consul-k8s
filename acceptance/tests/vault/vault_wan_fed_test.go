@@ -130,7 +130,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// dc2
 	// Configure Service Mesh CA
@@ -153,7 +153,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		AuthMethodPath:      secondaryAuthMethodName,
 		SkipPKIMount:        true,
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfigSecondary)
+	serverPKIConfigSecondary.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// -------------------------
 	// KV2 secrets
@@ -167,7 +167,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
-	vault.SaveSecret(t, vaultClient, gossipSecret)
+	gossipSecret.Save(t, vaultClient)
 
 	// License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
@@ -177,7 +177,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		PolicyName: "license",
 	}
 	if cfg.EnableEnterprise {
-		vault.SaveSecret(t, vaultClient, licenseSecret)
+		licenseSecret.Save(t, vaultClient)
 	}
 
 	// Bootstrap Token
@@ -189,7 +189,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
+	bootstrapTokenSecret.Save(t, vaultClient)
 
 	// Replication Token
 	replicationToken, err := uuid.GenerateUUID()
@@ -200,7 +200,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		Value:      replicationToken,
 		PolicyName: "replication",
 	}
-	vault.SaveSecret(t, vaultClient, replicationTokenSecret)
+	replicationTokenSecret.Save(t, vaultClient)
 
 	commonServerPolicies := "gossip"
 	if cfg.EnableEnterprise {
@@ -216,84 +216,92 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
 	consulServerRole := "server"
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
-	})
+	}
+	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
 	consulClientRole := "client"
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
-	})
+	}
+	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, replicationTokenSecret.PolicyName),
-	})
+	}
+	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// allow all components to access server ca
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
-	})
+	}
+	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// --------------------------------------------
 	// Additional Auth Roles for Secondary Datacenter
 	// --------------------------------------------
 	// server
 	secondaryServerPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicySecondary, serverPKIConfigSecondary.PolicyName, replicationTokenSecret.PolicyName)
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            consulServerRole,
 		PolicyNames:         secondaryServerPolicies,
-	})
+	}
+	srvAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	clientAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
-	})
+	}
+	clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	aclAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         replicationTokenSecret.PolicyName,
-	})
+	}
+	aclAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	// allow all components to access server ca
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvCAAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
 		AuthMethodPath:      secondaryAuthMethodName,
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
-	})
+	}
+	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	// // Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// // secondary cluster.

@@ -55,7 +55,7 @@ func TestVault(t *testing.T) {
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// -------------------------
 	// KV2 secrets
@@ -69,7 +69,7 @@ func TestVault(t *testing.T) {
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
-	vault.SaveSecret(t, vaultClient, gossipSecret)
+	gossipSecret.Save(t, vaultClient)
 
 	// License
 	licenseSecret := &vault.SaveVaultSecretConfiguration{
@@ -79,7 +79,7 @@ func TestVault(t *testing.T) {
 		PolicyName: "license",
 	}
 	if cfg.EnableEnterprise {
-		vault.SaveSecret(t, vaultClient, licenseSecret)
+		licenseSecret.Save(t, vaultClient)
 	}
 
 	// Bootstrap Token
@@ -91,7 +91,7 @@ func TestVault(t *testing.T) {
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
+	bootstrapTokenSecret.Save(t, vaultClient)
 
 	// -------------------------
 	// Additional Auth Roles
@@ -103,44 +103,48 @@ func TestVault(t *testing.T) {
 
 	// server
 	consulServerRole := "server"
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
-	})
+	}
+	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
 	consulClientRole := "client"
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
-	})
+	}
+	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
 	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         bootstrapTokenSecret.PolicyName,
-	})
+	}
+	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// allow all components to access server ca
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
 		AuthMethodPath:      "kubernetes",
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
-	})
+	}
+	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
