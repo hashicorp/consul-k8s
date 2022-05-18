@@ -191,7 +191,14 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Download consul 
+      - name: Checkout consul code
+        uses: actions/checkout@v2
+        with:
+          repository: hashicorp/consul-enterprise
+          token: ${{secrets.PAT}}
+          ref: main
+
+      - name: Download consul
         working-directory: control-plane 
         run: |
             mkdir -p $HOME/bin
