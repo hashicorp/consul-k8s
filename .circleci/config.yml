@@ -289,20 +289,6 @@ jobs:
           working_directory: *control-plane-path
           command: make ci.dev-docker
 
-  # upload nightly dev docker image
-  nightly-dev-upload-docker:
-    executor: go
-    steps:
-      - checkout
-      # get consul-k8s binary
-      - attach_workspace:
-          at: .
-      - setup_remote_docker
-      - run:
-          name: make ci.nightly-dev-docker
-          working_directory: *control-plane-path
-          command: make ci.nightly-dev-docker
-
   unit-cli:
     executor: go
     steps:
@@ -918,7 +904,7 @@ workflows:
           OS: "linux"
           ARCH: "amd64"
           name: build-distros-amd64
-      - nightly-dev-upload-docker:
+      - dev-upload-docker:
           requires:
             - build-distros-amd64
       - cleanup-gcp-resources
@@ -931,10 +917,15 @@ workflows:
       - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources
+            - dev-upload-docker
       - acceptance-eks-1-19:
           requires:
             - cleanup-eks-resources
+            - dev-upload-docker
       - acceptance-aks-1-21:
           requires:
             - cleanup-azure-resources
-      - acceptance-kind-1-23
+            - dev-upload-docker
+      - acceptance-kind-1-23:
+          requires:
+            - dev-upload-docker
