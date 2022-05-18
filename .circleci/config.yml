@@ -892,13 +892,13 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+#    triggers:
+#      - schedule:
+#          cron: "0 0 * * *"
+#          filters:
+#            branches:
+#              only:
+#                - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -907,24 +907,24 @@ workflows:
       - dev-upload-docker:
           requires:
             - build-distros-amd64
-      - cleanup-gcp-resources
-      - cleanup-azure-resources
-      - cleanup-eks-resources
+#      - cleanup-gcp-resources
+#      - cleanup-azure-resources
+#      - cleanup-eks-resources
       # Disable until we can use UBI images.
       #      - acceptance-openshift:
       #          requires:
       #          - cleanup-azure-resources
       - acceptance-gke-1-20:
           requires:
-            - cleanup-gcp-resources
+#            - cleanup-gcp-resources
             - dev-upload-docker
       - acceptance-eks-1-19:
           requires:
-            - cleanup-eks-resources
+#            - cleanup-eks-resources
             - dev-upload-docker
       - acceptance-aks-1-21:
           requires:
-            - cleanup-azure-resources
+#            - cleanup-azure-resources
             - dev-upload-docker
       - acceptance-kind-1-23:
           requires:
