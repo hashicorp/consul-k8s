@@ -58,6 +58,13 @@ spec:
                 description: LastReconcileTime is the last time the resource was reconciled.
                 format: date-time
                 type: string
+              reconcileError:
+                properties:
+                  error:
+                    type: boolean
+                  message:
+                    type: string
+                type: object
               secret:
                 properties:
                   backend:
