@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/consul-k8s/cli/validation"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
@@ -358,15 +357,8 @@ func (c *Command) Run(args []string) int {
 	install.Wait = c.flagWait
 	install.Timeout = c.timeoutDuration
 
-	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := helm.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Create a *chart.Chart object from the files to run the installation from.
-	chart, err := loader.LoadFiles(chartFiles)
+	// Load the Helm chart.
+	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -419,14 +411,14 @@ func (c *Command) checkForPreviousPVCs() error {
 // and returns a message if the secret configuration is ok or an error if
 // the secret configuration could cause a conflict.
 func (c *Command) checkForPreviousSecrets(release release.Release) (string, error) {
-	secrets, err := validation.ListConsulSecrets(c.Ctx, c.kubernetes)
+	secrets, err := validation.ListConsulSecrets(c.Ctx, c.kubernetes, release.Namespace)
 	if err != nil {
 		return "", fmt.Errorf("Error listing Consul secrets: %s", err)
 	}
 
 	// If the Consul configuration is a secondary DC, only one secret should
 	// exist, the Consul federation secret.
-	fedSecret := release.Configuration.Global.Acls.ReplicationToken.SecretName
+	fedSecret := release.FedSecret()
 	if release.ShouldExpectFederationSecret() {
 		if len(secrets.Items) == 1 && secrets.Items[0].Name == fedSecret {
 			return fmt.Sprintf("Found secret %s for Consul federation.", fedSecret), nil

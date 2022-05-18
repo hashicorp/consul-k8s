@@ -85,7 +85,7 @@ load _helpers
       --set 'server.exposeGossipAndRPCPorts=true' \
       . | tee /dev/stderr |
       yq -r '.rules[] | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-server" ]
+  [ "${actual}" = "release-name-consul-server" ]
 }
 
 @test "server/Role: allows SCC and PSP access with global.openshift.enabled=true,server.exposeGossipAndRPCPorts=true and global.enablePodSecurityPolices=true" {
@@ -100,8 +100,8 @@ load _helpers
       yq -r '.rules[]' | tee /dev/stderr)
 
   local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
-  [ "${scc_resource}" = "RELEASE-NAME-consul-server" ]
+  [ "${scc_resource}" = "release-name-consul-server" ]
 
   local psp_resource=$(echo $rules | jq -r '. | select(.resources==["podsecuritypolicies"]) | .resourceNames[0]')
-  [ "${psp_resource}" = "RELEASE-NAME-consul-server" ]
+  [ "${psp_resource}" = "release-name-consul-server" ]
 }

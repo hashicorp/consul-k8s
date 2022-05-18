@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -110,6 +111,9 @@ type EndpointsController struct {
 	// will delete any tokens associated with this auth method
 	// whenever service instances are deregistered.
 	AuthMethod string
+	// ConsulAPITimeout is the duration that the consul API client will
+	// wait for a response from the API before cancelling the request.
+	ConsulAPITimeout time.Duration
 
 	MetricsConfig MetricsConfig
 	Log           logr.Logger
@@ -175,17 +179,19 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					continue
 				}
 
+				serviceName, ok := pod.Annotations[annotationKubernetesService]
+				if ok && serviceEndpoints.Name != serviceName {
+					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+					// deregistration for service instances that don't match the annotation happens later because we don't add this pod to the endpointAddressMap.
+					continue
+				}
+
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err := r.registerServicesAndHealthCheck(pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
 						r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						errs = multierror.Append(errs, err)
 					}
-				} else {
-					// If this endpoints object points to a pod that has injection disabled,
-					// then we want to ignore it for any further processing and exit early.
-					r.Log.Info("ignoring because endpoints pods have not been injected", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-					return ctrl.Result{}, nil
 				}
 			}
 		}
@@ -922,7 +928,7 @@ func (r *EndpointsController) remoteConsulClient(ip string, namespace string) (*
 	localConfig := r.ConsulClientCfg
 	localConfig.Address = newAddr
 	localConfig.Namespace = namespace
-	return consul.NewClient(localConfig)
+	return consul.NewClient(localConfig, r.ConsulAPITimeout)
 }
 
 // shouldIgnore ignores namespaces where we don't connect-inject.

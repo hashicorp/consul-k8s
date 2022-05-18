@@ -54,20 +54,112 @@ func TestValidateUnprivilegedPort(t *testing.T) {
 // TestConsulLogin ensures that our implementation of consul login hits `/v1/acl/login`.
 func TestConsulLogin(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
-	counter := 0
 	bearerTokenFile := WriteTempFile(t, "foo")
 	tokenFile := WriteTempFile(t, "")
 
-	client := startMockServer(t, &counter)
-	err := ConsulLogin(client, bearerTokenFile, testAuthMethod, tokenFile, "", testPodMeta)
-	require.NoError(err)
-	require.Equal(counter, 1)
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(t, err)
+	client := startMockServer(t)
+	params := LoginParams{
+		AuthMethod:      testAuthMethod,
+		Datacenter:      "dc1",
+		BearerTokenFile: bearerTokenFile,
+		TokenSinkFile:   tokenFile,
+	}
+	_, err = ConsulLogin(client, params, log)
+	require.NoError(t, err)
 	// Validate that the token file was written to disk.
 	data, err := ioutil.ReadFile(tokenFile)
-	require.NoError(err)
-	require.Equal(string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
+	require.NoError(t, err)
+	require.Equal(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
+}
+
+// TestConsulLogin_Retries tests we retry /v1/acl/login call if it fails.
+func TestConsulLogin_Retries(t *testing.T) {
+	t.Parallel()
+
+	numLoginCalls := 0
+	bearerTokenFile := WriteTempFile(t, "foo")
+	tokenFile := WriteTempFile(t, "")
+
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(t, err)
+	// Start the Consul server.
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record all the API calls made.
+		if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
+			if numLoginCalls == 0 {
+				w.WriteHeader(500)
+			} else {
+				w.Write([]byte(testLoginResponse))
+			}
+			numLoginCalls++
+		}
+		if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
+			w.Write([]byte(testLoginResponse))
+		}
+	}))
+	t.Cleanup(consulServer.Close)
+
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+	clientConfig := &api.Config{Address: serverURL.String()}
+	client, err := api.NewClient(clientConfig)
+	require.NoError(t, err)
+	params := LoginParams{
+		AuthMethod:      testAuthMethod,
+		Datacenter:      "dc1",
+		BearerTokenFile: bearerTokenFile,
+		TokenSinkFile:   tokenFile,
+	}
+	_, err = ConsulLogin(client, params, log)
+	require.NoError(t, err)
+	require.Equal(t, 2, numLoginCalls)
+	// Validate that the token file was written to disk.
+	data, err := ioutil.ReadFile(tokenFile)
+	require.NoError(t, err)
+	require.Equal(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
+}
+
+// TestConsulLogin_TokenNotReplicated tests that if we can't read the token in stale consistency mode
+// we return an error.
+func TestConsulLogin_TokenNotReplicated(t *testing.T) {
+	t.Parallel()
+
+	bearerTokenFile := WriteTempFile(t, "foo")
+	tokenFile := WriteTempFile(t, "")
+
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(t, err)
+	// Start the Consul server.
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record all the API calls made.
+		if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
+			w.Write([]byte(testLoginResponse))
+		}
+		if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
+			w.WriteHeader(500)
+		}
+	}))
+	t.Cleanup(consulServer.Close)
+
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+	clientConfig := &api.Config{Address: serverURL.String()}
+	client, err := api.NewClient(clientConfig)
+	require.NoError(t, err)
+	params := LoginParams{
+		AuthMethod:      testAuthMethod,
+		Datacenter:      "dc1",
+		BearerTokenFile: bearerTokenFile,
+		TokenSinkFile:   tokenFile,
+	}
+	_, err = ConsulLogin(client, params, log)
+	require.EqualError(t, err, "Unexpected response code: 500 ()")
 }
 
 func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
@@ -75,48 +167,41 @@ func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 	require := require.New(t)
 
 	bearerTokenFile := WriteTempFile(t, "")
-	err := ConsulLogin(
-		nil,
-		bearerTokenFile,
-		testAuthMethod,
-		"",
-		"",
-		testPodMeta,
-	)
-	require.EqualError(err, fmt.Sprintf("no bearer token found in %s", bearerTokenFile))
+	params := LoginParams{
+		BearerTokenFile: bearerTokenFile,
+	}
+	_, err := ConsulLogin(nil, params, hclog.NewNullLogger())
+	require.EqualError(err, fmt.Sprintf("no bearer token found in %q", bearerTokenFile))
 }
 
 func TestConsulLogin_BearerTokenFileDoesNotExist(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-	err := ConsulLogin(
-		nil,
-		randFileName,
-		testAuthMethod,
-		"",
-		"",
-		testPodMeta,
-	)
+	params := LoginParams{
+		BearerTokenFile: randFileName,
+	}
+	_, err := ConsulLogin(nil, params, hclog.NewNullLogger())
 	require.Error(err)
-	require.Contains(err.Error(), "unable to read bearerTokenFile")
+	require.Contains(err.Error(), "unable to read bearer token file")
 }
 
 func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	counter := 0
 	bearerTokenFile := WriteTempFile(t, "foo")
-	client := startMockServer(t, &counter)
+	client := startMockServer(t)
+	// This is a common.Logger.
+	log, err := Logger("INFO", false)
+	require.NoError(err)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-	err := ConsulLogin(
-		client,
-		bearerTokenFile,
-		testAuthMethod,
-		randFileName,
-		"",
-		testPodMeta,
-	)
+	params := LoginParams{
+		AuthMethod:      testAuthMethod,
+		BearerTokenFile: bearerTokenFile,
+		TokenSinkFile:   randFileName,
+		numRetries:      2,
+	}
+	_, err = ConsulLogin(client, params, log)
 	require.Error(err)
 	require.Contains(err.Error(), "error writing token to file sink")
 }
@@ -214,15 +299,16 @@ func TestGetResolvedServerAddresses(t *testing.T) {
 // startMockServer starts an httptest server used to mock a Consul server's
 // /v1/acl/login endpoint. apiCallCounter will be incremented on each call to /v1/acl/login.
 // It returns a consul client pointing at the server.
-func startMockServer(t *testing.T, apiCallCounter *int) *api.Client {
-
+func startMockServer(t *testing.T) *api.Client {
 	// Start the Consul server.
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Record all the API calls made.
 		if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-			*apiCallCounter++
+			w.Write([]byte(testLoginResponse))
 		}
-		w.Write([]byte(testLoginResponse))
+		if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
+			w.Write([]byte(testLoginResponse))
+		}
 	}))
 	t.Cleanup(consulServer.Close)
 
@@ -258,5 +344,3 @@ const testLoginResponse = `{
   "CreateIndex": 36,
   "ModifyIndex": 36
 }`
-
-var testPodMeta = map[string]string{"pod": "default/podName"}

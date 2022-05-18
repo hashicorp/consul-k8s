@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -149,6 +150,10 @@ type Handler struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
+	// ConsulAPITimeout is the duration that the consul API client will
+	// wait for a response from the API before cancelling the request.
+	ConsulAPITimeout time.Duration
+
 	// Log
 	Log logr.Logger
 	// Log settings for consul-sidecar
@@ -208,6 +213,9 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
 	pod.Spec.Volumes = append(pod.Spec.Volumes, h.containerVolume())
+
+	// Optionally mount data volume to other containers
+	h.injectVolumeMount(pod)
 
 	// Add the upstream services as environment variables for easy
 	// service discovery.
@@ -441,6 +449,19 @@ func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 	return nil
 }
 
+func (h *Handler) injectVolumeMount(pod corev1.Pod) {
+	containersToInject := splitCommaSeparatedItemsFromAnnotation(annotationInjectMountVolumes, pod)
+
+	for index, container := range pod.Spec.Containers {
+		if sliceContains(containersToInject, container.Name) {
+			pod.Spec.Containers[index].VolumeMounts = append(pod.Spec.Containers[index].VolumeMounts, corev1.VolumeMount{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+			})
+		}
+	}
+}
+
 func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 	// Don't inject in the Kubernetes system namespaces
 	if kubeSystemNamespaces.Contains(namespace) {
@@ -624,4 +645,13 @@ func (h *Handler) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1
 func (h *Handler) InjectDecoder(d *admission.Decoder) error {
 	h.decoder = d
 	return nil
+}
+
+func sliceContains(slice []string, entry string) bool {
+	for _, s := range slice {
+		if entry == s {
+			return true
+		}
+	}
+	return false
 }

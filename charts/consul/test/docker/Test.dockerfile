@@ -6,13 +6,15 @@
 # a script to configure kubectl, potentially install Helm, and run the tests
 # manually. This image only has the dependencies pre-installed.
 
-FROM circleci/golang:1.16
+FROM circleci/golang:1.17
 
 # change the user to root so we can install stuff
 USER root
 
-ENV BATS_VERSION "1.2.1"
+ENV BATS_VERSION "1.6.0"
 ENV TERRAFORM_VERSION "0.13.5"
+
+RUN apt-get update
 
 # base packages
 RUN apt-get install -y \

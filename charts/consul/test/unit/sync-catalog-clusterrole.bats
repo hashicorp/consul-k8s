@@ -61,20 +61,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.acls.manageSystemACLs
-
-@test "syncCatalog/ClusterRole: allows secret access with global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-clusterrole.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.rules[2].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
-}
-
-#--------------------------------------------------------------------
 # syncCatalog.toK8S={true,false}
 
 @test "syncCatalog/ClusterRole: has reduced permissions if toK8s=false" {

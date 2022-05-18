@@ -110,7 +110,7 @@ load _helpers
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.rules[] | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-client" ]
+  [ "${actual}" = "release-name-consul-client" ]
 }
 
 @test "client/Role: allows securitycontextconstraints and acl secret access with global.openshift.enabled=true and global.acls.manageSystemACLs=true" {
@@ -124,10 +124,10 @@ load _helpers
       yq -r '.rules[]' | tee /dev/stderr)
 
   local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
-  [ "${scc_resource}" = "RELEASE-NAME-consul-client" ]
+  [ "${scc_resource}" = "release-name-consul-client" ]
 
   local secrets_resource=$(echo $rules | jq -r '. | select(.resources==["secrets"]) | .resourceNames[0]')
-  [ "${secrets_resource}" = "RELEASE-NAME-consul-client-acl-token" ]
+  [ "${secrets_resource}" = "release-name-consul-client-acl-token" ]
 }
 
 @test "client/Role: allows securitycontextconstraints and psp access with global.openshift.enabled=true and global.enablePodSecurityPolices=true" {
@@ -141,10 +141,10 @@ load _helpers
       yq -r '.rules[]' | tee /dev/stderr)
 
   local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
-  [ "${scc_resource}" = "RELEASE-NAME-consul-client" ]
+  [ "${scc_resource}" = "release-name-consul-client" ]
 
   local psp_resource=$(echo $rules | jq -r '. | select(.resources==["podsecuritypolicies"]) | .resourceNames[0]')
-  [ "${psp_resource}" = "RELEASE-NAME-consul-client" ]
+  [ "${psp_resource}" = "release-name-consul-client" ]
 }
 
 @test "client/Role: allows securitycontextconstraints, acl secret, and psp access when all global.openshift.enabled, global.enablePodSecurityPolices, and global.acls.manageSystemACLs are true " {
@@ -159,11 +159,11 @@ load _helpers
       yq -r '.rules[]' | tee /dev/stderr)
 
   local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
-  [ "${scc_resource}" = "RELEASE-NAME-consul-client" ]
+  [ "${scc_resource}" = "release-name-consul-client" ]
 
   local secrets_resource=$(echo $rules | jq -r '. | select(.resources==["secrets"]) | .resourceNames[0]')
-  [ "${secrets_resource}" = "RELEASE-NAME-consul-client-acl-token" ]
+  [ "${secrets_resource}" = "release-name-consul-client-acl-token" ]
 
   local psp_resource=$(echo $rules | jq -r '. | select(.resources==["podsecuritypolicies"]) | .resourceNames[0]')
-  [ "${psp_resource}" = "RELEASE-NAME-consul-client" ]
+  [ "${psp_resource}" = "release-name-consul-client" ]
 }

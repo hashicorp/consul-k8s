@@ -48,7 +48,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
-{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,%s-server.%s,*.%s-server.%s.svc,%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
 {{- end -}}
 
 {{- define "consul.serverAdditionalDNSSANs" -}}
@@ -70,6 +70,13 @@ as well as the global.name setting.
 |
           {{ "{{" }}- with secret "{{ .Values.global.acls.replicationToken.secretName }}" -{{ "}}" }}
           acl { tokens { agent = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}", replication = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}" }}
+          {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.vaultBootstrapTokenConfigTemplate" -}}
+|
+          {{ "{{" }}- with secret "{{ .Values.global.acls.bootstrapToken.secretName }}" -{{ "}}" }}
+          acl { tokens { initial_management = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.bootstrapToken.secretKey }} -{{ "}}" }}" }}
           {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
@@ -159,6 +166,7 @@ This template is for an init container.
     - |
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
+        -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
@@ -166,12 +174,11 @@ This template is for an init container.
         {{- if .Values.externalServers.tlsServerName }}
         -tls-server-name={{ .Values.externalServers.tlsServerName }} \
         {{- end }}
-        {{- if not .Values.externalServers.useSystemRoots }}
-        -ca-file=/consul/tls/ca/tls.crt
-        {{- end }}
         {{- else }}
         -server-addr={{ template "consul.fullname" . }}-server \
         -server-port=8501 \
+        {{- end }}
+        {{- if or (not .Values.externalServers.enabled) (and .Values.externalServers.enabled (not .Values.externalServers.useSystemRoots)) }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
         -ca-file=/vault/secrets/serverca.crt
         {{- else }}
@@ -209,7 +216,7 @@ Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
 {{- define "consul.reservedNamesFailer" -}}
 {{- $name := index . 0 -}}
 {{- $key := index . 1 -}}
-{{- if or (eq "system" $name) (eq "universal" $name) (eq "consul" $name) (eq "operator" $name) (eq "root" $name) }}
+{{- if or (eq "system" $name) (eq "universal" $name) (eq "operator" $name) (eq "root" $name) }}
 {{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
 {{- end }}
 {{- end -}}

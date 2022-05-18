@@ -129,12 +129,16 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 }
 
 // bootstrap sets up Kubernetes auth method and enables secrets engines.
-func (v *VaultCluster) bootstrap(t *testing.T) {
+func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 	if !v.serverEnabled() {
 		v.logger.Logf(t, "skipping bootstrapping Vault because Vault server is not enabled")
 		return
 	}
 	v.vaultClient = v.SetupVaultClient(t)
+	if vaultNamespace != "" {
+		createNamespace(t, v.vaultClient, vaultNamespace)
+		v.vaultClient.SetNamespace(vaultNamespace)
+	}
 
 	// Enable the KV-V2 Secrets engine.
 	err := v.vaultClient.Sys().Mount("consul", &vapi.MountInput{
@@ -188,7 +192,7 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 }
 
 // Create installs Vault via Helm and then calls bootstrap to initialize it.
-func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
+func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNamespace string) {
 	t.Helper()
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
@@ -211,7 +215,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	k8s.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, v.releaseLabelSelector())
 
 	// Now call bootstrap().
-	v.bootstrap(t)
+	v.bootstrap(t, vaultNamespace)
 }
 
 // Destroy issues a helm delete and deletes the PVC + any helm secrets related to the release that are leftover.
@@ -401,5 +405,11 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+}
+
+// CreateNamespace creates a Vault namespace given the namespacePath.
+func createNamespace(t *testing.T, vaultClient *vapi.Client, namespacePath string) {
+	_, err := vaultClient.Logical().Write(fmt.Sprintf("sys/namespaces/%s", namespacePath), nil)
 	require.NoError(t, err)
 }

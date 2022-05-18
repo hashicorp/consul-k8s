@@ -8,13 +8,13 @@ load _helpers
 # These tests use test-runner.yaml to test the consul.fullname helper
 # since we need an existing template that calls the consul.fullname helper.
 
-@test "helper/consul.fullname: defaults to RELEASE-NAME-consul" {
+@test "helper/consul.fullname: defaults to release-name-consul" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/tests/test-runner.yaml \
       . | tee /dev/stderr |
       yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-consul-test" ]
+  [ "${actual}" = "release-name-consul-test" ]
 }
 
 @test "helper/consul.fullname: fullnameOverride overrides the name" {
@@ -84,7 +84,7 @@ load _helpers
       --set nameOverride=override \
       . | tee /dev/stderr |
       yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "RELEASE-NAME-override-test" ]
+  [ "${actual}" = "release-name-override-test" ]
 }
 
 #--------------------------------------------------------------------
@@ -139,7 +139,7 @@ load _helpers
 # consul.getAutoEncryptClientCA helper since we need an existing template that calls
 # the consul.getAutoEncryptClientCA helper.
 
-@test "helper/consul.getAutoEncryptClientCA: get-auto-encrypt-client-ca uses server's stateful set address by default" {
+@test "helper/consul.getAutoEncryptClientCA: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/tests/test-runner.yaml  \
@@ -149,7 +149,7 @@ load _helpers
       yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
 
   # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=RELEASE-NAME-consul-server")')
+  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
   [ "${actual}" = "true" ]
 
   # check server port
@@ -217,10 +217,6 @@ load _helpers
   # check the default server port is 443 if not provided
   actual=$(echo $command | jq ' . | contains("-server-port=443")')
   [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
 }
 
 @test "helper/consul.getAutoEncryptClientCA: can pass cloud auto-join string to server address via externalServers.hosts" {
@@ -285,7 +281,29 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault is enabled" {
+@test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault is enabled and external servers disabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+
+  actual=$(echo $object | jq '.command | join(" ") | contains("-ca-file=/vault/secrets/serverca.crt")')
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $object | jq '.volumeMounts[] | select(.name == "consul-ca-cert")')
+  [ "${actual}" = "" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault and external servers is enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/tests/test-runner.yaml  \
@@ -298,6 +316,8 @@ load _helpers
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
       --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul.io' \
       . | tee /dev/stderr |
       yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
 

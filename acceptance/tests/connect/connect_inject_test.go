@@ -179,7 +179,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 			retry.Run(t, func(r *retry.R) {
 				for _, name := range []string{"static-client", "static-client-sidecar-proxy"} {
 					instances, _, err := consulClient.Catalog().Service(name, "", nil)
@@ -301,7 +301,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Check that the ACL token is deleted.
 			if c.secure {

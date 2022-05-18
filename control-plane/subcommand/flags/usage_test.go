@@ -39,6 +39,10 @@ HTTP API Options
      is enabled. This can also be specified via the CONSUL_CLIENT_KEY
      environment variable.
 
+  -consul-api-timeout=<value>
+     The time in seconds that the consul API client will wait for a
+     response from the API before cancelling the request.
+
   -http-addr=<address>
      The $address$ and port of the Consul HTTP agent. The value can be
      an IP address or DNS address, but it must also include the port.
