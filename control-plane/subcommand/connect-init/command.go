@@ -1,6 +1,7 @@
 package connectinit
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -22,13 +23,8 @@ const (
 	defaultTokenSinkFile   = "/consul/connect-inject/acl-token"
 	defaultProxyIDFile     = "/consul/connect-inject/proxyid"
 
-	// The number of times to attempt ACL Login.
-	numLoginRetries = 3
 	// The number of times to attempt to read this service (120s).
 	defaultServicePollingRetries = 120
-
-	raftReplicationTimeout   = 2 * time.Second
-	tokenReadPollingInterval = 100 * time.Millisecond
 )
 
 type Command struct {
@@ -84,7 +80,6 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
-
 }
 
 func (c *Command) Run(args []string) int {
@@ -94,16 +89,9 @@ func (c *Command) Run(args []string) int {
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
-	if c.flagPodName == "" {
-		c.UI.Error("-pod-name must be set")
-		return 1
-	}
-	if c.flagPodNamespace == "" {
-		c.UI.Error("-pod-namespace must be set")
-		return 1
-	}
-	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
-		c.UI.Error("-service-account-name must be set when ACLs are enabled")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -119,7 +107,7 @@ func (c *Command) Run(args []string) int {
 	cfg := api.DefaultConfig()
 	cfg.Namespace = c.flagConsulServiceNamespace
 	c.http.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg, c.http.ConsulAPITimeout())
 	if err != nil {
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
@@ -129,13 +117,14 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
-		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagACLTokenSink, c.flagAuthMethodNamespace, loginMeta)
-			if err != nil {
-				c.logger.Error("Consul login failed; retrying", "error", err)
-			}
-			return err
-		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
+		loginParams := common.LoginParams{
+			AuthMethod:      c.flagACLAuthMethod,
+			Namespace:       c.flagAuthMethodNamespace,
+			BearerTokenFile: c.flagBearerTokenFile,
+			TokenSinkFile:   c.flagACLTokenSink,
+			Meta:            loginMeta,
+		}
+		token, err := common.ConsulLogin(consulClient, loginParams, c.logger)
 		if err != nil {
 			if c.flagServiceAccountName == "default" {
 				c.logger.Warn("The service account name for this Pod is \"default\"." +
@@ -143,60 +132,10 @@ func (c *Command) Run(args []string) int {
 					" The service account name must match the name of the Kubernetes Service" +
 					" or the consul.hashicorp.com/connect-service annotation.")
 			}
-			c.logger.Error("Hit maximum retries for consul login", "error", err)
+			c.logger.Error("unable to complete login", "error", err)
 			return 1
 		}
-		// Now update the client so that it will read the ACL token we just fetched.
-		cfg.TokenFile = c.flagACLTokenSink
-		consulClient, err = consul.NewClient(cfg)
-		if err != nil {
-			c.logger.Error("Unable to update client connection", "error", err)
-			return 1
-		}
-		c.logger.Info("Consul login complete")
-
-		// A workaround to check that the ACL token is replicated to other Consul servers.
-		//
-		// A consul client may reach out to a follower instead of a leader to resolve the token during the
-		// call to get services below. This is because clients talk to servers in the stale consistency mode
-		// to decrease the load on the servers (see https://www.consul.io/docs/architecture/consensus#stale).
-		// In that case, it's possible that the token isn't replicated
-		// to that server instance yet. The client will then get an "ACL not found" error
-		// and subsequently cache this not found response. Then our call below
-		// to get services from the agent will keep hitting the same "ACL not found" error
-		// until the cache entry expires (determined by the `acl_token_ttl` which defaults to 30 seconds).
-		// This is not great because it will delay app start up time by 30 seconds in most cases
-		// (if you are running 3 servers, then the probability of ending up on a follower is close to 2/3).
-		//
-		// To help with that, we try to first read the token in the stale consistency mode until we
-		// get a successful response. This should not take more than 100ms because raft replication
-		// should in most cases take less than that (see https://www.consul.io/docs/install/performance#read-write-tuning)
-		// but we set the timeout to 2s to be sure.
-		//
-		// Note though that this workaround does not eliminate this problem completely. It's still possible
-		// for this call and the next call to reach different servers and those servers to have different
-		// states from each other.
-		// For example, this call can reach a leader and succeed, while the call below can go to a follower
-		// that is still behind the leader and get an "ACL not found" error.
-		// However, this is a pretty unlikely case because
-		// clients have sticky connections to a server, and those connections get rebalanced only every 2-3min.
-		// And so, this workaround should work in a vast majority of cases.
-		c.logger.Info("Checking that the ACL token exists when reading it in the stale consistency mode")
-		// Use raft timeout and polling interval to determine the number of retries.
-		numTokenReadRetries := uint64(raftReplicationTimeout.Milliseconds() / tokenReadPollingInterval.Milliseconds())
-		err = backoff.Retry(func() error {
-			_, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{AllowStale: true})
-			if err != nil {
-				c.logger.Error("Unable to read ACL token; retrying", "err", err)
-			}
-			return err
-		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(tokenReadPollingInterval), numTokenReadRetries))
-		if err != nil {
-			c.logger.Error("Unable to read ACL token from a Consul server; "+
-				"please check that your server cluster is healthy", "err", err)
-			return 1
-		}
-		c.logger.Info("Successfully read ACL token from the server")
+		cfg.Token = token
 	}
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
@@ -204,6 +143,13 @@ func (c *Command) Run(args []string) int {
 	var proxyID string
 	registrationRetryCount := 0
 	var errServiceNameMismatch error
+	// We need a new client so that we can use the ACL token that was fetched during login to do the next bit,
+	// otherwise `consulClient` will still be using the bearerToken that was passed in.
+	consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
+	if err != nil {
+		c.logger.Error("Unable to update client connection", "error", err)
+		return 1
+	}
 	err = backoff.Retry(func() error {
 		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
@@ -280,6 +226,23 @@ func (c *Command) Run(args []string) int {
 	}
 	c.logger.Info("Connect initialization completed")
 	return 0
+}
+
+func (c *Command) validateFlags() error {
+	if c.flagPodName == "" {
+		return errors.New("-pod-name must be set")
+	}
+	if c.flagPodNamespace == "" {
+		return errors.New("-pod-namespace must be set")
+	}
+	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
+		return errors.New("-service-account-name must be set when ACLs are enabled")
+	}
+
+	if c.http.ConsulAPITimeout() <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

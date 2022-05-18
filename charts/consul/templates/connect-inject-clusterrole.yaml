@@ -12,14 +12,14 @@ metadata:
     component: connect-injector
 rules:
 {{- if .Values.global.acls.manageSystemACLs }}
-- apiGroups: [""]
+- apiGroups: [ "" ]
   resources:
   - serviceaccounts
   verbs:
   - get
 {{- end }}
-- apiGroups: [""]
-  resources: ["pods", "endpoints", "services", "namespaces"]
+- apiGroups: [ "" ]
+  resources: [ "pods", "endpoints", "services", "namespaces" ]
   verbs:
   - "get"
   - "list"
@@ -34,25 +34,11 @@ rules:
   - list
   - update
 {{- if .Values.global.enablePodSecurityPolicies }}
-- apiGroups: ["policy"]
-  resources: ["podsecuritypolicies"]
+- apiGroups: [ "policy" ]
+  resources: [ "podsecuritypolicies" ]
   resourceNames:
   - {{ template "consul.fullname" . }}-connect-injector
   verbs:
   - use
-{{- end }}
-{{- if .Values.global.acls.manageSystemACLs }}
-- apiGroups: [""]
-  resources:
-  - secrets
-  resourceNames:
-  - {{ template "consul.fullname" . }}-connect-inject-acl-token
-  verbs:
-  - get
-- apiGroups: [""]
-  resources:
-    - serviceaccounts
-  verbs:
-    - get
 {{- end }}
 {{- end }}

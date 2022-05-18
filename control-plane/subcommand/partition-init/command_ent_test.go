@@ -30,7 +30,17 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-partition-name must be set",
 		},
 		{
-			flags:  []string{"-server-address", "foo", "-partition-name", "bar", "-log-level", "invalid"},
+			flags: []string{
+				"-server-address", "foo", "-partition-name", "bar"},
+			expErr: "-consul-api-timeout must be set to a value greater than 0",
+		},
+		{
+			flags: []string{
+				"-server-address", "foo",
+				"-partition-name", "bar",
+				"-consul-api-timeout", "5s",
+				"-log-level", "invalid",
+			},
 			expErr: "unknown log level: invalid",
 		},
 	}
@@ -68,6 +78,7 @@ func TestRun_PartitionCreate(t *testing.T) {
 		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
 		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
 		"-partition-name", partitionName,
+		"-consul-api-timeout", "5s",
 	}
 
 	responseCode := cmd.Run(args)
@@ -106,6 +117,7 @@ func TestRun_PartitionExists(t *testing.T) {
 		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
 		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
 		"-partition-name", partitionName,
+		"-consul-api-timeout", "5s",
 	}
 
 	responseCode := cmd.Run(args)
@@ -135,6 +147,7 @@ func TestRun_ExitsAfterTimeout(t *testing.T) {
 		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
 		"-partition-name", partitionName,
 		"-timeout", "500ms",
+		"-consul-api-timeout", "5s",
 	}
 	server.Stop()
 	startTime := time.Now()

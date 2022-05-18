@@ -201,6 +201,71 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	}
+
+	// Verify all Consul Pods are deleted.
+	pods, err = h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, h.releaseName) {
+			t.Logf("Found pod which should have been deleted: %s", pod.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul PVCs are deleted.
+	pvcs, err := h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	require.Len(t, pvcs.Items, 0)
+
+	// Verify all Consul Service Accounts are deleted.
+	sas, err = h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, sa := range sas.Items {
+		if strings.Contains(sa.Name, h.releaseName) {
+			t.Logf("Found service account which should have been deleted: %s", sa.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Roles are deleted.
+	roles, err = h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, role := range roles.Items {
+		if strings.Contains(role.Name, h.releaseName) {
+			t.Logf("Found role which should have been deleted: %s", role.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Role Bindings are deleted.
+	roleBindings, err = h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, roleBinding := range roleBindings.Items {
+		if strings.Contains(roleBinding.Name, h.releaseName) {
+			t.Logf("Found role binding which should have been deleted: %s", roleBinding.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Secrets are deleted.
+	secrets, err = h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	for _, secret := range secrets.Items {
+		if strings.Contains(secret.Name, h.releaseName) {
+			t.Logf("Found secret which should have been deleted: %s", secret.Name)
+			t.Fail()
+		}
+	}
+
+	// Verify all Consul Jobs are deleted.
+	jobs, err = h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, job := range jobs.Items {
+		if strings.Contains(job.Name, h.releaseName) {
+			t.Logf("Found job which should have been deleted: %s", job.Name)
+			t.Fail()
+		}
+	}
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
@@ -211,12 +276,38 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
-func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
+func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) string {
+	localPort := terratestk8s.GetAvailablePort(t)
+	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
+	tunnel := terratestk8s.NewTunnelWithLogger(
+		h.helmOptions.KubectlOptions,
+		terratestk8s.ResourceTypePod,
+		serverPod,
+		localPort,
+		remotePort,
+		h.logger)
+
+	// Retry creating the port forward since it can fail occasionally.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
+		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
+		// get used to fail the test, just for logging.
+		require.NoError(r, tunnel.ForwardPortE(t))
+	})
+
+	t.Cleanup(func() {
+		tunnel.Close()
+	})
+
+	return fmt.Sprintf("127.0.0.1:%d", localPort)
+
+}
+
+func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {
 	t.Helper()
 
 	namespace := h.helmOptions.KubectlOptions.Namespace
 	config := api.DefaultConfig()
-	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
 
 	if secure {
@@ -250,32 +341,11 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		}
 	}
 
-	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		h.helmOptions.KubectlOptions,
-		terratestk8s.ResourceTypePod,
-		serverPod,
-		localPort,
-		remotePort,
-		h.logger)
-
-	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
-		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
-		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
-		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
-	})
-
-	t.Cleanup(func() {
-		tunnel.Close()
-	})
-
-	config.Address = fmt.Sprintf("127.0.0.1:%d", localPort)
+	config.Address = h.CreatePortForwardTunnel(t, remotePort)
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 
-	return consulClient
+	return consulClient, config.Address
 }
 
 // configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
@@ -386,25 +456,7 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 }
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), config.LicenseSecretName, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: config.LicenseSecretName,
-			},
-			StringData: map[string]string{
-				config.LicenseSecretKey: cfg.EnterpriseLicense,
-			},
-			Type: corev1.SecretTypeOpaque,
-		}, metav1.CreateOptions{})
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
-	}
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), config.LicenseSecretName, metav1.DeleteOptions{})
-	})
+	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
@@ -469,4 +521,26 @@ func defaultValues() map[string]string {
 		"client.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
 	}
 	return values
+}
+
+func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
+	_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: secretName,
+			},
+			StringData: map[string]string{
+				secretKey: secret,
+			},
+			Type: corev1.SecretTypeOpaque,
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+	})
 }

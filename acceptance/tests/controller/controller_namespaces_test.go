@@ -114,7 +114,7 @@ func TestControllerNamespaces(t *testing.T) {
 			defaultOpts := &api.QueryOptions{
 				Namespace: DefaultConsulNamespace,
 			}
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Test creation.
 			{

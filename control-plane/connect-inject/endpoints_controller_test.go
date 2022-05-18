@@ -3,9 +3,6 @@ package connectinject
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -13,6 +10,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	cpconsul "github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -1368,6 +1366,89 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				},
 			},
 		},
+		// Test that if a user is updating their deployment from non-mesh to mesh that we
+		// register the mesh pods.
+		{
+			name:          "Some endpoints injected, some not.",
+			consulSvcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod2 := createPod("pod2", "2.3.4.5", false, false)
+
+				// NOTE: the order of the addresses is important. The non-mesh pod must be first to correctly
+				// reproduce the bug where we were exiting the loop early if any pod was non-mesh.
+				endpointWithTwoAddresses := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod2",
+										Namespace: "default",
+									},
+								},
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+			},
+			initialConsulSvcs:       []*api.AgentServiceRegistration{},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created",
+					ServiceName:    "service-created",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    0,
+					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created-sidecar-proxy",
+					ServiceName:    "service-created-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    20000,
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-created",
+						DestinationServiceID:   "pod1-service-created",
+						LocalServiceAddress:    "",
+						LocalServicePort:       0,
+					},
+					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags: []string{},
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
+			},
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2709,6 +2790,70 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			enableACLs: true,
 		},
+		// When a Deployment has the mesh annotation removed, Kube will delete the old pods. When it deletes the last Pod,
+		// the endpoints object will contain only non-mesh pods, but you'll still have one consul service instance to clean up.
+		{
+			name:          "When a Deployment moves from mesh to non mesh its service instances should be deleted",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod2 := createPod("pod2", "2.3.4.5", false, false)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod2",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod2, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+			},
+			expectedConsulSvcInstances: nil,
+			expectedProxySvcInstances:  nil,
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3298,17 +3443,14 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	}
 }
 
-// Test that when endpoints pods have not been connect-injected (i.e. not in the service mesh)
-// we don't make any API calls to Consul.
-// This is because we want to avoid any unnecessary calls. Especially if the client agent is unreachable
-// and any calls to it will result in an i/o timeout errors, it will
-// slow down processing of the events by the endpoints controller making unnecessary calls and waiting for ~30sec.
-func TestReconcile_endpointsIgnoredWhenNotInjected(t *testing.T) {
+// Test that when an endpoints pod specifies the name for the Kubernetes service it wants to use
+// for registration, all other endpoints for that pod are skipped.
+func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	nodeName := "test-node"
 	namespace := "default"
 
-	// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
-	endpoint := &corev1.Endpoints{
+	// Set up the fake Kubernetes client with a few endpoints, pod, consul client, and the default namespace.
+	badEndpoint := &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-in-mesh",
 			Namespace: namespace,
@@ -3329,28 +3471,45 @@ func TestReconcile_endpointsIgnoredWhenNotInjected(t *testing.T) {
 			},
 		},
 	}
-	pod1 := createPod("pod1", "1.2.3.4", false, true)
+	endpoint := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "in-mesh",
+			Namespace: namespace,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "1.2.3.4",
+						NodeName: &nodeName,
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      "pod1",
+							Namespace: namespace,
+						},
+					},
+				},
+			},
+		},
+	}
+	pod1 := createPod("pod1", "1.2.3.4", true, true)
+	pod1.Annotations[annotationKubernetesService] = endpoint.Name
 	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-	k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
+	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, fakeClientPod, &ns}
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 	// Create test Consul server.
-	consul := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("content-type", "application/json")
-		if r != nil {
-			t.Fatalf("should not receive any calls to Consul client")
-		}
-	}))
-	t.Cleanup(consul.Close)
-
-	cfg := &api.Config{Address: consul.URL}
+	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
+	require.NoError(t, err)
+	defer consul.Stop()
+	consul.WaitForServiceIntentions(t)
+	cfg := &api.Config{Address: consul.HTTPAddr}
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
-	parsedURL, err := url.Parse(consul.URL)
-	require.NoError(t, err)
-	consulPort := parsedURL.Port()
+	addr := strings.Split(consul.HTTPAddr, ":")
+	consulPort := addr[1]
 
 	// Create the endpoints controller.
 	ep := &EndpointsController{
@@ -3366,13 +3525,165 @@ func TestReconcile_endpointsIgnoredWhenNotInjected(t *testing.T) {
 		ConsulClientCfg:       cfg,
 	}
 
-	// Run the reconcile process to deregister the service if it was registered before.
-	namespacedName := types.NamespacedName{Namespace: namespace, Name: "not-in-mesh"}
+	serviceName := badEndpoint.Name
+
+	// Initially register the pod with the bad endpoint
+	err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+		ID:      "pod1-" + serviceName,
+		Name:    serviceName,
+		Port:    0,
+		Address: "1.2.3.4",
+		Meta: map[string]string{
+			"k8s-namespace":    namespace,
+			"k8s-service-name": serviceName,
+			"managed-by":       "consul-k8s-endpoints-controller",
+			"pod-name":         "pod1",
+		},
+	})
+	require.NoError(t, err)
+	serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+	require.NoError(t, err)
+	require.Len(t, serviceInstances, 1)
+
+	// Run the reconcile process to check service deregistration.
+	namespacedName := types.NamespacedName{Namespace: badEndpoint.Namespace, Name: serviceName}
 	resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
+
+	// Check that the service has been deregistered with Consul.
+	serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
+	require.NoError(t, err)
+	require.Len(t, serviceInstances, 0)
+	proxyServiceInstances, _, err := consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+	require.NoError(t, err)
+	require.Len(t, proxyServiceInstances, 0)
+
+	// Run the reconcile again with the service we want to register.
+	serviceName = endpoint.Name
+	namespacedName = types.NamespacedName{Namespace: endpoint.Namespace, Name: serviceName}
+	resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// Check that the correct services are registered with Consul.
+	serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
+	require.NoError(t, err)
+	require.Len(t, serviceInstances, 1)
+	proxyServiceInstances, _, err = consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+	require.NoError(t, err)
+	require.Len(t, proxyServiceInstances, 1)
 }
 
+// TestReconcileUnreachableClient tests the scenario where a consul client is unreachable.  We want to verify that
+// the Timeout on the HttpClient has timed out quickly so as not to infinitely wait and cause queuing of subsequent
+// endpoint objects.
+func TestReconcileUnreachableClient(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	cases := []struct {
+		name          string
+		consulSvcName string
+		k8sObjects    func() []runtime.Object
+	}{
+		{
+			name:          "Basic endpoints",
+			consulSvcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// The agent ip address will be set to 126.0.0.1 which is an unreachable address.
+			// The test will assert that a Client Timeout kicked in rather than just an infinite
+			// wait- in which case the test time of 30s out would expire first.
+			fakeClientPod := createPod("fake-consul-client", "126.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consul server
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: consul.HTTPAddr,
+			}
+			consulClient, err := cpconsul.NewClient(cfg, 0)
+			require.NoError(t, err)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			// Create the endpoints controller
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "default",
+				ConsulClientCfg:       cfg,
+			}
+			namespacedName := types.NamespacedName{
+				Namespace: "default",
+				Name:      "service-created",
+			}
+
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+
+			// using concat (+) instead of fmt.Sprintf because string has lots of %s in it that cause issues
+			expectedErrorFragment := "Get \"http://126.0.0.1:" + consulPort + "/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\""
+			expectedErrorFragmentTwo := "(Client.Timeout exceeded while awaiting headers)"
+
+			// Splitting this into two asserts on fragments of the error because the error thrown
+			// can be either of the two below and matching on the whole string causes the test tobe flakey
+			// "1 error occurred:\n\t* Get \"http://126.0.0.1:31200/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n\n"
+			// "1 error occurred:\n\t* Get \"http://126.0.0.1:31200/v1/agent/services?filter=Meta%5B%22k8s-service-name%22%5D+%3D%3D+%22service-created%22+and+Meta%5B%22k8s-namespace%22%5D+%3D%3D+%22default%22+and+Meta%5B%22managed-by%22%5D+%3D%3D+%22consul-k8s-endpoints-controller%22\": dial tcp 126.0.0.1:31200: i/o timeout (Client.Timeout exceeded while awaiting headers)\n\n"
+			require.Contains(t, err.Error(), expectedErrorFragment)
+			require.Contains(t, err.Error(), expectedErrorFragmentTwo)
+			require.False(t, resp.Requeue)
+
+		})
+	}
+}
 func TestFilterAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {

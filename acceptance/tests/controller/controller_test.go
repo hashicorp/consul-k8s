@@ -49,7 +49,7 @@ func TestController(t *testing.T) {
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Test creation.
 			{

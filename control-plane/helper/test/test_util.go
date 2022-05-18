@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	componentAuthMethod = "consul-k8s-component-auth-method"
+)
+
 // GenerateServerCerts generates Consul CA
 // and a server certificate and saves them to temp files.
 // It returns file names in this order:
@@ -57,6 +61,79 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 	return caFile.Name(), certFile.Name(), certKeyFile.Name()
 }
 
+// SetupK8sComponentAuthMethod creates a k8s auth method, sample "acl:write" ACL policy, Role and BindingRule
+// that allows a client using serviceAccount's JWT token to call "consul login".
+func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, serviceAccountName, k8sComponentNS string) {
+	t.Helper()
+	// Start the mock k8s server.
+	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
+			w.Write([]byte(TokenReviewsResponse(serviceAccountName, k8sComponentNS)))
+		}
+		if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", k8sComponentNS, serviceAccountName) &&
+			r.Method == "GET" {
+			w.Write([]byte(ServiceAccountGetResponse(serviceAccountName, k8sComponentNS)))
+		}
+	}))
+	t.Cleanup(k8sMockServer.Close)
+
+	// Set up Component's auth method.
+	authMethodTmpl := api.ACLAuthMethod{
+		Name:        componentAuthMethod,
+		Type:        "kubernetes",
+		Description: "Kubernetes Auth Method",
+		Config: map[string]interface{}{
+			"Host":              k8sMockServer.URL,
+			"CACert":            serviceAccountCACert,
+			"ServiceAccountJWT": ServiceAccountJWTToken,
+		},
+	}
+	// This API call will idempotently create the auth method (it won't fail if it already exists).
+	_, _, err := consulClient.ACL().AuthMethodCreate(&authMethodTmpl, nil)
+	require.NoError(t, err)
+
+	rules := `acl = "write"`
+	policyName := fmt.Sprintf("%s-token", serviceAccountName)
+	policy := api.ACLPolicy{
+		Name:        policyName,
+		Description: fmt.Sprintf("%s Token Policy", policyName),
+		Rules:       rules,
+		Datacenters: []string{"dc1"},
+	}
+	_, _, err = consulClient.ACL().PolicyCreate(&policy, &api.WriteOptions{})
+	require.NoError(t, err)
+
+	// Create the ACL Role, it requires an ACLRolePolicyLink which contains a list
+	// of ACL policies that are allowed to be fetched by an associated ACLBindingRule.
+	ap := &api.ACLRolePolicyLink{
+		Name: policyName,
+	}
+	apl := []*api.ACLRolePolicyLink{}
+	apl = append(apl, ap)
+	aclRoleName := fmt.Sprintf("%s-acl-role", serviceAccountName)
+	role := &api.ACLRole{
+		Name:        aclRoleName,
+		Description: fmt.Sprintf("ACL Role for %s", serviceAccountName),
+		Policies:    apl,
+	}
+	_, _, err = consulClient.ACL().RoleCreate(role, &api.WriteOptions{})
+	require.NoError(t, err)
+
+	// Create the ACLBindingRule, this specifies that a user using the AuthMethod
+	// is able to request an ACL Token with associated ACLRole from above via BindName
+	// as long as its serviceaccount matches the Selector.
+	abr := api.ACLBindingRule{
+		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
+		AuthMethod:  componentAuthMethod,
+		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
+		BindType:    api.BindingRuleBindTypeRole,
+		BindName:    aclRoleName,
+	}
+	_, _, err = consulClient.ACL().BindingRuleCreate(&abr, nil)
+	require.NoError(t, err)
+}
+
 // SetupK8sAuthMethod create a k8s auth method and a binding rule in Consul for the
 // given k8s service and namespace.
 func SetupK8sAuthMethod(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
@@ -72,11 +149,11 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
-			w.Write([]byte(tokenReviewsResponse(serviceName, k8sServiceNS)))
+			w.Write([]byte(TokenReviewsResponse(serviceName, k8sServiceNS)))
 		}
 		if r != nil && r.URL.Path == fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s", k8sServiceNS, serviceName) &&
 			r.Method == "GET" {
-			w.Write([]byte(serviceAccountGetResponse(serviceName, k8sServiceNS)))
+			w.Write([]byte(ServiceAccountGetResponse(serviceName, k8sServiceNS)))
 		}
 	}))
 	t.Cleanup(k8sMockServer.Close)
@@ -119,7 +196,7 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	require.NoError(t, err)
 }
 
-func tokenReviewsResponse(name, ns string) string {
+func TokenReviewsResponse(name, ns string) string {
 	return fmt.Sprintf(`{
  "kind": "TokenReview",
  "apiVersion": "authentication.k8s.io/v1",
@@ -144,7 +221,7 @@ func tokenReviewsResponse(name, ns string) string {
 }`, ns, name, ns)
 }
 
-func serviceAccountGetResponse(name, ns string) string {
+func ServiceAccountGetResponse(name, ns string) string {
 	return fmt.Sprintf(`{
  "kind": "ServiceAccount",
  "apiVersion": "v1",

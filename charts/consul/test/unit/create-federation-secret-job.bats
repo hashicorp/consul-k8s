@@ -2,14 +2,14 @@
 
 load _helpers
 
-@test "createFederationSecet/Job: disabled by default" {
+@test "createFederationSecret/Job: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/create-federation-secret-job.yaml  \
       .
 }
 
-@test "createFederationSecet/Job: fails when global.federation.enabled=false" {
+@test "createFederationSecret/Job: fails when global.federation.enabled=false" {
   cd `chart_dir`
   run helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -20,7 +20,7 @@ load _helpers
 
 # NOTE: This error actually comes from server-statefulset but we test it here
 # too because this job requires TLS to be enabled.
-@test "createFederationSecet/Job: fails when global.tls.enabled=false" {
+@test "createFederationSecret/Job: fails when global.tls.enabled=false" {
   cd `chart_dir`
   run helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -32,7 +32,7 @@ load _helpers
 
 # NOTE: This error actually comes from server-acl-init but we test it here
 # too because this job requires that ACLs are enabled when createReplicationToken is true.
-@test "createFederationSecet/Job: fails when global.acls.createReplicationToken is true but global.acls.manageSystemACLs is false" {
+@test "createFederationSecret/Job: fails when global.acls.createReplicationToken is true but global.acls.manageSystemACLs is false" {
   cd `chart_dir`
   run helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -46,7 +46,7 @@ load _helpers
   [[ "$output" =~ "if global.acls.createReplicationToken is true, global.acls.manageSystemACLs must be true" ]]
 }
 
-@test "createFederationSecet/Job: fails when global.acls.createReplicationToken is false but global.acls.manageSystemACLs is true" {
+@test "createFederationSecret/Job: fails when global.acls.createReplicationToken is false but global.acls.manageSystemACLs is true" {
   cd `chart_dir`
   run helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -61,7 +61,7 @@ load _helpers
   [[ "$output" =~ "global.acls.createReplicationToken must be true when global.acls.manageSystemACLs is true because the federation secret must include the replication token" ]]
 }
 
-@test "createFederationSecet/Job: mounts auto-created ca secrets by default" {
+@test "createFederationSecret/Job: mounts auto-created ca secrets by default" {
   cd `chart_dir`
   local volumes=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -76,7 +76,7 @@ load _helpers
   local actual
 
   # test it uses the auto-generated ca secret
-  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-cert" and .secret.secretName=="RELEASE-NAME-consul-ca-cert")) | length > 0' | tee /dev/stderr)
+  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-cert" and .secret.secretName=="release-name-consul-ca-cert")) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # test it uses the correct secret key for the auto-generated ca secret
@@ -84,7 +84,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   # test it uses the auto-generated ca key secret
-  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-key" and .secret.secretName=="RELEASE-NAME-consul-ca-key")) | length > 0' | tee /dev/stderr)
+  actual=$(echo $volumes | yq 'map(select(.name=="consul-ca-key" and .secret.secretName=="release-name-consul-ca-key")) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # test it uses the correct secret key for the auto-generated ca key secret
@@ -92,10 +92,24 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "createFederationSecet/Job: sets -consul-api-timeout" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.consulServiceName=my-service-name' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr | yq '.spec.template.spec.containers[0].command | any(contains("-consul-api-timeout=5s"))')
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls
 
-@test "createFederationSecet/Job: mounts caCert secrets when set manually" {
+@test "createFederationSecret/Job: mounts caCert secrets when set manually" {
   cd `chart_dir`
   local volumes=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -130,7 +144,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "createFederationSecet/Job: auto-encrypt disabled" {
+@test "createFederationSecret/Job: auto-encrypt disabled" {
   cd `chart_dir`
   local obj=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -152,7 +166,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "createFederationSecet/Job: auto-encrypt enabled" {
+@test "createFederationSecret/Job: auto-encrypt enabled" {
   cd `chart_dir`
   local obj=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -182,7 +196,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.gossipEncryption
 
-@test "createFederationSecet/Job: gossip encryption key set" {
+@test "createFederationSecret/Job: gossip encryption key set" {
   cd `chart_dir`
   local obj=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -206,10 +220,34 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "createFederationSecret/Job: gossip encryption key autogenerated" {
+  cd `chart_dir`
+  local obj=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr)
+    
+  local actual
+
+
+  # test it mounts the secret
+  actual=$(echo "$obj" | yq '.spec.template.spec.volumes | map(select(.name == "gossip-encryption-key" and .secret.secretName == "release-name-consul-gossip-encryption-key" and .secret.items[0].key == "key")) | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # test it sets the -gossip-key-file flag
+  actual=$(echo "$obj" | yq '.spec.template.spec.containers[0].command | any(contains("-gossip-key-file"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.acls.createReplicationToken
 
-@test "createFederationSecet/Job: global.acls.createReplicationToken=true" {
+@test "createFederationSecret/Job: global.acls.createReplicationToken=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -227,7 +265,7 @@ load _helpers
 #--------------------------------------------------------------------
 # meshGateway.consulServiceName
 
-@test "createFederationSecet/Job: sets -mesh-gateway-service-name to meshGateway.consulServiceName" {
+@test "createFederationSecret/Job: sets -mesh-gateway-service-name to meshGateway.consulServiceName" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -238,5 +276,134 @@ load _helpers
       --set 'meshGateway.consulServiceName=my-service-name' \
       --set 'global.federation.createFederationSecret=true' \
       . | tee /dev/stderr | yq '.spec.template.spec.containers[0].command | any(contains("-mesh-gateway-service-name=my-service-name"))')
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# tolerations
+
+@test "createFederationSecret/Job: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .tolerations? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "createFederationSecret/Job: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      --set 'client.tolerations=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# priorityClassName
+
+@test "createFederationSecret/Job: priorityClassName is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "createFederationSecret/Job: specified priorityClassName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      --set 'client.priorityClassName=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+#--------------------------------------------------------------------
+# nodeSelector
+
+@test "createFederationSecret/Job: nodeSelector is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "createFederationSecret/Job: specified nodeSelector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      --set 'client.nodeSelector=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+#--------------------------------------------------------------------
+# get-auto-encrypt-client-ca
+
+@test "createFederationSecret/Job: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
+  [ "${actual}" = "true" ]
+
+  # check server port
+  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+
+  # check consul-api-timeout
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
   [ "${actual}" = "true" ]
 }

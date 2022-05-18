@@ -108,6 +108,17 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				writeResourceInfoToFile(t, deployment.Name, "deployment", testDebugDirectory, kubectlOptions)
 			}
 		}
+
+		// Describe any replicasets.
+		replicasets, err := client.AppsV1().ReplicaSets(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			logger.Log(t, "unable to get replicasets", "err", err)
+		} else {
+			for _, replicaset := range replicasets.Items {
+				// Describe replicaset and write it to a file.
+				writeResourceInfoToFile(t, replicaset.Name, "replicaset", testDebugDirectory, kubectlOptions)
+			}
+		}
 	}
 }
 

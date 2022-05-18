@@ -58,7 +58,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create the destination namespace in the non-secure case.
 			// In the secure installation, this namespace is created by the server-acl-init job.
@@ -97,11 +97,11 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			// Register the external service.
 			registerExternalService(t, consulClient, testNamespace)
 
-			// If ACLs are enabled we need to update the token of the terminating gateway
+			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can can request Connect certificates for it.
 			if c.secure {
-				updateTerminatingGatewayToken(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
+				updateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
 			// Create the config entry for the terminating gateway.
@@ -172,7 +172,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
@@ -205,11 +205,11 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			// Register the external service
 			registerExternalService(t, consulClient, testNamespace)
 
-			// If ACLs are enabled we need to update the token of the terminating gateway
+			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can can request Connect certificates for it.
 			if c.secure {
-				updateTerminatingGatewayToken(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
+				updateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
 			// Create the config entry for the terminating gateway

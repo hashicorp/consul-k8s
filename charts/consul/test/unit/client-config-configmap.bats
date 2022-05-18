@@ -70,3 +70,30 @@ load _helpers
       yq '.data["config.json"] | contains("check_update_interval")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# auto_reload_config
+
+@test "client/ConfigMap: auto reload config is set to true when Vault is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      . | tee /dev/stderr |
+      yq -r '.data["client.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "client/ConfigMap: auto reload config is config is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["client.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
+
+  [ "${actual}" = null ]
+}

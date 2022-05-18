@@ -23,18 +23,18 @@ func TestBasicInstallation(t *testing.T) {
 		secure      bool
 		autoEncrypt bool
 	}{
-		{
-			false,
-			false,
-		},
-		{
-			true,
-			false,
-		},
+		// {
+		// 	false,
+		// 	false,
+		// },
 		{
 			true,
-			true,
+			false,
 		},
+		// {
+		// 	true,
+		// 	true,
+		// },
 	}
 
 	for _, c := range cases {
@@ -51,7 +51,7 @@ func TestBasicInstallation(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			client := consulCluster.SetupConsulClient(t, c.secure)
+			client, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create a KV entry
 			randomKey := helpers.RandomName()

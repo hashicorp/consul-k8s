@@ -6,11 +6,9 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/cimg/go:1.17.5
+      - image: docker.mirror.hashicorp.services/cimg/go:1.17.9
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
-      CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
 
 control-plane-path: &control-plane-path control-plane
 cli-path: &cli-path cli
@@ -30,9 +28,9 @@ commands:
       - run:
           name: Install gotestsum, kind, kubectl, and helm
           command: |
-            wget https://golang.org/dl/go1.17.5.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.5.linux-amd64.tar.gz
-            rm go1.17.5.linux-amd64.tar.gz
+            wget https://golang.org/dl/go1.17.9.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.9.linux-amd64.tar.gz
+            rm go1.17.9.linux-amd64.tar.gz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
 
             wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
@@ -291,6 +289,20 @@ jobs:
           working_directory: *control-plane-path
           command: make ci.dev-docker
 
+  # upload nightly dev docker image
+  nightly-dev-upload-docker:
+    executor: go
+    steps:
+      - checkout
+      # get consul-k8s binary
+      - attach_workspace:
+          at: .
+      - setup_remote_docker
+      - run:
+          name: make ci.nightly-dev-docker
+          working_directory: *control-plane-path
+          command: make ci.nightly-dev-docker
+
   unit-cli:
     executor: go
     steps:
@@ -467,7 +479,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
     steps:
       - checkout
@@ -546,7 +558,7 @@ jobs:
   ##########################
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -563,7 +575,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -580,7 +592,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
     steps:
       - checkout
       - run:
@@ -605,7 +617,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
     steps:
       - run:
@@ -671,7 +683,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
     steps:
       - checkout
@@ -726,7 +738,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
     steps:
       - checkout
@@ -788,7 +800,7 @@ jobs:
     parallelism: 1
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
     steps:
       - checkout
@@ -886,9 +898,11 @@ workflows:
             - build-distros-amd64
       # Run acceptance tests using the docker image built for the control plane
       - acceptance:
+          context: consul-ci
           requires:
             - dev-upload-docker
       - acceptance-tproxy:
+          context: consul-ci
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
@@ -900,6 +914,13 @@ workflows:
               only:
                 - main
     jobs:
+      - build-distro:
+          OS: "linux"
+          ARCH: "amd64"
+          name: build-distros-amd64
+      - nightly-dev-upload-docker:
+          requires:
+            - build-distros-amd64
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources

@@ -9,8 +9,9 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-// InitActionConfig initializes a Helm Go SDK action configuration. This function currently uses a hack to override the
-// namespace field that gets set in the K8s client set up by the SDK.
+// InitActionConfig initializes a Helm Go SDK action configuration. This
+// function currently uses a hack to override the namespace field that gets set
+// in the K8s client set up by the SDK.
 func InitActionConfig(actionConfig *action.Configuration, namespace string, settings *helmCLI.EnvSettings, logger action.DebugLog) (*action.Configuration, error) {
 	getter := settings.RESTClientGetter()
 	configFlags := getter.(*genericclioptions.ConfigFlags)

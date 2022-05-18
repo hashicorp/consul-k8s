@@ -196,6 +196,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				"-acl-token-sink", tokenFile,
 				"-bearer-token-file", bearerFile,
 				"-proxy-id-file", proxyFile,
+				"-consul-api-timeout", "5s",
 			}
 			if c.acls {
 				flags = append(flags, "-acl-auth-method", test.AuthMethod, "-auth-method-namespace", c.authMethodNamespace)

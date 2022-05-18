@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: ingressgateways.consul.hashicorp.com
   labels:
@@ -55,7 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: IngressGatewaySpec defines the desired state of IngressGateway
+            description: IngressGatewaySpec defines the desired state of IngressGateway.
             properties:
               listeners:
                 description: Listeners declares what ports the ingress gateway should
@@ -64,25 +64,6 @@ spec:
                   description: IngressListener manages the configuration for a listener
                     on a specific port.
                   properties:
-                    tls:
-                      description: TLS config for this listener.
-                      properties:
-                        enabled:
-                          description: Indicates that TLS should be enabled for this
-                            gateway service.
-                          type: boolean
-                        sds:
-                          description: SDS allows configuring TLS certificate from
-                            an SDS service.
-                          properties:
-                            certResource:
-                              type: string
-                            clusterName:
-                              type: string
-                          type: object
-                      required:
-                      - enabled
-                      type: object
                     port:
                       description: Port declares the port on which the ingress gateway
                         should listen for traffic.
@@ -95,28 +76,14 @@ spec:
                         values are: (tcp | http | http2 | grpc).'
                       type: string
                     services:
-                      description: "Services declares the set of services to which
-                        the listener forwards traffic. \n For \"tcp\" protocol listeners,
-                        only a single service is allowed. For \"http\" listeners,
-                        multiple services can be declared."
+                      description: Services declares the set of services to which
+                        the listener forwards traffic. For "tcp" protocol listeners,
+                        only a single service is allowed. For "http" listeners, multiple
+                        services can be declared.
                       items:
                         description: IngressService manages configuration for services
                           that are exposed to ingress traffic.
                         properties:
-                          tls:
-                            description: TLS allows specifying some TLS configuration
-                              per listener.
-                            properties:
-                              sds:
-                                description: SDS allows configuring TLS certificate
-                                  from an SDS service.
-                                properties:
-                                  certResource:
-                                    type: string
-                                  clusterName:
-                                    type: string
-                                type: object
-                            type: object
                           hosts:
                             description: "Hosts is a list of hostnames which should
                               be associated to this service on the defined listener.
@@ -201,13 +168,86 @@ spec:
                                   any existing header values of the same name.
                                 type: object
                             type: object
+                          tls:
+                            description: TLS allows specifying some TLS configuration
+                              per listener.
+                            properties:
+                              sds:
+                                description: SDS allows configuring TLS certificate
+                                  from an SDS service.
+                                properties:
+                                  certResource:
+                                    description: CertResource is the SDS resource
+                                      name to request when fetching the certificate
+                                      from the SDS service.
+                                    type: string
+                                  clusterName:
+                                    description: ClusterName is the SDS cluster name
+                                      to connect to, to retrieve certificates. This
+                                      cluster must be specified in the Gateway's bootstrap
+                                      configuration.
+                                    type: string
+                                type: object
+                            type: object
                         type: object
                       type: array
+                    tls:
+                      description: TLS config for this listener.
+                      properties:
+                        cipherSuites:
+                          description: Define a subset of cipher suites to restrict
+                            Only applicable to connections negotiated via TLS 1.2
+                            or earlier.
+                          items:
+                            type: string
+                          type: array
+                        enabled:
+                          description: Indicates that TLS should be enabled for this
+                            gateway service.
+                          type: boolean
+                        sds:
+                          description: SDS allows configuring TLS certificate from
+                            an SDS service.
+                          properties:
+                            certResource:
+                              description: CertResource is the SDS resource name to
+                                request when fetching the certificate from the SDS
+                                service.
+                              type: string
+                            clusterName:
+                              description: ClusterName is the SDS cluster name to
+                                connect to, to retrieve certificates. This cluster
+                                must be specified in the Gateway's bootstrap configuration.
+                              type: string
+                          type: object
+                        tlsMaxVersion:
+                          description: TLSMaxVersion sets the default maximum TLS
+                            version supported. Must be greater than or equal to `TLSMinVersion`.
+                            One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or
+                            `TLSv1_3`. If unspecified, Envoy will default to TLS 1.3
+                            as a max version for incoming connections.
+                          type: string
+                        tlsMinVersion:
+                          description: TLSMinVersion sets the default minimum TLS
+                            version supported. One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`,
+                            `TLSv1_2`, or `TLSv1_3`. If unspecified, Envoy v1.22.0
+                            and newer will default to TLS 1.2 as a min version, while
+                            older releases of Envoy default to TLS 1.0.
+                          type: string
+                      required:
+                      - enabled
+                      type: object
                   type: object
                 type: array
               tls:
                 description: TLS holds the TLS configuration for this gateway.
                 properties:
+                  cipherSuites:
+                    description: Define a subset of cipher suites to restrict Only
+                      applicable to connections negotiated via TLS 1.2 or earlier.
+                    items:
+                      type: string
+                    type: array
                   enabled:
                     description: Indicates that TLS should be enabled for this gateway
                       service.
@@ -217,10 +257,29 @@ spec:
                       service.
                     properties:
                       certResource:
+                        description: CertResource is the SDS resource name to request
+                          when fetching the certificate from the SDS service.
                         type: string
                       clusterName:
+                        description: ClusterName is the SDS cluster name to connect
+                          to, to retrieve certificates. This cluster must be specified
+                          in the Gateway's bootstrap configuration.
                         type: string
                     type: object
+                  tlsMaxVersion:
+                    description: TLSMaxVersion sets the default maximum TLS version
+                      supported. Must be greater than or equal to `TLSMinVersion`.
+                      One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+                      If unspecified, Envoy will default to TLS 1.3 as a max version
+                      for incoming connections.
+                    type: string
+                  tlsMinVersion:
+                    description: TLSMinVersion sets the default minimum TLS version
+                      supported. One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`,
+                      or `TLSv1_3`. If unspecified, Envoy v1.22.0 and newer will default
+                      to TLS 1.2 as a min version, while older releases of Envoy default
+                      to TLS 1.0.
+                    type: string
                 required:
                 - enabled
                 type: object
