@@ -18,7 +18,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: PeeringAcceptor is the Schema for the peeringacceptors API
+        description: PeeringAcceptor is the Schema for the peeringacceptors API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: PeeringAcceptorSpec defines the desired state of PeeringAcceptor
+            description: PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
             properties:
               peer:
                 description: Peer describes the information needed to create a peering.
@@ -52,7 +52,7 @@ spec:
             - peer
             type: object
           status:
-            description: PeeringAcceptorStatus defines the observed state of PeeringAcceptor
+            description: PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
             properties:
               lastReconcileTime:
                 description: LastReconcileTime is the last time the resource was reconciled.
