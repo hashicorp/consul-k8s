@@ -115,11 +115,14 @@ func (pf *PortForward) allocateLocalPort() error {
 	if err != nil {
 		return err
 	}
-	defer listener.Close()
 
 	_, port, err := net.SplitHostPort(listener.Addr().String())
 	if err != nil {
 		return err
+	}
+
+	if err := listener.Close(); err != nil {
+		return fmt.Errorf("unable to close listener %v", err)
 	}
 
 	pf.localPort, err = strconv.Atoi(port)
