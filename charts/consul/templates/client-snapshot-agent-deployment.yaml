@@ -121,7 +121,7 @@ spec:
         env:
         {{- if .Values.client.snapshotAgent.caCert }}
         - name: SSL_CERT_DIR
-          value: "/etc/ssl/certs,/extra-ssl-certs"
+          value: "/etc/ssl/certs:/extra-ssl-certs"
         {{- end }}
         - name: HOST_IP
           valueFrom:

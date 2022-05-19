@@ -577,7 +577,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo $object | jq -r '.name' | tee /dev/stderr)
   [ "${actual}" = "SSL_CERT_DIR" ]
   local actual=$(echo $object | jq -r '.value' | tee /dev/stderr)
-  [ "${actual}" = "/etc/ssl/certs,/extra-ssl-certs" ]
+  [ "${actual}" = "/etc/ssl/certs:/extra-ssl-certs" ]
 }
 
 #--------------------------------------------------------------------
