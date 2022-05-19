@@ -3,6 +3,7 @@ package aclinit
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -113,8 +114,9 @@ func (c *Command) Run(args []string) int {
 	if err = c.flags.Parse(args); err != nil {
 		return 1
 	}
-	if len(c.flags.Args()) > 0 {
-		c.UI.Error("Should have no non-flag arguments.")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -181,7 +183,7 @@ func (c *Command) Run(args []string) int {
 			cfg.Scheme = scheme
 		}
 
-		c.consulClient, err = consul.NewClient(cfg)
+		c.consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
 		if err != nil {
 			c.logger.Error("Unable to get client connection", "error", err)
 			return 1
@@ -263,6 +265,17 @@ func (c *Command) getSecret(secretName string) (string, error) {
 
 	// Extract token
 	return string(secret.Data["token"]), nil
+}
+
+func (c *Command) validateFlags() error {
+	if len(c.flags.Args()) > 0 {
+		return errors.New("Should have no non-flag arguments.")
+	}
+	if c.http.ConsulAPITimeout() <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

@@ -71,6 +71,26 @@ load _helpers
   [[ "$output" =~ "externalServers.enabled needs to be true and configured to create a non-default partition." ]]
 }
 
+@test "partitionInit/Job: command defaults" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $command | jq -r '. | any(contains("consul-k8s-control-plane partition-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $command | jq -r '. | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enabled
 

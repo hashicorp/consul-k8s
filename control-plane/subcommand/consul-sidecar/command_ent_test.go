@@ -34,6 +34,7 @@ func TestRun_ServicesRegistration_Namespaces(t *testing.T) {
 		"-http-addr", a.HTTPAddr,
 		"-service-config", configFile,
 		"-sync-period", "100ms",
+		"-consul-api-timeout", "5s",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 

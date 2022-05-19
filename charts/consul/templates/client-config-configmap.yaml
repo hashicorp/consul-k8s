@@ -15,7 +15,9 @@ metadata:
 data:
   client.json: |-
     {
+      {{- if and .Values.global.secretsBackend.vault.enabled }}
       "auto_reload_config": true
+      {{- end }}
     }
   extra-from-values.json: |-
 {{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}

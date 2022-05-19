@@ -1,6 +1,7 @@
 package getconsulclientca
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -27,13 +28,14 @@ type Command struct {
 
 	flags *flag.FlagSet
 
-	flagOutputFile    string
-	flagServerAddr    string
-	flagServerPort    string
-	flagCAFile        string
-	flagTLSServerName string
-	flagLogLevel      string
-	flagLogJSON       bool
+	flagOutputFile       string
+	flagServerAddr       string
+	flagServerPort       string
+	flagCAFile           string
+	flagTLSServerName    string
+	flagConsulAPITimeout time.Duration
+	flagLogLevel         string
+	flagLogJSON          bool
 
 	once sync.Once
 	help string
@@ -60,7 +62,8 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-
+	c.flags.DurationVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
+		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
 	c.help = flags.Usage(help, c.flags)
 }
 
@@ -69,18 +72,10 @@ func (c *Command) Run(args []string) int {
 	if err := c.flags.Parse(args); err != nil {
 		return 1
 	}
-	if len(c.flags.Args()) > 0 {
-		c.UI.Error("Should have no non-flag arguments.")
-		return 1
-	}
 
-	if c.flagOutputFile == "" {
-		c.UI.Error("-output-file must be set")
-		return 1
-	}
-
-	if c.flagServerAddr == "" {
-		c.UI.Error("-server-addr must be set")
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -153,7 +148,7 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 		cfg.TLSConfig.Address = c.flagTLSServerName
 	}
 
-	return consul.NewClient(cfg)
+	return consul.NewClient(cfg, c.flagConsulAPITimeout)
 }
 
 // consulServerAddr returns the consul server address
@@ -203,6 +198,26 @@ func getActiveRoot(roots *api.CARootList) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("none of the roots were active")
+}
+
+func (c *Command) validateFlags() error {
+	if len(c.flags.Args()) > 0 {
+		return errors.New("Should have no non-flag arguments.")
+	}
+
+	if c.flagOutputFile == "" {
+		return errors.New("-output-file must be set")
+	}
+
+	if c.flagServerAddr == "" {
+		return errors.New("-server-addr must be set")
+	}
+
+	if c.flagConsulAPITimeout <= 0 {
+		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	}
+
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

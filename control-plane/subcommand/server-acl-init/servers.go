@@ -3,7 +3,9 @@ package serveraclinit
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
@@ -37,15 +39,17 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 
 		// Override our original client with a new one that has the bootstrap token
 		// set.
-		consulClient, err := consul.NewClient(&api.Config{
-			Address: firstServerAddr,
-			Scheme:  scheme,
-			Token:   bootstrapToken,
-			TLSConfig: api.TLSConfig{
-				Address: c.flagConsulTLSServerName,
-				CAFile:  c.flagConsulCACert,
-			},
-		})
+		clientConfig := api.DefaultConfig()
+		clientConfig.Address = firstServerAddr
+		clientConfig.Scheme = scheme
+		clientConfig.Token = bootstrapToken
+		clientConfig.TLSConfig = api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		}
+
+		consulClient, err := consul.NewClient(clientConfig,
+			c.flagConsulAPITimeout)
 		if err != nil {
 			return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 		}
@@ -61,14 +65,27 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 // bootstrapACLs makes the ACL bootstrap API call and writes the bootstrap token
 // to a kube secret.
 func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootTokenSecretName string) (string, error) {
-	consulClient, err := consul.NewClient(&api.Config{
-		Address: firstServerAddr,
-		Scheme:  scheme,
-		TLSConfig: api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		},
-	})
+	clientConfig := api.DefaultConfig()
+	clientConfig.Address = firstServerAddr
+	clientConfig.Scheme = scheme
+	clientConfig.TLSConfig = api.TLSConfig{
+		Address: c.flagConsulTLSServerName,
+		CAFile:  c.flagConsulCACert,
+	}
+	// Exempting this particular use of the http client from using global.consulAPITimeout
+	// which defaults to 5 seconds.  In acceptance tests, we saw that the call
+	// to /v1/acl/bootstrap taking 5-7 seconds and when it does, the request times
+	// out without returning the bootstrap token, but the bootstrapping does complete.
+	// This would leave cases where server-acl-init job would get a 403 that it had
+	// already bootstrapped and would not be able to complete.
+	// Since this is an area where we have to wait and can't retry, we are setting it
+	// to a large number like 5 minutes since previously this had no timeout.
+	clientConfig.HttpClient = &http.Client{
+		Timeout: 5 * time.Minute,
+	}
+	consulClient, err := consul.NewClient(clientConfig,
+		c.flagConsulAPITimeout)
+
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 	}
@@ -143,15 +160,17 @@ func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []st
 
 		// We create a new client for each server because we need to call each
 		// server specifically.
-		serverClient, err := consul.NewClient(&api.Config{
-			Address: fmt.Sprintf("%s:%d", host, c.flagServerPort),
-			Scheme:  scheme,
-			Token:   bootstrapToken,
-			TLSConfig: api.TLSConfig{
-				Address: c.flagConsulTLSServerName,
-				CAFile:  c.flagConsulCACert,
-			},
-		})
+		clientConfig := api.DefaultConfig()
+		clientConfig.Address = fmt.Sprintf("%s:%d", host, c.flagServerPort)
+		clientConfig.Scheme = scheme
+		clientConfig.Token = bootstrapToken
+		clientConfig.TLSConfig = api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		}
+
+		serverClient, err := consul.NewClient(clientConfig,
+			c.flagConsulAPITimeout)
 		if err != nil {
 			return err
 		}

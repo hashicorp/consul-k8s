@@ -166,6 +166,7 @@ This template is for an init container.
     - |
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
+        -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
