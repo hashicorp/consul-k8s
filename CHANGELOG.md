@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Helm
+  * Update client-snapshot-agent so that setting `client.snapshotAgent.caCert` no longer requires root access to modify the trust store. [[GH-1190](https://github.com/hashicorp/consul-k8s/pull/1190/)]
+
 ## 0.44.0 (May 17, 2022)
 
 BREAKING CHANGES:

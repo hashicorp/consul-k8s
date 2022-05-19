@@ -72,8 +72,13 @@ spec:
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
-      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
       volumes:
+      {{- if .Values.client.snapshotAgent.caCert }}
+      - name: extra-ssl-certs
+        emptyDir:
+          medium: "Memory"
+      {{- end }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
       - name: consul-data
         emptyDir:
           medium: "Memory"
@@ -114,6 +119,10 @@ spec:
       - name: consul-snapshot-agent
         image: "{{ default .Values.global.image .Values.client.image }}"
         env:
+        {{- if .Values.client.snapshotAgent.caCert }}
+        - name: SSL_CERT_DIR
+          value: "/etc/ssl/certs:/extra-ssl-certs"
+        {{- end }}
         - name: HOST_IP
           valueFrom:
             fieldRef:
@@ -145,7 +154,7 @@ spec:
         - "-ec"
         - |
           {{- if .Values.client.snapshotAgent.caCert }}
-          cat <<EOF > /etc/ssl/certs/custom-ca.pem
+          cat <<EOF > /extra-ssl-certs/custom-ca.pem
           {{- .Values.client.snapshotAgent.caCert | nindent 14 }}
           EOF
           {{- end }}
@@ -160,22 +169,17 @@ spec:
             {{- if .Values.global.acls.manageSystemACLs }}
             -config-dir=/consul/login \
             {{- end }}
-        {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
-        {{- if .Values.global.acls.manageSystemACLs }}
-        lifecycle:
-          preStop:
-            exec:
-              command:
-              - "/bin/sh"
-              - "-ec"
-              - |
-                /bin/consul logout
-        {{- end }}
         volumeMounts:
+        {{- if .Values.client.snapshotAgent.caCert }}
+        - name: extra-ssl-certs
+          mountPath: /extra-ssl-certs
+          readOnly: false
+        {{- end }}
+        {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
         {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: snapshot-config
-          readOnly: true
           mountPath: /consul/config
+          readOnly: true
         {{- end }}
         - mountPath: /consul/login
           name: consul-data
@@ -194,6 +198,16 @@ spec:
           mountPath: /consul/tls/ca
           readOnly: true
         {{- end }}
+        {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-ec"
+                - |
+                  /bin/consul logout
         {{- end }}
         {{- with .Values.client.snapshotAgent.resources }}
         resources:
