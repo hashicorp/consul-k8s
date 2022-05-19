@@ -553,7 +553,7 @@ load _helpers
 #--------------------------------------------------------------------
 # client.snapshotAgent.caCert
 
-@test "client/SnapshotAgentDeployment: if caCert is set it is used in command" {
+@test "client/SnapshotAgentDeployment: if caCert is set command is modified correctly" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
@@ -561,9 +561,39 @@ load _helpers
       --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2] | contains("MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL")' | tee /dev/stderr)
-
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat <<EOF > /extra-ssl-certs/custom-ca.pem")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "client/SnapshotAgentDeployment: if caCert is set extra-ssl-certs volumeMount is added" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.volumes[0].name' | tee /dev/stderr)
+  [ "${actual}" = "extra-ssl-certs" ]
+
+  local actual=$(echo $object | jq -r '.containers[0].volumeMounts[0].name' | tee /dev/stderr)
+  [ "${actual}" = "extra-ssl-certs" ]
+}
+
+@test "client/SnapshotAgentDeployment: if caCert is set SSL_CERT_DIR env var is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec.containers[0].env[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "SSL_CERT_DIR" ]
+  local actual=$(echo $object | jq -r '.value' | tee /dev/stderr)
+  [ "${actual}" = "/etc/ssl/certs:/extra-ssl-certs" ]
 }
 
 #--------------------------------------------------------------------
