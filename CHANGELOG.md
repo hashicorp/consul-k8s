@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Helm
+  * Snapshot Agent: update the processing of `client.snapshotAgent.caCert` so 
+    it does not require root access any longer.
+
 ## 0.43.0 (April 21, 2022)
 
 BREAKING CHANGES:
