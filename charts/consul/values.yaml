@@ -269,7 +269,13 @@ global:
         # to send webhooks to the controller.
         tlsCert:
           # @type: string
-          secretName: nil
+          secretName: null
+        # The directory that Kubernetes will use on Kubernetes CRD creation, 
+        # deletion, and update, to get CA certificates used issued from vault
+        # to send webhooks to the controller.
+        caCert:
+          # @type: string
+          secretName: null
       
       # The Vault role for consul controller to read the Consul's controllers's CA Certificate (unauthenticated).
       # A Vault policy must be created which grants read capabilities to 
@@ -278,11 +284,18 @@ global:
       
       connectInject:
         # The directory that Kubernetes will use on Kubernetes CRD creation, 
+        # deletion, and update, to get CA certificates used issued from vault
+        # to send webhooks to ConnectInject
+        caCert: 
+          # @type: string
+          secretName: null
+        
+        # The directory that Kubernetes will use on Kubernetes CRD creation, 
         # deletion, and update, to get TLS certificates used issued from vault
         # to send webhooks to ConnectInject
         tlsCert: 
           # @type: string
-          secretName: nil
+          secretName: null
 
       # The Vault role for consul connect inject to read the Consul's controllers's CA Certificate (unauthenticated).
       # A Vault policy must be created which grants read capabilities to 
