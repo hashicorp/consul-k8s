@@ -270,6 +270,7 @@ global:
         tlsCert:
           # @type: string
           secretName: null
+          
         # The directory that Kubernetes will use on Kubernetes CRD creation, 
         # deletion, and update, to get CA certificates used issued from vault
         # to send webhooks to the controller.
