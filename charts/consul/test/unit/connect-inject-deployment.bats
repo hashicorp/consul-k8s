@@ -2169,7 +2169,7 @@ EOF
   [ "${actual}" == "" ]
 }
 
-@test "connectInject/Deployment: vault vault.hashicorp.com/role not set if global.secretsBackend.vault.consulControllerCARole is not set" {
+@test "connectInject/Deployment: vault vault.hashicorp.com/role not set if global.secretsBackend.vault.consulConnectInjectCARole is not set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -2177,9 +2177,10 @@ EOF
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
-      
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
