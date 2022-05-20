@@ -67,6 +67,21 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	statusSecretSet := false
+	if peeringAcceptor.Status.Secret != nil {
+		statusSecretSet = true
+	}
+
+	// Look up existing secret
+	var existingSecret *corev1.Secret
+	if statusSecretSet {
+		_, existingSecret, err = r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
+		if err != nil {
+			_ = r.updateStatusError(ctx, peeringAcceptor, err)
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Read the peering from Consul.
 	// Todo(peering) do we need to pass in partition?
 	readReq := api.PeeringReadRequest{Name: peeringAcceptor.Name}
@@ -78,12 +93,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound && peering == nil {
 		r.Log.Info("peering doesn't exist in Consul", "name", peeringAcceptor.Name)
 
-		if peeringAcceptor.Status.Secret != nil {
-			_, existingSecret, err := r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
-			if err != nil {
-				_ = r.updateStatusError(ctx, peeringAcceptor, err)
-				return ctrl.Result{}, err
-			}
+		if statusSecretSet {
 			if existingSecret != nil {
 				err := r.Client.Delete(ctx, existingSecret)
 				if err != nil {
@@ -119,21 +129,14 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// be set to true.
 	var shouldGenerate bool
 	var nameChanged bool
-	existingSecretName := peeringAcceptor.Status.Secret.Name
-	existingSecret := &corev1.Secret{}
-	if peeringAcceptor.Status.Secret == nil {
-		shouldGenerate = true
-	} else {
-		_, existingSecret, err = r.getExistingSecret(ctx, existingSecretName, peeringAcceptor.Namespace)
-		if err != nil {
-			_ = r.updateStatusError(ctx, peeringAcceptor, err)
-			return ctrl.Result{}, err
-		}
+	if statusSecretSet {
 		shouldGenerate, nameChanged, err = r.shouldGenerateToken(peeringAcceptor, existingSecret)
 		if err != nil {
 			_ = r.updateStatusError(ctx, peeringAcceptor, err)
 			return ctrl.Result{}, err
 		}
+	} else {
+		shouldGenerate = true
 	}
 
 	if shouldGenerate {
