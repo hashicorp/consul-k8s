@@ -1816,7 +1816,7 @@ EOF
 #--------------------------------------------------------------------
 # enable-webhook-ca-update
 
-@test "controller/Deployment: enable-webhook-ca-update flag is not set on command by default" {
+@test "connectInject/Deployment: enable-webhook-ca-update flag is not set on command by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -2167,6 +2167,25 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "certs")' | tee /dev/stderr)
   [ "${actual}" == "" ]
+}
+
+@test "connectInject/Deployment: vault vault.hashicorp.com/role not set if global.secretsBackend.vault.consulControllerCARole is not set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
+  [ "${actual}" = "" ]
 }
 
 #--------------------------------------------------------------------
