@@ -1959,7 +1959,7 @@ EOF
       --set 'global.secretsBackend.vault.consulConnectInjectCARole=connectinjectcarole' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "One of the following has been set, so all three must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
 @test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.connectInject.tlsCert.secretName is set but global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
@@ -1977,7 +1977,7 @@ EOF
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "One of the following has been set, so all three must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
 @test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.connectInject.caCert.secretName is set but global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.tlsCert.secretName are not" {
@@ -1995,7 +1995,7 @@ EOF
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "One of the following has been set, so all three must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
 @test "connectInject/Deployment: vault tls annotations are set when tls is enabled" {
