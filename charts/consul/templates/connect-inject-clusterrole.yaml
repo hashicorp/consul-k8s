@@ -31,6 +31,7 @@ rules:
     - "list"
     - "watch"
     - "create"
+    - "delete"
 - apiGroups:
   - coordination.k8s.io
   resources:
