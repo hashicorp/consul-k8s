@@ -2070,36 +2070,6 @@ EOF
 
 }
 
-@test "connectInject/Deployment: vault does not add tls-ca-cert volume when global.tls.enabled is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=foo' \
-      --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test2' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" == "" ]
-}
-
-@test "connectInject/Deployment: vault does not add tls-ca-cert volumeMounts when global.tls.enabled is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=foo' \
-      --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test2' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" == "" ]
-}
-
 @test "connectInject/Deployment: vault tls-cert-dir flag is set to /vault/secrets" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -2151,6 +2121,52 @@ EOF
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
   [ "${actual}" = "pki_int/cert/ca" ]
+}
+
+@test "connectInject/Deployment: vault does not add certs volume when global.secretsBackend.vault.connectInject.tlsCert.secretName is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name == "certs")' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}
+
+@test "connectInject/Deployment: vault does not add certs volumeMounts when global.secretsBackend.vault.connectInject.tlsCert.secretName is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test2' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "certs")' | tee /dev/stderr)
+  [ "${actual}" == "" ]
 }
 
 #--------------------------------------------------------------------

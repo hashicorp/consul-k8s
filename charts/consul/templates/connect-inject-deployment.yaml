@@ -278,7 +278,7 @@ spec:
             successThreshold: 1
             timeoutSeconds: 5
           volumeMounts:
-          {{- if not .Values.global.secretsBackend.vault.enabled }}
+          {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
           - name: certs
             mountPath: /etc/connect-injector/certs
             readOnly: true
@@ -300,7 +300,7 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-      {{- if not .Values.global.secretsBackend.vault.enabled }}
+      {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
       - name: certs
         secret:
           defaultMode: 420
