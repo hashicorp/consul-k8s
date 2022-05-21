@@ -18,6 +18,10 @@ import (
 // It then configures Consul to use vault as the backend and checks that it works
 // by turning off web cert manager and configuring controller and connect injector
 // to receive ca bundles and tls certs from Vault PKI engine.
+// This test is modeled after TestVault() with the addition of configuring it
+// to turn off web cert manager and have controller get tls and ca certs
+// from Vault PKI Engine.
+
 func TestVault_WebhookCerts(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
@@ -169,13 +173,6 @@ func TestVault_WebhookCerts(t *testing.T) {
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
 	})
-
-	// pathForConnectInjectWebookCerts :=
-	// 	vault.ConfigurePKICertificatesForConnectInjectWebhook(t, vaultClient,
-	// 		consulReleaseName, ns, "dc1", "1h")
-	// pathForControllerWebookCerts :=
-	// 	vault.ConfigurePKICertificatesForControllerWebhook(t, vaultClient,
-	// 		consulReleaseName, ns, "dc1", "1h")
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
