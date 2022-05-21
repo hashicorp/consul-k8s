@@ -147,13 +147,6 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 	})
 	require.NoError(t, err)
 
-	// Enable the PKI Secrets engine.
-	err = v.vaultClient.Sys().Mount("pki", &vapi.MountInput{
-		Type:   "pki",
-		Config: vapi.MountConfigInput{},
-	})
-	require.NoError(t, err)
-
 	namespace := v.helmOptions.KubectlOptions.Namespace
 	vaultServerServiceAccountName := fmt.Sprintf("%s-vault", v.releaseName)
 	v.ConfigureAuthMethod(t, v.vaultClient, "kubernetes", "https://kubernetes.default.svc", vaultServerServiceAccountName, namespace)

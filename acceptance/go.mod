@@ -7,7 +7,7 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20211207212234-aea9efea5638
 	github.com/hashicorp/consul/api v1.12.0
 	github.com/hashicorp/consul/sdk v0.9.0
-	github.com/hashicorp/go-uuid v1.0.2
+	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/vault/api v1.2.0
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/yaml.v2 v2.4.0
