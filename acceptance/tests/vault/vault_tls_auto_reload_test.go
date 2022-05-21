@@ -72,7 +72,7 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
-	gossipSecret := &vault.SaveVaultSecretConfiguration{
+	gossipSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/gossip",
 		Key:        "gossip",
 		Value:      gossipKey,
@@ -81,7 +81,7 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	gossipSecret.Save(t, vaultClient)
 
 	// License
-	licenseSecret := &vault.SaveVaultSecretConfiguration{
+	licenseSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
 		Value:      cfg.EnterpriseLicense,
@@ -94,7 +94,7 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
-	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+	bootstrapTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/bootstrap",
 		Key:        "token",
 		Value:      bootstrapToken,

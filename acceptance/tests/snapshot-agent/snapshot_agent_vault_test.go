@@ -71,7 +71,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
-	gossipSecret := &vault.SaveVaultSecretConfiguration{
+	gossipSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/gossip",
 		Key:        "gossip",
 		Value:      gossipKey,
@@ -80,7 +80,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	gossipSecret.Save(t, vaultClient)
 
 	// License
-	licenseSecret := &vault.SaveVaultSecretConfiguration{
+	licenseSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
 		Value:      cfg.EnterpriseLicense,
@@ -93,7 +93,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
-	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+	bootstrapTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/bootstrap",
 		Key:        "token",
 		Value:      bootstrapToken,
@@ -104,7 +104,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Snapshot Agent config
 	snapshotAgentConfig := generateSnapshotAgentConfig(t, bootstrapToken)
 	require.NoError(t, err)
-	snapshotAgentConfigSecret := &vault.SaveVaultSecretConfiguration{
+	snapshotAgentConfigSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/snapshot-agent-config",
 		Key:        "config",
 		Value:      snapshotAgentConfig,

@@ -161,7 +161,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
-	gossipSecret := &vault.SaveVaultSecretConfiguration{
+	gossipSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/gossip",
 		Key:        "gossip",
 		Value:      gossipKey,
@@ -170,7 +170,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	gossipSecret.Save(t, vaultClient)
 
 	// License
-	licenseSecret := &vault.SaveVaultSecretConfiguration{
+	licenseSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
 		Value:      cfg.EnterpriseLicense,
@@ -183,7 +183,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
-	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+	bootstrapTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/bootstrap",
 		Key:        "token",
 		Value:      bootstrapToken,
@@ -194,7 +194,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Replication Token
 	replicationToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
-	replicationTokenSecret := &vault.SaveVaultSecretConfiguration{
+	replicationTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/replication",
 		Key:        "token",
 		Value:      replicationToken,

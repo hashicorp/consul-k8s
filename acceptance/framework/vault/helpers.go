@@ -154,14 +154,14 @@ func (config *PKIAndAuthRoleConfiguration) ConfigurePKIAndAuthRole(t *testing.T,
 	authMethodRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 }
 
-type SaveVaultSecretConfiguration struct {
+type KV2Secret struct {
 	Path       string
 	Key        string
 	PolicyName string
 	Value      string
 }
 
-func (config *SaveVaultSecretConfiguration) Save(t *testing.T, vaultClient *vapi.Client) {
+func (config *KV2Secret) Save(t *testing.T, vaultClient *vapi.Client) {
 	policy := fmt.Sprintf(`
 	path "%s" {
 	  capabilities = ["read"]
