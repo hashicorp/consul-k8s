@@ -2169,7 +2169,7 @@ EOF
   [ "${actual}" == "" ]
 }
 
-@test "connectInject/Deployment: vault vault.hashicorp.com/role not set if global.secretsBackend.vault.consulConnectInjectCARole is not set" {
+@test "connectInject/Deployment: vault vault.hashicorp.com/role set to global.secretsBackend.vault.consulCARole if global.secretsBackend.vault.consulConnectInjectCARole is not set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -2186,7 +2186,7 @@ EOF
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
-  [ "${actual}" = "" ]
+  [ "${actual}" = "carole" ]
 }
 
 #--------------------------------------------------------------------

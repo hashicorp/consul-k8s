@@ -1145,7 +1145,7 @@ load _helpers
   [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
-@test "controller/Deployment: vault vault.hashicorp.com/role not set if global.secretsBackend.vault.consulControllerCARole is not set" {
+@test "controller/Deployment: vault vault.hashicorp.com/role set to global.secretsBackend.vault.consulControllerCARole if global.secretsBackend.vault.consulControllerCARole is not set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/controller-deployment.yaml  \
@@ -1154,7 +1154,6 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
@@ -1164,7 +1163,7 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
-  [ "${actual}" = "" ]
+  [ "${actual}" = "test2" ]
 }
 #--------------------------------------------------------------------
 # Vault agent annotations

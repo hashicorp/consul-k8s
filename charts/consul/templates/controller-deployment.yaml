@@ -36,6 +36,8 @@ spec:
         "vault.hashicorp.com/agent-inject": "true"
         {{- if .Values.global.secretsBackend.vault.consulControllerCARole }}
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulControllerCARole }}
+        {{ else }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
         {{ end }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
