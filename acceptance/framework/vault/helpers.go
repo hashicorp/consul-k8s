@@ -105,7 +105,7 @@ func (config *KubernetesAuthRoleConfiguration) ConfigureK8SAuthRole(t *testing.T
 	// with the Kubernetes auth method to obtain a Vault token.
 	// Please see https://www.vaultproject.io/docs/auth/kubernetes#configuration
 	// for more details.
-	logger.Logf(t, "Creating the %q", config.ServiceAccountName)
+	logger.Logf(t, "Creating the Vault Auth Role for %q", config.ServiceAccountName)
 	params := map[string]interface{}{
 		"bound_service_account_names":      config.ServiceAccountName,
 		"bound_service_account_namespaces": config.KubernetesNamespace,
@@ -161,17 +161,19 @@ type KV2Secret struct {
 	Value      string
 }
 
-func (config *KV2Secret) Save(t *testing.T, vaultClient *vapi.Client) {
+// SaveSecretAndAddReadPolicy will create a read policy for the PolicyName
+// on the KV2Secret and then will save the secret in the KV2 store.
+func (config *KV2Secret) SaveSecretAndAddReadPolicy(t *testing.T, vaultClient *vapi.Client) {
 	policy := fmt.Sprintf(`
 	path "%s" {
 	  capabilities = ["read"]
 	}`, config.Path)
-	// Create the Vault Policy for the gossip key.
+	// Create the Vault Policy for the secret.
 	logger.Log(t, "Creating policy")
 	err := vaultClient.Sys().PutPolicy(config.PolicyName, policy)
 	require.NoError(t, err)
 
-	// Create the gossip secret.
+	// Save secret.
 	logger.Logf(t, "Creating the %s secret", config.Path)
 	params := map[string]interface{}{
 		"data": map[string]interface{}{
@@ -182,11 +184,13 @@ func (config *KV2Secret) Save(t *testing.T, vaultClient *vapi.Client) {
 	require.NoError(t, err)
 }
 
-// CreateConnectCAPolicyForDatacenter creates the Vault Policy for the connect-ca in a given datacenter.
+// CreateConnectCARootAndIntermediatePKIPolicy creates the Vault Policy for the connect-ca in a given datacenter.
 func CreateConnectCARootAndIntermediatePKIPolicy(t *testing.T, vaultClient *vapi.Client, policyName, rootPath, intermediatePath string) {
 	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
 	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
-	connectCAPolicyTemplate := `
+	err := vaultClient.Sys().PutPolicy(
+		policyName,
+		fmt.Sprintf(`
 path "/sys/mounts" {
   capabilities = [ "read" ]
 }
@@ -202,9 +206,7 @@ path "/%s/*" {
 path "/%s/*" {
   capabilities = [ "create", "read", "update", "delete", "list" ]
 }
-`
-	err := vaultClient.Sys().PutPolicy(
-		policyName,
-		fmt.Sprintf(connectCAPolicyTemplate, rootPath, intermediatePath, rootPath, intermediatePath))
+`,
+			rootPath, intermediatePath, rootPath, intermediatePath))
 	require.NoError(t, err)
 }

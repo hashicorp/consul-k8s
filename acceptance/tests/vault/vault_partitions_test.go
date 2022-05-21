@@ -139,7 +139,7 @@ func TestVault_Partitions(t *testing.T) {
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
-	gossipSecret.Save(t, vaultClient)
+	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// License
 	licenseSecret := &vault.KV2Secret{
@@ -149,7 +149,7 @@ func TestVault_Partitions(t *testing.T) {
 		PolicyName: "license",
 	}
 	if cfg.EnableEnterprise {
-		licenseSecret.Save(t, vaultClient)
+		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 	}
 
 	// Bootstrap Token
@@ -161,7 +161,7 @@ func TestVault_Partitions(t *testing.T) {
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-	bootstrapTokenSecret.Save(t, vaultClient)
+	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// Partition Token
 	partitionToken, err := uuid.GenerateUUID()
@@ -172,7 +172,7 @@ func TestVault_Partitions(t *testing.T) {
 		Value:      partitionToken,
 		PolicyName: "partition",
 	}
-	partitionTokenSecret.Save(t, vaultClient)
+	partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// -------------------------------------------
 	// Additional Auth Roles in Primary Datacenter
