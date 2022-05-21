@@ -19,7 +19,7 @@ import (
 )
 
 const staticServerNamespace = "ns1"
-const staticClientNamespace = "ns2"
+const StaticClientNamespace = "ns2"
 
 // Test that Connect works with Consul Enterprise namespaces.
 // These tests currently only test non-secure and secure without auto-encrypt installations
@@ -92,26 +92,26 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			staticClientOpts := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
-				Namespace:   staticClientNamespace,
+				Namespace:   StaticClientNamespace,
 			}
 
-			logger.Logf(t, "creating namespaces %s and %s", staticServerNamespace, staticClientNamespace)
+			logger.Logf(t, "creating namespaces %s and %s", staticServerNamespace, StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				// Note: this deletion will take longer in cases when the static-client deployment
 				// hasn't yet fully terminated.
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
-			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
+			clientQueryOpts := &api.QueryOptions{Namespace: StaticClientNamespace}
 
 			if !c.mirrorK8S {
 				serverQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
@@ -135,7 +135,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 							tokens, _, err = consulClient.ACL().TokenList(clientQueryOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
-								require.NotContains(r, token.Description, staticClientName)
+								require.NotContains(r, token.Description, StaticClientName)
 							}
 						})
 					}
@@ -170,16 +170,16 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
-			services, _, err = consulClient.Catalog().Service(staticClientName, "", clientQueryOpts)
+			services, _, err = consulClient.Catalog().Service(StaticClientName, "", clientQueryOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 				} else {
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, StaticClientName, "http://localhost:1234")
 				}
 
 				intention := &api.ServiceIntentionsConfigEntry{
@@ -188,8 +188,8 @@ func TestConnectInjectNamespaces(t *testing.T) {
 					Namespace: staticServerNamespace,
 					Sources: []*api.SourceIntention{
 						{
-							Name:      staticClientName,
-							Namespace: staticClientNamespace,
+							Name:      StaticClientName,
+							Namespace: StaticClientNamespace,
 							Action:    api.IntentionActionAllow,
 						},
 					},
@@ -209,9 +209,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, StaticClientName, "http://localhost:1234")
 			}
 
 			// Test that kubernetes readiness status is synced to Consul.
@@ -226,9 +226,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}
 		})
 	}
@@ -298,23 +298,23 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			logger.Logf(t, "creating namespace %s", staticClientNamespace)
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			logger.Logf(t, "creating namespace %s", StaticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})
 
 			logger.Log(t, "creating static-client deployment")
 			staticClientOpts := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
-				Namespace:   staticClientNamespace,
+				Namespace:   StaticClientNamespace,
 			}
 			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-			expectedConsulNS := staticClientNamespace
+			expectedConsulNS := StaticClientNamespace
 			if !c.mirrorK8S {
 				expectedConsulNS = c.destinationNamespace
 			}
@@ -330,14 +330,14 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 				}
 			})
 
-			pods, err := ctx.KubernetesClient(t).CoreV1().Pods(staticClientNamespace).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
+			pods, err := ctx.KubernetesClient(t).CoreV1().Pods(StaticClientNamespace).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
 			require.NoError(t, err)
 			require.Len(t, pods.Items, 1)
 			podName := pods.Items[0].Name
 
 			logger.Logf(t, "force killing the static-client pod %q", podName)
 			var gracePeriod int64 = 0
-			err = ctx.KubernetesClient(t).CoreV1().Pods(staticClientNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+			err = ctx.KubernetesClient(t).CoreV1().Pods(StaticClientNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 			require.NoError(t, err)
 
 			logger.Log(t, "ensuring pod is deregistered")
