@@ -129,8 +129,8 @@ func TestVault_VaultNamespace(t *testing.T) {
 	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
-	consulClientRole := "client"
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
 	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
@@ -141,8 +141,8 @@ func TestVault_VaultNamespace(t *testing.T) {
 	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
-	manageSystemACLsRole := "server-acl-init"
-	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
 	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
@@ -268,8 +268,8 @@ func TestVault_VaultNamespace(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 }

@@ -123,7 +123,7 @@ func TestVault_Partitions(t *testing.T) {
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
 		MaxTTL:              "1h",
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
@@ -187,31 +187,31 @@ func TestVault_Partitions(t *testing.T) {
 	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
 	}
 	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
-	consulClientRole := "client"
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
 	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
 	}
 	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
-	manageSystemACLsRole := "server-acl-init"
-	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
 	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, partitionTokenSecret.PolicyName),
 	}
@@ -221,7 +221,7 @@ func TestVault_Partitions(t *testing.T) {
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
 	}

@@ -125,10 +125,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		RoleName:            "consul-ca-role",
 		KubernetesNamespace: ns,
 		DataCenter:          "dc1",
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
-		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
 		MaxTTL:              "1h",
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
@@ -147,8 +147,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		RoleName:            "consul-ca-role-dc2",
 		KubernetesNamespace: ns,
 		DataCenter:          "dc2",
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
-		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
 		MaxTTL:              "1h",
 		AuthMethodPath:      secondaryAuthMethodName,
 		SkipPKIMount:        true,
@@ -215,35 +215,35 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	if cfg.EnableEnterprise {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
-	consulServerRole := "server"
+	consulServerRole := ServerRole
 	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
 	}
 	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
-	consulClientRole := "client"
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
 	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
 	}
 	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
-	manageSystemACLsRole := "server-acl-init"
-	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
 	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, replicationTokenSecret.PolicyName),
 	}
@@ -253,7 +253,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
 	}
@@ -382,7 +382,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// which will point the node IP.
 	if cfg.UseKind {
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
-		kubernetesEndpoint, err := secondaryCtx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
+		kubernetesEndpoint, err := secondaryCtx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), KubernetesAuthMethodPath, metav1.GetOptions{})
 		require.NoError(t, err)
 		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
 	} else {
@@ -492,7 +492,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	require.NoError(t, err)
 
 	logger.Log(t, "checking that connection is successful")
-	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 }
 
 // vaultAddress returns Vault's server URL depending on test configuration.

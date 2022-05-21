@@ -14,7 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const staticClientName = "static-client"
+const (
+	StaticClientName         = "static-client"
+	KubernetesAuthMethodPath = "kubernetes"
+	ManageSystemACLsRole     = "server-acl-init"
+	ClientRole               = "client"
+	ServerRole               = "server"
+)
 
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
@@ -50,10 +56,10 @@ func TestVault(t *testing.T) {
 		RoleName:            "consul-ca-role",
 		KubernetesNamespace: ns,
 		DataCenter:          "dc1",
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
-		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
 		MaxTTL:              "1h",
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
@@ -102,35 +108,35 @@ func TestVault(t *testing.T) {
 	}
 
 	// server
-	consulServerRole := "server"
+	consulServerRole := ServerRole
 	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
 	}
 	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
-	consulClientRole := "client"
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
 	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
 	}
 	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
-	manageSystemACLsRole := "server-acl-init"
-	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
 	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         bootstrapTokenSecret.PolicyName,
 	}
@@ -140,7 +146,7 @@ func TestVault(t *testing.T) {
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
 	}
@@ -249,8 +255,8 @@ func TestVault(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 }
