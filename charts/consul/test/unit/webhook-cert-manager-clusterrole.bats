@@ -149,7 +149,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Vault
 
-@test "webhookCertManager/ClusterRole: disabled when global.secretsBackend.vault.enabled=true" {
+@test "webhookCertManager/ClusterRole: disabled when the following are configured - global.secretsBackend.vault.enabled, .global.secretsBackend.vault.enabled, .global.secretsBackend.vault.consulConnectInjectCARole, .global.secretsBackend.vault.connectInject.tlsCert.secretName, .global.secretsBackend.vault.connectInject.caCert.secretName, .global.secretsBackend.vault.consulControllerCARole, .global.secretsBackend.vault.controller.tlsCert.secretName, and .global.secretsBackend.vault.controller.caCert.secretName" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
