@@ -59,7 +59,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, serverPKIConfig)
+	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// Configure controller webhook PKI
 	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
@@ -73,7 +73,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, controllerWebhookPKIConfig)
+	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// Configure controller webhook PKI
 	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
@@ -87,7 +87,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
 	}
-	vault.ConfigurePKIAndAuthRole(t, vaultClient, connectInjectorWebhookPKIConfig)
+	connectInjectorWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// -------------------------
 	// KV2 secrets
@@ -95,35 +95,35 @@ func TestVault_WebhookCerts(t *testing.T) {
 	// Gossip key
 	gossipKey, err := vault.GenerateGossipSecret()
 	require.NoError(t, err)
-	gossipSecret := &vault.SaveVaultSecretConfiguration{
+	gossipSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/gossip",
 		Key:        "gossip",
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
-	vault.SaveSecret(t, vaultClient, gossipSecret)
+	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// License
-	licenseSecret := &vault.SaveVaultSecretConfiguration{
+	licenseSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/license",
 		Key:        "license",
 		Value:      cfg.EnterpriseLicense,
 		PolicyName: "license",
 	}
 	if cfg.EnableEnterprise {
-		vault.SaveSecret(t, vaultClient, licenseSecret)
+		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 	}
 
 	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
-	bootstrapTokenSecret := &vault.SaveVaultSecretConfiguration{
+	bootstrapTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/bootstrap",
 		Key:        "token",
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-	vault.SaveSecret(t, vaultClient, bootstrapTokenSecret)
+	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// -------------------------
 	// Additional Auth Roles
@@ -134,45 +134,49 @@ func TestVault_WebhookCerts(t *testing.T) {
 	}
 
 	// server
-	consulServerRole := "server"
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	consulServerRole := ServerRole
+	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulServerRole,
 		PolicyNames:         serverPolicies,
-	})
+	}
+	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// client
-	consulClientRole := "client"
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
+	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
-	})
+	}
+	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
-	manageSystemACLsRole := "server-acl-init"
-	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "server-acl-init")
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
+	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         bootstrapTokenSecret.PolicyName,
-	})
+	}
+	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// allow all components to access server ca
-	vault.ConfigureK8SAuthRole(t, vaultClient, &vault.KubernetesAuthRoleConfiguration{
+	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
 		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
+		AuthMethodPath:      KubernetesAuthMethodPath,
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
-	})
+	}
+	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
@@ -283,8 +287,8 @@ func TestVault_WebhookCerts(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 }
