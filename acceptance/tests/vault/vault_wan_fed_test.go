@@ -209,13 +209,14 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	replicationTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-	// --------------------------------------------
-	// Additional Auth Roles for Primary Datacenter
-	// --------------------------------------------
 	commonServerPolicies := "gossip"
 	if cfg.EnableEnterprise {
 		commonServerPolicies += ",license"
 	}
+
+	// --------------------------------------------
+	// Additional Auth Roles for Primary Datacenter
+	// --------------------------------------------
 	// server
 	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", commonServerPolicies, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
 	if cfg.EnableEnterprise {

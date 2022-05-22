@@ -93,7 +93,6 @@ func TestVault_VaultNamespace(t *testing.T) {
 		Value:      gossipKey,
 		PolicyName: "gossip",
 	}
-
 	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// License
@@ -116,7 +115,6 @@ func TestVault_VaultNamespace(t *testing.T) {
 		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-
 	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// -------------------------

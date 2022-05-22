@@ -30,10 +30,7 @@ as well as the global.name setting.
 {{- end -}}
 
 {{- define "consul.serverTLSCATemplate" -}}
- |
-            {{ "{{" }}- with secret "{{ .Values.global.tls.caCert.secretName }}" -{{ "}}" }}
-            {{ "{{" }}- .Data.certificate -{{ "}}" }}
-            {{ "{{" }}- end -{{ "}}" }}
+{{ include "consul.vaultCATemplate" .Values.global.tls.caCert }}
 {{- end -}}
 
 {{- define "consul.serverTLSCertTemplate" -}}
