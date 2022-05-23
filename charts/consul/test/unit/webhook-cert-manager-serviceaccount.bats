@@ -64,7 +64,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Vault
 
-@test "webhookCertManager/ServiceAccount: disabled when the following are configured - global.secretsBackend.vault.enabled, .global.secretsBackend.vault.enabled, .global.secretsBackend.vault.consulConnectInjectCARole, .global.secretsBackend.vault.connectInject.tlsCert.secretName, .global.secretsBackend.vault.connectInject.caCert.secretName, .global.secretsBackend.vault.consulControllerCARole, .global.secretsBackend.vault.controller.tlsCert.secretName, and .global.secretsBackend.vault.controller.caCert.secretName" {
+@test "webhookCertManager/ServiceAccount: disabled when the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and .global.secretsBackend.vault.controller.caCert.secretName" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/webhook-cert-manager-serviceaccount.yaml  \

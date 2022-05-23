@@ -33,6 +33,7 @@ rules:
   - get
   - list
   - update
+{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulConnectInjectCARole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName  .Values.global.secretsBackend.vault.connectInject.caCert.secretName)}}
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
@@ -42,6 +43,7 @@ rules:
   - list
   - watch
   - patch
+{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]
   resources: [ "podsecuritypolicies" ]
