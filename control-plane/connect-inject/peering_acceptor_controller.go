@@ -72,7 +72,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		statusSecretSet = true
 	}
 
-	// Look up existing secret
+	// Look up existing secret.
 	var existingSecret *corev1.Secret
 	if statusSecretSet {
 		_, existingSecret, err = r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
@@ -83,7 +83,6 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Read the peering from Consul.
-	// Todo(peering) do we need to pass in partition?
 	readReq := api.PeeringReadRequest{Name: peeringAcceptor.Name}
 	peering, _, err := r.ConsulClient.Peerings().Read(ctx, readReq, nil)
 	var statusErr api.StatusError
@@ -167,6 +166,9 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
+// shouldGenerateToken returns whether a token should be generated, and whether the name of the secret has changed. It
+// compares the spec secret's name/key/backend and contents to the status secret's name/key/backend and contents. The
+// contents are compared by taking a SHA256 sum of the secret.
 func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
 	if peeringAcceptor.Status.Secret == nil {
 		return false, false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
@@ -196,6 +198,7 @@ func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existi
 	return false, false, nil
 }
 
+// updateStatusError updates the peeringAcceptor's secret in the status.
 func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
 	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
@@ -218,6 +221,7 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 	return err
 }
 
+// updateStatusError updates the peeringAcceptor's ReconcileError in the status.
 func (r *PeeringAcceptorController) updateStatusError(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, reconcileErr error) error {
 	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
 		Error:   pointerToBool2(true),
@@ -232,6 +236,8 @@ func (r *PeeringAcceptorController) updateStatusError(ctx context.Context, peeri
 	return err
 }
 
+// getExistingSecret gets the K8s secret specified, and returns a bool indicating whether it exists, and the secret
+// itself. It returns nil if it doesn't exist.
 func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name string, namespace string) (bool, *corev1.Secret, error) {
 	existingSecret := &corev1.Secret{}
 	namespacedName := types.NamespacedName{
