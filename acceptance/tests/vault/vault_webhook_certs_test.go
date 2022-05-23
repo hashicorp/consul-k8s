@@ -281,8 +281,9 @@ func TestVault_WebhookCerts(t *testing.T) {
 
 	// Check that webhook-cert-manager is not deployed.
 	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
-	deployments, err := client.AppsV1().Deployments(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "component=webhook-cert-manager"})
-	require.Empty(t, deployments)
+	deployments, err := client.AppsV1().Deployments(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=webhook-cert-manager,release=%s", consulReleaseName)})
+	require.NoError(t, err)
+	require.Empty(t, deployments.Items)
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
@@ -303,5 +304,4 @@ func TestVault_WebhookCerts(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
-	t.Fail()
 }
