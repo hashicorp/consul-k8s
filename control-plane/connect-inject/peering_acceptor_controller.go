@@ -130,7 +130,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	var shouldGenerate bool
 	var nameChanged bool
 	if statusSecretSet {
-		shouldGenerate, nameChanged, err = r.shouldGenerateToken(peeringAcceptor, existingSecret)
+		shouldGenerate, nameChanged, err = shouldGenerateToken(peeringAcceptor, existingSecret)
 		if err != nil {
 			_ = r.updateStatusError(ctx, peeringAcceptor, err)
 			return ctrl.Result{}, err
@@ -167,7 +167,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
+func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
 	if peeringAcceptor.Status.Secret == nil {
 		return false, false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
@@ -189,7 +189,6 @@ func (r *PeeringAcceptorController) shouldGenerateToken(peeringAcceptor *consulv
 		existingSecretHashBytes := sha256.Sum256(existingSecret.Data[peeringAcceptor.Status.Secret.Key])
 		existingSecretHash := hex.EncodeToString(existingSecretHashBytes[:])
 		if existingSecretHash != peeringAcceptor.Status.Secret.LatestHash {
-			r.Log.Info("secret doesn't match status.secret.latestHash, should generate new token")
 			return true, false, nil
 		}
 
