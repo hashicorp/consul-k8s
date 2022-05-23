@@ -1,31 +1,37 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestVault_WebhookCerts installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works
 // by turning off web cert manager and configuring controller and connect injector
 // to receive ca bundles and tls certs from Vault PKI engine.
-// This test is modeled after TestVault() with the addition of configuring it
-// to turn off web cert manager and have controller get tls and ca certs
-// from Vault PKI Engine.
+// This test is modeled after TestVault() with the addition of:
+// - ensuring webhook-cert-manager is not deployed.
+// - setting the maxTTL for both controller and connect-inject PKI to rotate
+//   to ensure that certificate rotation occurs properly and without error.
 
 func TestVault_WebhookCerts(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
-	ns := ctx.KubectlOptions(t).Namespace
+	kubectlOptions := ctx.KubectlOptions(t)
+	ns := kubectlOptions.Namespace
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
@@ -61,6 +67,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
+	webhookCertTtl := 25 * time.Second
 	// Configure controller webhook PKI
 	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "controller",
@@ -70,7 +77,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		DataCenter:          "dc1",
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
-		MaxTTL:              "1h",
+		MaxTTL:              webhookCertTtl.String(),
 		AuthMethodPath:      "kubernetes",
 	}
 	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
@@ -84,7 +91,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		DataCenter:          "dc1",
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
-		MaxTTL:              "1h",
+		MaxTTL:              webhookCertTtl.String(),
 		AuthMethodPath:      "kubernetes",
 	}
 	connectInjectorWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
@@ -272,6 +279,11 @@ func TestVault_WebhookCerts(t *testing.T) {
 		require.True(t, license.Valid)
 	}
 
+	// Check that webhook-cert-manager is not deployed.
+	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
+	deployments, err := client.AppsV1().Deployments(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "component=webhook-cert-manager"})
+	require.Empty(t, deployments)
+
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
@@ -291,4 +303,5 @@ func TestVault_WebhookCerts(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
+	t.Fail()
 }
