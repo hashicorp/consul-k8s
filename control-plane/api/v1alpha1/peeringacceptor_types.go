@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -70,13 +69,8 @@ type ReconcileErrorStatus struct {
 
 type SecretStatus struct {
 	// TODO(peering): add additional status fields
-	Name       string                  `json:"name,omitempty"`
-	Key        string                  `json:"key,omitempty"`
-	Backend    string                  `json:"backend,omitempty"`
-	LatestHash string                  `json:"latestHash,omitempty"`
-	Kubernetes *KubernetesSecretStatus `json:"kubernetes,omitempty"`
-}
-
-type KubernetesSecretStatus struct {
-	SecretRef *corev1.ObjectReference `json:"secretRef,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Key        string `json:"key,omitempty"`
+	Backend    string `json:"backend,omitempty"`
+	LatestHash string `json:"latestHash,omitempty"`
 }
