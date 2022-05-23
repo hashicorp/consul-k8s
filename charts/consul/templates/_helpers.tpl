@@ -289,10 +289,10 @@ Fails when at least one but not all of the following have been set:
 The above values are needed in full to turn off web cert manager and allow
 connect inject and controller to manage its own webhook certs.
 
-Usage: {{ template "consul.maybeFailValuesForVaultWebhookCertsAreIncomplete" . }}
+Usage: {{ template "consul.maybeFailValuesIfVaultWebhookCertSettingsAreIncomplete" . }}
 
 */}}
-{{- define "consul.maybeFailValuesForVaultWebhookCertsAreIncomplete" -}}
+{{- define "consul.maybeFailValuesIfVaultWebhookCertSettingsAreIncomplete" -}}
 {{- if or .Values.global.secretsBackend.vault.consulConnectInjectCARole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.consulControllerCARole .Values.global.secretsBackend.vault.controller.tlsCert.secretName .Values.global.secretsBackend.vault.controller.caCert.secretName}}
 {{- if or (not .Values.global.secretsBackend.vault.consulConnectInjectCARole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.consulControllerCARole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
 {{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
