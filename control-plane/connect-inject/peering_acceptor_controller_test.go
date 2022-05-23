@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -546,16 +547,114 @@ func TestShouldGenerateToken(t *testing.T) {
 			expNameChanged:    false,
 			expErr:            nil,
 		},
+		{
+			name: "Key was changed",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data-new",
+							Backend: "kubernetes",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringAcceptorStatus{
+					Secret: &v1alpha1.SecretStatus{
+						Name:       "acceptor-secret",
+						Key:        "data-old",
+						Backend:    "kubernetes",
+						LatestHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+					},
+				},
+			},
+			existingSecret: func() *corev1.Secret {
+				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				return secret
+			},
+			expShouldGenerate: true,
+			expNameChanged:    false,
+			expErr:            nil,
+		},
+		{
+			name: "Name changed",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret-new",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringAcceptorStatus{
+					Secret: &v1alpha1.SecretStatus{
+						Name:       "acceptor-secret-old",
+						Key:        "data",
+						Backend:    "kubernetes",
+						LatestHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+					},
+				},
+			},
+			existingSecret: func() *corev1.Secret {
+				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				return secret
+			},
+			expShouldGenerate: true,
+			expNameChanged:    true,
+			expErr:            nil,
+		},
+		{
+			name: "Error case",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data",
+							Backend: "different-backend",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringAcceptorStatus{
+					Secret: &v1alpha1.SecretStatus{
+						Name:       "acceptor-secret",
+						Key:        "data",
+						Backend:    "kubernetes",
+						LatestHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+					},
+				},
+			},
+			existingSecret: func() *corev1.Secret {
+				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				return secret
+			},
+			expShouldGenerate: false,
+			expNameChanged:    false,
+			expErr:            errors.New("PeeringAcceptor backend cannot be changed"),
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-
 			shouldGenerate, nameChanged, err := shouldGenerateToken(tt.peeringAcceptor, tt.existingSecret())
-			require.Equal(t, shouldGenerate, tt.expShouldGenerate)
-			require.Equal(t, nameChanged, tt.expNameChanged)
 			if tt.expErr == nil {
 				require.NoError(t, err)
+				require.Equal(t, shouldGenerate, tt.expShouldGenerate)
+				require.Equal(t, nameChanged, tt.expNameChanged)
 			} else {
 				require.EqualError(t, err, tt.expErr.Error())
 			}
@@ -598,6 +697,10 @@ func TestUpdateStatus(t *testing.T) {
 					Backend:    "kubernetes",
 					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
 				},
+				ReconcileError: &v1alpha1.ReconcileErrorStatus{
+					Error:   pointerToBool2(false),
+					Message: pointerToString(""),
+				},
 			},
 		},
 		{
@@ -635,6 +738,10 @@ func TestUpdateStatus(t *testing.T) {
 					Backend:    "kubernetes",
 					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
 				},
+				ReconcileError: &v1alpha1.ReconcileErrorStatus{
+					Error:   pointerToBool2(false),
+					Message: pointerToString(""),
+				},
 			},
 		},
 	}
@@ -671,6 +778,106 @@ func TestUpdateStatus(t *testing.T) {
 			require.Equal(t, tt.expStatus.Secret.Key, peeringAcceptor.Status.Secret.Key)
 			require.Equal(t, tt.expStatus.Secret.Backend, peeringAcceptor.Status.Secret.Backend)
 			require.Equal(t, tt.expStatus.Secret.LatestHash, peeringAcceptor.Status.Secret.LatestHash)
+			require.Equal(t, *tt.expStatus.ReconcileError.Error, *peeringAcceptor.Status.ReconcileError.Error)
+
+		})
+	}
+}
+
+func TestUpdateStatusError(t *testing.T) {
+	cases := []struct {
+		name            string
+		peeringAcceptor *v1alpha1.PeeringAcceptor
+		reconcileErr    error
+		expStatus       v1alpha1.PeeringAcceptorStatus
+	}{
+		{
+			name: "updates status when there's no existing status",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+			},
+			reconcileErr: errors.New("this is an error"),
+			expStatus: v1alpha1.PeeringAcceptorStatus{
+				ReconcileError: &v1alpha1.ReconcileErrorStatus{
+					Error:   pointerToBool2(true),
+					Message: pointerToString("this is an error"),
+				},
+			},
+		},
+		{
+			name: "updates status when there is an existing status",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringAcceptorStatus{
+					ReconcileError: &v1alpha1.ReconcileErrorStatus{
+						Error:   pointerToBool2(false),
+						Message: pointerToString(""),
+					},
+				},
+			},
+			reconcileErr: errors.New("this is an error"),
+			expStatus: v1alpha1.PeeringAcceptorStatus{
+				ReconcileError: &v1alpha1.ReconcileErrorStatus{
+					Error:   pointerToBool2(true),
+					Message: pointerToString("this is an error"),
+				},
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client.
+			k8sObjects := []runtime.Object{&ns}
+			k8sObjects = append(k8sObjects, tt.peeringAcceptor)
+
+			// Add peering types to the scheme.
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			// Create the peering acceptor controller.
+			pac := &PeeringAcceptorController{
+				Client: fakeClient,
+				Log:    logrtest.TestLogger{T: t},
+				Scheme: s,
+			}
+
+			err := pac.updateStatusError(context.Background(), tt.peeringAcceptor, tt.reconcileErr)
+			require.NoError(t, err)
+
+			peeringAcceptor := &v1alpha1.PeeringAcceptor{}
+			peeringAcceptorName := types.NamespacedName{
+				Name:      "acceptor",
+				Namespace: "default",
+			}
+			err = fakeClient.Get(context.Background(), peeringAcceptorName, peeringAcceptor)
+			require.NoError(t, err)
+			require.Equal(t, *tt.expStatus.ReconcileError.Error, *peeringAcceptor.Status.ReconcileError.Error)
 
 		})
 	}

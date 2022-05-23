@@ -207,6 +207,10 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 	peeringAcceptor.Status.Secret.LatestHash = hex.EncodeToString(peeringTokenHash[:])
 
 	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
+	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
+		Error:   pointerToBool2(false),
+		Message: pointerToString(""),
+	}
 	err := r.Status().Update(ctx, peeringAcceptor)
 	if err != nil {
 		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", peeringAcceptor.Name, "namespace", peeringAcceptor.Namespace)
