@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
@@ -15,15 +16,16 @@ import (
 
 // HTTPFlags are flags used to configure communication with a Consul agent.
 type HTTPFlags struct {
-	address       StringValue
-	token         StringValue
-	tokenFile     StringValue
-	caFile        StringValue
-	caPath        StringValue
-	certFile      StringValue
-	keyFile       StringValue
-	tlsServerName StringValue
-	partition     StringValue
+	address          StringValue
+	token            StringValue
+	tokenFile        StringValue
+	caFile           StringValue
+	caPath           StringValue
+	certFile         StringValue
+	keyFile          StringValue
+	tlsServerName    StringValue
+	partition        StringValue
+	consulAPITimeout DurationValue
 }
 
 func (f *HTTPFlags) Flags() *flag.FlagSet {
@@ -59,11 +61,17 @@ func (f *HTTPFlags) Flags() *flag.FlagSet {
 			"can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
 	fs.Var(&f.partition, "partition",
 		"[Enterprise Only] Name of the Consul Admin Partition to query. Default to \"default\" if Admin Partitions are enabled.")
+	fs.Var(&f.consulAPITimeout, "consul-api-timeout",
+		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
 	return fs
 }
 
 func (f *HTTPFlags) Addr() string {
 	return f.address.String()
+}
+
+func (f *HTTPFlags) ConsulAPITimeout() time.Duration {
+	return f.consulAPITimeout.Duration()
 }
 
 func (f *HTTPFlags) Token() string {
@@ -105,7 +113,7 @@ func (f *HTTPFlags) APIClient() (*api.Client, error) {
 
 	f.MergeOntoConfig(c)
 
-	return consul.NewClient(c)
+	return consul.NewClient(c, f.ConsulAPITimeout())
 }
 
 func (f *HTTPFlags) MergeOntoConfig(c *api.Config) {
@@ -158,6 +166,46 @@ func (s *StringValue) String() string {
 	var current string
 	if s.v != nil {
 		current = *(s.v)
+	}
+	return current
+}
+
+// DurationValue provides a flag value that's aware if it has been set.
+type DurationValue struct {
+	v *time.Duration
+}
+
+// Merge will overlay this value if it has been set.
+func (d *DurationValue) Merge(onto *time.Duration) {
+	if d.v != nil {
+		*onto = *(d.v)
+	}
+}
+
+// Set implements the flag.Value interface.
+func (d *DurationValue) Set(v string) error {
+	if d.v == nil {
+		d.v = new(time.Duration)
+	}
+	var err error
+	*(d.v), err = time.ParseDuration(v)
+	return err
+}
+
+// String implements the flag.Value interface.
+func (d *DurationValue) String() string {
+	var current time.Duration
+	if d.v != nil {
+		current = *(d.v)
+	}
+	return current.String()
+}
+
+// String implements the flag.Value interface.
+func (d *DurationValue) Duration() time.Duration {
+	var current time.Duration
+	if d.v != nil {
+		current = *(d.v)
 	}
 	return current
 }

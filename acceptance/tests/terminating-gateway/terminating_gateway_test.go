@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const staticClientName = "static-client"
+const StaticClientName = "static-client"
 const staticServerName = "static-server"
 
 // Test that terminating gateways work in a default and secure installations.
@@ -93,7 +93,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 		})
 	}
 }
@@ -191,7 +191,7 @@ func assertNoConnectionAndAddIntention(t *testing.T, consulClient *api.Client, k
 	t.Helper()
 
 	logger.Log(t, "testing intentions prevent connections through the terminating gateway")
-	k8s.CheckStaticServerConnectionFailing(t, k8sOptions, staticClientName, "http://localhost:1234")
+	k8s.CheckStaticServerConnectionFailing(t, k8sOptions, StaticClientName, "http://localhost:1234")
 
 	logger.Log(t, "creating static-client => static-server intention")
 	_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -200,7 +200,7 @@ func assertNoConnectionAndAddIntention(t *testing.T, consulClient *api.Client, k
 		Namespace: destinationNS,
 		Sources: []*api.SourceIntention{
 			{
-				Name:      staticClientName,
+				Name:      StaticClientName,
 				Namespace: sourceNS,
 				Action:    api.IntentionActionAllow,
 			},

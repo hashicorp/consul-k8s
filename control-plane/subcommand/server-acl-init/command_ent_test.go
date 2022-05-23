@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -54,6 +55,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", consulDestNamespace,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
+				"-consul-api-timeout=5s",
 			}
 
 			responseCode := cmd.Run(args)
@@ -183,6 +185,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
+				"-consul-api-timeout=5s",
 			}
 			args = append(args, c.ExtraFlags...)
 			responseCode := cmd.Run(args)
@@ -248,6 +251,7 @@ func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 		"-allow-dns",
 		"-partition=test",
 		"-enable-namespaces",
+		"-consul-api-timeout=5s",
 	}
 	responseCode := cmd.Run(args)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -300,6 +304,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-terminating-gateway-name=tgw",
 				"-terminating-gateway-name=anothertgw",
 				"-controller",
+				"-consul-api-timeout=5s",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -604,6 +609,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				"-enable-partitions",
 				"-partition=default",
 				"-connect-inject",
+				"-consul-api-timeout=5s",
 			}
 
 			// First run. NOTE: we don't assert anything here since we've
@@ -716,6 +722,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
+				"-consul-api-timeout=5s",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
@@ -972,6 +979,7 @@ partition "default" {
 				"-enable-namespaces=true",
 				"-enable-partitions",
 				"-partition=default",
+				"-consul-api-timeout=5s",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
@@ -1073,6 +1081,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 				"-auth-method-host=" + k8sMockServer.URL,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-consul-api-timeout=5s",
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -1168,6 +1177,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 				"-auth-method-host=" + k8sMockServer.URL,
 				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
 				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
+				"-consul-api-timeout=5s",
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -1227,6 +1237,7 @@ func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 		"-enable-partitions",
 		"-partition=default",
 		"-partition-token-file", partitionTokenFile.Name(),
+		"-consul-api-timeout=5s",
 	}
 
 	responseCode := cmd.Run(cmdArgs)
@@ -1278,7 +1289,7 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) (*te
 	serverAPIClient, err := consul.NewClient(&api.Config{
 		Address: server.HTTPAddr,
 		Token:   bootToken,
-	})
+	}, 5*time.Second)
 	require.NoError(t, err)
 
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})

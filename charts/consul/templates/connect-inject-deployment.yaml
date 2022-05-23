@@ -96,6 +96,7 @@ spec:
             - "-ec"
             - |
               consul-k8s-control-plane inject-connect \
+                -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
@@ -222,7 +223,7 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  consul-k8s-control-plane consul-logout
+                  consul-k8s-control-plane consul-logout -consul-api-timeout={{ .Values.global.consulAPITimeout }}
           {{- end }}
           startupProbe:
             httpGet:
@@ -348,6 +349,7 @@ spec:
               {{- if .Values.global.adminPartitions.enabled }}
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
+              -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
               -log-json={{ .Values.global.logJSON }}
         resources:

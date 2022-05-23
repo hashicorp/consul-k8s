@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const staticClientName = "static-client"
+const StaticClientName = "static-client"
 
 // Test that ingress gateways work in a default installation and a secure installation.
 func TestIngressGateway(t *testing.T) {
@@ -96,7 +96,7 @@ func TestIngressGateway(t *testing.T) {
 				// static-server pod because of intentions.
 				logger.Log(t, "testing intentions prevent ingress")
 				k8s.CheckStaticServerConnectionFailing(t, k8sOptions,
-					staticClientName, "-H", "Host: static-server.ingress.consul",
+					StaticClientName, "-H", "Host: static-server.ingress.consul",
 					fmt.Sprintf("http://%s-consul-%s:8080/", releaseName, igName))
 
 				// Now we create the allow intention.
@@ -118,7 +118,7 @@ func TestIngressGateway(t *testing.T) {
 			// via the static-client pod. It should route to the static-server pod.
 			logger.Log(t, "trying calls to ingress gateway")
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions,
-				staticClientName, "-H", "Host: static-server.ingress.consul",
+				StaticClientName, "-H", "Host: static-server.ingress.consul",
 				fmt.Sprintf("http://%s-consul-%s:8080/", releaseName, igName))
 		})
 	}

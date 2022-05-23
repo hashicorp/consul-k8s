@@ -678,22 +678,22 @@ load _helpers
       yq -r '.data["tls-config.json"]' | tee /dev/stderr)
 
   local actual
-  actual=$(echo $config | jq -r .tls.defaults.ca_file | tee /dev/stderr)
+  actual=$(echo $config | jq -r .ca_file | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 
-  actual=$(echo $config | jq -r .tls.defaults.cert_file | tee /dev/stderr)
+  actual=$(echo $config | jq -r .cert_file | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/server/tls.crt" ]
 
-  actual=$(echo $config | jq -r .tls.defaults.key_file | tee /dev/stderr)
+  actual=$(echo $config | jq -r .key_file | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/server/tls.key" ]
 
-  actual=$(echo $config | jq -r .tls.internal_rpc.verify_incoming | tee /dev/stderr)
+  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $config | jq -r .tls.defaults.verify_outgoing | tee /dev/stderr)
+  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $config | jq -r .tls.internal_rpc.verify_server_hostname | tee /dev/stderr)
+  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   actual=$(echo $config | jq -c .ports | tee /dev/stderr)
@@ -710,10 +710,13 @@ load _helpers
       yq -r '.data["tls-config.json"]' | tee /dev/stderr)
 
   local actual
-  actual=$(echo $config | jq -r .tls.internal_rpc | tee /dev/stderr)
+  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  actual=$(echo $config | jq -r .tls.defaults.verify_outgoing | tee /dev/stderr)
+  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -761,13 +764,13 @@ load _helpers
     . | tee /dev/stderr |
     yq -r '.data["tls-config.json"]' | tee /dev/stderr)
 
-  local actual=$(echo $object | jq -r .tls.defaults.ca_file | tee /dev/stderr)
+  local actual=$(echo $object | jq -r .ca_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/serverca.crt" ]
 
-  local actual=$(echo $object | jq -r .tls.defaults.cert_file | tee /dev/stderr)
+  local actual=$(echo $object | jq -r .cert_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/servercert.crt" ]
 
-  local actual=$(echo $object | jq -r .tls.defaults.key_file | tee /dev/stderr)
+  local actual=$(echo $object | jq -r .key_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/servercert.key" ]
 }
 
@@ -799,12 +802,26 @@ load _helpers
 #--------------------------------------------------------------------
 # auto_reload_config
 
-@test "server/ConfigMap: auto reload config is set to true" {
+@test "server/ConfigMap: auto reload config is set to true when Vault is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: auto reload config is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
 
-  [ "${actual}" = "true" ]
+  [ "${actual}" = null ]
 }

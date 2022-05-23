@@ -5,8 +5,8 @@ Your release is named {{ .Release.Name }}.
 
 To learn more about the release, run:
 
-  $ helm status {{ .Release.Name }}
-  $ helm get all {{ .Release.Name }}
+  $ helm status {{ .Release.Name }} {{- if .Release.Namespace }} --namespace {{ .Release.Namespace }}{{ end }}
+  $ helm get all {{ .Release.Name }} {{- if .Release.Namespace }} --namespace {{ .Release.Namespace }}{{ end }}
 
 Consul on Kubernetes Documentation:
 https://www.consul.io/docs/platform/k8s

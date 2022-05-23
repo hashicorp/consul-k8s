@@ -551,7 +551,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 3bd6198418457f5acc746c0d21fbb4afdf2b38e5bbcfef23fb3f97e2600fe964 ]
+  [ "${actual}" = 55f93d04c3f0b85c7ef2869e4b8623296025a8388c881eab63be9f2dc70bafd6 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
@@ -561,7 +561,7 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 41535aa4cb7cffc4c70641efc882f5d6e3e87fce6e76d409409ff287cb4b23e8 ]
+  [ "${actual}" = 891c0e207e1e0259ffb150d7364b667b7b12786ce37af3dd89f366bc6d2f21aa ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
@@ -571,7 +571,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = bad77069ea6e4915272cf520faecb96333f6adef97c992e0aecc324381754eb2 ]
+  [ "${actual}" = f9be2829fed80a127e3752e10be32f29c2f9ca0ea548abcf3d4fc2c985cb7201 ]
 }
 
 #--------------------------------------------------------------------
@@ -903,13 +903,13 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
 
   local actual
-  actual=$(echo $command | jq -r '. | contains("tls { internal_rpc { verify_incoming = true }}")' | tee /dev/stderr)
+  actual=$(echo $command | jq -r '. | contains("verify_incoming_rpc = true")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | contains("tls { defaults { verify_outgoing = true }}")' | tee /dev/stderr)
+  actual=$(echo $command | jq -r '. | contains("verify_outgoing = true")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | contains("tls { internal_rpc { verify_server_hostname = true }}")' | tee /dev/stderr)
+  actual=$(echo $command | jq -r '. | contains("verify_server_hostname = true")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1194,6 +1194,10 @@ local actual=$(echo $object |
   local actual=$(echo $object |
       yq -r '.command | any(contains("partition=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "client/DaemonSet: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
@@ -1308,19 +1312,8 @@ local actual=$(echo $object |
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=false' \
-      . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "consul-ca-cert" ]
-
-  local actual=$(echo $object |
-      yq -r '.mountPath' | tee /dev/stderr)
-  [ "${actual}" = "/consul/tls/ca" ]
-
-  local actual=$(echo $object |
-      yq -r '.readOnly' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      . | yq '.spec.template.spec.initContainers[0].volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" == "" ]
 }
 
 @test "client/DaemonSet: fail when externalServers is enabled but the externalServers.hosts is not provided" {

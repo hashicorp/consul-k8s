@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	staticClientName = "static-client"
+	StaticClientName = "static-client"
 	staticServerName = "static-server"
 )
 
@@ -98,7 +98,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 				require.NoError(r, err)
 				for _, token := range tokens {
 					require.NotContains(r, token.Description, staticServerName)
-					require.NotContains(r, token.Description, staticClientName)
+					require.NotContains(r, token.Description, StaticClientName)
 				}
 			})
 		})
@@ -130,9 +130,9 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 }
 
@@ -145,7 +145,7 @@ func (c *ConnectHelper) CreateIntention(t *testing.T) {
 		Name: staticServerName,
 		Sources: []*api.SourceIntention{
 			{
-				Name:   staticClientName,
+				Name:   StaticClientName,
 				Action: api.IntentionActionAllow,
 			},
 		},
@@ -159,9 +159,9 @@ func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
-		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), staticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 }
 
@@ -185,13 +185,13 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	// other tests.
 	logger.Log(t, "checking that connection is unsuccessful")
 	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), staticClientName, false, []string{
+		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
 			"curl: (7) Failed to connect to static-server port 80: Connection refused",
 		}, "", "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), staticClientName, false, []string{
+		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
 		}, "", "http://localhost:1234")

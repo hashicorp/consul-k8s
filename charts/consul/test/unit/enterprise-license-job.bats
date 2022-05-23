@@ -88,6 +88,10 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

@@ -121,7 +121,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, StaticClientName, "http://localhost:1234")
 		})
 	}
 }
@@ -180,11 +180,11 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
-			staticClientNamespace := "ns2"
-			logger.Logf(t, "creating Kubernetes namespace %s", staticClientNamespace)
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			StaticClientNamespace := "ns2"
+			logger.Logf(t, "creating Kubernetes namespace %s", StaticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})
 
 			ns1K8SOptions := &terratestk8s.KubectlOptions{
@@ -195,7 +195,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			ns2K8SOptions := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
-				Namespace:   staticClientNamespace,
+				Namespace:   StaticClientNamespace,
 			}
 
 			// Deploy a static-server that will play the role of an external service.
@@ -224,12 +224,12 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				// With the terminating gateway up, we test that we can make a call to it
 				// via the static-server. It should fail to connect with the
 				// static-server pod because of intentions.
-				assertNoConnectionAndAddIntention(t, consulClient, ns2K8SOptions, staticClientNamespace, testNamespace)
+				assertNoConnectionAndAddIntention(t, consulClient, ns2K8SOptions, StaticClientNamespace, testNamespace)
 			}
 
 			// Test that we can make a call to the terminating gateway
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, ns2K8SOptions, staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, ns2K8SOptions, StaticClientName, "http://localhost:1234")
 		})
 	}
 }

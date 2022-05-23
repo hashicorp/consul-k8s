@@ -205,6 +205,7 @@ spec:
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
+            -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
         resources:
