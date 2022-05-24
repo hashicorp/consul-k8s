@@ -97,7 +97,7 @@ func (pf *PortForward) Open() error {
 func (pf *PortForward) Endpoint() (string, error) {
 	select {
 	case <-pf.readyChan:
-		return fmt.Sprintf("http://localhost:%d", pf.localPort), nil
+		return fmt.Sprintf("localhost:%d", pf.localPort), nil
 	case <-time.After(time.Second):
 		return "", fmt.Errorf("port forwarder is not running")
 	}
