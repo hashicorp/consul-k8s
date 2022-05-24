@@ -66,8 +66,8 @@ func (pf *PortForward) Open() error {
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", portForwardURL)
 
 	// Create channels for Goroutines to communicate.
-	pf.stopChan = make(chan struct{})
-	pf.readyChan = make(chan struct{})
+	pf.stopChan = make(chan struct{}, 1)
+	pf.readyChan = make(chan struct{}, 1)
 	errChan := make(chan error)
 
 	// Create a Kubernetes port forwarder.
