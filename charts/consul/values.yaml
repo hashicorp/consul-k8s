@@ -51,7 +51,6 @@ global:
       # If not set and using a NodePort service, Kubernetes will automatically assign
       # a port.
       nodePort:
-
         # RPC node port
         # @type: integer
         rpc: null
@@ -392,7 +391,6 @@ global:
 
   # Configure ACLs.
   acls:
-
     # If true, the Helm chart will automatically manage ACL tokens and policies
     # for all Consul and consul-k8s-control-plane components.
     # This requires Consul >= 1.4.
@@ -441,7 +439,6 @@ global:
       # The key within the Vault secret that holds the parition token.
       # @type: string
       secretKey: null
-
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
@@ -565,7 +562,7 @@ global:
     # its components on OpenShift.
     enabled: false
 
-  # The time in seconds that the consul API client will wait for a response from 
+  # The time in seconds that the consul API client will wait for a response from
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
@@ -573,7 +570,6 @@ global:
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
 server:
-
   # If true, the chart will install all the resources necessary for a
   # Consul server cluster. If you're running Consul externally and want agents
   # within Kubernetes to join that cluster, this should probably be false.
@@ -628,7 +624,7 @@ server:
   #
   # Vault Secrets backend:
   # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
-  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`. 
+  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`.
   # Please see the following guide for steps to generate a compatible certificate:
   # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
   # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
@@ -1296,6 +1292,10 @@ client:
     # The number of snapshot agents to run.
     replicas: 2
 
+    # Interval to perform a snapshot run, defaults to 1h
+    # More infos on the format https://www.consul.io/commands/snapshot/agent#interval
+    interval: 1h
+
     # A Kubernetes or Vault secret that should be manually created to contain the entire
     # config to be used on the snapshot agent.
     # This is the preferred method of configuration since there are usually storage
@@ -1410,7 +1410,6 @@ ui:
 
     # Set the port value of the UI service.
     port:
-
       # HTTP port.
       http: 80
 
@@ -1421,7 +1420,6 @@ ui:
     # If not set and using a NodePort service, Kubernetes will automatically assign
     # a port.
     nodePort:
-
       # HTTP node port
       # @type: integer
       http: null
@@ -1612,9 +1610,9 @@ syncCatalog:
     # already exist, it will be created. Turning this on overrides the
     # `consulDestinationNamespace` setting.
     # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
-    # If mirroring is enabled, avoid creating any Consul resources in the following 
-    # Kubernetes namespaces, as Consul currently reserves these namespaces for 
-    # system use: "system", "universal", "operator", "root". 
+    # If mirroring is enabled, avoid creating any Consul resources in the following
+    # Kubernetes namespaces, as Consul currently reserves these namespaces for
+    # system use: "system", "universal", "operator", "root".
     mirroringK8S: false
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
@@ -1874,7 +1872,7 @@ connectInject:
   # This setting can be safely disabled by setting to "Ignore".
   failurePolicy: "Fail"
 
-  # Selector for restricting the webhook to only specific namespaces. 
+  # Selector for restricting the webhook to only specific namespaces.
   # Use with `connectInject.default: true` to automatically inject all pods in namespaces that match the selector. This should be set to a multiline string.
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
   # for more details.
@@ -1941,9 +1939,9 @@ connectInject:
     # of the same name as their k8s namespace, optionally prefixed if
     # `mirroringK8SPrefix` is set below. If the Consul namespace does not
     # already exist, it will be created. Turning this on overrides the
-    # `consulDestinationNamespace` setting. If mirroring is enabled, avoid creating any Consul 
-    # resources in the following Kubernetes namespaces, as Consul currently reserves these 
-    # namespaces for system use: "system", "universal", "operator", "root". 
+    # `consulDestinationNamespace` setting. If mirroring is enabled, avoid creating any Consul
+    # resources in the following Kubernetes namespaces, as Consul currently reserves these
+    # namespaces for system use: "system", "universal", "operator", "root".
     mirroringK8S: false
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
@@ -2725,7 +2723,6 @@ apiGateway:
 # Configuration settings for the webhook-cert-manager
 # `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.
 webhookCertManager:
-
   # Toleration Settings
   # This should be a multi-line string matching the Toleration array
   # in a PodSpec.
