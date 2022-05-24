@@ -1294,6 +1294,7 @@ client:
 
     # Interval to perform a snapshot run, defaults to 1h
     # More infos on the format https://www.consul.io/commands/snapshot/agent#interval
+    # @type: string
     interval: 1h
 
     # A Kubernetes or Vault secret that should be manually created to contain the entire
