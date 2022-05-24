@@ -866,7 +866,7 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1.11:
+  acceptance-kind-1-23-consul-nightly-1-11:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "https://hub.docker.com/r/hashicorppreview/consul:1.11.0-dev"
@@ -901,7 +901,7 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11.x nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1.12:
+  acceptance-kind-1-23-consul-nightly-1-12:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "https://hub.docker.com/r/hashicorppreview/consul:1.12.0-dev"
@@ -936,7 +936,7 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1.13:
+  acceptance-kind-1-23-consul-nightly-1-13:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "https://hub.docker.com/r/hashicorppreview/consul:1.13.0-dev"
@@ -1044,6 +1044,6 @@ workflows:
               only:
                 - main
     jobs:
-      - acceptance-kind-1-23-consul-nightly-1.11
-      - acceptance-kind-1-23-consul-nightly-1.12
-      - acceptance-kind-1-23-consul-nightly-1.13
+      - acceptance-kind-1-23-consul-nightly-1-11
+      - acceptance-kind-1-23-consul-nightly-1-12
+      - acceptance-kind-1-23-consul-nightly-1-13
