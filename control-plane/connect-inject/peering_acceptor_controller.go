@@ -39,15 +39,17 @@ type PeeringAcceptorController struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // PeeringAcceptor resources determine whether to generate a new peering token in Consul and store it in the backend
-// specified in the spec. If the resource doesn't exist, the peering should be deleted in Consul. If the resource
-// exists, and a peering doesn't exist in Consul, it should be created. If the resource exists, and a peering does exist
-// in Consul, it should be reconciled. If the status of the resource does not match the current state of the specified
-// secret, generate a new token and store it according to the spec.
+// specified in the spec.
+// - If the resource doesn't exist, the peering should be deleted in Consul.
+// - If the resource exists, and a peering doesn't exist in Consul, it should be created.
+// - If the resource exists, and a peering does exist in Consul, it should be reconciled.
+// - If the status of the resource does not match the current state of the specified secret, generate a new token
+//   and store it according to the spec.
 func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("peering", req.NamespacedName)
 
-	r.Log.Info("received request for PeeringAcceptor:", "name", req.Name, "ns", req.Namespace)
+	r.Log.Info("received request for PeeringAcceptor", "name", req.Name, "ns", req.Namespace)
 
 	// Get the PeeringAcceptor resource.
 	peeringAcceptor := &consulv1alpha1.PeeringAcceptor{}
@@ -198,7 +200,7 @@ func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existi
 	return false, false, nil
 }
 
-// updateStatusError updates the peeringAcceptor's secret in the status.
+// updateStatus updates the peeringAcceptor's secret in the status.
 func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
 	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
@@ -211,7 +213,7 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 
 	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
 	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
-		Error:   pointerToBool2(false),
+		Error:   pointerToBool(false),
 		Message: pointerToString(""),
 	}
 	err := r.Status().Update(ctx, peeringAcceptor)
@@ -224,7 +226,7 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcc
 // updateStatusError updates the peeringAcceptor's ReconcileError in the status.
 func (r *PeeringAcceptorController) updateStatusError(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, reconcileErr error) error {
 	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
-		Error:   pointerToBool2(true),
+		Error:   pointerToBool(true),
 		Message: pointerToString(reconcileErr.Error()),
 	}
 
@@ -329,7 +331,4 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 
 func pointerToString(s string) *string {
 	return &s
-}
-func pointerToBool2(b bool) *bool {
-	return &b
 }

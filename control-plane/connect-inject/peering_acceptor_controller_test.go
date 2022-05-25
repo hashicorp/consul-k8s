@@ -160,8 +160,8 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 						Kind:               "PeeringAcceptor",
 						Name:               "acceptor-created",
 						UID:                "",
-						Controller:         pointerToBool2(true),
-						BlockOwnerDeletion: pointerToBool2(true),
+						Controller:         pointerToBool(true),
+						BlockOwnerDeletion: pointerToBool(true),
 					},
 				}
 				return []runtime.Object{peeringAcceptor, secret}
@@ -698,7 +698,7 @@ func TestUpdateStatus(t *testing.T) {
 					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
 				},
 				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool2(false),
+					Error:   pointerToBool(false),
 					Message: pointerToString(""),
 				},
 			},
@@ -739,7 +739,7 @@ func TestUpdateStatus(t *testing.T) {
 					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
 				},
 				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool2(false),
+					Error:   pointerToBool(false),
 					Message: pointerToString(""),
 				},
 			},
@@ -811,7 +811,7 @@ func TestUpdateStatusError(t *testing.T) {
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool2(true),
+					Error:   pointerToBool(true),
 					Message: pointerToString("this is an error"),
 				},
 			},
@@ -834,7 +834,7 @@ func TestUpdateStatusError(t *testing.T) {
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
 					ReconcileError: &v1alpha1.ReconcileErrorStatus{
-						Error:   pointerToBool2(false),
+						Error:   pointerToBool(false),
 						Message: pointerToString(""),
 					},
 				},
@@ -842,7 +842,7 @@ func TestUpdateStatusError(t *testing.T) {
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool2(true),
+					Error:   pointerToBool(true),
 					Message: pointerToString("this is an error"),
 				},
 			},

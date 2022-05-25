@@ -33,7 +33,6 @@ type PeeringAcceptorList struct {
 
 // PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
 type PeeringAcceptorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Peer describes the information needed to create a peering.
@@ -41,36 +40,48 @@ type PeeringAcceptorSpec struct {
 }
 
 type Peer struct {
+	// Secret describes how to store the generated peering token.
 	Secret *Secret `json:"secret,omitempty"`
 }
 
 type Secret struct {
-	Name    string `json:"name,omitempty"`
-	Key     string `json:"key,omitempty"`
+	// Name is the name of the secret generated.
+	Name string `json:"name,omitempty"`
+	// Key is the key of the secret generated.
+	Key string `json:"key,omitempty"`
+	// Backend is where the generated secret is stored. Currently supports the value: "kubernetes".
 	Backend string `json:"backend,omitempty"`
 }
 
 // PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
 type PeeringAcceptorStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// LastReconcileTime is the last time the resource was reconciled.
 	// +optional
-	LastReconcileTime *metav1.Time          `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
-	ReconcileError    *ReconcileErrorStatus `json:"reconcileError,omitempty"`
-	Secret            *SecretStatus         `json:"secret,omitempty"`
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
+	// ReconcileError shows any errors during the last reconciliation of this resource.
+	// +optional
+	ReconcileError *ReconcileErrorStatus `json:"reconcileError,omitempty"`
+	// Secret shows any errors during the last reconciliation of this resource.
+	// +optional
+	Secret *SecretStatus `json:"secret,omitempty"`
 }
 
 type ReconcileErrorStatus struct {
-	Error   *bool   `json:"error,omitempty"`
+	// Error is a boolean indicating if there was an error during the last reconcile of this resource.
+	Error *bool `json:"error,omitempty"`
+	// Message displays the error message from the last reconcile.
 	Message *string `json:"message,omitempty"`
 }
 
 type SecretStatus struct {
-	// TODO(peering): add additional status fields
-	Name       string `json:"name,omitempty"`
-	Key        string `json:"key,omitempty"`
-	Backend    string `json:"backend,omitempty"`
+	// Name is the name of the secret generated.
+	Name string `json:"name,omitempty"`
+	// Key is the key of the secret generated.
+	Key string `json:"key,omitempty"`
+	// Backend is where the generated secret is stored. Currently supports the value: "kubernetes".
+	Backend string `json:"backend,omitempty"`
+	// LatestHash is the SHA256 sum of the secret generated.
 	LatestHash string `json:"latestHash,omitempty"`
 }
