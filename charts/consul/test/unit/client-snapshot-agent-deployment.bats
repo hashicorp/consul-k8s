@@ -1072,7 +1072,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "sa-role" ]
 }
 
-@test "client/SnapshotAgentDeployment: interval property default" {
+@test "client/SnapshotAgentDeployment: interval defaults to 1h" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
@@ -1082,7 +1082,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-@test "client/SnapshotAgentDeployment: interval property is overwritten" {
+@test "client/SnapshotAgentDeployment: interval can be set" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \

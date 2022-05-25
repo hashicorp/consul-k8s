@@ -1292,8 +1292,8 @@ client:
     # The number of snapshot agents to run.
     replicas: 2
 
-    # Interval to perform a snapshot run, defaults to 1h
-    # More infos on the format https://www.consul.io/commands/snapshot/agent#interval
+    # Interval at which to perform snapshots.
+    # See https://www.consul.io/commands/snapshot/agent#interval
     # @type: string
     interval: 1h
 
