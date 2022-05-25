@@ -203,6 +203,219 @@ func TestProcessUpstreams(t *testing.T) {
 		consulPartitionsEnabled bool
 	}{
 		{
+			name: "annotated upstream with svc only",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream1",
+					LocalBindPort:   1234,
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream with svc and dc",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.dc1.dc:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream1",
+					Datacenter:      "dc1",
+					LocalBindPort:   1234,
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream with svc and peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.peer1.peer:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream1",
+					DestinationPeer: "peer1",
+					LocalBindPort:   1234,
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream with svc and peer, needs ns before peer if namespaces enabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.peer1.peer:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.peer1.peer:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream with svc, ns, and peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.peer1.peer:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					DestinationPeer:      "peer1",
+					DestinationNamespace: "ns1",
+					LocalBindPort:        1234,
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream with svc, ns, and partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.ap:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					DestinationPartition: "part1",
+					DestinationNamespace: "ns1",
+					LocalBindPort:        1234,
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "annotated upstream with svc, ns, and dc",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.dc1.dc:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					Datacenter:           "dc1",
+					DestinationNamespace: "ns1",
+					LocalBindPort:        1234,
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "multiple annotated upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.dc1.dc:1234, upstream2.svc:2234, upstream3.svc.ns1.ns:3234, upstream4.svc.ns1.ns.peer1.peer:4234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					Datacenter:           "dc1",
+					DestinationNamespace: "ns1",
+					LocalBindPort:        1234,
+				},
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream2",
+					LocalBindPort:   2234,
+				},
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream3",
+					DestinationNamespace: "ns1",
+					LocalBindPort:        3234,
+				},
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream4",
+					DestinationNamespace: "ns1",
+					DestinationPeer:      "peer1",
+					LocalBindPort:        4234,
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "annotated upstream error: invalid partition/dc/peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.ns1.ns.part1.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream error: invalid namespace",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.ns1.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream error: invalid number of pieces in the address",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream error: invalid peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.peer1.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.peer1.err:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream error: invalid number of pieces in the address without namespaces and partitions",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.err:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
 			name: "upstream with datacenter without ProxyDefaults",
 			pod: func() *corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -468,10 +681,10 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
-			name: "prepared query and non-query upstreams",
+			name: "prepared query and non-query upstreams and annotated non-query upstreams",
 			pod: func() *corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234, upstream1:2234, prepared_query:6687bd19-5654-76be-d764:8202"
+				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234, upstream1:2234, prepared_query:6687bd19-5654-76be-d764:8202, upstream2.svc:3234"
 				return pod1
 			},
 			expected: []api.Upstream{
@@ -489,6 +702,11 @@ func TestProcessUpstreams(t *testing.T) {
 					DestinationType: api.UpstreamDestTypePreparedQuery,
 					DestinationName: "6687bd19-5654-76be-d764",
 					LocalBindPort:   8202,
+				},
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream2",
+					LocalBindPort:   3234,
 				},
 			},
 			consulNamespacesEnabled: false,
