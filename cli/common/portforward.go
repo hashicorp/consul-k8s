@@ -1,9 +1,11 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -34,36 +36,40 @@ type PortForward struct {
 	localPort int
 	stopChan  chan struct{}
 	readyChan chan struct{}
+
+	portForwardURL *url.URL
 }
 
 // Open opens a port forward session to a Kubernetes Pod.
-func (pf *PortForward) Open() error {
+func (pf *PortForward) Open(ctx context.Context) (string, error) {
 	// Get an open port on localhost.
 	if err := pf.allocateLocalPort(); err != nil {
-		return fmt.Errorf("failed to allocate local port: %v", err)
+		return "", fmt.Errorf("failed to allocate local port: %v", err)
 	}
 
 	// Load the Kubernetes API client configuration.
 	config, err := pf.loadApiClientConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load API client config: %v", err)
+		return "", fmt.Errorf("failed to load API client config: %v", err)
 	}
 
-	// Configure the connection to the Pod.
-	postEndpoint := pf.KubeClient.CoreV1().RESTClient().Post()
-	portForwardURL := postEndpoint.
-		Resource("pods").
-		Namespace(pf.Namespace).
-		Name(pf.PodName).
-		SubResource("portforward").
-		URL()
+	if pf.portForwardURL == nil {
+		// Configure the connection to the Pod.
+		postEndpoint := pf.KubeClient.CoreV1().RESTClient().Post()
+		pf.portForwardURL = postEndpoint.
+			Resource("pods").
+			Namespace(pf.Namespace).
+			Name(pf.PodName).
+			SubResource("portforward").
+			URL()
+	}
 
 	// Create a dialer for the port forward target.
 	transport, upgrader, err := spdy.RoundTripperFor(config)
 	if err != nil {
-		return fmt.Errorf("failed to create roundtripper: %v", err)
+		return "", fmt.Errorf("failed to create roundtripper: %v", err)
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", portForwardURL)
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", pf.portForwardURL)
 
 	// Create channels for Goroutines to communicate.
 	pf.stopChan = make(chan struct{}, 1)
@@ -74,7 +80,7 @@ func (pf *PortForward) Open() error {
 	ports := []string{fmt.Sprintf("%d:%d", pf.localPort, pf.RemotePort)}
 	portforwarder, err := portforward.New(dialer, ports, pf.stopChan, pf.readyChan, nil, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Start port forwarding.
@@ -86,20 +92,15 @@ func (pf *PortForward) Open() error {
 	// once the port forwarder is ready.
 	select {
 	case err := <-errChan:
-		return err
-	case <-pf.readyChan:
-		return nil
-	}
-}
-
-// Endpoint returns the local port that the port forwarder is listening on.
-// An error is returned if the port forwarder is not running.
-func (pf *PortForward) Endpoint() (string, error) {
-	select {
+		return "", err
 	case <-pf.readyChan:
 		return fmt.Sprintf("localhost:%d", pf.localPort), nil
-	case <-time.After(time.Second):
-		return "", fmt.Errorf("port forwarder is not running")
+	case <-ctx.Done():
+		pf.Close()
+		return "", fmt.Errorf("port forward cancelled")
+	case <-time.After(time.Second * 5):
+		pf.Close()
+		return "", fmt.Errorf("port forward timed out")
 	}
 }
 
