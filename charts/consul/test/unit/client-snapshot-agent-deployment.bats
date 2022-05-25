@@ -1078,7 +1078,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '[.spec.template.spec.containers[0].command[2]] | any(contains("-interval=1h"))' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=1h")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1089,6 +1089,6 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.interval=10h34m5s' \
       . | tee /dev/stderr |
-      yq -r '[.spec.template.spec.containers[0].command[2]] | any(contains("-interval=10h34m5s"))' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
