@@ -1,6 +1,5 @@
 name: test
-on:
-  push:
+on: [push, pull_request]
 
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
