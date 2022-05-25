@@ -59,7 +59,7 @@ spec:
         {{- with .Values.client.snapshotAgent.configSecret }}
         "vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.json": "{{ .secretName }}"
         "vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json": {{ template "consul.vaultSecretTemplate" . }}
-        {{- end }} 
+        {{- end }}
         {{- end }}
         {{- end }}
     spec:
@@ -159,6 +159,7 @@ spec:
           EOF
           {{- end }}
           exec /bin/consul snapshot agent \
+            -interval={{ .Values.client.snapshotAgent.interval }} \
             {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
             {{- if  .Values.global.secretsBackend.vault.enabled }}
             -config-file=/vault/secrets/snapshot-agent-config.json \

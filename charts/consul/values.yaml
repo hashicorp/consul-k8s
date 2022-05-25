@@ -1296,6 +1296,11 @@ client:
     # The number of snapshot agents to run.
     replicas: 2
 
+    # Interval at which to perform snapshots.
+    # See https://www.consul.io/commands/snapshot/agent#interval
+    # @type: string
+    interval: 1h
+
     # A Kubernetes or Vault secret that should be manually created to contain the entire
     # config to be used on the snapshot agent.
     # This is the preferred method of configuration since there are usually storage
