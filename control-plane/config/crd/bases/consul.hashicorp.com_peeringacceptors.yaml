@@ -39,12 +39,18 @@ spec:
                 description: Peer describes the information needed to create a peering.
                 properties:
                   secret:
+                    description: Secret describes how to store the generated peering
+                      token.
                     properties:
                       backend:
+                        description: 'Backend is where the generated secret is stored.
+                          Currently supports the value: "kubernetes".'
                         type: string
                       key:
+                        description: Key is the key of the secret generated.
                         type: string
                       name:
+                        description: Name is the name of the secret generated.
                         type: string
                     type: object
                 type: object
@@ -59,22 +65,34 @@ spec:
                 format: date-time
                 type: string
               reconcileError:
+                description: ReconcileError shows any errors during the last reconciliation
+                  of this resource.
                 properties:
                   error:
+                    description: Error is a boolean indicating if there was an error
+                      during the last reconcile of this resource.
                     type: boolean
                   message:
+                    description: Message displays the error message from the last
+                      reconcile.
                     type: string
                 type: object
               secret:
+                description: Secret shows any errors during the last reconciliation
+                  of this resource.
                 properties:
                   backend:
+                    description: 'Backend is where the generated secret is stored.
+                      Currently supports the value: "kubernetes".'
                     type: string
                   key:
+                    description: Key is the key of the secret generated.
                     type: string
                   latestHash:
+                    description: LatestHash is the SHA256 sum of the secret generated.
                     type: string
                   name:
-                    description: 'TODO(peering): add additional status fields'
+                    description: Name is the name of the secret generated.
                     type: string
                 type: object
             type: object
