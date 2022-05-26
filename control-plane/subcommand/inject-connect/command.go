@@ -32,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
+const WebhookCAFilename = "ca.crt"
+
 type Command struct {
 	UI cli.Ui
 
@@ -484,8 +486,8 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) updateWebhookCABundle(ctx context.Context) error {
-	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "connect-injector")
-	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, "ca.crt")
+	webhookConfigName := fmt.Sprintf("%s-connect-injector", c.flagResourcePrefix)
+	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, WebhookCAFilename)
 	caCert, err := ioutil.ReadFile(caPath)
 	if err != nil {
 		return err
