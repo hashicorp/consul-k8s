@@ -2,8 +2,6 @@ package connectinject
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"time"
@@ -83,6 +81,8 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	peering, _, err := r.ConsulClient.Peerings().Read(ctx, readReq, nil)
 	var statusErr api.StatusError
 
+	var secretResourceVersion string
+
 	// If the peering doesn't exist in Consul, generate a new token, and store it in the specified backend. Store the
 	// current state in the status.
 	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound && peering == nil {
@@ -104,13 +104,14 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if peeringAcceptor.Spec.Peer.Secret.Backend == "kubernetes" {
-			if err := r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp); err != nil {
+			secretResourceVersion, err = r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp)
+			if err != nil {
 				_ = r.updateStatusError(ctx, peeringAcceptor, err)
 				return ctrl.Result{}, err
 			}
 		}
 		// Store the state in the status.
-		err := r.updateStatus(ctx, peeringAcceptor, resp)
+		err := r.updateStatus(ctx, peeringAcceptor, secretResourceVersion)
 		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
@@ -141,7 +142,8 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if peeringAcceptor.Spec.Peer.Secret.Backend == "kubernetes" {
-			if err := r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp); err != nil {
+			secretResourceVersion, err = r.createK8sPeeringTokenSecretWithOwner(ctx, peeringAcceptor, resp)
+			if err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -157,7 +159,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		// Store the state in the status.
-		err := r.updateStatus(ctx, peeringAcceptor, resp)
+		err := r.updateStatus(ctx, peeringAcceptor, secretResourceVersion)
 		return ctrl.Result{}, err
 	}
 
@@ -186,9 +188,7 @@ func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existi
 	// Compare the existing secret hash.
 	// Get the secret specified by the status, make sure it matches the status' secret.latestHash.
 	if existingStatusSecret != nil {
-		existingSecretHashBytes := sha256.Sum256(existingStatusSecret.Data[peeringAcceptor.Status.Secret.Key])
-		existingSecretHash := hex.EncodeToString(existingSecretHashBytes[:])
-		if existingSecretHash != peeringAcceptor.Status.Secret.LatestHash {
+		if existingStatusSecret.ResourceVersion != peeringAcceptor.Status.Secret.LatestHash {
 			return true, false, nil
 		}
 
@@ -199,15 +199,14 @@ func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existi
 }
 
 // updateStatus updates the peeringAcceptor's secret in the status.
-func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
+func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, secretResourceVersion string) error {
 	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
 		Key:     peeringAcceptor.Spec.Peer.Secret.Key,
 		Backend: peeringAcceptor.Spec.Peer.Secret.Backend,
 	}
 
-	peeringTokenHash := sha256.Sum256([]byte(resp.PeeringToken))
-	peeringAcceptor.Status.Secret.LatestHash = hex.EncodeToString(peeringTokenHash[:])
+	peeringAcceptor.Status.Secret.LatestHash = secretResourceVersion
 
 	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
 	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
@@ -257,26 +256,34 @@ func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name 
 // createK8sPeeringTokenSecretWithOwner creates a secret and uses the controller's K8s client to apply the secret. It
 // sets an owner reference to the PeeringAcceptor resource. It also checks if there's an existing secret with the same
 // name and makes sure to update the existing secret if so.
-func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) error {
-	secret := createSecret(peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
+func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) (string, error) {
+	secretName := peeringAcceptor.Spec.Peer.Secret.Name
+	secretNamespace := peeringAcceptor.Namespace
+	secret := createSecret(secretName, secretNamespace, peeringAcceptor.Spec.Peer.Secret.Key, resp.PeeringToken)
 	if err := controllerutil.SetControllerReference(peeringAcceptor, secret, r.Scheme); err != nil {
-		return err
+		return "", err
 	}
 	existingSecret, err := r.getExistingSecret(ctx, peeringAcceptor.Spec.Peer.Secret.Name, peeringAcceptor.Namespace)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if existingSecret != nil {
 		if err := r.Client.Update(ctx, secret); err != nil {
-			return err
+			return "", err
 		}
 
 	} else {
 		if err := r.Client.Create(ctx, secret); err != nil {
-			return err
+			return "", err
 		}
 	}
-	return nil
+	// The newly created or updated secret should exist at this point, so we can get it and return the resourceVersion.
+	var newSecret *corev1.Secret
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, newSecret); err != nil {
+		return "", err
+	}
+
+	return newSecret.ResourceVersion, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

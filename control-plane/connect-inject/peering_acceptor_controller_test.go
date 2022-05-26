@@ -100,6 +100,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
+				secret.ResourceVersion = "1234"
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
@@ -154,6 +155,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
+				secret.ResourceVersion = "1234"
 				secret.OwnerReferences = []metav1.OwnerReference{
 					{
 						APIVersion:         "consul.hashicorp.com/v1alpha1",
@@ -219,6 +221,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
+				secret.ResourceVersion = "1234"
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
@@ -277,6 +280,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
+				secret.ResourceVersion = "1234"
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
@@ -665,10 +669,10 @@ func TestShouldGenerateToken(t *testing.T) {
 
 func TestUpdateStatus(t *testing.T) {
 	cases := []struct {
-		name              string
-		peeringAcceptor   *v1alpha1.PeeringAcceptor
-		generateTokenResp *api.PeeringGenerateTokenResponse
-		expStatus         v1alpha1.PeeringAcceptorStatus
+		name            string
+		peeringAcceptor *v1alpha1.PeeringAcceptor
+		resourceVersion string
+		expStatus       v1alpha1.PeeringAcceptorStatus
 	}{
 		{
 			name: "updates status when there's no existing status",
@@ -687,9 +691,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			generateTokenResp: &api.PeeringGenerateTokenResponse{
-				PeeringToken: "fake",
-			},
+			resourceVersion: "fake",
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				Secret: &v1alpha1.SecretStatus{
 					Name:       "acceptor-secret",
@@ -728,9 +730,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			generateTokenResp: &api.PeeringGenerateTokenResponse{
-				PeeringToken: "fake",
-			},
+			resourceVersion: "fake",
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				Secret: &v1alpha1.SecretStatus{
 					Name:       "acceptor-secret",
@@ -764,7 +764,7 @@ func TestUpdateStatus(t *testing.T) {
 				Scheme: s,
 			}
 
-			err := pac.updateStatus(context.Background(), tt.peeringAcceptor, tt.generateTokenResp)
+			err := pac.updateStatus(context.Background(), tt.peeringAcceptor, tt.resourceVersion)
 			require.NoError(t, err)
 
 			peeringAcceptor := &v1alpha1.PeeringAcceptor{}
