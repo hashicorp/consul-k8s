@@ -21,23 +21,118 @@ func TestFetchPods(t *testing.T) {
 		},
 		"Gateway pods": {
 			namespace: "default",
-			pods:      []v1.Pod{},
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ingress-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"component": "ingress-gateway",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mesh-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"component": "mesh-gateway",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "terminating-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"component": "terminating-gateway",
+						},
+					},
+				},
+			},
 		},
 		"API Gateway Pods": {
 			namespace: "default",
-			pods:      []v1.Pod{},
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "api-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"api-gateway.consul.hashicorp.com/managed": "true",
+						},
+					},
+				},
+			},
 		},
 		"Sidecar Pods": {
 			namespace: "default",
-			pods:      []v1.Pod{},
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sidecar",
+						Namespace: "default",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+			},
 		},
 		"All kinds of Pods": {
 			namespace: "default",
-			pods:      []v1.Pod{},
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sidecar",
+						Namespace: "default",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mesh-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"component": "mesh-gateway",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "api-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"api-gateway.consul.hashicorp.com/managed": "true",
+						},
+					},
+				},
+			},
 		},
 		"Pods in multiple namespaces": {
 			namespace: "",
-			pods:      []v1.Pod{},
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "api-gateway",
+						Namespace: "consul",
+						Labels: map[string]string{
+							"api-gateway.consul.hashicorp.com/managed": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sidecar",
+						Namespace: "default",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -47,7 +142,7 @@ func TestFetchPods(t *testing.T) {
 
 			// Add the pods to the client.
 			for _, pod := range c.pods {
-				client.CoreV1().Pods(c.namespace).Create(context.Background(), &pod, metav1.CreateOptions{})
+				client.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(context.Background(), &pod, metav1.CreateOptions{})
 			}
 
 			pods, err := FetchPods(context.Background(), client, c.namespace)
