@@ -68,7 +68,7 @@ commands:
         type: string
       consul-image:
         type: string
-        default: "hashicorp/consul:1.11.6"
+        default: "hashicorp/consul-enterprise:1.11.6-ent"
       consul-k8s-image:
         type: string
         default: "hashicorp/consul-k8s-control-plane:0.44.0"
