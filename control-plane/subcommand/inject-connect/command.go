@@ -407,8 +407,6 @@ func (c *Command) Run(args []string) int {
 	if err = (&connectinject.EndpointsController{
 		Client:                     mgr.GetClient(),
 		ConsulClient:               c.consulClient,
-		ConsulScheme:               consulURL.Scheme,
-		ConsulPort:                 consulURL.Port(),
 		AllowK8sNamespacesSet:      allowK8sNamespaces,
 		DenyK8sNamespacesSet:       denyK8sNamespaces,
 		MetricsConfig:              metricsConfig,
@@ -474,6 +472,7 @@ func (c *Command) Run(args []string) int {
 			RequireAnnotation:             !c.flagDefaultInject,
 			AuthMethod:                    c.flagACLAuthMethod,
 			ConsulCACert:                  string(consulCACert),
+			ConsulAddress:                 consulURL.Hostname(),
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,

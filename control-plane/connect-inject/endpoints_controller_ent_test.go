@@ -326,7 +326,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 //     corresponding service instance in Consul is deregistered.
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
-// This test covers EndpointsController.deregisterServiceOnAllAgents when services should be selectively deregistered
+// This test covers EndpointsController.deregisterService when services should be selectively deregistered
 // since the map will not be nil.
 func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 	t.Parallel()
@@ -1348,7 +1348,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 }
 
 // Tests deleting an Endpoints object, with and without matching Consul and K8s service names when Consul namespaces are enabled.
-// This test covers EndpointsController.deregisterServiceOnAllAgents when the map is nil (not selectively deregistered).
+// This test covers EndpointsController.deregisterService when the map is nil (not selectively deregistered).
 func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"

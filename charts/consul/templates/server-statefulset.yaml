@@ -335,6 +335,9 @@ spec:
             - name: https
               containerPort: 8501
             {{- end }}
+            - name: grpc
+              containerPort: 8502
+              protocol: "TCP"
             - name: serflan-tcp
               containerPort: {{ .Values.server.ports.serflan.port }}
               {{- if .Values.server.exposeGossipAndRPCPorts }}

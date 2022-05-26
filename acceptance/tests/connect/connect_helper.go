@@ -206,6 +206,8 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 // Secure and AutoEncrypt fields taking precedence.
 func (c *ConnectHelper) helmValues() map[string]string {
 	helmValues := map[string]string{
+		"global.image": "ishustava/consul-dev:agentless",
+		"global.imageK8S": "ishustava/consul-k8s-dev:05-25-2022-050b6fb1",
 		"connectInject.enabled":        "true",
 		"global.tls.enabled":           strconv.FormatBool(c.Secure),
 		"global.tls.enableAutoEncrypt": strconv.FormatBool(c.AutoEncrypt),
