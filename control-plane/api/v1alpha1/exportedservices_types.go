@@ -69,6 +69,8 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
+	// PeerName is the name of the peer to export the service to.
+	PeerName string `json:"peerName,omitempty"`
 }
 
 func (in *ExportedServices) GetObjectMeta() metav1.ObjectMeta {
@@ -164,7 +166,11 @@ func (in *ExportedServices) ToConsul(datacenter string) api.ConfigEntry {
 func (in *ExportedService) toConsul() capi.ExportedService {
 	var consumers []capi.ServiceConsumer
 	for _, consumer := range in.Consumers {
-		consumers = append(consumers, capi.ServiceConsumer{Partition: consumer.Partition})
+		if consumer.PeerName != "" {
+			consumers = append(consumers, capi.ServiceConsumer{PeerName: consumer.PeerName})
+		} else {
+			consumers = append(consumers, capi.ServiceConsumer{Partition: consumer.Partition})
+		}
 	}
 	return capi.ExportedService{
 		Name:      in.Name,
@@ -199,7 +205,7 @@ func (in *ExportedServices) Validate(consulMeta common.ConsulMeta) error {
 	}
 	for i, service := range in.Spec.Services {
 		if err := service.validate(field.NewPath("spec").Child("services").Index(i)); err != nil {
-			errs = append(errs, err)
+			errs = append(errs, err...)
 		}
 	}
 	if len(errs) > 0 {
@@ -210,9 +216,25 @@ func (in *ExportedServices) Validate(consulMeta common.ConsulMeta) error {
 	return nil
 }
 
-func (in *ExportedService) validate(path *field.Path) *field.Error {
+func (in *ExportedService) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
 	if len(in.Consumers) == 0 {
-		return field.Invalid(path, in.Consumers, "service must have at least 1 consumer.")
+		errs = append(errs, field.Invalid(path, in.Consumers, "service must have at least 1 consumer."))
+	}
+	for i, consumer := range in.Consumers {
+		if err := consumer.validate(path.Child("consumers").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (in *ServiceConsumer) validate(path *field.Path) *field.Error {
+	if in.Partition != "" && in.PeerName != "" {
+		return field.Invalid(path, *in, "both partition and peerName cannot be specified.")
+	}
+	if in.Partition == "" && in.PeerName == "" {
+		return field.Invalid(path, *in, "either partition or peerName must be specified.")
 	}
 	return nil
 }
