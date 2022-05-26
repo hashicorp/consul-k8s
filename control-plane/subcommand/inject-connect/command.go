@@ -469,7 +469,7 @@ func (c *Command) Run(args []string) int {
 		}})
 
 	if c.flagEnableWebhookCAUpdate {
-		err := c.configureCABundleUpdate(ctx)
+		err := c.updateWebhookCABundle(ctx)
 		if err != nil {
 			setupLog.Error(err, "problem getting CA Cert")
 			return 1
@@ -483,7 +483,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-func (c *Command) configureCABundleUpdate(ctx context.Context) error {
+func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 	webhookConfigName := fmt.Sprintf("%s-%s", c.flagResourcePrefix, "connect-injector")
 	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, "ca.crt")
 	caCert, err := ioutil.ReadFile(caPath)

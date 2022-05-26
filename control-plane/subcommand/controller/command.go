@@ -333,7 +333,7 @@ func (c *Command) Run(args []string) int {
 	// +kubebuilder:scaffold:builder
 
 	if c.flagEnableWebhookCAUpdate {
-		err := c.configureCABundleUpdate()
+		err := c.updateWebhookCABundle()
 		if err != nil {
 			setupLog.Error(err, "problem getting CA Cert")
 			return 1
@@ -348,7 +348,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-func (c *Command) configureCABundleUpdate() error {
+func (c *Command) updateWebhookCABundle() error {
 	// Create a context to be used by the processes started in this command.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
