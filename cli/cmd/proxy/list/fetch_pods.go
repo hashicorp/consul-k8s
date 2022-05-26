@@ -9,7 +9,7 @@ import (
 )
 
 // FetchPods attempts to fetch all pods which are running Envoy in the cluster
-// based on their labels.
+// based on their labels. Passing "" for namespace will fetch Pods from all namespaces.
 func FetchPods(ctx context.Context, client kubernetes.Interface, namespace string) ([]v1.Pod, error) {
 	var pods []v1.Pod
 
