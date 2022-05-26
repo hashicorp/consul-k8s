@@ -204,8 +204,8 @@ func TestVault_WebhookCerts(t *testing.T) {
 		"global.secretsBackend.vault.consulServerRole":          consulServerRole,
 		"global.secretsBackend.vault.consulClientRole":          consulClientRole,
 		"global.secretsBackend.vault.consulCARole":              serverPKIConfig.RoleName,
-		"global.secretsBackend.vault.consulConnectInjectCARole": connectInjectorWebhookPKIConfig.RoleName,
-		"global.secretsBackend.vault.consulControllerCARole":    controllerWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.consulConnectInjectRole": connectInjectorWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.consulControllerRole":    controllerWebhookPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole":      manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,

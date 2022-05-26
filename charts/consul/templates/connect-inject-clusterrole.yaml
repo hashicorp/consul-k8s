@@ -33,7 +33,7 @@ rules:
   - get
   - list
   - update
-{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulConnectInjectCARole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName  .Values.global.secretsBackend.vault.connectInject.caCert.secretName)}}
+{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulConnectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName  .Values.global.secretsBackend.vault.connectInject.caCert.secretName)}}
 - apiGroups:
   - admissionregistration.k8s.io
   resources:

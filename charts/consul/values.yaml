@@ -281,7 +281,7 @@ global:
       # The Vault role for consul controller to read the Consul's controllers's CA Certificate (unauthenticated).
       # A Vault policy must be created which grants read capabilities to 
       # `global.secretsBackend.vault.controller.tlsCert.secretName`.
-      consulControllerCARole: ""
+      consulControllerRole: ""
       
       connectInject:
         # The directory that Kubernetes will use on Kubernetes CRD creation, 
@@ -301,7 +301,7 @@ global:
       # The Vault role for consul connect inject to read the Consul's controllers's CA Certificate (unauthenticated).
       # A Vault policy must be created which grants read capabilities to 
       # `global.secretsBackend.vault.connectInject.tlsCert.secretName`.
-      consulConnectInjectCARole: ""
+      consulConnectInjectRole: ""
 
   # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://www.consul.io/docs/agent/config/cli-flags#_encrypt)).

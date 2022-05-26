@@ -279,10 +279,10 @@ Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
 
 {{/*
 Fails when at least one but not all of the following have been set:
-- global.secretsBackend.vault.consulConnectInjectCARole
+- global.secretsBackend.vault.consulConnectInjectRole
 - global.secretsBackend.vault.connectInject.tlsCert.secretName
 - global.secretsBackend.vault.connectInject.caCert.secretName
-- global.secretsBackend.vault.consulControllerCARole
+- global.secretsBackend.vault.consulControllerRole
 - global.secretsBackend.vault.controller.tlsCert.secretName
 - global.secretsBackend.vault.controller.caCert.secretName
 
@@ -293,9 +293,9 @@ Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 
 */}}
 {{- define "consul.validateVaultWebhookCertConfiguration" -}}
-{{- if or .Values.global.secretsBackend.vault.consulConnectInjectCARole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.consulControllerCARole .Values.global.secretsBackend.vault.controller.tlsCert.secretName .Values.global.secretsBackend.vault.controller.caCert.secretName}}
-{{- if or (not .Values.global.secretsBackend.vault.consulConnectInjectCARole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.consulControllerCARole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
-{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
+{{- if or .Values.global.secretsBackend.vault.consulConnectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.consulControllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName .Values.global.secretsBackend.vault.controller.caCert.secretName}}
+{{- if or (not .Values.global.secretsBackend.vault.consulConnectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.consulControllerRole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
+{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
 {{ end }}
 {{ end }}
 {{- end -}}

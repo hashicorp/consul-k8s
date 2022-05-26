@@ -75,10 +75,10 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.consulConnectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -958,15 +958,15 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.consulConnectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=pki/issue/controller-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1027,10 +1027,10 @@ load _helpers
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.consulConnectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1053,10 +1053,10 @@ load _helpers
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.consulConnectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1076,10 +1076,10 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.consulConnectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1091,7 +1091,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "controller/Deployment: fails if vault is enabled and global.secretsBackend.vault.consulControllerCARole is set but global.secretsBackend.vault.connectInject.tlsCert.secretName and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
+@test "controller/Deployment: fails if vault is enabled and global.secretsBackend.vault.consulControllerRole is set but global.secretsBackend.vault.connectInject.tlsCert.secretName and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
   cd `chart_dir`
   run helm template \
       -s templates/controller-deployment.yaml  \
@@ -1103,13 +1103,13 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=controllerinjectcarole' \
+      --set 'global.secretsBackend.vault.consulControllerRole=controllerinjectcarole' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
-@test "controller/Deployment: fails if vault is enabled and global.secretsBackend.vault.controller.tlsCert.secretName is set but global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
+@test "controller/Deployment: fails if vault is enabled and global.secretsBackend.vault.controller.tlsCert.secretName is set but global.secretsBackend.vault.consulConnectInjectRole and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
   cd `chart_dir`
   run helm template \
       -s templates/controller-deployment.yaml  \
@@ -1124,10 +1124,10 @@ load _helpers
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
-@test "controller/Deployment: fails if vault is enabled and global.secretsBackend.vault.controller.caCert.secretName is set but global.secretsBackend.vault.consulConnectInjectCARole and global.secretsBackend.vault.connectInject.tlsCert.secretName are not" {
+@test "controller/Deployment: fails if vault is enabled and global.secretsBackend.vault.controller.caCert.secretName is set but global.secretsBackend.vault.consulConnectInjectRole and global.secretsBackend.vault.connectInject.tlsCert.secretName are not" {
   cd `chart_dir`
   run helm template \
       -s templates/controller-deployment.yaml  \
@@ -1142,10 +1142,10 @@ load _helpers
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerCARole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.consulControllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
-@test "controller/Deployment: vault vault.hashicorp.com/role set to global.secretsBackend.vault.consulControllerCARole if global.secretsBackend.vault.consulControllerCARole is not set" {
+@test "controller/Deployment: vault vault.hashicorp.com/role set to global.secretsBackend.vault.consulControllerRole if global.secretsBackend.vault.consulControllerRole is not set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/controller-deployment.yaml  \

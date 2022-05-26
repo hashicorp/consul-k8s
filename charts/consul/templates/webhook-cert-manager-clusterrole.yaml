@@ -1,4 +1,4 @@
-{{- if (and (or .Values.connectInject.enabled .Values.controller.enabled) (not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulConnectInjectCARole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.consulControllerCARole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName))) }}
+{{- if (and (or .Values.connectInject.enabled .Values.controller.enabled) (not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulConnectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.consulControllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName))) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

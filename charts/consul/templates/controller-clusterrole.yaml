@@ -57,7 +57,7 @@ rules:
   - get
   - list
   - update
-{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulControllerCARole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName)}}
+{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.consulControllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName)}}
 - apiGroups:
   - admissionregistration.k8s.io
   resources:

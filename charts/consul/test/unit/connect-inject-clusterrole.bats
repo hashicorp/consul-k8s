@@ -145,7 +145,7 @@ load _helpers
 #--------------------------------------------------------------------
 # vault
 
-@test "connectInject/ClusterRole: vault sets get, list, watch, and patch access to mutatingwebhookconfigurationswhen the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulConnectInjectCARole, global.secretsBackend.vault.connectInject.tlsCert.secretName, and global.secretsBackend.vault.connectInject.caCert.secretName." {
+@test "connectInject/ClusterRole: vault sets get, list, watch, and patch access to mutatingwebhookconfigurationswhen the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, and global.secretsBackend.vault.connectInject.caCert.secretName." {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -156,10 +156,10 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
-      --set 'global.secretsBackend.vault.consulConnectInjectCARole=inject-ca-role' \
+      --set 'global.secretsBackend.vault.consulConnectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
-      --set 'global.secretsBackend.vault.consulControllerCARole=test' \
+      --set 'global.secretsBackend.vault.consulControllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
