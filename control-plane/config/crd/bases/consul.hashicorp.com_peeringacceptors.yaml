@@ -1,0 +1,109 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: peeringacceptors.consul.hashicorp.com
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: PeeringAcceptor
+    listKind: PeeringAcceptorList
+    plural: peeringacceptors
+    singular: peeringacceptor
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PeeringAcceptor is the Schema for the peeringacceptors API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
+            properties:
+              peer:
+                description: Peer describes the information needed to create a peering.
+                properties:
+                  secret:
+                    description: Secret describes how to store the generated peering
+                      token.
+                    properties:
+                      backend:
+                        description: 'Backend is where the generated secret is stored.
+                          Currently supports the value: "kubernetes".'
+                        type: string
+                      key:
+                        description: Key is the key of the secret generated.
+                        type: string
+                      name:
+                        description: Name is the name of the secret generated.
+                        type: string
+                    type: object
+                type: object
+            required:
+            - peer
+            type: object
+          status:
+            description: PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
+            properties:
+              lastReconcileTime:
+                description: LastReconcileTime is the last time the resource was reconciled.
+                format: date-time
+                type: string
+              reconcileError:
+                description: ReconcileError shows any errors during the last reconciliation
+                  of this resource.
+                properties:
+                  error:
+                    description: Error is a boolean indicating if there was an error
+                      during the last reconcile of this resource.
+                    type: boolean
+                  message:
+                    description: Message displays the error message from the last
+                      reconcile.
+                    type: string
+                type: object
+              secret:
+                description: Secret shows any errors during the last reconciliation
+                  of this resource.
+                properties:
+                  backend:
+                    description: 'Backend is where the generated secret is stored.
+                      Currently supports the value: "kubernetes".'
+                    type: string
+                  key:
+                    description: Key is the key of the secret generated.
+                    type: string
+                  latestHash:
+                    description: LatestHash is the SHA256 sum of the secret generated.
+                    type: string
+                  name:
+                    description: Name is the name of the secret generated.
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
