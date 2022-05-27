@@ -268,6 +268,8 @@ global:
         # deletion, and update, to get TLS certificates used issued from vault
         # to send webhooks to the controller.
         tlsCert:
+          # The Vault secret path that issues TLS certificates for controller
+          # webhooks.
           # @type: string
           secretName: null
           
@@ -275,10 +277,13 @@ global:
         # deletion, and update, to get CA certificates used issued from vault
         # to send webhooks to the controller.
         caCert:
+          # The Vault secret path that contains the CA certificate for controller
+          # webhooks.
           # @type: string
           secretName: null
       
-      # The Vault role for consul controller to read the Consul's controllers's CA Certificate (unauthenticated).
+      # The Vault role for consul controller to read the Consul controllers's 
+      # CA Certificate and the webhook certificate and private key.
       # A Vault policy must be created which grants read capabilities to 
       # `global.secretsBackend.vault.controller.tlsCert.secretName`.
       consulControllerRole: ""
@@ -288,17 +293,22 @@ global:
         # deletion, and update, to get CA certificates used issued from vault
         # to send webhooks to ConnectInject
         caCert: 
+          # The Vault secret path that contains the CA certificate for
+          # Connect Inject webhooks.
           # @type: string
           secretName: null
         
         # The directory that Kubernetes will use on Kubernetes CRD creation, 
         # deletion, and update, to get TLS certificates used issued from vault
-        # to send webhooks to ConnectInject
-        tlsCert: 
+        # to send webhooks to Connect Inject
+        tlsCert:
+          # The Vault secret path that issues TLS certificates for connect
+          # inject webhooks.
           # @type: string
           secretName: null
 
-      # The Vault role for consul connect inject to read the Consul's controllers's CA Certificate (unauthenticated).
+      # The Vault role for consul connect inject to read the Consul controller's 
+      # CA Certificate and the webhook certificate and private key.
       # A Vault policy must be created which grants read capabilities to 
       # `global.secretsBackend.vault.connectInject.tlsCert.secretName`.
       consulConnectInjectRole: ""

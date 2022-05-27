@@ -91,7 +91,7 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableWebhooks, "enable-webhooks", true,
 		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
 	c.flagSet.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
-		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
+		"Release prefix of the Consul installation used to prepend on the webhook name that will have its CA bundle updated.")
 	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
 		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
