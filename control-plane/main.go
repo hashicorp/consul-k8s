@@ -4,8 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"github.com/mitchellh/cli"
+
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 func main() {
