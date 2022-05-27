@@ -190,22 +190,6 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-#      - name: Checkout consul code
-#        uses: actions/checkout@v2
-#        with:
-#          repository: hashicorp/consul-enterprise
-#          token: ${{secrets.PAT}}
-#          ref: main
-#          path: consul-enterprise
-#
-#      - name: Download consul latest ent
-#        working-directory: consul-enterprise
-#        run: |
-#          mkdir -p $HOME/bin
-#          make dev
-#          cp ./bin $HOME/bin/consul
-#          chmod +x $HOME/bin/consul
-
       - name: Download consul
         working-directory: control-plane
         run: |
