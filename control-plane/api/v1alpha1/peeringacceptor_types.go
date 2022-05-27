@@ -63,9 +63,9 @@ type PeeringAcceptorStatus struct {
 	// ReconcileError shows any errors during the last reconciliation of this resource.
 	// +optional
 	ReconcileError *ReconcileErrorStatus `json:"reconcileError,omitempty"`
-	// Secret shows any errors during the last reconciliation of this resource.
+	// SecretRef shows the status of the secret.
 	// +optional
-	Secret *SecretStatus `json:"secret,omitempty"`
+	SecretRef *SecretStatus `json:"secret,omitempty"`
 }
 
 type ReconcileErrorStatus struct {
@@ -82,6 +82,6 @@ type SecretStatus struct {
 	Key string `json:"key,omitempty"`
 	// Backend is where the generated secret is stored. Currently supports the value: "kubernetes".
 	Backend string `json:"backend,omitempty"`
-	// LatestHash is the SHA256 sum of the secret generated.
-	LatestHash string `json:"latestHash,omitempty"`
+	// ResourceVersion is the resource version for the secret.
+	ResourceVersion string `json:"latestHash,omitempty"`
 }

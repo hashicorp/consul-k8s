@@ -905,8 +905,8 @@ func (in *PeeringAcceptorStatus) DeepCopyInto(out *PeeringAcceptorStatus) {
 		*out = new(ReconcileErrorStatus)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Secret != nil {
-		in, out := &in.Secret, &out.Secret
+	if in.SecretRef != nil {
+		in, out := &in.SecretRef, &out.SecretRef
 		*out = new(SecretStatus)
 		**out = **in
 	}

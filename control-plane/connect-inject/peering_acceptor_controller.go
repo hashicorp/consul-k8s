@@ -64,12 +64,12 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	statusSecretSet := peeringAcceptor.Status.Secret != nil
+	statusSecretSet := peeringAcceptor.Status.SecretRef != nil
 
 	// existingStatusSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
 	var existingStatusSecret *corev1.Secret
 	if statusSecretSet {
-		existingStatusSecret, err = r.getExistingSecret(ctx, peeringAcceptor.Status.Secret.Name, peeringAcceptor.Namespace)
+		existingStatusSecret, err = r.getExistingSecret(ctx, peeringAcceptor.Status.SecretRef.Name, peeringAcceptor.Namespace)
 		if err != nil {
 			_ = r.updateStatusError(ctx, peeringAcceptor, err)
 			return ctrl.Result{}, err
@@ -170,25 +170,25 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 // compares the spec secret's name/key/backend and contents to the status secret's name/key/backend and contents. The
 // contents are compared by taking a SHA256 sum of the secret.
 func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existingStatusSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
-	if peeringAcceptor.Status.Secret == nil {
+	if peeringAcceptor.Status.SecretRef == nil {
 		return false, false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
 	// Compare the existing name, key, and backend.
-	if peeringAcceptor.Status.Secret.Name != peeringAcceptor.Spec.Peer.Secret.Name {
+	if peeringAcceptor.Status.SecretRef.Name != peeringAcceptor.Spec.Peer.Secret.Name {
 		return true, true, nil
 	}
-	if peeringAcceptor.Status.Secret.Key != peeringAcceptor.Spec.Peer.Secret.Key {
+	if peeringAcceptor.Status.SecretRef.Key != peeringAcceptor.Spec.Peer.Secret.Key {
 		return true, false, nil
 	}
 
 	// TODO(peering): remove this when validation webhook exists.
-	if peeringAcceptor.Status.Secret.Backend != peeringAcceptor.Spec.Peer.Secret.Backend {
+	if peeringAcceptor.Status.SecretRef.Backend != peeringAcceptor.Spec.Peer.Secret.Backend {
 		return false, false, errors.New("PeeringAcceptor backend cannot be changed")
 	}
 	// Compare the existing secret hash.
 	// Get the secret specified by the status, make sure it matches the status' secret.latestHash.
 	if existingStatusSecret != nil {
-		if existingStatusSecret.ResourceVersion != peeringAcceptor.Status.Secret.LatestHash {
+		if existingStatusSecret.ResourceVersion != peeringAcceptor.Status.SecretRef.ResourceVersion {
 			return true, false, nil
 		}
 
@@ -200,13 +200,13 @@ func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existi
 
 // updateStatus updates the peeringAcceptor's secret in the status.
 func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, secretResourceVersion string) error {
-	peeringAcceptor.Status.Secret = &consulv1alpha1.SecretStatus{
+	peeringAcceptor.Status.SecretRef = &consulv1alpha1.SecretStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
 		Key:     peeringAcceptor.Spec.Peer.Secret.Key,
 		Backend: peeringAcceptor.Spec.Peer.Secret.Backend,
 	}
 
-	peeringAcceptor.Status.Secret.LatestHash = secretResourceVersion
+	peeringAcceptor.Status.SecretRef.ResourceVersion = secretResourceVersion
 
 	peeringAcceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
 	peeringAcceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
@@ -319,7 +319,7 @@ func (r *PeeringAcceptorController) deletePeering(ctx context.Context, peerName 
 	return resp, nil
 }
 
-// createSecret is a helper function that creates a corev1.Secret when provided inputs.
+// createSecret is a helper function that creates a corev1.SecretRef when provided inputs.
 func createSecret(name, namespace, key, value string) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
