@@ -435,11 +435,21 @@ func (c *Command) Run(args []string) int {
 	if err = (&connectinject.PeeringAcceptorController{
 		Client:       mgr.GetClient(),
 		ConsulClient: c.consulClient,
-		Log:          ctrl.Log.WithName("controller").WithName("peering"),
+		Log:          ctrl.Log.WithName("controller").WithName("peering-acceptor"),
 		Scheme:       mgr.GetScheme(),
 		Context:      ctx,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "peering")
+		setupLog.Error(err, "unable to create controller", "controller", "peering-acceptor")
+		return 1
+	}
+	if err = (&connectinject.PeeringDialerController{
+		Client:       mgr.GetClient(),
+		ConsulClient: c.consulClient,
+		Log:          ctrl.Log.WithName("controller").WithName("peering-dialer"),
+		Scheme:       mgr.GetScheme(),
+		Context:      ctx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "peering-dialer")
 		return 1
 	}
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
