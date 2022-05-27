@@ -145,7 +145,7 @@ load _helpers
 #--------------------------------------------------------------------
 # vault
 
-@test "connectInject/ClusterRole: vault sets get, list, watch, and patch access to mutatingwebhookconfigurationswhen the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, and global.secretsBackend.vault.connectInject.caCert.secretName." {
+@test "connectInject/ClusterRole: vault sets get, list, watch, and patch access to mutatingwebhookconfigurations when the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulConnectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, and global.secretsBackend.vault.connectInject.caCert.secretName." {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \

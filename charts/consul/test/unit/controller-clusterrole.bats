@@ -190,7 +190,7 @@ load _helpers
 #--------------------------------------------------------------------
 # vault
 
-@test "controller/ClusterRole: vault sets get, list, watch, and patch access to mutatingwebhookconfigurationswhen the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulControllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." {
+@test "controller/ClusterRole: vault sets get, list, watch, and patch access to mutatingwebhookconfigurations when the following are configured - global.secretsBackend.vault.enabled, global.secretsBackend.vault.consulControllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/controller-clusterrole.yaml  \
