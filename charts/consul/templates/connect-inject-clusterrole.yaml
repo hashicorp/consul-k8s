@@ -70,6 +70,24 @@ rules:
     - get
     - patch
     - update
+- apiGroups: ["consul.hashicorp.com"]
+  resources: ["peeringdialers"]
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - consul.hashicorp.com
+  resources:
+    - peeringdialers/status
+  verbs:
+    - get
+    - patch
+    - update
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]
   resources: [ "podsecuritypolicies" ]
