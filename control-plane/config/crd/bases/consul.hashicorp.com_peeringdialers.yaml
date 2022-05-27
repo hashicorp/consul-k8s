@@ -58,7 +58,7 @@ spec:
             - peer
             type: object
           status:
-            description: PeeringDialerStatus defines the observed state of PeeringDialer
+            description: PeeringDialerStatus defines the observed state of PeeringDialer.
             properties:
               lastReconcileTime:
                 description: LastReconcileTime is the last time the resource was reconciled.
