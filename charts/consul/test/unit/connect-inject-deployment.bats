@@ -617,6 +617,17 @@ EOF
   [ "${actual}" = "key" ]
 }
 
+@test "connectInject/Deployment: Adds -tls-cert-dir=/etc/connect-injector/certs to command" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-dir=/etc/connect-injector/certs"))' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enableAutoEncrypt
 
@@ -2039,6 +2050,10 @@ EOF
   [ "${actual}" = "foo/ca" ]
 
   local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/secret-volume-path-ca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "/vault/secrets/connect-injector/certs" ]
+  
+  local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 
@@ -2056,8 +2071,12 @@ EOF
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=localhost,release-name-consul-connect-injector,*.release-name-consul-connect-injector,*.release-name-consul-connect-injector.default,release-name-consul-connect-injector.default,*.release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc,*.connect-injector.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=release-name-consul-connect-injector,release-name-consul-connect-injector.default,release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc.cluster.local\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/secret-volume-path-tls.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "/vault/secrets/connect-injector/certs" ]
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-tls.key"]' | tee /dev/stderr)"
@@ -2065,12 +2084,15 @@ EOF
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=localhost,release-name-consul-connect-injector,*.release-name-consul-connect-injector,*.release-name-consul-connect-injector.default,release-name-consul-connect-injector.default,*.release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc,*.connect-injector.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=release-name-consul-connect-injector,release-name-consul-connect-injector.default,release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc.cluster.local\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/secret-volume-path-tls.key"]' | tee /dev/stderr)"
+  [ "${actual}" = "/vault/secrets/connect-injector/certs" ]
 }
 
-@test "connectInject/Deployment: vault tls-cert-dir flag is set to /vault/secrets" {
+@test "connectInject/Deployment: vault tls-cert-dir flag is set to /vault/secrets/connect-injector/certs" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -2086,7 +2108,7 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
                  . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-dir=/vault/secrets"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-dir=/vault/secrets/connect-injector/certs"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }

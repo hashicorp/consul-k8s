@@ -392,6 +392,17 @@ load _helpers
   [ "${actual}" = "key" ]
 }
 
+@test "controller/Deployment: Adds -webhook-tls-cert-dir=/tmp/controller-webhook/certs to command" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-webhook-tls-cert-dir=/tmp/controller-webhook/certs"))' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enableAutoEncrypt
 
@@ -985,6 +996,19 @@ load _helpers
   [ "${actual}" = "pki_int/cert/ca" ]
 
   local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-ca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"foo/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-ca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "foo/ca" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/secret-volume-path-ca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "/vault/secrets/controller-webhook/certs" ]
+  
+  local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 
@@ -1002,8 +1026,12 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=localhost,release-name-consul-controller-webhook,*.release-name-consul-controller-webhook,*.release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default,*.release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc,*.controller-webhook.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=release-name-consul-controller-webhook,release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc.cluster.local\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/secret-volume-path-tls.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "/vault/secrets/controller-webhook/certs" ]
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-tls.key"]' | tee /dev/stderr)"
@@ -1011,8 +1039,12 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=localhost,release-name-consul-controller-webhook,*.release-name-consul-controller-webhook,*.release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default,*.release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc,*.controller-webhook.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=release-name-consul-controller-webhook,release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc.cluster.local\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/secret-volume-path-tls.key"]' | tee /dev/stderr)"
+  [ "${actual}" = "/vault/secrets/controller-webhook/certs" ]
 }
 
 @test "controller/Deployment: vault does not add cert volume when global.tls.enabled is true" {

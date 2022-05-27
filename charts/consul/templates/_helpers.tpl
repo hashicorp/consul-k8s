@@ -106,13 +106,13 @@ as well as the global.name setting.
 {{- define "consul.connectInjectorTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
-{{ printf "localhost,%s-connect-injector,*.%s-connect-injector,*.%s-connect-injector.%s,%s-connect-injector.%s,*.%s-connect-injector.%s.svc,%s-connect-injector.%s.svc,*.connect-injector.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{ printf "%s-connect-injector,%s-connect-injector.%s,%s-connect-injector.%s.svc,%s-connect-injector.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
 {{- end -}}
 
 {{- define "consul.controllerWebhookTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
-{{ printf "localhost,%s-controller-webhook,*.%s-controller-webhook,*.%s-controller-webhook.%s,%s-controller-webhook.%s,*.%s-controller-webhook.%s.svc,%s-controller-webhook.%s.svc,*.controller-webhook.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{ printf "%s-controller-webhook,%s-controller-webhook.%s,%s-controller-webhook.%s.svc,%s-controller-webhook.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
 {{- end -}}
 
 {{- define "consul.vaultReplicationTokenTemplate" -}}
