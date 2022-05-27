@@ -9,6 +9,7 @@ IMPROVEMENTS:
 BUG FIXES:
 * Helm
   * Update client-snapshot-agent so that setting `client.snapshotAgent.caCert` no longer requires root access to modify the trust store. [[GH-1190](https://github.com/hashicorp/consul-k8s/pull/1190/)]
+  * Add missing vault agent annotations to the `api-gateway-controller-deployment`. [[GH-1247](https://github.com/hashicorp/consul-k8s/pull/1247)]
 
 ## 0.44.0 (May 17, 2022)
 
