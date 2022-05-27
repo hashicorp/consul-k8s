@@ -278,7 +278,7 @@ func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx con
 		}
 	}
 	// The newly created or updated secret should exist at this point, so we can get it and return the resourceVersion.
-	var newSecret *corev1.Secret
+	newSecret := &corev1.Secret{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, newSecret); err != nil {
 		return "", err
 	}

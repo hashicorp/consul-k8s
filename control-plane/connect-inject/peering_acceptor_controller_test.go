@@ -100,7 +100,6 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
-				secret.ResourceVersion = "1234"
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
@@ -155,7 +154,6 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("acceptor-created-secret", "default", "some-old-key", "some-old-data")
-				secret.ResourceVersion = "1234"
 				secret.OwnerReferences = []metav1.OwnerReference{
 					{
 						APIVersion:         "consul.hashicorp.com/v1alpha1",
@@ -221,7 +219,6 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
-				secret.ResourceVersion = "1234"
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
@@ -280,7 +277,6 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 					},
 				}
 				secret := createSecret("some-old-secret", "default", "some-old-key", "some-old-data")
-				secret.ResourceVersion = "1234"
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
@@ -539,12 +535,13 @@ func TestShouldGenerateToken(t *testing.T) {
 						Name:       "acceptor-secret",
 						Key:        "data",
 						Backend:    "kubernetes",
-						LatestHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+						LatestHash: "1",
 					},
 				},
 			},
 			existingSecret: func() *corev1.Secret {
 				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				secret.ResourceVersion = "1"
 				return secret
 			},
 			expShouldGenerate: false,
@@ -572,12 +569,13 @@ func TestShouldGenerateToken(t *testing.T) {
 						Name:       "acceptor-secret",
 						Key:        "data-old",
 						Backend:    "kubernetes",
-						LatestHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+						LatestHash: "1",
 					},
 				},
 			},
 			existingSecret: func() *corev1.Secret {
-				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				secret := createSecret("acceptor-secret", "default", "data-old", "foo")
+				secret.ResourceVersion = "1"
 				return secret
 			},
 			expShouldGenerate: true,
@@ -605,16 +603,52 @@ func TestShouldGenerateToken(t *testing.T) {
 						Name:       "acceptor-secret-old",
 						Key:        "data",
 						Backend:    "kubernetes",
-						LatestHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+						LatestHash: "1",
 					},
 				},
 			},
 			existingSecret: func() *corev1.Secret {
-				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				secret := createSecret("acceptor-secret-old", "default", "data", "foo")
+				secret.ResourceVersion = "1"
 				return secret
 			},
 			expShouldGenerate: true,
 			expNameChanged:    true,
+			expErr:            nil,
+		},
+		{
+			name: "Contents changed",
+			peeringAcceptor: &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "acceptor",
+					Namespace: "default",
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-secret",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringAcceptorStatus{
+					Secret: &v1alpha1.SecretStatus{
+						Name:       "acceptor-secret",
+						Key:        "data",
+						Backend:    "kubernetes",
+						LatestHash: "1",
+					},
+				},
+			},
+			// existingSecret resource version is different from status, signalling the contents have changed.
+			existingSecret: func() *corev1.Secret {
+				secret := createSecret("acceptor-secret", "default", "data", "foo")
+				secret.ResourceVersion = "12345"
+				return secret
+			},
+			expShouldGenerate: true,
+			expNameChanged:    false,
 			expErr:            nil,
 		},
 		{
@@ -691,13 +725,13 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			resourceVersion: "fake",
+			resourceVersion: "1234",
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				Secret: &v1alpha1.SecretStatus{
 					Name:       "acceptor-secret",
 					Key:        "data",
 					Backend:    "kubernetes",
-					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
+					LatestHash: "1234",
 				},
 				ReconcileError: &v1alpha1.ReconcileErrorStatus{
 					Error:   pointerToBool(false),
@@ -726,17 +760,17 @@ func TestUpdateStatus(t *testing.T) {
 						Name:       "old-name",
 						Key:        "old-key",
 						Backend:    "kubernetes",
-						LatestHash: "old-sha",
+						LatestHash: "old-resource-version",
 					},
 				},
 			},
-			resourceVersion: "fake",
+			resourceVersion: "1234",
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				Secret: &v1alpha1.SecretStatus{
 					Name:       "acceptor-secret",
 					Key:        "data",
 					Backend:    "kubernetes",
-					LatestHash: "b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78",
+					LatestHash: "1234",
 				},
 				ReconcileError: &v1alpha1.ReconcileErrorStatus{
 					Error:   pointerToBool(false),
