@@ -6,6 +6,24 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - secrets/status
+  verbs:
+  - get
+- apiGroups:
   - consul.hashicorp.com
   resources:
   - exportedservices
@@ -61,6 +79,26 @@ rules:
   - consul.hashicorp.com
   resources:
   - mesh/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - peeringacceptors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - peeringacceptors/status
   verbs:
   - get
   - patch

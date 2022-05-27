@@ -142,14 +142,13 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Download consul 
-        working-directory: control-plane 
+      - name: Download consul
+        working-directory: control-plane
         run: |
-            mkdir -p $HOME/bin
-            wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
-              unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-              rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
-            chmod +x $HOME/bin/consul
+          mkdir -p $HOME/bin
+          wget https://github.com/ndhanushkodi/binaries/releases/download/v1oss/consul -O consulbin && \
+            mv consulbin $HOME/bin/consul &&
+          chmod +x $HOME/bin/consul
 
       - name: Run go tests
         working-directory: control-plane
@@ -191,13 +190,12 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Download consul 
-        working-directory: control-plane 
+      - name: Download consul
+        working-directory: control-plane
         run: |
             mkdir -p $HOME/bin
-            wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
-              unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-              rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
+            wget https://github.com/ndhanushkodi/binaries/releases/download/v1ent/consul -O consulbin && \
+              mv consulbin $HOME/bin/consul &&
             chmod +x $HOME/bin/consul
 
       - name: Run go tests
