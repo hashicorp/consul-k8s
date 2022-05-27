@@ -5,20 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: peeringacceptors.consul.hashicorp.com
+  name: peeringdialers.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
-    kind: PeeringAcceptor
-    listKind: PeeringAcceptorList
-    plural: peeringacceptors
-    singular: peeringacceptor
+    kind: PeeringDialer
+    listKind: PeeringDialerList
+    plural: peeringdialers
+    singular: peeringdialer
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: PeeringAcceptor is the Schema for the peeringacceptors API.
+        description: PeeringDialer is the Schema for the peeringdialers API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
+            description: PeeringDialerSpec defines the desired state of PeeringDialer.
             properties:
               peer:
                 description: Peer describes the information needed to create a peering.
@@ -58,7 +58,7 @@ spec:
             - peer
             type: object
           status:
-            description: PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
+            description: PeeringDialerStatus defines the observed state of PeeringDialer.
             properties:
               lastReconcileTime:
                 description: LastReconcileTime is the last time the resource was reconciled.
