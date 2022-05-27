@@ -65,7 +65,7 @@ type PeeringAcceptorStatus struct {
 	ReconcileError *ReconcileErrorStatus `json:"reconcileError,omitempty"`
 	// SecretRef shows the status of the secret.
 	// +optional
-	SecretRef *SecretStatus `json:"secret,omitempty"`
+	SecretRef *SecretRefStatus `json:"secret,omitempty"`
 }
 
 type ReconcileErrorStatus struct {
@@ -75,7 +75,7 @@ type ReconcileErrorStatus struct {
 	Message *string `json:"message,omitempty"`
 }
 
-type SecretStatus struct {
+type SecretRefStatus struct {
 	// Name is the name of the secret generated.
 	Name string `json:"name,omitempty"`
 	// Key is the key of the secret generated.

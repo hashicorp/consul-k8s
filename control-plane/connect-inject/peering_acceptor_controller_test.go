@@ -57,7 +57,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				return []runtime.Object{peeringAcceptor}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:    "acceptor-created-secret",
 					Key:     "data",
 					Backend: "kubernetes",
@@ -103,7 +103,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:    "acceptor-created-secret",
 					Key:     "data",
 					Backend: "kubernetes",
@@ -145,7 +145,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 						},
 					},
 					Status: v1alpha1.PeeringAcceptorStatus{
-						SecretRef: &v1alpha1.SecretStatus{
+						SecretRef: &v1alpha1.SecretRefStatus{
 							Name:            "acceptor-created-secret",
 							Key:             "some-old-key",
 							Backend:         "kubernetes",
@@ -167,7 +167,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:    "acceptor-created-secret",
 					Key:     "data",
 					Backend: "kubernetes",
@@ -210,7 +210,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 						},
 					},
 					Status: v1alpha1.PeeringAcceptorStatus{
-						SecretRef: &v1alpha1.SecretStatus{
+						SecretRef: &v1alpha1.SecretRefStatus{
 							Name:            "some-old-secret",
 							Key:             "some-old-key",
 							Backend:         "kubernetes",
@@ -222,7 +222,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:    "acceptor-created-secret",
 					Key:     "data",
 					Backend: "kubernetes",
@@ -268,7 +268,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 						},
 					},
 					Status: v1alpha1.PeeringAcceptorStatus{
-						SecretRef: &v1alpha1.SecretStatus{
+						SecretRef: &v1alpha1.SecretRefStatus{
 							Name:            "some-old-secret",
 							Key:             "some-old-key",
 							Backend:         "kubernetes",
@@ -280,7 +280,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 				return []runtime.Object{peeringAcceptor, secret}
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:    "acceptor-created-secret",
 					Key:     "data",
 					Backend: "kubernetes",
@@ -531,7 +531,7 @@ func TestShouldGenerateToken(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					SecretRef: &v1alpha1.SecretStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
 						Name:            "acceptor-secret",
 						Key:             "data",
 						Backend:         "kubernetes",
@@ -565,7 +565,7 @@ func TestShouldGenerateToken(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					SecretRef: &v1alpha1.SecretStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
 						Name:            "acceptor-secret",
 						Key:             "data-old",
 						Backend:         "kubernetes",
@@ -599,7 +599,7 @@ func TestShouldGenerateToken(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					SecretRef: &v1alpha1.SecretStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
 						Name:            "acceptor-secret-old",
 						Key:             "data",
 						Backend:         "kubernetes",
@@ -633,7 +633,7 @@ func TestShouldGenerateToken(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					SecretRef: &v1alpha1.SecretStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
 						Name:            "acceptor-secret",
 						Key:             "data",
 						Backend:         "kubernetes",
@@ -668,7 +668,7 @@ func TestShouldGenerateToken(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					SecretRef: &v1alpha1.SecretStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
 						Name:            "acceptor-secret",
 						Key:             "data",
 						Backend:         "kubernetes",
@@ -727,7 +727,7 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			resourceVersion: "1234",
 			expStatus: v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:            "acceptor-secret",
 					Key:             "data",
 					Backend:         "kubernetes",
@@ -756,7 +756,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					SecretRef: &v1alpha1.SecretStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
 						Name:            "old-name",
 						Key:             "old-key",
 						Backend:         "kubernetes",
@@ -766,7 +766,7 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			resourceVersion: "1234",
 			expStatus: v1alpha1.PeeringAcceptorStatus{
-				SecretRef: &v1alpha1.SecretStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
 					Name:            "acceptor-secret",
 					Key:             "data",
 					Backend:         "kubernetes",

@@ -200,7 +200,7 @@ func shouldGenerateToken(peeringAcceptor *consulv1alpha1.PeeringAcceptor, existi
 
 // updateStatus updates the peeringAcceptor's secret in the status.
 func (r *PeeringAcceptorController) updateStatus(ctx context.Context, peeringAcceptor *consulv1alpha1.PeeringAcceptor, secretResourceVersion string) error {
-	peeringAcceptor.Status.SecretRef = &consulv1alpha1.SecretStatus{
+	peeringAcceptor.Status.SecretRef = &consulv1alpha1.SecretRefStatus{
 		Name:    peeringAcceptor.Spec.Peer.Secret.Name,
 		Key:     peeringAcceptor.Spec.Peer.Secret.Key,
 		Backend: peeringAcceptor.Spec.Peer.Secret.Backend,
