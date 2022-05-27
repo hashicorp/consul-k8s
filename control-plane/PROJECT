@@ -3,7 +3,7 @@ layout:
 - go.kubebuilder.io/v2
 plugins:
   go.operator-sdk.io/v2-alpha: {}
-repo: github.com/hashicorp/consul-k8s
+repo: github.com/hashicorp/consul-k8s/control-plane
 resources:
 - controller: true
   domain: hashicorp.com
@@ -58,5 +58,14 @@ resources:
   group: consul
   kind: ExportedServices
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  controller: true
+  domain: hashicorp.com
+  group: consul
+  kind: PeeringAcceptor
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
   version: v1alpha1
 version: "3"
