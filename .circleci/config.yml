@@ -503,10 +503,9 @@ jobs:
           paths:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
-      - acceptance-kind-1-23-consul-nightly-1-11
-#      - run-acceptance-tests:
-#          failfast: true
-#          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2"
+      - run-acceptance-tests:
+          failfast: true
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorp/consul:1.11.6 -consul-k8s-image="docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.44.0" -consul-major-version=11
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
