@@ -1266,6 +1266,43 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	})
 }
 
+// Test target information are set in service meta.
+func TestServiceResource_targetRefInMeta(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
+
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	// Insert the service
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Insert the endpoints
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+
+	// Verify what we got
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foobar", actual[0].Service.Meta[ConsulK8SRefValue])
+		require.Equal(r, "pod", actual[0].Service.Meta[ConsulK8SRefKind])
+		require.Equal(r, nodeName1, actual[0].Service.Meta[ConsulK8SNodeName])
+
+		// For second service, there is a node but no target refs
+		require.Equal(r, nodeName2, actual[1].Service.Meta[ConsulK8SNodeName])
+		require.NotContains(r, actual[1].Service.Meta, ConsulK8SRefValue)
+		require.NotContains(r, actual[1].Service.Meta, ConsulK8SRefKind)
+	})
+}
+
 // Test allow/deny namespace lists.
 func TestServiceResource_AllowDenyNamespaces(t *testing.T) {
 	t.Parallel()
@@ -1601,6 +1638,7 @@ func createNodes(t *testing.T, client *fake.Clientset) (*apiv1.Node, *apiv1.Node
 func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, namespace string) {
 	node1 := nodeName1
 	node2 := nodeName2
+	targetRef := apiv1.ObjectReference{Kind: "pod", Name: "foobar"}
 	_, err := client.CoreV1().Endpoints(namespace).Create(
 		context.Background(),
 		&apiv1.Endpoints{
@@ -1612,7 +1650,7 @@ func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, n
 			Subsets: []apiv1.EndpointSubset{
 				{
 					Addresses: []apiv1.EndpointAddress{
-						{NodeName: &node1, IP: "1.1.1.1"},
+						{NodeName: &node1, IP: "1.1.1.1", TargetRef: &targetRef},
 					},
 					Ports: []apiv1.EndpointPort{
 						{Name: "http", Port: 8080},
