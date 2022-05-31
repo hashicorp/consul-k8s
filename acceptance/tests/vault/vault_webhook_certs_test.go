@@ -43,6 +43,14 @@ func TestVault_WebhookCerts(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
+	// Initially tried toset the expiration to 5-20s to keep the test as short running as possible,
+	// but at those levels, the pods would fail to start becuase the certs had expired and would throw errors.
+	// 30s seconds seemed to consistently clear this issue and not have startup problems.
+	// If trying to go lower, be sure to run this several times in CI to ensure that there are little issues.
+	// If wanting to make this higher, there is no problem except for consideration of how long the test will
+	// take to complete.
+	expirationInSeconds := 30
+
 	// -------------------------
 	// PKI
 	// -------------------------
@@ -62,12 +70,11 @@ func TestVault_WebhookCerts(t *testing.T) {
 		DataCenter:          "dc1",
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
-		MaxTTL:              "1h",
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
 		AuthMethodPath:      "kubernetes",
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
-	webhookCertTtl := 25 * time.Second
 	// Configure controller webhook PKI
 	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "controller",
@@ -77,7 +84,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		DataCenter:          "dc1",
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
-		MaxTTL:              webhookCertTtl.String(),
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
 		AuthMethodPath:      "kubernetes",
 		CommonName:          "Consul Webhook Certificates",
 	}
@@ -92,7 +99,7 @@ func TestVault_WebhookCerts(t *testing.T) {
 		DataCenter:          "dc1",
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
-		MaxTTL:              webhookCertTtl.String(),
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
 		AuthMethodPath:      "kubernetes",
 		CommonName:          "Consul Webhook Certificates",
 	}
@@ -251,6 +258,20 @@ func TestVault_WebhookCerts(t *testing.T) {
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
 	consulCluster.Create(t)
 
+	// Portforward to connect injector pod and get cert
+	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
+	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
+		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=connect-injector,release=%s", consulReleaseName)})
+	require.NotEmpty(t, podList.Items)
+	connectInjectorPodName := podList.Items[0].Name
+	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 443)
+	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "RPC expiry: %s \n", connectInjectorCert.NotAfter.String())
+
+	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
+	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
+
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
 	consulCluster.ACLToken = bootstrapToken
@@ -281,12 +302,6 @@ func TestVault_WebhookCerts(t *testing.T) {
 		require.True(t, license.Valid)
 	}
 
-	// Check that webhook-cert-manager is not deployed.
-	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
-	deployments, err := client.AppsV1().Deployments(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=webhook-cert-manager,release=%s", consulReleaseName)})
-	require.NoError(t, err)
-	require.Empty(t, deployments.Items)
-
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
@@ -306,4 +321,11 @@ func TestVault_WebhookCerts(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
+
+	connectInjectorCert2, err := getCertificate(t, connectInjectorPodAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "RPC expiry: %s \n", connectInjectorCert2.NotAfter.String())
+	// verify that a previous cert expired and that a new one has been issued
+	// by comparing the NotAfter on the two certs.
+	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
 }
