@@ -24,8 +24,8 @@ type TableEntry struct {
 	Color string
 }
 
-// Rich adds a row to the table.
-func (t *Table) Rich(cols []string, colors []string) {
+// AddRow adds a row to the table.
+func (t *Table) AddRow(cols []string, colors []string) {
 	var row []TableEntry
 
 	for i, col := range cols {
