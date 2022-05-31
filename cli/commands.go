@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
+	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
 	"github.com/hashicorp/consul-k8s/cli/cmd/status"
 	"github.com/hashicorp/consul-k8s/cli/cmd/uninstall"
 	"github.com/hashicorp/consul-k8s/cli/cmd/upgrade"
@@ -46,6 +47,11 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 			return &cmdversion.Command{
 				BaseCommand: baseCommand,
 				Version:     version.GetHumanVersion(),
+			}, nil
+		},
+		"proxy list": func() (cli.Command, error) {
+			return &list.Command{
+				BaseCommand: baseCommand,
 			}, nil
 		},
 	}
