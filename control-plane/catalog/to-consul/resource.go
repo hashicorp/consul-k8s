@@ -28,7 +28,10 @@ const (
 
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
-	ConsulK8SNS = "external-k8s-ns"
+	ConsulK8SNS       = "external-k8s-ns"
+	ConsulK8SRefKind  = "external-k8s-ref-kind"
+	ConsulK8SRefValue = "external-k8s-ref-name"
+	ConsulK8SNodeName = "external-k8s-node-name"
 )
 
 type NodePortSyncType string
@@ -656,6 +659,19 @@ func (t *ServiceResource) registerServiceInstance(
 			r.Service.ID = serviceID(r.Service.Service, addr)
 			r.Service.Address = addr
 			r.Service.Port = epPort
+			r.Service.Meta = make(map[string]string)
+			// Deepcopy baseService.Meta into r.Service.Meta as baseService is shared
+			// between all nodes of a service
+			for k, v := range baseService.Meta {
+				r.Service.Meta[k] = v
+			}
+			if subsetAddr.TargetRef != nil {
+				r.Service.Meta[ConsulK8SRefValue] = subsetAddr.TargetRef.Name
+				r.Service.Meta[ConsulK8SRefKind] = subsetAddr.TargetRef.Kind
+			}
+			if subsetAddr.NodeName != nil {
+				r.Service.Meta[ConsulK8SNodeName] = *subsetAddr.NodeName
+			}
 
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
