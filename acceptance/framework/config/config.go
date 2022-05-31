@@ -39,8 +39,9 @@ type TestConfig struct {
 
 	EnableTransparentProxy bool
 
-	ConsulImage    string
-	ConsulK8SImage string
+	ConsulImage        string
+	ConsulMajorVersion int
+	ConsulK8SImage     string
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string

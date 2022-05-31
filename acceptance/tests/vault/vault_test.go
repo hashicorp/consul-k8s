@@ -26,6 +26,9 @@ const (
 // It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
+		t.Skipf("Skipping: Vault secrets backend not supported in version %v", cfg.ConsulMajorVersion)
+	}
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
 

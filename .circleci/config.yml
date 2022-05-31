@@ -68,11 +68,10 @@ commands:
         type: string
       consul-image:
         type: string
-        default: "hashicorp/consul-enterprise:1.11.6-ent"
+        default: "hashicorp/consul-enterprise:1.12.0-ent"
       consul-k8s-image:
         type: string
-        default: "hashicorp/consul-k8s-control-plane:0.44.0"
-        #default: "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:$(git rev-parse --short HEAD)"
+        default: "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:$(git rev-parse --short HEAD)"
       go-path:
         type: string
         default: "/home/circleci/.go_workspace"
@@ -897,7 +896,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-major-version=11
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -932,7 +931,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-major-version=12
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:

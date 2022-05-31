@@ -22,6 +22,9 @@ import (
 // with the vault namespace.
 func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
+		t.Skipf("Skipping: Vault secrets backend with Vault namespaces not supported in version %v", cfg.ConsulMajorVersion)
+	}
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
 	vaultNamespacePath := "test-namespace"

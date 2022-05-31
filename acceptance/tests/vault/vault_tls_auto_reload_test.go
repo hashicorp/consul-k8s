@@ -22,6 +22,9 @@ import (
 // that certs have different expirations.
 func TestVault_TlsAutoReload(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
+		t.Skipf("Skipping: Vault secrets auto-reload not supported in version %v", cfg.ConsulMajorVersion)
+	}
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
 

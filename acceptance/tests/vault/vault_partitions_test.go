@@ -21,6 +21,10 @@ import (
 func TestVault_Partitions(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
+
+	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
+		t.Skipf("Skipping: Vault partitions is not supported in version %v", cfg.ConsulMajorVersion)
+	}
 	serverClusterCtx := env.DefaultContext(t)
 	clientClusterCtx := env.Context(t, environment.SecondaryContextName)
 	ns := serverClusterCtx.KubectlOptions(t).Namespace

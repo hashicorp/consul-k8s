@@ -27,6 +27,9 @@ import (
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
+		t.Skipf("Skipping: Vault wanfed is not supported in version %v", cfg.ConsulMajorVersion)
+	}
 	if !cfg.EnableMultiCluster {
 		t.Skipf("skipping this test because -enable-multi-cluster is not set")
 	}

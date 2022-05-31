@@ -28,8 +28,9 @@ type TestFlags struct {
 
 	flagEnableTransparentProxy bool
 
-	flagConsulImage    string
-	flagConsulK8sImage string
+	flagConsulImage        string
+	flagConsulMajorVersion int
+	flagConsulK8sImage     string
 
 	flagNoCleanupOnFailure bool
 
@@ -55,6 +56,7 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
 
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
+	flag.IntVar(&t.flagConsulMajorVersion, "consul-major-version", 0, "The Consul major version.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
@@ -132,8 +134,9 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
 
-		ConsulImage:    t.flagConsulImage,
-		ConsulK8SImage: t.flagConsulK8sImage,
+		ConsulImage:        t.flagConsulImage,
+		ConsulK8SImage:     t.flagConsulK8sImage,
+		ConsulMajorVersion: t.flagConsulMajorVersion,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
