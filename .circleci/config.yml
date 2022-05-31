@@ -503,7 +503,7 @@ jobs:
           paths:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
-      - acceptance-kind-1-23-consul-nightly-1-11
+      - nightly-acceptance-tests-consul
 #      - run-acceptance-tests:
 #          failfast: true
 #          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2"
