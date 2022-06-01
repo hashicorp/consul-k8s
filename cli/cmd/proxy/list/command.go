@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Command is the command struct for the proxy list command.
 type Command struct {
 	*common.BaseCommand
 
@@ -30,6 +31,7 @@ type Command struct {
 	help string
 }
 
+// init sets up flags and help text for the command.
 func (c *Command) init() {
 	c.set = flag.NewSets()
 
@@ -68,6 +70,7 @@ func (c *Command) init() {
 	c.Init()
 }
 
+// Run executes the list command.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 	c.Log.ResetNamed("list")
@@ -105,15 +108,18 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+// Help returns a description of the command and how it is used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
 	return c.Synopsis() + "\n\nUsage: consul-k8s proxy list [flags]\n\n" + c.help
 }
 
+// Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
 	return "List all Pods running Consul proxies."
 }
 
+// validateFlags ensures that the flags passed in by the can be used.
 func (c *Command) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
@@ -125,6 +131,7 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
+// initKubernetes initializes the Kubernetes client with the users config.
 func (c *Command) initKubernetes() error {
 	settings := helmCLI.New()
 
@@ -137,6 +144,7 @@ func (c *Command) initKubernetes() error {
 	return err
 }
 
+// fetchPods fetches all pods in flagNamespace which run Consul proxies.
 func (c *Command) fetchPods() ([]v1.Pod, error) {
 	var pods []v1.Pod
 
