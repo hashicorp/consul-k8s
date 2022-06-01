@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Command is the command struct for the proxy list command.
-type Command struct {
+// ListCommand is the command struct for the proxy list command.
+type ListCommand struct {
 	*common.BaseCommand
 
 	kubernetes kubernetes.Interface
@@ -33,7 +33,7 @@ type Command struct {
 }
 
 // init sets up flags and help text for the command.
-func (c *Command) init() {
+func (c *ListCommand) init() {
 	c.set = flag.NewSets()
 
 	f := c.set.NewSet("Command Options")
@@ -72,7 +72,7 @@ func (c *Command) init() {
 }
 
 // Run executes the list command.
-func (c *Command) Run(args []string) int {
+func (c *ListCommand) Run(args []string) int {
 	c.once.Do(c.init)
 	c.Log.ResetNamed("list")
 	defer common.CloseWithError(c.BaseCommand)
@@ -111,18 +111,18 @@ func (c *Command) Run(args []string) int {
 }
 
 // Help returns a description of the command and how it is used.
-func (c *Command) Help() string {
+func (c *ListCommand) Help() string {
 	c.once.Do(c.init)
 	return c.Synopsis() + "\n\nUsage: consul-k8s proxy list [flags]\n\n" + c.help
 }
 
 // Synopsis returns a one-line command summary.
-func (c *Command) Synopsis() string {
+func (c *ListCommand) Synopsis() string {
 	return "List all Pods running Consul proxies."
 }
 
 // validateFlags ensures that the flags passed in by the can be used.
-func (c *Command) validateFlags() error {
+func (c *ListCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
 	}
@@ -134,7 +134,7 @@ func (c *Command) validateFlags() error {
 }
 
 // initKubernetes initializes the Kubernetes client with the users config.
-func (c *Command) initKubernetes() error {
+func (c *ListCommand) initKubernetes() error {
 	settings := helmCLI.New()
 
 	restConfig, err := settings.RESTClientGetter().ToRESTConfig()
@@ -147,7 +147,7 @@ func (c *Command) initKubernetes() error {
 }
 
 // fetchPods fetches all pods in flagNamespace which run Consul proxies.
-func (c *Command) fetchPods() ([]v1.Pod, error) {
+func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	var pods []v1.Pod
 
 	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
@@ -178,7 +178,7 @@ func (c *Command) fetchPods() ([]v1.Pod, error) {
 }
 
 // output prints a table of pods to the terminal.
-func (c *Command) output(pods []v1.Pod) {
+func (c *ListCommand) output(pods []v1.Pod) {
 	if c.flagNamespace == "" {
 		c.UI.Output("Namespace: All Namespaces\n")
 	} else {
