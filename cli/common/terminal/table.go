@@ -64,20 +64,15 @@ func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	table.SetHeader(tbl.Headers)
 	table.SetBorder(false)
 	table.SetAutoWrapText(false)
-
-	if cfg.Style == "Simple" {
-		// Format the table without borders, simple output
-
-		table.SetAutoFormatHeaders(true)
-		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.SetCenterSeparator("")
-		table.SetColumnSeparator("")
-		table.SetRowSeparator("")
-		table.SetHeaderLine(false)
-		table.SetTablePadding("\t") // pad with tabs
-		table.SetNoWhiteSpace(true)
-	}
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetCenterSeparator("")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetHeaderLine(false)
+	table.SetTablePadding("\t") // pad with tabs
+	table.SetNoWhiteSpace(true)
 
 	for _, row := range tbl.Rows {
 		colors := make([]tablewriter.Colors, len(row))
