@@ -50,7 +50,7 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 			}, nil
 		},
 		"proxy list": func() (cli.Command, error) {
-			return &list.Command{
+			return &list.ListCommand{
 				BaseCommand: baseCommand,
 			}, nil
 		},
