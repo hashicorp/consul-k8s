@@ -177,6 +177,7 @@ func (c *Command) fetchPods() ([]v1.Pod, error) {
 	return pods, nil
 }
 
+// output prints a table of pods to the terminal.
 func (c *Command) output(pods []v1.Pod) {
 	if c.flagNamespace == "" {
 		c.UI.Output("Namespace: All Namespaces\n")
@@ -190,27 +191,28 @@ func (c *Command) output(pods []v1.Pod) {
 	} else {
 		tbl = terminal.NewTable("Name", "Type")
 	}
-	for _, pod := range pods {
-		component := pod.Labels["component"]
 
-		var podType string
-		if component == "ingress-gateway" {
-			podType = "Ingress Gateway"
-		} else if component == "api-gateway" {
-			podType = "API Gateway"
-		} else if component == "mesh-gateway" {
-			podType = "Mesh Gateway"
-		} else if component == "terminating-gateway" {
-			podType = "Terminating Gateway"
-		} else {
-			podType = "Sidecar"
+	for _, pod := range pods {
+		var proxyType string
+		switch pod.Labels["component"] {
+		case "ingress-gateway":
+			proxyType = "Ingress Gateway"
+		case "mesh-gateway":
+			proxyType = "Mesh Gateway"
+		case "terminating-gateway":
+			proxyType = "Terminating Gateway"
+		case "api-gateway":
+			proxyType = "API Gateway"
+		default:
+			proxyType = "Sidecar"
 		}
 
 		if c.flagNamespace == "" {
-			tbl.AddRow([]string{pod.Namespace, pod.Name, podType}, []string{})
+			tbl.AddRow([]string{pod.Namespace, pod.Name, proxyType}, []string{})
 		} else {
-			tbl.AddRow([]string{pod.Name, podType}, []string{})
+			tbl.AddRow([]string{pod.Name, proxyType}, []string{})
 		}
 	}
+
 	c.UI.Table(tbl)
 }
