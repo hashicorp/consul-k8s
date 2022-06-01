@@ -8,7 +8,13 @@ import (
 // Passed to UI.Table to provide a nicely formatted table.
 type Table struct {
 	Headers []string
-	Rows    [][]TableEntry
+	Rows    [][]Cell
+}
+
+// Cell is a single entry for a table.
+type Cell struct {
+	Value string
+	Color string
 }
 
 // Table creates a new Table structure that can be used with UI.Table.
@@ -18,21 +24,15 @@ func NewTable(headers ...string) *Table {
 	}
 }
 
-// TableEntry is a single entry for a table.
-type TableEntry struct {
-	Value string
-	Color string
-}
-
 // AddRow adds a row to the table.
 func (t *Table) AddRow(cols []string, colors []string) {
-	var row []TableEntry
+	var row []Cell
 
 	for i, col := range cols {
 		if i < len(colors) {
-			row = append(row, TableEntry{Value: col, Color: colors[i]})
+			row = append(row, Cell{Value: col, Color: colors[i]})
 		} else {
-			row = append(row, TableEntry{Value: col})
+			row = append(row, Cell{Value: col})
 		}
 	}
 
