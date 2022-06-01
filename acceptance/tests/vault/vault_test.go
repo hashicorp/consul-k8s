@@ -1,11 +1,14 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -13,6 +16,7 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -28,7 +32,8 @@ const (
 func TestVault(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
-	ns := ctx.KubectlOptions(t).Namespace
+	kubectlOptions := ctx.KubectlOptions(t)
+	ns := kubectlOptions.Namespace
 
 	ver, err := version.NewVersion("1.12.0")
 	require.NoError(t, err)
@@ -45,6 +50,14 @@ func TestVault(t *testing.T) {
 
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
+
+	// Initially tried toset the expiration to 5-20s to keep the test as short running as possible,
+	// but at those levels, the pods would fail to start becuase the certs had expired and would throw errors.
+	// 30s seconds seemed to consistently clear this issue and not have startup problems.
+	// If trying to go lower, be sure to run this several times in CI to ensure that there are little issues.
+	// If wanting to make this higher, there is no problem except for consideration of how long the test will
+	// take to complete.
+	expirationInSeconds := 30
 
 	// -------------------------
 	// PKI
@@ -65,10 +78,40 @@ func TestVault(t *testing.T) {
 		DataCenter:          "dc1",
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, ServerRole),
-		MaxTTL:              "1h",
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
 		AuthMethodPath:      KubernetesAuthMethodPath,
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
+	// Configure controller webhook PKI
+	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "controller",
+		PolicyName:          "controller-ca-policy",
+		RoleName:            "controller-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		CommonName:          "Consul Webhook Certificates",
+	}
+	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
+	// Configure controller webhook PKI
+	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "connect",
+		PolicyName:          "connect-ca-policy",
+		RoleName:            "connect-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		CommonName:          "Consul Webhook Certificates",
+	}
+	connectInjectorWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
 	// -------------------------
 	// KV2 secrets
@@ -169,12 +212,18 @@ func TestVault(t *testing.T) {
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
 		"controller.enabled":     "true",
+		"global.secretsBackend.vault.connectInject.tlsCert.secretName": connectInjectorWebhookPKIConfig.CertPath,
+		"global.secretsBackend.vault.connectInject.caCert.secretName":  connectInjectorWebhookPKIConfig.CAPath,
+		"global.secretsBackend.vault.controller.tlsCert.secretName":    controllerWebhookPKIConfig.CertPath,
+		"global.secretsBackend.vault.controller.caCert.secretName":     controllerWebhookPKIConfig.CAPath,
 
-		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
-		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
-		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
-		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+		"global.secretsBackend.vault.enabled":                 "true",
+		"global.secretsBackend.vault.consulServerRole":        consulServerRole,
+		"global.secretsBackend.vault.consulClientRole":        consulClientRole,
+		"global.secretsBackend.vault.consulCARole":            serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.consulConnectInjectRole": connectInjectorWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.consulControllerRole":    controllerWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole":    manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
@@ -216,6 +265,20 @@ func TestVault(t *testing.T) {
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
 	consulCluster.Create(t)
+
+	// Portforward to connect injector pod and get cert
+	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
+	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
+		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=connect-injector,release=%s", consulReleaseName)})
+	require.NotEmpty(t, podList.Items)
+	connectInjectorPodName := podList.Items[0].Name
+	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 8080)
+	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
+	require.NoError(t, err)
+	logger.Logf(t, "RPC expiry: %s \n", connectInjectorCert.NotAfter.String())
+
+	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
+	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
@@ -266,4 +329,10 @@ func TestVault(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
+
+	connectInjectorCert2, err := getCertificate(t, connectInjectorPodAddress)
+	require.NoError(t, err)
+	// verify that a previous cert expired and that a new one has been issued
+	// by comparing the NotAfter on the two certs.
+	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
 }
