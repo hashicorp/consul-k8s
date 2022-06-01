@@ -270,6 +270,7 @@ func TestVault(t *testing.T) {
 	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
 	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
 		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=connect-injector,release=%s", consulReleaseName)})
+	require.NoError(t, err)
 	require.NotEmpty(t, podList.Items)
 	connectInjectorPodName := podList.Items[0].Name
 	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 8080)
