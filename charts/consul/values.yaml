@@ -107,7 +107,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: "hashicorp/consul-k8s-control-plane:0.43.0"
+  imageK8S: "hashicorp/consul-k8s-control-plane:0.44.0"
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -564,6 +564,10 @@ global:
     # If true, the Helm chart will create necessary configuration for running
     # its components on OpenShift.
     enabled: false
+
+  # The time in seconds that the consul API client will wait for a response from 
+  # the API before cancelling the request.
+  consulAPITimeout: 5s
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -1291,6 +1295,11 @@ client:
 
     # The number of snapshot agents to run.
     replicas: 2
+
+    # Interval at which to perform snapshots.
+    # See https://www.consul.io/commands/snapshot/agent#interval
+    # @type: string
+    interval: 1h
 
     # A Kubernetes or Vault secret that should be manually created to contain the entire
     # config to be used on the snapshot agent.

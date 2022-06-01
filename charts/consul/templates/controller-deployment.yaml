@@ -96,6 +96,7 @@ spec:
               {{- if .Values.global.adminPartitions.enabled }}
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
+              -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
               -log-json={{ .Values.global.logJSON }}
         resources:
@@ -113,6 +114,7 @@ spec:
         - "-ec"
         - |
           consul-k8s-control-plane controller \
+            -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
@@ -144,7 +146,7 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  consul-k8s-control-plane consul-logout
+                  consul-k8s-control-plane consul-logout -consul-api-timeout={{ .Values.global.consulAPITimeout }}
         {{- end }}
         env:
         {{- if .Values.global.acls.manageSystemACLs }}

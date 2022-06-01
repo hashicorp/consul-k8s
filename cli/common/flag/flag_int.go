@@ -23,7 +23,7 @@ type IntVar struct {
 func (f *Set) IntVar(i *IntVar) {
 	initial := i.Default
 	if v, exist := os.LookupEnv(i.EnvVar); exist {
-		if i, err := strconv.ParseInt(v, 0, 64); err == nil {
+		if i, err := strconv.ParseInt(v, 0, 32); err == nil {
 			initial = int(i)
 		}
 	}
@@ -60,7 +60,7 @@ func newIntValue(v *IntVar, def int, target *int, hidden bool) *intValue {
 }
 
 func (i *intValue) Set(s string) error {
-	v, err := strconv.ParseInt(s, 0, 64)
+	v, err := strconv.ParseInt(s, 0, 32)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ type UintVar struct {
 func (f *Set) UintVar(i *UintVar) {
 	initial := i.Default
 	if v, exist := os.LookupEnv(i.EnvVar); exist {
-		if i, err := strconv.ParseUint(v, 0, 64); err == nil {
+		if i, err := strconv.ParseUint(v, 0, 32); err == nil {
 			initial = uint(i)
 		}
 	}
@@ -204,7 +204,7 @@ func newUintValue(v *UintVar, def uint, target *uint, hidden bool) *uintValue {
 }
 
 func (i *uintValue) Set(s string) error {
-	v, err := strconv.ParseUint(s, 0, 64)
+	v, err := strconv.ParseUint(s, 0, 32)
 	if err != nil {
 		return err
 	}

@@ -45,7 +45,7 @@ rules:
   resources:
   - podsecuritypolicies
   resourceNames:
-  - {{ template "consul.fullname" . }}-connect-injector
+  - {{ template "consul.fullname" . }}-webhook-cert-manager
   verbs:
   - use
 {{- end }}

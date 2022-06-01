@@ -48,6 +48,18 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "terminatingGateways/Deployment: consul-sidecar uses -consul-api-timeout" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # prerequisites
 
@@ -1209,6 +1221,7 @@ EOF
   -component-name=terminating-gateway/release-name-consul-terminating \
   -acl-auth-method=release-name-consul-k8s-component-auth-method \
   -token-sink-file=/consul/service/acl-token \
+  -consul-api-timeout=5s \
   -log-level=info \
   -log-json=false
 
@@ -1450,6 +1463,38 @@ EOF
 
   local actual=$(echo $object | yq '.[2] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# get-auto-encrypt-client-ca
+
+@test "terminatingGateways/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=gateway1' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
+  [ "${actual}" = "true" ]
+
+  # check server port
+  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+
+  # check consul-api-timeout
+  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

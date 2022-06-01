@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -102,24 +103,175 @@ func TestVault_Partitions(t *testing.T) {
 		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, ns)
 	}
 
-	vault.ConfigureGossipVaultSecret(t, vaultClient)
-	vault.CreateConnectCAPolicy(t, vaultClient, "dc1")
-	vault.ConfigureEnterpriseLicenseVaultSecret(t, vaultClient, cfg)
-	vault.ConfigureACLTokenVaultSecret(t, vaultClient, "bootstrap")
-	vault.ConfigureACLTokenVaultSecret(t, vaultClient, "partition")
+	// -------------------------
+	// PKI
+	// -------------------------
+	// Configure Service Mesh CA
+	connectCAPolicy := "connect-ca-dc1"
+	connectCARootPath := "connect_root"
+	connectCAIntermediatePath := "dc1/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
-	serverPolicies := "gossip,license,connect-ca-dc1,server-cert-dc1,bootstrap-token"
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server", serverPolicies)
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "client", "gossip")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes", "server-acl-init", "bootstrap-token,partition-token")
-	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes")
+	// Configure Server PKI
+	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy",
+		RoleName:            "consul-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      KubernetesAuthMethodPath,
+	}
+	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "client", "gossip")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "server-acl-init", "partition-token")
-	vault.ConfigureKubernetesAuthRole(t, vaultClient, consulReleaseName, ns, "kubernetes-"+secondaryPartition, "partition-init", "partition-token")
-	vault.ConfigureConsulCAKubernetesAuthRole(t, vaultClient, ns, "kubernetes-"+secondaryPartition)
-	vault.ConfigurePKICA(t, vaultClient)
-	certPath := vault.ConfigurePKICertificates(t, vaultClient, consulReleaseName, ns, "dc1", "1h")
+	// -------------------------
+	// KV2 secrets
+	// -------------------------
+	// Gossip key
+	gossipKey, err := vault.GenerateGossipSecret()
+	require.NoError(t, err)
+	gossipSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/gossip",
+		Key:        "gossip",
+		Value:      gossipKey,
+		PolicyName: "gossip",
+	}
+	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+
+	// License
+	licenseSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/license",
+		Key:        "license",
+		Value:      cfg.EnterpriseLicense,
+		PolicyName: "license",
+	}
+	if cfg.EnableEnterprise {
+		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+	}
+
+	// Bootstrap Token
+	bootstrapToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	bootstrapTokenSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/bootstrap",
+		Key:        "token",
+		Value:      bootstrapToken,
+		PolicyName: "bootstrap",
+	}
+	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+
+	// Partition Token
+	partitionToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	partitionTokenSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/partition",
+		Key:        "token",
+		Value:      partitionToken,
+		PolicyName: "partition",
+	}
+	partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+
+	// -------------------------------------------
+	// Additional Auth Roles in Primary Datacenter
+	// -------------------------------------------
+	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+	if cfg.EnableEnterprise {
+		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+	}
+
+	// server
+	consulServerRole := "server"
+	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            consulServerRole,
+		PolicyNames:         serverPolicies,
+	}
+	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// client
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
+	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  consulClientServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            consulClientRole,
+		PolicyNames:         gossipSecret.PolicyName,
+	}
+	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// manageSystemACLs
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
+	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  manageSystemACLsServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            manageSystemACLsRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, partitionTokenSecret.PolicyName),
+	}
+	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// allow all components to access server ca
+	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  "*",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            serverPKIConfig.RoleName,
+		PolicyNames:         serverPKIConfig.PolicyName,
+	}
+	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// ---------------------------------------------
+	// Additional Auth Roles in Secondary Datacenter
+	// ---------------------------------------------
+
+	// client
+	clientAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  consulClientServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+		RoleName:            consulClientRole,
+		PolicyNames:         gossipSecret.PolicyName,
+	}
+	clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+	// manageSystemACLs
+	aclAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  manageSystemACLsServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+		RoleName:            manageSystemACLsRole,
+		PolicyNames:         partitionTokenSecret.PolicyName,
+	}
+	aclAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+	// partition init
+	adminPartitionsRole := "partition-init"
+	partitionInitServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init")
+	prtAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  partitionInitServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+		RoleName:            adminPartitionsRole,
+		PolicyNames:         partitionTokenSecret.PolicyName,
+	}
+	prtAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+	// allow all components to access server ca
+	srvCAAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  "*",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+		RoleName:            serverPKIConfig.RoleName,
+		PolicyNames:         serverPKIConfig.PolicyName,
+	}
+	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 
@@ -133,9 +285,9 @@ func TestVault_Partitions(t *testing.T) {
 		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulClientRole":     "client",
-		"global.secretsBackend.vault.consulCARole":         "consul-ca",
-		"global.secretsBackend.vault.manageSystemACLsRole": "server-acl-init",
+		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
+		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecretName,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
@@ -144,28 +296,28 @@ func TestVault_Partitions(t *testing.T) {
 
 		"global.tls.enabled":           "true",
 		"global.tls.enableAutoEncrypt": "true",
-		"global.tls.caCert.secretName": "pki/cert/ca",
+		"global.tls.caCert.secretName": serverPKIConfig.CAPath,
 
-		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
-		"global.gossipEncryption.secretKey":  "gossip",
+		"global.gossipEncryption.secretName": gossipSecret.Path,
+		"global.gossipEncryption.secretKey":  gossipSecret.Key,
 
-		"global.enterpriseLicense.secretName": "consul/data/secret/license",
-		"global.enterpriseLicense.secretKey":  "license",
+		"global.enterpriseLicense.secretName": licenseSecret.Path,
+		"global.enterpriseLicense.secretKey":  licenseSecret.Key,
 	}
 
 	serverHelmValues := map[string]string{
-		"global.secretsBackend.vault.consulServerRole":              "server",
+		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
 		"global.secretsBackend.vault.connectCA.address":             serverClusterVault.Address(),
-		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "dc1/connect_inter",
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
 
-		"global.acls.bootstrapToken.secretName": "consul/data/secret/bootstrap",
-		"global.acls.bootstrapToken.secretKey":  "token",
-		"global.acls.partitionToken.secretName": "consul/data/secret/partition",
-		"global.acls.partitionToken.secretKey":  "token",
+		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
+		"global.acls.bootstrapToken.secretKey":  bootstrapTokenSecret.Key,
+		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
+		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
 		"server.exposeGossipAndRPCPorts": "true",
-		"server.serverCert.secretName":   certPath,
+		"server.serverCert.secretName":   serverPKIConfig.CertPath,
 
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
@@ -211,11 +363,11 @@ func TestVault_Partitions(t *testing.T) {
 
 		"global.adminPartitions.name": secondaryPartition,
 
-		"global.acls.bootstrapToken.secretName": "consul/data/secret/partition",
-		"global.acls.bootstrapToken.secretKey":  "token",
+		"global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
+		"global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
 
 		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
-		"global.secretsBackend.vault.adminPartitionsRole": "partition-init",
+		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
 		"externalServers.enabled":           "true",
 		"externalServers.hosts[0]":          partitionSvcAddress,
