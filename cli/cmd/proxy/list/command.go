@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -99,11 +100,12 @@ func (c *Command) Run(args []string) int {
 		c.flagNamespace = ""
 	}
 
-	pods, err := FetchPods(c.Ctx, c.kubernetes, c.flagNamespace)
+	pods, err := c.fetchPods()
 	if err != nil {
 		c.UI.Output("Error fetching pods:\n%v", err, terminal.WithErrorStyle())
 		return 1
 	}
+
 	c.output(pods)
 	return 0
 }
