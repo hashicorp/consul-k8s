@@ -137,6 +137,36 @@ func (c *Command) initKubernetes() error {
 	return err
 }
 
+func (c *Command) fetchPods() ([]v1.Pod, error) {
+	var pods []v1.Pod
+
+	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
+		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway)",
+	})
+	if err != nil {
+		return nil, err
+	}
+	pods = append(pods, gatewaypods.Items...)
+
+	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
+		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
+	})
+	if err != nil {
+		return nil, err
+	}
+	pods = append(pods, apigatewaypods.Items...)
+
+	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
+		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
+	})
+	if err != nil {
+		return nil, err
+	}
+	pods = append(pods, sidecarpods.Items...)
+
+	return pods, nil
+}
+
 func (c *Command) output(pods []v1.Pod) {
 	if c.flagNamespace == "" {
 		c.UI.Output("Namespace: All Namespaces\n")
