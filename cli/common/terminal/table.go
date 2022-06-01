@@ -5,6 +5,18 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
+const (
+	Yellow = "yellow"
+	Green  = "green"
+	Red    = "red"
+)
+
+var colorMapping = map[string]int{
+	Green:  tablewriter.FgGreenColor,
+	Yellow: tablewriter.FgYellowColor,
+	Red:    tablewriter.FgRedColor,
+}
+
 // Passed to UI.Table to provide a nicely formatted table.
 type Table struct {
 	Headers []string
@@ -84,16 +96,4 @@ func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	}
 
 	table.Render()
-}
-
-const (
-	Yellow = "yellow"
-	Green  = "green"
-	Red    = "red"
-)
-
-var colorMapping = map[string]int{
-	Green:  tablewriter.FgGreenColor,
-	Yellow: tablewriter.FgYellowColor,
-	Red:    tablewriter.FgRedColor,
 }
