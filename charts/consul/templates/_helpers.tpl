@@ -60,7 +60,7 @@ as well as the global.name setting.
 {{- define "consul.connectInjectWebhookTLSCertTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{ printf "common_name=connect-injector.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
