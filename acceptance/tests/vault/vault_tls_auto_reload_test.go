@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"testing"
 	"time"
 
@@ -24,6 +25,12 @@ func TestVault_TlsAutoReload(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
+
+	ver, err := version.NewVersion("1.12.0")
+	require.NoError(t, err)
+	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+		t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
+	}
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()

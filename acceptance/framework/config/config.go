@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v2"
 )
 
@@ -41,6 +42,7 @@ type TestConfig struct {
 
 	ConsulImage    string
 	ConsulK8SImage string
+	ConsulVersion  *version.Version
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string
