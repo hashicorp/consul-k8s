@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
-	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -228,10 +227,12 @@ func TestVault_TLSAutoReload(t *testing.T) {
 	rpcAddress := consulCluster.CreatePortForwardTunnel(t, 8300)
 
 	// here we can verify that the cert expiry changed
-	httpsCert := getCertificate(t, httpsAddress)
+	httpsCert, err := getCertificate(t, httpsAddress)
+	require.NoError(t, err)
 	logger.Logf(t, "HTTPS expiry: %s \n", httpsCert.NotAfter.String())
 
-	rpcCert := getCertificate(t, rpcAddress)
+	rpcCert, err := getCertificate(t, rpcAddress)
+	require.NoError(t, err)
 	logger.Logf(t, "RPC expiry: %s \n", rpcCert.NotAfter.String())
 
 	// Validate that consul sever is running correctly and the consul members command works
@@ -264,10 +265,12 @@ func TestVault_TLSAutoReload(t *testing.T) {
 	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
 	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
 
-	httpsCert2 := getCertificate(t, httpsAddress)
+	httpsCert2, err := getCertificate(t, httpsAddress)
+	require.NoError(t, err)
 	logger.Logf(t, "HTTPS 2 expiry: %s \n", httpsCert2.NotAfter.String())
 
-	rpcCert2 := getCertificate(t, rpcAddress)
+	rpcCert2, err := getCertificate(t, rpcAddress)
+	require.NoError(t, err)
 	logger.Logf(t, "RPC 2 expiry: %s \n", rpcCert2.NotAfter.String())
 
 	// verify that a previous cert expired and that a new one has been issued
@@ -277,24 +280,22 @@ func TestVault_TLSAutoReload(t *testing.T) {
 
 }
 
-func getCertificate(t *testing.T, address string) *x509.Certificate {
-	var conn tls.Conn
-	var cert *x509.Certificate
+func getCertificate(t *testing.T, address string) (*x509.Certificate, error) {
+	logger.Log(t, "Checking TLS....")
+	conf := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+
+	logger.Logf(t, "Dialing %s", address)
+	conn, err := tls.Dial("tcp", address, conf)
+	if err != nil {
+		logger.Log(t, "Error in Dial", err)
+		return nil, err
+	}
 	defer conn.Close()
 
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 20}, t, func(r *retry.R) {
-		logger.Log(t, "Checking TLS....")
-		conf := &tls.Config{
-			InsecureSkipVerify: true,
-		}
-
-		logger.Logf(t, "Dialing %s", address)
-		conn, err := tls.Dial("tcp", address, conf)
-		require.NoError(r, err)
-
-		connState := conn.ConnectionState()
-		logger.Logf(t, "Connection State: %+v", connState)
-		cert = connState.PeerCertificates[0]
-	})
-	return cert
+	connState := conn.ConnectionState()
+	logger.Logf(t, "Connection State: %+v", connState)
+	cert := connState.PeerCertificates[0]
+	return cert, nil
 }
