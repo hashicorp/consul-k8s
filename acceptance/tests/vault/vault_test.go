@@ -51,7 +51,7 @@ func TestVault(t *testing.T) {
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
-	// Initially tried toset the expiration to 5-20s to keep the test as short running as possible,
+	// Initially tried to set the expiration to 5-20s to keep the test as short running as possible,
 	// but at those levels, the pods would fail to start becuase the certs had expired and would throw errors.
 	// 30s seconds seemed to consistently clear this issue and not have startup problems.
 	// If trying to go lower, be sure to run this several times in CI to ensure that there are little issues.

@@ -77,7 +77,6 @@ func TestController(t *testing.T) {
 
 			if c.useVault {
 				consulCluster.ACLToken = bootstrapToken
-
 			}
 
 			// Test creation.

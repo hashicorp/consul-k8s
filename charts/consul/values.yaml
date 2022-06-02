@@ -195,15 +195,15 @@ global:
       # and check the name of `metadata.name`.
       adminPartitionsRole: ""
 
-      # The Vault role for consul controller to read the Consul controllers's 
-      # CA Certificate and the webhook certificate and private key.
-      # A Vault policy must be created which grants read capabilities to 
+      # The Vault role to read Consul controller's webhook's 
+      # CA and issue a certificate and private key.
+      # A Vault policy must be created which grants issue capabilities to 
       # `global.secretsBackend.vault.controller.tlsCert.secretName`.
       consulControllerRole: ""
 
-      # The Vault role for consul connect inject to read the Consul controller's 
-      # CA Certificate and the webhook certificate and private key.
-      # A Vault policy must be created which grants read capabilities to 
+      # The Vault role to read Consul connect-injector webhook's CA
+      # and issue a certificate and private key.
+      # A Vault policy must be created which grants issue capabilities to 
       # `global.secretsBackend.vault.connectInject.tlsCert.secretName`.
       consulConnectInjectRole: ""
 
