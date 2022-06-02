@@ -281,7 +281,7 @@ spec:
           - name: certs
             mountPath: /etc/connect-injector/certs
             readOnly: true
-          {{- end}}
+          {{- end }}
           - mountPath: /consul/login
             name: consul-data
             readOnly: true

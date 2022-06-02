@@ -480,6 +480,7 @@ func (c *Command) Run(args []string) int {
 
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
+		return 1
 	}
 	c.UI.Info("shutting down")
 	return 0

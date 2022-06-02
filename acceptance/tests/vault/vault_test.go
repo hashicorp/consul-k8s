@@ -98,7 +98,7 @@ func TestVault(t *testing.T) {
 	}
 	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
-	// Configure controller webhook PKI
+	// Configure connect injector webhook PKI
 	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "connect",
 		PolicyName:          "connect-ca-policy",
@@ -274,7 +274,7 @@ func TestVault(t *testing.T) {
 	require.NotEmpty(t, podList.Items)
 	connectInjectorPodName := podList.Items[0].Name
 	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 8080)
-	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
+	connectInjectorCert := getCertificate(t, connectInjectorPodAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "RPC expiry: %s \n", connectInjectorCert.NotAfter.String())
 
@@ -331,8 +331,7 @@ func TestVault(t *testing.T) {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 
-	connectInjectorCert2, err := getCertificate(t, connectInjectorPodAddress)
-	require.NoError(t, err)
+	connectInjectorCert2 := getCertificate(t, connectInjectorPodAddress)
 	// verify that a previous cert expired and that a new one has been issued
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
