@@ -2303,6 +2303,27 @@ meshGateway:
   # @type: string
   tolerations: null
 
+  # Pod topology spread constraints for server pods.
+  # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
+  # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+  #
+  # This requires K8S >= 1.18 (beta) or 1.19 (stable).
+  #
+  # Example:
+  #
+  # ```yaml
+  # topologySpreadConstraints: |
+  #   - maxSkew: 1
+  #     topologyKey: topology.kubernetes.io/zone
+  #     whenUnsatisfiable: DoNotSchedule
+  #     labelSelector:
+  #       matchLabels:
+  #         app: {{ template "consul.name" . }}
+  #         release: "{{ .Release.Name }}"
+  #         component: server
+  # ```
+  topologySpreadConstraints: ""
+
   # Optional YAML string to specify a nodeSelector config.
   # @type: string
   nodeSelector: null
@@ -2545,6 +2566,27 @@ terminatingGateways:
     # Optional YAML string to specify tolerations.
     # @type: string
     tolerations: null
+
+    # Pod topology spread constraints for server pods.
+    # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
+    # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+    #
+    # This requires K8S >= 1.18 (beta) or 1.19 (stable).
+    #
+    # Example:
+    #
+    # ```yaml
+    # topologySpreadConstraints: |
+    #   - maxSkew: 1
+    #     topologyKey: topology.kubernetes.io/zone
+    #     whenUnsatisfiable: DoNotSchedule
+    #     labelSelector:
+    #       matchLabels:
+    #         app: {{ template "consul.name" . }}
+    #         release: "{{ .Release.Name }}"
+    #         component: server
+    # ```
+    topologySpreadConstraints: ""
 
     # Optional YAML string to specify a nodeSelector config.
     # @type: string

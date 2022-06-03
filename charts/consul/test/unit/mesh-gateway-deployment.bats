@@ -282,8 +282,33 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
-# hostNetwork
+# topologySpreadConstraints
 
+@test "meshGateway/Deployment: topologySpreadConstraints not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .topologySpreadConstraints? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: topologySpreadConstraints can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.topologySpreadConstraints=foobar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.topologySpreadConstraints == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# hostNetwork
 
 @test "meshGateway/Deployment: hostNetwork is not set by default" {
   cd `chart_dir`
