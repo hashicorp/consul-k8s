@@ -44,6 +44,7 @@ func TestValidateExportedServices(t *testing.T) {
 			},
 			consulMeta: common.ConsulMeta{
 				PartitionsEnabled: true,
+				NamespacesEnabled: true,
 				Partition:         otherPartition,
 			},
 			expAllow: true,
@@ -93,6 +94,7 @@ func TestValidateExportedServices(t *testing.T) {
 			},
 			consulMeta: common.ConsulMeta{
 				PartitionsEnabled: true,
+				NamespacesEnabled: true,
 				Partition:         otherPartition,
 			},
 			expAllow:      false,
@@ -102,13 +104,12 @@ func TestValidateExportedServices(t *testing.T) {
 			existingResources: []runtime.Object{},
 			newResource: &ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: otherPartition,
+					Name: "default",
 				},
 				Spec: ExportedServicesSpec{
 					Services: []ExportedService{
 						{
 							Name:      "service",
-							Namespace: "service-ns",
 							Consumers: []ServiceConsumer{{Partition: "other"}},
 						},
 					},
@@ -119,7 +120,7 @@ func TestValidateExportedServices(t *testing.T) {
 				Partition:         "",
 			},
 			expAllow:      false,
-			expErrMessage: "exportedservices.consul.hashicorp.com \"other\" is forbidden: Consul Enterprise Admin Partitions must be enabled to create ExportedServices",
+			expErrMessage: "exportedservices.consul.hashicorp.com \"default\" is invalid: spec.services[0].consumers[0].partitions: Invalid value: \"other\": Consul Admin Partitions need to be enabled to specify partition.",
 		},
 		"no services": {
 			existingResources: []runtime.Object{},
@@ -156,6 +157,7 @@ func TestValidateExportedServices(t *testing.T) {
 			},
 			consulMeta: common.ConsulMeta{
 				PartitionsEnabled: true,
+				NamespacesEnabled: true,
 				Partition:         otherPartition,
 			},
 			expAllow:      false,
