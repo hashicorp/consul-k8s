@@ -2303,7 +2303,7 @@ meshGateway:
   # @type: string
   tolerations: null
 
-  # Pod topology spread constraints for server pods.
+  # Pod topology spread constraints for mesh gateway pods.
   # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
   # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
   #
@@ -2454,7 +2454,7 @@ ingressGateways:
     # @type: string
     tolerations: null
 
-    # Pod topology spread constraints for server pods.
+    # Pod topology spread constraints for ingress gateway pods.
     # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
     # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
     #
@@ -2588,7 +2588,7 @@ terminatingGateways:
     # @type: string
     tolerations: null
 
-    # Pod topology spread constraints for server pods.
+    # Pod topology spread constraints for terminating gateway pods.
     # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
     # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
     #
