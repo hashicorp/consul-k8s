@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"net/http"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
@@ -364,8 +363,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			require.False(t, resp.Requeue)
 
 			// After reconciliation, Consul should have the peering.
-			readReq := api.PeeringReadRequest{Name: "acceptor-created"}
-			peering, _, err := consulClient.Peerings().Read(context.Background(), readReq, nil)
+			peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-created", nil)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedConsulPeerings[0].Name, peering.Name)
 			require.NotEmpty(t, peering.ID)
@@ -495,12 +493,9 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			require.False(t, resp.Requeue)
 
 			// After reconciliation, Consul should not have the peering.
-			readReq := api.PeeringReadRequest{Name: "acceptor-deleted"}
-			peering, _, err := consulClient.Peerings().Read(context.Background(), readReq, nil)
-			var statusErr api.StatusError
-			require.ErrorAs(t, err, &statusErr)
-			require.Equal(t, http.StatusNotFound, statusErr.Code)
+			peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-deleted", nil)
 			require.Nil(t, peering)
+			require.NoError(t, err)
 		})
 	}
 }
