@@ -3,7 +3,6 @@ package connectinject
 import (
 	"context"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -45,7 +44,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 	// error), we need to delete it in Consul.
 	if k8serrors.IsNotFound(err) {
 		r.Log.Info("PeeringDialer was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-		_, err := r.deletePeering(ctx, req.Name)
+		err := r.deletePeering(ctx, req.Name)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -111,17 +110,13 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Read the peering from Consul.
 	// TODO(peering): do we need to pass in partition?
-	readReq := api.PeeringReadRequest{Name: peeringDialer.Name}
 	r.Log.Info("reading peering from Consul", "name", peeringDialer.Name)
-	peering, _, err := r.ConsulClient.Peerings().Read(ctx, readReq, nil)
-	var statusErr api.StatusError
-	peeringExists := true
-	if errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound && peering == nil {
-		peeringExists = false
-	} else if err != nil {
+	peering, _, err := r.ConsulClient.Peerings().Read(ctx, peeringDialer.Name, nil)
+	if err != nil {
 		r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
 		return ctrl.Result{}, err
 	}
+	peeringExists := peering != nil
 	// TODO(peering): Verify that the existing peering in Consul is an dialer peer. If it is an acceptor peer, an error should be thrown.
 
 	// At this point, we know the spec secret exists. If the status secret doesn't
@@ -258,14 +253,11 @@ func (r *PeeringDialerController) initiatePeering(ctx context.Context, peerName 
 }
 
 // deletePeering is a helper function that calls the Consul api to delete a peering.
-func (r *PeeringDialerController) deletePeering(ctx context.Context, peerName string) (*api.PeeringDeleteResponse, error) {
-	deleteReq := api.PeeringDeleteRequest{
-		Name: peerName,
-	}
-	resp, _, err := r.ConsulClient.Peerings().Delete(ctx, deleteReq, nil)
+func (r *PeeringDialerController) deletePeering(ctx context.Context, peerName string) error {
+	_, err := r.ConsulClient.Peerings().Delete(ctx, peerName, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to delete Peering from Consul", "name", peerName)
-		return nil, err
+		return err
 	}
-	return resp, nil
+	return nil
 }

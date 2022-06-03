@@ -282,6 +282,9 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 }
 
 func (r *ConfigEntryController) consulNamespace(configEntry capi.ConfigEntry, namespace string, globalResource bool) string {
+	if !r.EnableConsulNamespaces {
+		return ""
+	}
 	// ServiceIntentions have the appropriate Consul Namespace set on them as the value
 	// is defaulted by the webhook. These are then set on the ServiceIntentions config entry
 	// but not on the others. In case the ConfigEntry has the Consul Namespace set, we just
