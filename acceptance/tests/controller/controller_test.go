@@ -402,6 +402,7 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
 		MaxTTL:              "1h",
 		AuthMethodPath:      "kubernetes",
+		CommonName:          "Consul CA",
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
@@ -417,7 +418,6 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
 		MaxTTL:              webhookCertTtl.String(),
 		AuthMethodPath:      "kubernetes",
-		CommonName:          "Consul Webhook Certificates",
 	}
 	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
@@ -432,7 +432,6 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
 		MaxTTL:              webhookCertTtl.String(),
 		AuthMethodPath:      "kubernetes",
-		CommonName:          "Consul Webhook Certificates",
 	}
 	connectInjectorWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
