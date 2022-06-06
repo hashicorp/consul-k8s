@@ -945,7 +945,8 @@ load _helpers
 #--------------------------------------------------------------------
 # topologySpreadConstraints
 
-@test "ingressGateways/Deployment: topologySpreadConstraints not set by default" {  cd `chart_dir`
+@test "ingressGateways/Deployment: topologySpreadConstraints not set by default" { 
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml \
       --set 'ingressGateways.enabled=true' \
