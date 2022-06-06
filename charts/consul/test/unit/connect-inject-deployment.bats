@@ -2071,7 +2071,7 @@ EOF
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=release-name-consul-connect-injector,release-name-consul-connect-injector.default,release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc.cluster.local\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/connect-webhook-cert-dc1\" \"common_name=connect-injector.dc1.consul\"\n\"alt_names=release-name-consul-connect-injector,release-name-consul-connect-injector.default,release-name-consul-connect-injector.default.svc,release-name-consul-connect-injector.default.svc.cluster.local\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $cmd |
