@@ -67,6 +67,10 @@ spec:
       tolerations:
         {{ tpl .Values.meshGateway.tolerations . | nindent 8 | trim }}
       {{- end }}
+      {{- if .Values.meshGateway.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 8 | trim }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" . }}-mesh-gateway
       volumes:
