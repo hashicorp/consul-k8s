@@ -94,7 +94,6 @@ func TestVault(t *testing.T) {
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
 		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
 		AuthMethodPath:      KubernetesAuthMethodPath,
-		CommonName:          "Consul Webhook Certificates",
 	}
 	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
@@ -109,7 +108,6 @@ func TestVault(t *testing.T) {
 		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
 		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
 		AuthMethodPath:      KubernetesAuthMethodPath,
-		CommonName:          "Consul Webhook Certificates",
 	}
 	connectInjectorWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
