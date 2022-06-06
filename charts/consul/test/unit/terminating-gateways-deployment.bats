@@ -1007,6 +1007,46 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# topologySpreadConstraints
+
+@test "terminatingGateways/Deployment: topologySpreadConstraints not set by default" {  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .topologySpreadConstraints? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: topologySpreadConstraints can be set through defaults" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.defaults.topologySpreadConstraints=- key: value' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+@test "terminatingGateways/Deployment: topologySpreadConstraints can be set through specific gateway, overriding defaults" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.topologySpreadConstraints=foobar' \
+      --set 'terminatingGateways.defaults.topologySpreadConstraints=- key: value' \
+      --set 'terminatingGateways.gateways[0].name=gateway1' \
+      --set 'terminatingGateways.gateways[0].topologySpreadConstraints=- key: value2' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value2" ]
+}
+
+#--------------------------------------------------------------------
 # nodeSelector
 
 @test "terminatingGateways/Deployment: no nodeSelector by default" {

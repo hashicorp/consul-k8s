@@ -3,6 +3,7 @@
 IMPROVEMENTS:
 * Helm
   * Enable the configuring of snapshot intervals in the client snapshot agent via `client.snapshotAgent.interval`. [[GH-1235](https://github.com/hashicorp/consul-k8s/pull/1235)]
+  * Enable configuring the pod topologySpreadConstraints for mesh, terminating, and ingress gateways. [[GH-1257](https://github.com/hashicorp/consul-k8s/pull/1257)]
 * Control Plane
   * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:8.6`. [[GH-1244](https://github.com/hashicorp/consul-k8s/pull/1244)]
   * Add additional metadata to service instances registered via catalog sync. [[GH-447](https://github.com/hashicorp/consul-k8s/pull/447)]

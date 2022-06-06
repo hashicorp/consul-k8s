@@ -943,6 +943,47 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# topologySpreadConstraints
+
+@test "ingressGateways/Deployment: topologySpreadConstraints not set by default" { 
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .topologySpreadConstraints? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: topologySpreadConstraints can be set through defaults" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.defaults.topologySpreadConstraints=- key: value' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+@test "ingressGateways/Deployment: topologySpreadConstraints can be set through specific gateway, overriding defaults" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.topologySpreadConstraints=foobar' \
+      --set 'ingressGateways.defaults.topologySpreadConstraints=- key: value' \
+      --set 'ingressGateways.gateways[0].name=gateway1' \
+      --set 'ingressGateways.gateways[0].topologySpreadConstraints=- key: value2' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value2" ]
+}
+
+#--------------------------------------------------------------------
 # nodeSelector
 
 @test "ingressGateways/Deployment: no nodeSelector by default" {
