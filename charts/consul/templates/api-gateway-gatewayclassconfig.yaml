@@ -28,6 +28,12 @@ spec:
     {{- else }}
       http: 8500
     {{- end }}
+  deployment:
+    {{- if .Values.apiGateway.managedGatewayClass.deployment }}
+    defaultInstances: {{ default 1 .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+    maxInstances: {{ default 8 .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
+    minInstances: {{ default 1 .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
+    {{- end }}
   image:
     consulAPIGateway: {{ .Values.apiGateway.image }}
     envoy: {{ .Values.global.imageEnvoy }}
