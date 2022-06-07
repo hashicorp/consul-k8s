@@ -29,6 +29,14 @@ rules:
   - use
 {{- end }}
 {{- else}}
-rules: []
+#todo: add a case for this
+rules:
+- apiGroups: [ "" ]
+  resources: [ "services" ]
+  verbs:
+    - "get"
+    - "list"
+    - "watch"
+
 {{- end }}
 {{- end }}

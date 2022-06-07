@@ -937,6 +937,9 @@ server:
 
   # Server service properties.
   service:
+    # Type of service, ex. LoadBalancer, ClusterIP. Additionally, the value "Headless" is supported to not have a cluster ip.
+    type: Headless
+
     # Annotations to apply to the server service.
     #
     # ```yaml
