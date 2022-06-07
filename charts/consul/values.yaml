@@ -2711,11 +2711,15 @@ apiGateway:
     # This values defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
     #
     # Example:
+    #
     # ```yaml
     # deployment:
     #   defaultInstances: 3
-    #   minInstances: 1
     #   maxInstances: 8
+    #   minInstances: 1
+    # ```
+    #
+    # @type: map
     deployment: null
 
   # Configuration for the ServiceAccount created for the api-gateway component
