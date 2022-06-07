@@ -24,7 +24,11 @@ metadata:
     # https://github.com/kubernetes/kubernetes/issues/58662
     service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
 spec:
+  {{- if eq (trim .Values.server.service.type) `Headless` }}
   clusterIP: None
+  {{- else }}
+  type: {{ .Values.server.service.type }}
+  {{- end }}
   # We want the servers to become available even if they're not ready
   # since this DNS is also used for join operations.
   publishNotReadyAddresses: true
@@ -43,18 +47,18 @@ spec:
       protocol: "TCP"
       port: 8301
       targetPort: 8301
-    - name: serflan-udp
-      protocol: "UDP"
-      port: 8301
-      targetPort: 8301
+#    - name: serflan-udp
+#      protocol: "UDP"
+#      port: 8301
+#      targetPort: 8301
     - name: serfwan-tcp
       protocol: "TCP"
       port: 8302
       targetPort: 8302
-    - name: serfwan-udp
-      protocol: "UDP"
-      port: 8302
-      targetPort: 8302
+#    - name: serfwan-udp
+#      protocol: "UDP"
+#      port: 8302
+#      targetPort: 8302
     - name: server
       port: 8300
       targetPort: 8300
@@ -62,10 +66,10 @@ spec:
       protocol: "TCP"
       port: 8600
       targetPort: dns-tcp
-    - name: dns-udp
-      protocol: "UDP"
-      port: 8600
-      targetPort: dns-udp
+#    - name: dns-udp
+#      protocol: "UDP"
+#      port: 8600
+#      targetPort: dns-udp
   selector:
     app: {{ template "consul.name" . }}
     release: "{{ .Release.Name }}"

@@ -180,6 +180,27 @@ spec:
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
+      initContainers:
+        - name: consul-init
+          image: {{ .Values.global.imageK8S }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              {{- $serviceType := .Values.server.service.type }}
+              {{- if (eq $serviceType "LoadBalancer") }}
+              consul-k8s-control-plane service-address \
+                -log-level={{ .Values.global.logLevel }} \
+                -log-json={{ .Values.global.logJSON }} \
+                -k8s-namespace={{ .Release.Namespace }} \
+                -name={{ template "consul.fullname" . }}-server \
+                -resolve-hostnames=true \
+                -output-file=/consul/data/address.txt
+              {{- end }}
+          volumeMounts:
+            - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+              mountPath: /consul/data
+
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
@@ -266,9 +287,14 @@ spec:
               {{- end }}
 
               {{ template "consul.extraconfig" }}
+              
+              WAN_ADDR="$(cat /consul/data/address.txt)"
 
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
                 -advertise="${ADVERTISE_IP}" \
+                {{- if (eq $serviceType "LoadBalancer") }}
+                -advertise-wan="${WAN_ADDR}" \
+                {{- end }}
                 -config-dir=/consul/config \
                 {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
