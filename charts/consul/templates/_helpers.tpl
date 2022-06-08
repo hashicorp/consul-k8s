@@ -59,7 +59,7 @@ as well as the global.name setting.
 
 {{- define "consul.connectInjectWebhookTLSCertTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{ printf "common_name=connect-injector.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-connect-injector" $name }}"
             "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
@@ -67,7 +67,7 @@ as well as the global.name setting.
 
 {{- define "consul.connectInjectWebhookTLSKeyTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{ printf "common_name=connect-injector.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-connect-injector" $name }}"
             "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
@@ -75,7 +75,7 @@ as well as the global.name setting.
 
 {{- define "consul.controllerWebhookTLSCertTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{ printf "common_name=controller-webhook.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
             "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
@@ -83,7 +83,7 @@ as well as the global.name setting.
 
 {{- define "consul.controllerWebhookTLSKeyTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{ printf "common_name=controller-webhook.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
             "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}

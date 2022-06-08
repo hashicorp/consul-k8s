@@ -1026,7 +1026,7 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.crt"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=release-name-consul-controller-webhook,release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc.cluster.local\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=release-name-consul-controller-webhook\"\n\"alt_names=release-name-consul-controller-webhook,release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc.cluster.local\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $cmd |
@@ -1039,7 +1039,7 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-tls.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=controller-webhook.dc1.consul\"\n\"alt_names=release-name-consul-controller-webhook,release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc.cluster.local\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki/issue/controller-webhook-cert-dc1\" \"common_name=release-name-consul-controller-webhook\"\n\"alt_names=release-name-consul-controller-webhook,release-name-consul-controller-webhook.default,release-name-consul-controller-webhook.default.svc,release-name-consul-controller-webhook.default.svc.cluster.local\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $cmd |
