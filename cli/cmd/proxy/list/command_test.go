@@ -55,7 +55,6 @@ func TestArgumentParsing(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := getInitializedCommand(t)
-			c.kubernetes = fake.NewSimpleClientset()
 			out := c.Run(tc.args)
 			require.Equal(t, tc.out, out)
 		})
