@@ -76,12 +76,15 @@ type ReconcileErrorStatus struct {
 }
 
 type SecretRefStatus struct {
-	// Name is the name of the secret generated.
-	Name string `json:"name,omitempty"`
-	// Key is the key of the secret generated.
-	Key string `json:"key,omitempty"`
-	// Backend is where the generated secret is stored. Currently supports the value: "kubernetes".
-	Backend string `json:"backend,omitempty"`
+	Secret `json:",inline"`
 	// ResourceVersion is the resource version for the secret.
-	ResourceVersion string `json:"latestHash,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
+func (pa *PeeringAcceptor) Secret() *Secret {
+	return pa.Spec.Peer.Secret
+}
+
+func (pa *PeeringAcceptor) SecretRef() *SecretRefStatus {
+	return pa.Status.SecretRef
 }
