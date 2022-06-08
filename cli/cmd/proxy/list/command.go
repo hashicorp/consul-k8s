@@ -81,19 +81,19 @@ func (c *ListCommand) Run(args []string) int {
 
 	// Parse the command line flags.
 	if err := c.set.Parse(args); err != nil {
-		c.UI.Output("Error parsing arguments:\n%v", err.Error())
+		c.UI.Output("Error parsing arguments: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
 	// Validate the command line flags.
 	if err := c.validateFlags(); err != nil {
-		c.UI.Output("Invalid argument:\n%v", err.Error())
+		c.UI.Output("Invalid argument: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
 	if c.kubernetes == nil {
 		if err := c.initKubernetes(); err != nil {
-			c.UI.Output("Error initializing Kubernetes client", err.Error())
+			c.UI.Output("Error initializing Kubernetes client", err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
 	}
@@ -104,7 +104,7 @@ func (c *ListCommand) Run(args []string) int {
 
 	pods, err := c.fetchPods()
 	if err != nil {
-		c.UI.Output("Error fetching pods:\n%v", err, terminal.WithErrorStyle())
+		c.UI.Output("Error fetching pods:", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
@@ -129,7 +129,7 @@ func (c *ListCommand) validateFlags() error {
 		return errors.New("should have no non-flag arguments")
 	}
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
-		return fmt.Errorf("invalid namespace name: %v", strings.Join(errs, "; "))
+		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
 	return nil
 }
