@@ -134,7 +134,8 @@ func (c *ListCommand) validateFlags() error {
 	return nil
 }
 
-// initKubernetes initializes the Kubernetes client with the users config.
+// initKubernetes initializes the Kubernetes client and sets the namespace based
+// on the user-provided arguments.
 func (c *ListCommand) initKubernetes() error {
 	settings := helmCLI.New()
 
@@ -143,6 +144,15 @@ func (c *ListCommand) initKubernetes() error {
 		return fmt.Errorf("error retrieving Kubernetes authentication %v", err)
 	}
 	c.kubernetes, err = kubernetes.NewForConfig(restConfig)
+
+	// Use the default namespace if not provided, unless the all-namespaces flag is set.
+	if c.flagNamespace == "" && !c.flagAllNamespaces {
+		c.namespace = settings.Namespace()
+	} else if c.flagNamespace != "" && c.flagAllNamespaces {
+		c.namespace = "" // An empty namespace means all namespaces.
+	} else {
+		c.namespace = c.flagNamespace
+	}
 
 	return err
 }
@@ -180,14 +190,14 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 
 // output prints a table of pods to the terminal.
 func (c *ListCommand) output(pods []v1.Pod) {
-	if c.flagNamespace == "" {
+	if c.flagAllNamespaces {
 		c.UI.Output("Namespace: All Namespaces\n")
 	} else {
-		c.UI.Output("Namespace: %s\n", c.flagNamespace)
+		c.UI.Output("Namespace: %s\n", c.namespace)
 	}
 
 	var tbl *terminal.Table
-	if c.flagNamespace == "" {
+	if c.flagAllNamespaces {
 		tbl = terminal.NewTable("Namespace", "Name", "Type")
 	} else {
 		tbl = terminal.NewTable("Name", "Type")
