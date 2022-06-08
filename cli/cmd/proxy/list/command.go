@@ -21,6 +21,7 @@ type ListCommand struct {
 	*common.BaseCommand
 
 	kubernetes kubernetes.Interface
+	namespace  string
 
 	set *flag.Sets
 
