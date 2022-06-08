@@ -3,6 +3,7 @@ package list
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -126,9 +128,8 @@ func (c *ListCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
 	}
-	if !common.IsValidLabel(c.flagNamespace) {
-		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
-			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character", c.flagNamespace)
+	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
+		return fmt.Errorf("invalid namespace name: %v", strings.Join(errs, "; "))
 	}
 	return nil
 }
