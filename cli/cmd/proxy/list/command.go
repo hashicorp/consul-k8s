@@ -43,7 +43,6 @@ func (c *ListCommand) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    "namespace",
 		Target:  &c.flagNamespace,
-		Default: "default",
 		Usage:   "The namespace to list proxies in.",
 		Aliases: []string{"n"},
 	})
@@ -97,10 +96,6 @@ func (c *ListCommand) Run(args []string) int {
 			c.UI.Output("Error initializing Kubernetes client", err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-	}
-
-	if c.flagAllNamespaces {
-		c.flagNamespace = ""
 	}
 
 	pods, err := c.fetchPods()
@@ -222,7 +217,7 @@ func (c *ListCommand) output(pods []v1.Pod) {
 			proxyType = "Sidecar"
 		}
 
-		if c.flagNamespace == "" {
+		if c.flagAllNamespaces {
 			tbl.AddRow([]string{pod.Namespace, pod.Name, proxyType}, []string{})
 		} else {
 			tbl.AddRow([]string{pod.Name, proxyType}, []string{})
