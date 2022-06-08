@@ -118,7 +118,7 @@ func (c *ListCommand) Help() string {
 
 // Synopsis returns a one-line command summary.
 func (c *ListCommand) Synopsis() string {
-	return "List all Pods running Consul proxies."
+	return "List all Pods running proxies managed by Consul."
 }
 
 // validateFlags ensures that the flags passed in by the can be used.
