@@ -3,12 +3,14 @@ package common
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -37,7 +39,16 @@ type PortForward struct {
 	stopChan  chan struct{}
 	readyChan chan struct{}
 
+	restConfig     *rest.Config
 	portForwardURL *url.URL
+	newForwarder   func(httpstream.Dialer, []string, <-chan struct{}, chan struct{}, io.Writer, io.Writer) (forwarder, error)
+}
+
+// forwarder is an interface which can be used for opening a port forward session.
+type forwarder interface {
+	ForwardPorts() error
+	Close()
+	GetPorts() ([]portforward.ForwardedPort, error)
 }
 
 // Open opens a port forward session to a Kubernetes Pod.
@@ -47,25 +58,19 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to allocate local port: %v", err)
 	}
 
-	// Load the Kubernetes API client configuration.
-	config, err := pf.loadApiClientConfig()
-	if err != nil {
-		return "", fmt.Errorf("failed to load API client config: %v", err)
+	// Load the Kubernetes REST client configuration.
+	if err := pf.loadRestConfig(); err != nil {
+		return "", fmt.Errorf("failed to load REST client configuration: %v", err)
 	}
 
+	// Configure the URL for starting the port forward.
 	if pf.portForwardURL == nil {
-		// Configure the connection to the Pod.
-		postEndpoint := pf.KubeClient.CoreV1().RESTClient().Post()
-		pf.portForwardURL = postEndpoint.
-			Resource("pods").
-			Namespace(pf.Namespace).
-			Name(pf.PodName).
-			SubResource("portforward").
-			URL()
+		pf.portForwardURL = pf.KubeClient.CoreV1().RESTClient().Post().Resource("pods").Namespace(pf.Namespace).
+			Name(pf.PodName).SubResource("portforward").URL()
 	}
 
 	// Create a dialer for the port forward target.
-	transport, upgrader, err := spdy.RoundTripperFor(config)
+	transport, upgrader, err := spdy.RoundTripperFor(pf.restConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to create roundtripper: %v", err)
 	}
@@ -76,9 +81,14 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 	pf.readyChan = make(chan struct{}, 1)
 	errChan := make(chan error)
 
+	// Use the default Kubernetes port forwarder if none is specified.
+	if pf.newForwarder == nil {
+		pf.newForwarder = newDefaultForwarder
+	}
+
 	// Create a Kubernetes port forwarder.
 	ports := []string{fmt.Sprintf("%d:%d", pf.localPort, pf.RemotePort)}
-	portforwarder, err := portforward.New(dialer, ports, pf.stopChan, pf.readyChan, nil, nil)
+	portforwarder, err := pf.newForwarder(dialer, ports, pf.stopChan, pf.readyChan, nil, nil)
 	if err != nil {
 		return "", err
 	}
@@ -88,13 +98,11 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 		errChan <- portforwarder.ForwardPorts()
 	}()
 
-	// Return an error from the channel if one is received, otherwise return nil
-	// once the port forwarder is ready.
 	select {
-	case err := <-errChan:
-		return "", err
 	case <-pf.readyChan:
 		return fmt.Sprintf("localhost:%d", pf.localPort), nil
+	case err := <-errChan:
+		return "", err
 	case <-ctx.Done():
 		pf.Close()
 		return "", fmt.Errorf("port forward cancelled")
@@ -130,17 +138,27 @@ func (pf *PortForward) allocateLocalPort() error {
 	return err
 }
 
-// loadApiClientConfig loads the Kubernetes API client configuration using the
-// provided configuration file and context.
-func (pf *PortForward) loadApiClientConfig() (*rest.Config, error) {
+// loadRestConfig loads the Kubernetes REST client configuration using the
+// provided Kubernetes configuration file and context.
+func (pf *PortForward) loadRestConfig() (err error) {
 	overrides := clientcmd.ConfigOverrides{}
 	if pf.KubeContext != "" {
 		overrides.CurrentContext = pf.KubeContext
 	}
 
-	config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: pf.KubeConfig},
-		&overrides)
+	if pf.restConfig == nil {
+		pf.restConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: pf.KubeConfig},
+			&overrides).ClientConfig()
+		if err != nil {
+			return err
+		}
+	}
 
-	return config.ClientConfig()
+	return nil
+}
+
+// newDefaultForwarder creates a new Kubernetes port forwarder.
+func newDefaultForwarder(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (forwarder, error) {
+	return portforward.New(dialer, ports, stopChan, readyChan, out, errOut)
 }
