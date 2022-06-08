@@ -161,7 +161,8 @@ func (c *ListCommand) initKubernetes() error {
 func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	var pods []v1.Pod
 
-	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
+	// Fetch all pods in the namespace with labels matching the gateway component names.
+	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway)",
 	})
 	if err != nil {
@@ -169,7 +170,8 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	}
 	pods = append(pods, gatewaypods.Items...)
 
-	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
+	// Fetch all pods in the namespace with a label indicating they are an API gateway.
+	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
 	})
 	if err != nil {
@@ -177,7 +179,8 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	}
 	pods = append(pods, apigatewaypods.Items...)
 
-	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).List(c.Ctx, metav1.ListOptions{
+	// Fetch all pods in the namespace with a label indicating they are a service networked by Consul.
+	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
 	})
 	if err != nil {
