@@ -124,7 +124,7 @@ func TestFetchPods(t *testing.T) {
 			pods: []v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "sidecar",
+						Name:      "pod1",
 						Namespace: "default",
 						Labels: map[string]string{
 							"consul.hashicorp.com/connect-inject-status": "injected",
@@ -139,7 +139,7 @@ func TestFetchPods(t *testing.T) {
 			pods: []v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "sidecar",
+						Name:      "pod1",
 						Namespace: "default",
 						Labels: map[string]string{
 							"consul.hashicorp.com/connect-inject-status": "injected",
@@ -181,7 +181,7 @@ func TestFetchPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "sidecar",
+						Name:      "pod1",
 						Namespace: "default",
 						Labels: map[string]string{
 							"consul.hashicorp.com/connect-inject-status": "injected",
@@ -203,7 +203,7 @@ func TestFetchPods(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "sidecar",
+						Name:      "pod1",
 						Namespace: "default",
 						Labels: map[string]string{
 							"consul.hashicorp.com/connect-inject-status": "injected",
