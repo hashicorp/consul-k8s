@@ -111,7 +111,7 @@ func (c *ListCommand) Run(args []string) int {
 // Help returns a description of the command and how it is used.
 func (c *ListCommand) Help() string {
 	c.once.Do(c.init)
-	return c.Synopsis() + "\n\nUsage: consul-k8s proxy list [flags]\n\n" + c.help
+	return fmt.Sprintf("%s\n\nUsage: consul-k8s proxy list [flags]\n\n%s", c.Synopsis(), c.help)
 }
 
 // Synopsis returns a one-line command summary.
@@ -139,15 +139,16 @@ func (c *ListCommand) initKubernetes() error {
 	if err != nil {
 		return fmt.Errorf("error retrieving Kubernetes authentication %v", err)
 	}
-	c.kubernetes, err = kubernetes.NewForConfig(restConfig)
+	if c.kubernetes, err = kubernetes.NewForConfig(restConfig); err != nil {
+		return fmt.Errorf("error creating Kubernetes client %v", err)
+	}
 
-	// Use the default namespace if not provided, unless the all-namespaces flag is set.
-	if c.flagNamespace == "" && !c.flagAllNamespaces {
-		c.namespace = settings.Namespace()
-	} else if c.flagNamespace != "" && c.flagAllNamespaces {
+	if c.flagAllNamespaces {
 		c.namespace = "" // An empty namespace means all namespaces.
-	} else {
+	} else if c.flagNamespace != "" {
 		c.namespace = c.flagNamespace
+	} else {
+		c.namespace = settings.Namespace()
 	}
 
 	return err
