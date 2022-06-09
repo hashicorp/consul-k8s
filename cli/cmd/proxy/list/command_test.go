@@ -1,7 +1,6 @@
 package list
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -63,12 +62,14 @@ func TestArgumentParsing(t *testing.T) {
 
 func TestFetchPods(t *testing.T) {
 	cases := map[string]struct {
-		namespace string
-		pods      []v1.Pod
+		namespace    string
+		pods         []v1.Pod
+		expectedPods int
 	}{
 		"No pods": {
-			namespace: "default",
-			pods:      []v1.Pod{},
+			namespace:    "default",
+			pods:         []v1.Pod{},
+			expectedPods: 0,
 		},
 		"Gateway pods": {
 			namespace: "default",
@@ -101,6 +102,7 @@ func TestFetchPods(t *testing.T) {
 					},
 				},
 			},
+			expectedPods: 3,
 		},
 		"API Gateway Pods": {
 			namespace: "default",
@@ -115,6 +117,7 @@ func TestFetchPods(t *testing.T) {
 					},
 				},
 			},
+			expectedPods: 1,
 		},
 		"Sidecar Pods": {
 			namespace: "default",
@@ -129,6 +132,7 @@ func TestFetchPods(t *testing.T) {
 					},
 				},
 			},
+			expectedPods: 1,
 		},
 		"All kinds of Pods": {
 			namespace: "default",
@@ -161,6 +165,7 @@ func TestFetchPods(t *testing.T) {
 					},
 				},
 			},
+			expectedPods: 3,
 		},
 		"Pods in multiple namespaces": {
 			namespace: "",
@@ -184,27 +189,43 @@ func TestFetchPods(t *testing.T) {
 					},
 				},
 			},
+			expectedPods: 2,
+		},
+		"Pods which should not be fetched": {
+			namespace: "default",
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "dont-fetch",
+						Namespace: "default",
+						Labels:    map[string]string{},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sidecar",
+						Namespace: "default",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+			},
+			expectedPods: 1,
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-
-			// Add the pods to the client.
-			for _, pod := range tc.pods {
-				client.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(context.Background(), &pod, metav1.CreateOptions{})
-			}
+			client := fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
 
 			c := getInitializedCommand(t)
 			c.kubernetes = client
 			c.flagNamespace = tc.namespace
 			pods, err := c.fetchPods()
-			require.NoError(t, err)
 
-			if len(pods) != len(tc.pods) {
-				t.Errorf("FetchPods(%v) returned %d pods, expected %d", tc.namespace, len(pods), len(tc.pods))
-			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedPods, len(pods))
 		})
 	}
 }
