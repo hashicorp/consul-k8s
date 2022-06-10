@@ -505,7 +505,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorp/consul:1.11.6 -consul-k8s-image="docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.44.0" -consul-major-version=11
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorp/consul:1.11.6 -consul-k8s-image="docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.44.0" -consul-version="1.11.6"
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -897,7 +897,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-major-version=11
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11-dev"
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -932,7 +932,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-major-version=12
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12-dev"
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
