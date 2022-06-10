@@ -69,6 +69,7 @@ func TestPortForwardingError(t *testing.T) {
 	defer pf.Close()
 
 	require.Error(t, err)
+	require.Equal(t, "error", err.Error())
 	require.Equal(t, "", endpoint)
 }
 
@@ -95,6 +96,7 @@ func TestPortForwardingContextCancel(t *testing.T) {
 	endpoint, err := pf.Open(ctx)
 
 	require.Error(t, err)
+	require.Equal(t, "port forward cancelled", err.Error())
 	require.Equal(t, "", endpoint)
 }
 
@@ -118,6 +120,8 @@ func TestPortForwardingTimeout(t *testing.T) {
 	}
 
 	endpoint, err := pf.Open(context.Background())
+
 	require.Error(t, err)
+	require.Equal(t, "port forward timed out", err.Error())
 	require.Equal(t, "", endpoint)
 }
