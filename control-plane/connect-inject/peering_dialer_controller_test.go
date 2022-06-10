@@ -277,7 +277,7 @@ func TestReconcileCreateUpdatePeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.peeringExists {
-				_, _, err := dialerClient.Peerings().Initiate(context.Background(), api.PeeringInitiateRequest{PeerName: tt.peeringName, PeeringToken: encodedPeeringToken}, nil)
+				_, _, err := dialerClient.Peerings().Establish(context.Background(), api.PeeringEstablishRequest{PeerName: tt.peeringName, PeeringToken: encodedPeeringToken}, nil)
 				require.NoError(t, err)
 				k8sObjects = append(k8sObjects, createSecret("dialer-token-old", "default", "token", "old-token"))
 			}
