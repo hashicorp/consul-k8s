@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -324,6 +325,7 @@ func TestReconcileCreateUpdatePeeringDialer(t *testing.T) {
 					require.Equal(t, tt.expectedStatus.SecretRef.Key, dialer.SecretRef().Key)
 					require.Equal(t, tt.expectedStatus.SecretRef.Backend, dialer.SecretRef().Backend)
 					require.Equal(t, "latest-version", dialer.SecretRef().ResourceVersion)
+					require.Contains(t, dialer.Finalizers, FinalizerName)
 					require.NotEmpty(t, dialer.SecretRef().ResourceVersion)
 					require.NotEqual(t, "test-version", dialer.SecretRef().ResourceVersion)
 				}
@@ -502,10 +504,24 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			// Add the default namespace.
-			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+
+			dialer := &v1alpha1.PeeringDialer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "dialer-deleted",
+					Namespace:         "default",
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.PeeringDialerSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: nil,
+					},
+				},
+			}
 
 			// Create fake k8s client.
-			k8sObjects := []runtime.Object{&ns}
+			k8sObjects := []runtime.Object{ns, dialer}
 
 			// Add peering types to the scheme.
 			s := scheme.Scheme
@@ -557,6 +573,9 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 			peering, _, err := consulClient.Peerings().Read(context.Background(), "dialer-deleted", nil)
 			require.Nil(t, peering)
 			require.NoError(t, err)
+
+			err = fakeClient.Get(context.Background(), namespacedName, dialer)
+			require.EqualError(t, err, `peeringdialers.consul.hashicorp.com "dialer-deleted" not found`)
 		})
 	}
 }
