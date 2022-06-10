@@ -32,7 +32,7 @@ var (
 )
 
 // Handler is the HTTP handler for admission webhooks.
-type Handler struct {
+type ConnectWebhook struct {
 	ConsulClient *api.Client
 	Clientset    kubernetes.Interface
 
@@ -170,12 +170,12 @@ type multiPortInfo struct {
 // Handle is the admission.Handler implementation that actually handles the
 // webhook request for admission control. This should be registered or
 // served via the controller runtime manager.
-func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (w *ConnectWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var pod corev1.Pod
 
 	// Decode the pod from the request
-	if err := h.decoder.Decode(req, &pod); err != nil {
-		h.Log.Error(err, "could not unmarshal request to pod")
+	if err := w.decoder.Decode(req, &pod); err != nil {
+		w.Log.Error(err, "could not unmarshal request to pod")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -186,40 +186,40 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if err := h.validatePod(pod); err != nil {
-		h.Log.Error(err, "error validating pod", "request name", req.Name)
+	if err := w.validatePod(pod); err != nil {
+		w.Log.Error(err, "error validating pod", "request name", req.Name)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	// Setup the default annotation values that are used for the container.
 	// This MUST be done before shouldInject is called since that function
 	// uses these annotations.
-	if err := h.defaultAnnotations(&pod, string(origPodJson)); err != nil {
-		h.Log.Error(err, "error creating default annotations", "request name", req.Name)
+	if err := w.defaultAnnotations(&pod, string(origPodJson)); err != nil {
+		w.Log.Error(err, "error creating default annotations", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating default annotations: %s", err))
 	}
 
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
-	if shouldInject, err := h.shouldInject(pod, req.Namespace); err != nil {
-		h.Log.Error(err, "error checking if should inject", "request name", req.Name)
+	if shouldInject, err := w.shouldInject(pod, req.Namespace); err != nil {
+		w.Log.Error(err, "error checking if should inject", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking if should inject: %s", err))
 	} else if !shouldInject {
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
 
-	h.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
+	w.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
-	pod.Spec.Volumes = append(pod.Spec.Volumes, h.containerVolume())
+	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume())
 
 	// Optionally mount data volume to other containers
-	h.injectVolumeMount(pod)
+	w.injectVolumeMount(pod)
 
 	// Add the upstream services as environment variables for easy
 	// service discovery.
-	containerEnvVars := h.containerEnvVars(pod)
+	containerEnvVars := w.containerEnvVars(pod)
 	for i := range pod.Spec.InitContainers {
 		pod.Spec.InitContainers[i].Env = append(pod.Spec.InitContainers[i].Env, containerEnvVars...)
 	}
@@ -229,35 +229,35 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	}
 
 	// Add the init container which copies the Consul binary to /consul/connect-inject/.
-	initCopyContainer := h.initCopyContainer()
+	initCopyContainer := w.initCopyContainer()
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
 	// A user can enable/disable tproxy for an entire namespace via a label.
-	ns, err := h.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
 	if err != nil {
-		h.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
+		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
 	// Get service names from the annotation. If theres 0-1 service names, it's a single port pod, otherwise it's multi
 	// port.
-	annotatedSvcNames := h.annotatedServiceNames(pod)
+	annotatedSvcNames := w.annotatedServiceNames(pod)
 	multiPort := len(annotatedSvcNames) > 1
 
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := h.containerInit(*ns, pod, multiPortInfo{})
+		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{})
 		if err != nil {
-			h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
+			w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
 		}
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 		// Add the Envoy sidecar.
-		envoySidecar, err := h.envoySidecar(*ns, pod, multiPortInfo{})
+		envoySidecar, err := w.envoySidecar(*ns, pod, multiPortInfo{})
 		if err != nil {
-			h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
+			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
@@ -269,27 +269,27 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		// service account per service. So, this will look for service accounts whose name matches the service and mount
 		// those tokens if not already specified via the pod's serviceAccountName.
 
-		h.Log.Info("processing multiport pod")
-		err := h.checkUnsupportedMultiPortCases(*ns, pod)
+		w.Log.Info("processing multiport pod")
+		err := w.checkUnsupportedMultiPortCases(*ns, pod)
 		if err != nil {
-			h.Log.Error(err, "checking unsupported cases for multi port pods")
+			w.Log.Error(err, "checking unsupported cases for multi port pods")
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 		for i, svc := range annotatedSvcNames {
-			h.Log.Info(fmt.Sprintf("service: %s", svc))
-			if h.AuthMethod != "" {
+			w.Log.Info(fmt.Sprintf("service: %s", svc))
+			if w.AuthMethod != "" {
 				if svc != "" && pod.Spec.ServiceAccountName != svc {
-					sa, err := h.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
+					sa, err := w.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
 					if err != nil {
-						h.Log.Error(err, "couldn't get service accounts")
+						w.Log.Error(err, "couldn't get service accounts")
 						return admission.Errored(http.StatusInternalServerError, err)
 					}
 					if len(sa.Secrets) == 0 {
-						h.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
+						w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
 						return admission.Errored(http.StatusInternalServerError, fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
 					}
 					saSecret := sa.Secrets[0].Name
-					h.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
+					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
 					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 						Name: fmt.Sprintf("%s-service-account", svc),
 						VolumeSource: corev1.VolumeSource{
@@ -308,17 +308,17 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 			}
 
 			// Add the init container that registers the service and sets up the Envoy configuration.
-			initContainer, err := h.containerInit(*ns, pod, mpi)
+			initContainer, err := w.containerInit(*ns, pod, mpi)
 			if err != nil {
-				h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
+				w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
 			}
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 			// Add the Envoy sidecar.
-			envoySidecar, err := h.envoySidecar(*ns, pod, mpi)
+			envoySidecar, err := w.envoySidecar(*ns, pod, mpi)
 			if err != nil {
-				h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
+				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
@@ -329,17 +329,17 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// (that functionality lives in the endpoints-controller),
 	// we only need the consul sidecar to run the metrics merging server.
 	// First, determine if we need to run the metrics merging server.
-	shouldRunMetricsMerging, err := h.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	shouldRunMetricsMerging, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
 	if err != nil {
-		h.Log.Error(err, "error determining if metrics merging server should be run", "request name", req.Name)
+		w.Log.Error(err, "error determining if metrics merging server should be run", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if metrics merging server should be run: %s", err))
 	}
 
 	// Add the consul-sidecar only if we need to run the metrics merging server.
 	if shouldRunMetricsMerging {
-		consulSidecar, err := h.consulSidecar(pod)
+		consulSidecar, err := w.consulSidecar(pod)
 		if err != nil {
-			h.Log.Error(err, "error configuring consul sidecar container", "request name", req.Name)
+			w.Log.Error(err, "error configuring consul sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, consulSidecar)
@@ -350,8 +350,8 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	pod.Annotations[keyInjectStatus] = injected
 
 	// Add annotations for metrics.
-	if err = h.prometheusAnnotations(&pod); err != nil {
-		h.Log.Error(err, "error configuring prometheus annotations", "request name", req.Name)
+	if err = w.prometheusAnnotations(&pod); err != nil {
+		w.Log.Error(err, "error configuring prometheus annotations", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring prometheus annotations: %s", err))
 	}
 
@@ -365,14 +365,14 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	pod.Labels[keyManagedBy] = managedByValue
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
-	if h.EnableNamespaces {
-		pod.Annotations[annotationConsulNamespace] = h.consulNamespace(req.Namespace)
+	if w.EnableNamespaces {
+		pod.Annotations[annotationConsulNamespace] = w.consulNamespace(req.Namespace)
 	}
 
 	// Overwrite readiness/liveness probes if needed.
-	err = h.overwriteProbes(*ns, &pod)
+	err = w.overwriteProbes(*ns, &pod)
 	if err != nil {
-		h.Log.Error(err, "error overwriting readiness or liveness probes", "request name", req.Name)
+		w.Log.Error(err, "error overwriting readiness or liveness probes", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
 	}
 
@@ -393,10 +393,10 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// Check and potentially create Consul resources. This is done after
 	// all patches are created to guarantee no errors were encountered in
 	// that process before modifying the Consul cluster.
-	if h.EnableNamespaces {
-		if _, err := namespaces.EnsureExists(h.ConsulClient, h.consulNamespace(req.Namespace), h.CrossNamespaceACLPolicy); err != nil {
-			h.Log.Error(err, "error checking or creating namespace",
-				"ns", h.consulNamespace(req.Namespace), "request name", req.Name)
+	if w.EnableNamespaces {
+		if _, err := namespaces.EnsureExists(w.ConsulClient, w.consulNamespace(req.Namespace), w.CrossNamespaceACLPolicy); err != nil {
+			w.Log.Error(err, "error checking or creating namespace",
+				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
 		}
 	}
@@ -418,13 +418,13 @@ func shouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
 
 // overwriteProbes overwrites readiness/liveness probes of this pod when
 // both transparent proxy is enabled and overwrite probes is true for the pod.
-func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
-	tproxyEnabled, err := transparentProxyEnabled(ns, *pod, h.EnableTransparentProxy)
+func (w *ConnectWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
+	tproxyEnabled, err := transparentProxyEnabled(ns, *pod, w.EnableTransparentProxy)
 	if err != nil {
 		return err
 	}
 
-	overwriteProbes, err := shouldOverwriteProbes(*pod, h.TProxyOverwriteProbes)
+	overwriteProbes, err := shouldOverwriteProbes(*pod, w.TProxyOverwriteProbes)
 	if err != nil {
 		return err
 	}
@@ -449,7 +449,7 @@ func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 	return nil
 }
 
-func (h *Handler) injectVolumeMount(pod corev1.Pod) {
+func (w *ConnectWebhook) injectVolumeMount(pod corev1.Pod) {
 	containersToInject := splitCommaSeparatedItemsFromAnnotation(annotationInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
@@ -462,7 +462,7 @@ func (h *Handler) injectVolumeMount(pod corev1.Pod) {
 	}
 }
 
-func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
+func (w *ConnectWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 	// Don't inject in the Kubernetes system namespaces
 	if kubeSystemNamespaces.Contains(namespace) {
 		return false, nil
@@ -470,12 +470,12 @@ func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 
 	// Namespace logic
 	// If in deny list, don't inject
-	if h.DenyK8sNamespacesSet.Contains(namespace) {
+	if w.DenyK8sNamespacesSet.Contains(namespace) {
 		return false, nil
 	}
 
 	// If not in allow list or allow list is not *, don't inject
-	if !h.AllowK8sNamespacesSet.Contains("*") && !h.AllowK8sNamespacesSet.Contains(namespace) {
+	if !w.AllowK8sNamespacesSet.Contains("*") && !w.AllowK8sNamespacesSet.Contains(namespace) {
 		return false, nil
 	}
 
@@ -491,10 +491,10 @@ func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 		return strconv.ParseBool(raw)
 	}
 
-	return !h.RequireAnnotation, nil
+	return !w.RequireAnnotation, nil
 }
 
-func (h *Handler) defaultAnnotations(pod *corev1.Pod, podJson string) error {
+func (w *ConnectWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error {
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
@@ -518,16 +518,16 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, podJson string) error {
 
 // prometheusAnnotations sets the Prometheus scraping configuration
 // annotations on the Pod.
-func (h *Handler) prometheusAnnotations(pod *corev1.Pod) error {
-	enableMetrics, err := h.MetricsConfig.enableMetrics(*pod)
+func (w *ConnectWebhook) prometheusAnnotations(pod *corev1.Pod) error {
+	enableMetrics, err := w.MetricsConfig.enableMetrics(*pod)
 	if err != nil {
 		return err
 	}
-	prometheusScrapePort, err := h.MetricsConfig.prometheusScrapePort(*pod)
+	prometheusScrapePort, err := w.MetricsConfig.prometheusScrapePort(*pod)
 	if err != nil {
 		return err
 	}
-	prometheusScrapePath := h.MetricsConfig.prometheusScrapePath(*pod)
+	prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(*pod)
 
 	if enableMetrics {
 		pod.Annotations[annotationPrometheusScrape] = "true"
@@ -540,11 +540,11 @@ func (h *Handler) prometheusAnnotations(pod *corev1.Pod) error {
 // consulNamespace returns the namespace that a service should be
 // registered in based on the namespace options. It returns an
 // empty string if namespaces aren't enabled.
-func (h *Handler) consulNamespace(ns string) string {
-	return namespaces.ConsulNamespace(ns, h.EnableNamespaces, h.ConsulDestinationNamespace, h.EnableK8SNSMirroring, h.K8SNSMirroringPrefix)
+func (w *ConnectWebhook) consulNamespace(ns string) string {
+	return namespaces.ConsulNamespace(ns, w.EnableNamespaces, w.ConsulDestinationNamespace, w.EnableK8SNSMirroring, w.K8SNSMirroringPrefix)
 }
 
-func (h *Handler) validatePod(pod corev1.Pod) error {
+func (w *ConnectWebhook) validatePod(pod corev1.Pod) error {
 	if _, ok := pod.Annotations[annotationProtocol]; ok {
 		return fmt.Errorf("the %q annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
 			annotationProtocol)
@@ -609,7 +609,7 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcN
 	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
 }
 
-func (h *Handler) annotatedServiceNames(pod corev1.Pod) []string {
+func (w *ConnectWebhook) annotatedServiceNames(pod corev1.Pod) []string {
 	var annotatedSvcNames []string
 	if anno, ok := pod.Annotations[annotationService]; ok {
 		annotatedSvcNames = strings.Split(anno, ",")
@@ -617,16 +617,16 @@ func (h *Handler) annotatedServiceNames(pod corev1.Pod) []string {
 	return annotatedSvcNames
 }
 
-func (h *Handler) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
-	tproxyEnabled, err := transparentProxyEnabled(ns, pod, h.EnableTransparentProxy)
+func (w *ConnectWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
+	tproxyEnabled, err := transparentProxyEnabled(ns, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return fmt.Errorf("couldn't check if tproxy is enabled: %s", err)
 	}
-	metricsEnabled, err := h.MetricsConfig.enableMetrics(pod)
+	metricsEnabled, err := w.MetricsConfig.enableMetrics(pod)
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics is enabled: %s", err)
 	}
-	metricsMergingEnabled, err := h.MetricsConfig.enableMetricsMerging(pod)
+	metricsMergingEnabled, err := w.MetricsConfig.enableMetricsMerging(pod)
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
 	}
@@ -642,8 +642,8 @@ func (h *Handler) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1
 	return nil
 }
 
-func (h *Handler) InjectDecoder(d *admission.Decoder) error {
-	h.decoder = d
+func (w *ConnectWebhook) InjectDecoder(d *admission.Decoder) error {
+	w.decoder = d
 	return nil
 }
 

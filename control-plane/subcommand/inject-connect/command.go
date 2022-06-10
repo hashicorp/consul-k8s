@@ -455,7 +455,7 @@ func (c *Command) Run(args []string) int {
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
-		&webhook.Admission{Handler: &connectinject.Handler{
+		&webhook.Admission{Handler: &connectinject.ConnectWebhook{
 			Clientset:                     c.clientset,
 			ConsulClient:                  c.consulClient,
 			ImageConsul:                   c.flagConsulImage,
