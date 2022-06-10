@@ -1311,6 +1311,73 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`spec.sources[2].partition: Invalid value: "partition-foo": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
 			},
 		},
+		"single source peer and partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+							Peer:      "peer-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+			},
+		},
+		"multiple source peer and partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+							Peer:      "peer-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+							Partition: "partition-2",
+							Peer:      "peer-2",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {

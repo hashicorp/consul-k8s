@@ -78,6 +78,8 @@ type SourceIntention struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace for the Name parameter.
 	Namespace string `json:"namespace,omitempty"`
+	// Peer is the peer name for the Name parameter.
+	Peer string `json:"peer,omitempty"`
 	// Partition is the Admin Partition for the Name parameter.
 	Partition string `json:"partition,omitempty"`
 	// Action is required for an L4 intention, and should be set to one of
@@ -270,7 +272,7 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
-	errs = append(errs, in.validatePartitions(consulMeta.PartitionsEnabled)...)
+	errs = append(errs, in.validateSourcePeerAndPartitions(consulMeta.PartitionsEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -311,6 +313,7 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 		Name:        in.Name,
 		Namespace:   in.Namespace,
 		Partition:   in.Partition,
+		Peer:        in.Peer,
 		Action:      in.Action.toConsul(),
 		Permissions: in.Permissions.toConsul(),
 		Description: in.Description,
@@ -455,14 +458,16 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 	return errs
 }
 
-func (in *ServiceIntentions) validatePartitions(partitionsEnabled bool) field.ErrorList {
+func (in *ServiceIntentions) validateSourcePeerAndPartitions(partitionsEnabled bool) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-	if !partitionsEnabled {
-		for i, source := range in.Spec.Sources {
-			if source.Partition != "" {
-				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
-			}
+	for i, source := range in.Spec.Sources {
+		if source.Partition != "" && !partitionsEnabled {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
+		}
+
+		if source.Peer != "" && source.Partition != "" {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i), source, `Both source.peer and source.partition cannot be set.`))
 		}
 	}
 	return errs
