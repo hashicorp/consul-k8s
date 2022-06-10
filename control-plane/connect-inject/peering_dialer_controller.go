@@ -111,7 +111,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		// correct secret specified in the spec.
 		r.Log.Info("the secret in status.secretRef doesn't exist or wasn't set, establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 		peeringToken := specSecret.Data[dialer.Secret().Key]
-		if err := r.initiatePeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+		if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
 			r.updateStatusError(ctx, dialer, err)
 			return ctrl.Result{}, err
 		} else {
@@ -134,7 +134,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		if peering == nil {
 			r.Log.Info("status.secret exists, but the peering doesn't exist in Consul; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
-			if err := r.initiatePeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, err)
 				return ctrl.Result{}, err
 			} else {
@@ -148,7 +148,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		if r.specStatusSecretsDifferent(dialer, specSecret) {
 			r.Log.Info("the secret in status.secretRef exists and is different from spec.peer.secret; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
-			if err := r.initiatePeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, err)
 				return ctrl.Result{}, err
 			} else {
@@ -224,13 +224,13 @@ func (r *PeeringDialerController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// initiatePeering is a helper function that calls the Consul api to generate a token for the peer.
-func (r *PeeringDialerController) initiatePeering(ctx context.Context, peerName string, peeringToken string) error {
-	req := api.PeeringInitiateRequest{
+// establishPeering is a helper function that calls the Consul api to generate a token for the peer.
+func (r *PeeringDialerController) establishPeering(ctx context.Context, peerName string, peeringToken string) error {
+	req := api.PeeringEstablishRequest{
 		PeerName:     peerName,
 		PeeringToken: peeringToken,
 	}
-	_, _, err := r.ConsulClient.Peerings().Initiate(ctx, req, nil)
+	_, _, err := r.ConsulClient.Peerings().Establish(ctx, req, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to initiate peering", "err", err)
 		return err
