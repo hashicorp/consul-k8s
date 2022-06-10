@@ -2708,7 +2708,7 @@ apiGateway:
       # @type: string
       service: null
 
-    # This values defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
+    # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
     #
     # Example:
     #
