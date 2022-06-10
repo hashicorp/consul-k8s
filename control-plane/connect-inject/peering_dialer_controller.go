@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,8 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // PeeringDialerController reconciles a PeeringDialer object.
@@ -40,17 +40,36 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 	dialer := &consulv1alpha1.PeeringDialer{}
 	err := r.Client.Get(ctx, req.NamespacedName, dialer)
 
-	// If the PeeringDialer resource has been deleted (and we get an IsNotFound
-	// error), we need to delete it in Consul.
+	// This can be safely ignored as a resource will only ever be not found if it has never been reconciled
+	// since we add finalizers to our resources.
 	if k8serrors.IsNotFound(err) {
-		r.Log.Info("PeeringDialer was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-		if err := r.deletePeering(ctx, req.Name); err != nil {
-			return ctrl.Result{}, err
-		}
+		r.Log.Info("PeeringDialer resource not found. Ignoring resource", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, nil
 	} else if err != nil {
 		r.Log.Error(err, "failed to get PeeringDialer", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
+	}
+
+	// The DeletionTimestamp is zero when the object has not been marked for deletion. The finalizer is added
+	// in case it does not exist to all resources. If the DeletionTimestamp is non-zero, the object has been
+	// marked for deletion and goes into the deletion workflow.
+	if dialer.GetDeletionTimestamp().IsZero() {
+		if !controllerutil.ContainsFinalizer(dialer, FinalizerName) {
+			controllerutil.AddFinalizer(dialer, FinalizerName)
+			if err := r.Update(ctx, dialer); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		if containsString(dialer.Finalizers, FinalizerName) {
+			r.Log.Info("PeeringDialer was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
+			if err := r.deletePeering(ctx, req.Name); err != nil {
+				return ctrl.Result{}, err
+			}
+			controllerutil.RemoveFinalizer(dialer, FinalizerName)
+			err := r.Update(ctx, dialer)
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Get the status secret and the spec secret.

@@ -28,6 +28,8 @@ type PeeringAcceptorController struct {
 	context.Context
 }
 
+const FinalizerName = "finalizers.consul.hashicorp.com"
+
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -49,17 +51,41 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	acceptor := &consulv1alpha1.PeeringAcceptor{}
 	err := r.Client.Get(ctx, req.NamespacedName, acceptor)
 
-	// If the PeeringAcceptor resource has been deleted (and we get an IsNotFound
-	// error), we need to delete it in Consul.
+	// This can be safely ignored as a resource will only ever be not found if it has never been reconciled
+	// since we add finalizers to our resources.
 	if k8serrors.IsNotFound(err) {
-		r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-		if err := r.deletePeering(ctx, req.Name); err != nil {
-			return ctrl.Result{}, err
-		}
+		r.Log.Info("PeeringAcceptor resource not found. Ignoring resource", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, nil
 	} else if err != nil {
 		r.Log.Error(err, "failed to get PeeringAcceptor", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
+	}
+
+	// The DeletionTimestamp is zero when the object has not been marked for deletion. The finalizer is added
+	// in case it does not exist to all resources. If the DeletionTimestamp is non-zero, the object has been
+	// marked for deletion and goes into the deletion workflow.
+	if acceptor.GetDeletionTimestamp().IsZero() {
+		if !controllerutil.ContainsFinalizer(acceptor, FinalizerName) {
+			controllerutil.AddFinalizer(acceptor, FinalizerName)
+			if err := r.Update(ctx, acceptor); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		if containsString(acceptor.Finalizers, FinalizerName) {
+			r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
+			if err := r.deletePeering(ctx, req.Name); err != nil {
+				return ctrl.Result{}, err
+			}
+			if acceptor.Secret().Backend == "kubernetes" {
+				if err := r.deleteK8sSecret(ctx, acceptor); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+			controllerutil.RemoveFinalizer(acceptor, FinalizerName)
+			err := r.Update(ctx, acceptor)
+			return ctrl.Result{}, err
+		}
 	}
 
 	statusSecretSet := acceptor.SecretRef() != nil
@@ -104,7 +130,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
-			secretResourceVersion, err = r.createK8sPeeringTokenSecretWithOwner(ctx, acceptor, resp)
+			secretResourceVersion, err = r.createK8sSecret(ctx, acceptor, resp)
 			if err != nil {
 				r.updateStatusError(ctx, acceptor, err)
 				return ctrl.Result{}, err
@@ -142,7 +168,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
-			secretResourceVersion, err = r.createK8sPeeringTokenSecretWithOwner(ctx, acceptor, resp)
+			secretResourceVersion, err = r.createK8sSecret(ctx, acceptor, resp)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -244,17 +270,13 @@ func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name 
 	return existingSecret, nil
 }
 
-// createK8sPeeringTokenSecretWithOwner creates a secret and uses the controller's K8s client to apply the secret. It
-// sets an owner reference to the PeeringAcceptor resource. It also checks if there's an existing secret with the same
-// name and makes sure to update the existing secret if so.
-func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) (string, error) {
+// createK8sSecret creates a secret and uses the controller's K8s client to apply the secret. It checks if
+// there's an existing secret with the same name and makes sure to update the existing secret if so.
+func (r *PeeringAcceptorController) createK8sSecret(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) (string, error) {
 	secretName := acceptor.Secret().Name
 	secretNamespace := acceptor.Namespace
 	secret := createSecret(secretName, secretNamespace, acceptor.Secret().Key, resp.PeeringToken)
-	if err := controllerutil.SetControllerReference(acceptor, secret, r.Scheme); err != nil {
-		return "", err
-	}
-	existingSecret, err := r.getExistingSecret(ctx, acceptor.Secret().Name, acceptor.Namespace)
+	existingSecret, err := r.getExistingSecret(ctx, secretName, secretNamespace)
 	if err != nil {
 		return "", err
 	}
@@ -275,6 +297,22 @@ func (r *PeeringAcceptorController) createK8sPeeringTokenSecretWithOwner(ctx con
 	}
 
 	return newSecret.ResourceVersion, nil
+}
+
+func (r *PeeringAcceptorController) deleteK8sSecret(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor) error {
+	secretName := acceptor.Secret().Name
+	secretNamespace := acceptor.Namespace
+	secret := createSecret(secretName, secretNamespace, "", "")
+	existingSecret, err := r.getExistingSecret(ctx, secretName, secretNamespace)
+	if err != nil {
+		return err
+	}
+	if existingSecret != nil {
+		if err := r.Client.Delete(ctx, secret); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -326,4 +364,14 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 
 func pointerToString(s string) *string {
 	return &s
+}
+
+// containsString returns true if s is in slice.
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }
