@@ -28,7 +28,7 @@ func TestContainerEnvVars(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			var h Handler
+			var h ConnectWebhook
 			envVars := h.containerEnvVars(corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{

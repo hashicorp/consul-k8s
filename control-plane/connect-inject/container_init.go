@@ -93,13 +93,13 @@ type initContainerCommandData struct {
 
 // initCopyContainer returns the init container spec for the copy container which places
 // the consul binary into the shared volume.
-func (h *Handler) initCopyContainer() corev1.Container {
+func (w *ConnectWebhook) initCopyContainer() corev1.Container {
 	// Copy the Consul binary from the image to the shared volume.
 	cmd := "cp /bin/consul /consul/connect-inject/consul"
 	container := corev1.Container{
 		Name:      InjectInitCopyContainerName,
-		Image:     h.ImageConsul,
-		Resources: h.InitContainerResources,
+		Image:     w.ImageConsul,
+		Resources: w.InitContainerResources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
@@ -109,7 +109,7 @@ func (h *Handler) initCopyContainer() corev1.Container {
 		Command: []string{"/bin/sh", "-ec", cmd},
 	}
 	// If running on OpenShift, don't set the security context and instead let OpenShift set a random user/group for us.
-	if !h.EnableOpenShift {
+	if !w.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
 			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
 			RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
@@ -123,14 +123,14 @@ func (h *Handler) initCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+func (w *ConnectWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
-	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
+	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
-	dnsEnabled, err := consulDNSEnabled(namespace, pod, h.EnableConsulDNS)
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, w.EnableConsulDNS)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -140,20 +140,20 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 		// If Consul DNS is enabled, we find the environment variable that has the value
 		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
-		consulDNSClusterIP = os.Getenv(h.constructDNSServiceHostName())
+		consulDNSClusterIP = os.Getenv(w.constructDNSServiceHostName())
 		if consulDNSClusterIP == "" {
-			return corev1.Container{}, fmt.Errorf("environment variable %s is not found", h.constructDNSServiceHostName())
+			return corev1.Container{}, fmt.Errorf("environment variable %s is not found", w.constructDNSServiceHostName())
 		}
 	}
 
 	multiPort := mpi.serviceName != ""
 
 	data := initContainerCommandData{
-		AuthMethod:                 h.AuthMethod,
-		ConsulPartition:            h.ConsulPartition,
-		ConsulNamespace:            h.consulNamespace(namespace.Name),
-		NamespaceMirroringEnabled:  h.EnableK8SNSMirroring,
-		ConsulCACert:               h.ConsulCACert,
+		AuthMethod:                 w.AuthMethod,
+		ConsulPartition:            w.ConsulPartition,
+		ConsulNamespace:            w.consulNamespace(namespace.Name),
+		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
+		ConsulCACert:               w.ConsulCACert,
 		EnableTransparentProxy:     tproxyEnabled,
 		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
@@ -163,7 +163,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 		EnvoyUID:                   envoyUserAndGroupID,
 		MultiPort:                  multiPort,
 		EnvoyAdminPort:             19000 + mpi.serviceIndex,
-		ConsulAPITimeout:           h.ConsulAPITimeout,
+		ConsulAPITimeout:           w.ConsulAPITimeout,
 	}
 
 	// Create expected volume mounts
@@ -179,7 +179,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 	} else {
 		data.ServiceName = pod.Annotations[annotationService]
 	}
-	if h.AuthMethod != "" {
+	if w.AuthMethod != "" {
 		if multiPort {
 			// If multi port then we require that the service account name
 			// matches the service name.
@@ -201,13 +201,13 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 	// This determines how to configure the consul connect envoy command: what
 	// metrics backend to use and what path to expose on the
 	// envoy_prometheus_bind_addr listener for scraping.
-	metricsServer, err := h.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 	if metricsServer {
-		prometheusScrapePath := h.MetricsConfig.prometheusScrapePath(pod)
-		mergedMetricsPort, err := h.MetricsConfig.mergedMetricsPort(pod)
+		prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
+		mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
 		if err != nil {
 			return corev1.Container{}, err
 		}
@@ -230,7 +230,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 	}
 	container := corev1.Container{
 		Name:  initContainerName,
-		Image: h.ImageConsulK8S,
+		Image: w.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",
@@ -257,7 +257,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 				},
 			},
 		},
-		Resources:    h.InitContainerResources,
+		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}
@@ -283,8 +283,8 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 // constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
 // key of the env variable whose value is the cluster IP of the Consul DNS Service.
 // It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
-func (h *Handler) constructDNSServiceHostName() string {
-	upcaseResourcePrefix := strings.ToUpper(h.ResourcePrefix)
+func (w *ConnectWebhook) constructDNSServiceHostName() string {
+	upcaseResourcePrefix := strings.ToUpper(w.ResourcePrefix)
 	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
 	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
 }

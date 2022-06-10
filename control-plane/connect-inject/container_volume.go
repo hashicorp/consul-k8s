@@ -10,7 +10,7 @@ const volumeName = "consul-connect-inject-data"
 
 // containerVolume returns the volume data to add to the pod. This volume
 // is used for shared data between containers.
-func (h *Handler) containerVolume() corev1.Volume {
+func (w *ConnectWebhook) containerVolume() corev1.Volume {
 	return corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
