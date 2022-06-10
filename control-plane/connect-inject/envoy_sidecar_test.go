@@ -12,7 +12,7 @@ import (
 
 func TestHandlerEnvoySidecar(t *testing.T) {
 	require := require.New(t)
-	h := Handler{}
+	h := ConnectWebhook{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -45,7 +45,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 
 func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 	require := require.New(t)
-	h := Handler{}
+	h := ConnectWebhook{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -136,7 +136,7 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{
+			h := ConnectWebhook{
 				EnableTransparentProxy: c.tproxyEnabled,
 				EnableOpenShift:        c.openShiftEnabled,
 			}
@@ -166,7 +166,7 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 // an error to the handler.
 func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
 	require := require.New(t)
-	h := Handler{}
+	h := ConnectWebhook{}
 	pod := corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -190,7 +190,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 	cases := []struct {
 		name          string
 		pod           corev1.Pod
-		handler       Handler
+		handler       ConnectWebhook
 		expErr        bool
 		expErrMessage error
 	}{
@@ -217,7 +217,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 					},
 				},
 			},
-			handler:       Handler{},
+			handler:       ConnectWebhook{},
 			expErr:        true,
 			expErrMessage: fmt.Errorf("container app has runAsUser set to the same uid %q as envoy which is not allowed", envoyUserAndGroupID),
 		},
@@ -244,7 +244,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 					},
 				},
 			},
-			handler: Handler{
+			handler: ConnectWebhook{
 				ImageEnvoy: "envoy",
 			},
 			expErr: false,
@@ -341,7 +341,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			h := Handler{
+			h := ConnectWebhook{
 				ImageConsul:    "hashicorp/consul:latest",
 				ImageEnvoy:     "hashicorp/consul-k8s:latest",
 				EnvoyExtraArgs: tc.envoyExtraArgs,
@@ -362,13 +362,13 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 	zero := resource.MustParse("0")
 
 	cases := map[string]struct {
-		handler      Handler
+		handler      ConnectWebhook
 		annotations  map[string]string
 		expResources corev1.ResourceRequirements
 		expErr       string
 	}{
 		"no defaults, no annotations": {
-			handler:     Handler{},
+			handler:     ConnectWebhook{},
 			annotations: nil,
 			expResources: corev1.ResourceRequirements{
 				Limits:   corev1.ResourceList{},
@@ -376,7 +376,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"all defaults, no annotations": {
-			handler: Handler{
+			handler: ConnectWebhook{
 				DefaultProxyCPURequest:    cpu1,
 				DefaultProxyCPULimit:      cpu2,
 				DefaultProxyMemoryRequest: mem1,
@@ -395,7 +395,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"no defaults, all annotations": {
-			handler: Handler{},
+			handler: ConnectWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPURequest:    "100m",
 				annotationSidecarProxyMemoryRequest: "100Mi",
@@ -414,7 +414,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"annotations override defaults": {
-			handler: Handler{
+			handler: ConnectWebhook{
 				DefaultProxyCPURequest:    zero,
 				DefaultProxyCPULimit:      zero,
 				DefaultProxyMemoryRequest: zero,
@@ -438,7 +438,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"defaults set to zero, no annotations": {
-			handler: Handler{
+			handler: ConnectWebhook{
 				DefaultProxyCPURequest:    zero,
 				DefaultProxyCPULimit:      zero,
 				DefaultProxyMemoryRequest: zero,
@@ -457,7 +457,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"annotations set to 0": {
-			handler: Handler{},
+			handler: ConnectWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPURequest:    "0",
 				annotationSidecarProxyMemoryRequest: "0",
@@ -476,28 +476,28 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"invalid cpu request": {
-			handler: Handler{},
+			handler: ConnectWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPURequest: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-cpu-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid cpu limit": {
-			handler: Handler{},
+			handler: ConnectWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPULimit: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-cpu-limit:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory request": {
-			handler: Handler{},
+			handler: ConnectWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyMemoryRequest: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-memory-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory limit": {
-			handler: Handler{},
+			handler: ConnectWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyMemoryLimit: "invalid",
 			},

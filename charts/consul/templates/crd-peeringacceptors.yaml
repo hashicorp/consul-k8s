@@ -94,11 +94,11 @@ spec:
                   key:
                     description: Key is the key of the secret generated.
                     type: string
-                  latestHash:
-                    description: ResourceVersion is the resource version for the secret.
-                    type: string
                   name:
                     description: Name is the name of the secret generated.
+                    type: string
+                  resourceVersion:
+                    description: ResourceVersion is the resource version for the secret.
                     type: string
                 type: object
             type: object
