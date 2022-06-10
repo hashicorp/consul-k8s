@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"testing"
+	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -407,18 +408,12 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			require.Contains(t, string(decodedTokenData), "\"CA\":null")
 			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
 			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.consul\"")
-			// Assert on the owner reference
-			require.Len(t, createdSecret.OwnerReferences, 1)
-			require.Equal(t, "consul.hashicorp.com/v1alpha1", createdSecret.OwnerReferences[0].APIVersion)
-			require.Equal(t, "PeeringAcceptor", createdSecret.OwnerReferences[0].Kind)
-			require.Equal(t, "acceptor-created", createdSecret.OwnerReferences[0].Name)
-			require.Equal(t, true, *createdSecret.OwnerReferences[0].BlockOwnerDeletion)
-			require.Equal(t, true, *createdSecret.OwnerReferences[0].Controller)
 
 			// Get the reconciled PeeringAcceptor and make assertions on the status
 			acceptor := &v1alpha1.PeeringAcceptor{}
 			err = fakeClient.Get(context.Background(), namespacedName, acceptor)
 			require.NoError(t, err)
+			require.Contains(t, acceptor.Finalizers, FinalizerName)
 			if tt.expectedStatus != nil {
 				require.Equal(t, tt.expectedStatus.SecretRef.Name, acceptor.SecretRef().Name)
 				require.Equal(t, tt.expectedStatus.SecretRef.Key, acceptor.SecretRef().Key)
@@ -459,8 +454,24 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			// Add the default namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 
-			// Create fake k8s client.
-			k8sObjects := []runtime.Object{&ns}
+			acceptor := &v1alpha1.PeeringAcceptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "acceptor-deleted",
+					Namespace:         "default",
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.PeeringAcceptorSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "acceptor-deleted-secret",
+							Key:     "data",
+							Backend: "kubernetes",
+						},
+					},
+				},
+			}
+			k8sObjects := []runtime.Object{&ns, acceptor}
 
 			// Add peering types to the scheme.
 			s := scheme.Scheme
@@ -512,6 +523,13 @@ func TestReconcileDeletePeeringAcceptor(t *testing.T) {
 			peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-deleted", nil)
 			require.Nil(t, peering)
 			require.NoError(t, err)
+
+			err = fakeClient.Get(context.Background(), namespacedName, acceptor)
+			require.EqualError(t, err, `peeringacceptors.consul.hashicorp.com "acceptor-deleted" not found`)
+
+			oldSecret := &corev1.Secret{}
+			err = fakeClient.Get(context.Background(), namespacedName, oldSecret)
+			require.EqualError(t, err, `secrets "acceptor-deleted" not found`)
 		})
 	}
 }
