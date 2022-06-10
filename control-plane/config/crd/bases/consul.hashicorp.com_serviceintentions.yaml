@@ -94,6 +94,9 @@ spec:
                     partition:
                       description: Partition is the Admin Partition for the Name parameter.
                       type: string
+                    peer:
+                      description: Peer is the peer name for the Name parameter.
+                      type: string
                     permissions:
                       description: Permissions is the list of all additional L7 attributes
                         that extend the intention match criteria. Permission precedence
