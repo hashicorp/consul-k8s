@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,11 +23,15 @@ import (
 // with the vault namespace.
 func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
-	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
-		t.Skipf("Skipping: Vault secrets backend with Vault namespaces not supported in version %v", cfg.ConsulMajorVersion)
-	}
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
+
+	ver, err := version.NewVersion("1.12.0")
+	require.NoError(t, err)
+	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+		t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
+	}
+
 	vaultNamespacePath := "test-namespace"
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v2"
 )
 
@@ -39,9 +40,9 @@ type TestConfig struct {
 
 	EnableTransparentProxy bool
 
-	ConsulImage        string
-	ConsulMajorVersion int
-	ConsulK8SImage     string
+	ConsulImage    string
+	ConsulK8SImage string
+	ConsulVersion  *version.Version
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/go-version"
 )
 
 type TestFlags struct {
@@ -28,9 +29,9 @@ type TestFlags struct {
 
 	flagEnableTransparentProxy bool
 
-	flagConsulImage        string
-	flagConsulMajorVersion int
-	flagConsulK8sImage     string
+	flagConsulImage    string
+	flagConsulK8sImage string
+	flagConsulVersion  string
 
 	flagNoCleanupOnFailure bool
 
@@ -56,8 +57,8 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
 
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
-	flag.IntVar(&t.flagConsulMajorVersion, "consul-major-version", 0, "The Consul major version.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
+	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -115,6 +116,9 @@ func (t *TestFlags) Validate() error {
 func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	tempDir := t.flagDebugDirectory
 
+	// if the Version is empty consulVersion will be nil
+	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
+
 	return &config.TestConfig{
 		Kubeconfig:    t.flagKubeconfig,
 		KubeContext:   t.flagKubecontext,
@@ -134,9 +138,9 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
 
-		ConsulImage:        t.flagConsulImage,
-		ConsulK8SImage:     t.flagConsulK8sImage,
-		ConsulMajorVersion: t.flagConsulMajorVersion,
+		ConsulImage:    t.flagConsulImage,
+		ConsulK8SImage: t.flagConsulK8sImage,
+		ConsulVersion:  consulVersion,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,

@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -27,12 +28,15 @@ import (
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
-	if cfg.ConsulMajorVersion != 0 && cfg.ConsulMajorVersion < 12 {
-		t.Skipf("Skipping: Vault wanfed is not supported in version %v", cfg.ConsulMajorVersion)
-	}
 	if !cfg.EnableMultiCluster {
 		t.Skipf("skipping this test because -enable-multi-cluster is not set")
 	}
+	ver, err := version.NewVersion("1.12.0")
+	require.NoError(t, err)
+	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+		t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
+	}
+
 	primaryCtx := suite.Environment().DefaultContext(t)
 	secondaryCtx := suite.Environment().Context(t, environment.SecondaryContextName)
 

@@ -105,6 +105,10 @@ spec:
       tolerations:
         {{ tpl (default $defaults.tolerations .tolerations) $root | nindent 8 | trim }}
       {{- end }}
+      {{- if (or $defaults.topologySpreadConstraints .topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:

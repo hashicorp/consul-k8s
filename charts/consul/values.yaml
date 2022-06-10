@@ -25,7 +25,7 @@ global:
   name: null
 
   # The domain Consul will answer DNS queries for
-  # (see `-domain` (https://consul.io/docs/agent/options#_domain)) and the domain services synced from
+  # (see `-domain` (https://www.consul.io/docs/agent/config/cli-flags#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
@@ -264,7 +264,7 @@ global:
           {}
 
   # Configures Consul's gossip encryption key.
-  # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
+  # (see `-encrypt` (https://www.consul.io/docs/agent/config/cli-flags#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
   # The recommended method is to automatically generate the key.
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
@@ -297,7 +297,7 @@ global:
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
-  # See https://www.consul.io/docs/agent/options#_recursor for more details.
+  # See https://www.consul.io/docs/agent/config/cli-flags#_recursor for more details.
   # If this is an empty array (the default), then Consul DNS will only resolve queries for the Consul top level domain (by default `.consul`).
   # @type: array<string>
   recursors: []
@@ -1019,7 +1019,7 @@ client:
   # @type: string
   image: null
 
-  # A list of valid `-retry-join` values (https://consul.io/docs/agent/options#retry-join).
+  # A list of valid `-retry-join` values (https://www.consul.io/docs/agent/config/cli-flags#_retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
   # This means that with `server.enabled` set to true, clients will automatically
@@ -1045,7 +1045,7 @@ client:
   grpc: true
 
   # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node
-  # (see https://www.consul.io/docs/agent/options.html#_node_meta)
+  # (see https://www.consul.io/docs/agent/config/cli-flags#_node_meta)
   nodeMeta:
     pod-name: ${HOSTNAME}
     host-ip: ${HOST_IP}
@@ -1295,6 +1295,11 @@ client:
 
     # The number of snapshot agents to run.
     replicas: 2
+
+    # Interval at which to perform snapshots.
+    # See https://www.consul.io/commands/snapshot/agent#interval
+    # @type: string
+    interval: 1h
 
     # A Kubernetes or Vault secret that should be manually created to contain the entire
     # config to be used on the snapshot agent.
@@ -2298,6 +2303,27 @@ meshGateway:
   # @type: string
   tolerations: null
 
+  # Pod topology spread constraints for mesh gateway pods.
+  # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
+  # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+  #
+  # This requires K8S >= 1.18 (beta) or 1.19 (stable).
+  #
+  # Example:
+  #
+  # ```yaml
+  # topologySpreadConstraints: |
+  #   - maxSkew: 1
+  #     topologyKey: topology.kubernetes.io/zone
+  #     whenUnsatisfiable: DoNotSchedule
+  #     labelSelector:
+  #       matchLabels:
+  #         app: {{ template "consul.name" . }}
+  #         release: "{{ .Release.Name }}"
+  #         component: mesh-gateway
+  # ```
+  topologySpreadConstraints: ""
+
   # Optional YAML string to specify a nodeSelector config.
   # @type: string
   nodeSelector: null
@@ -2428,6 +2454,27 @@ ingressGateways:
     # @type: string
     tolerations: null
 
+    # Pod topology spread constraints for ingress gateway pods.
+    # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
+    # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+    #
+    # This requires K8S >= 1.18 (beta) or 1.19 (stable).
+    #
+    # Example:
+    #
+    # ```yaml
+    # topologySpreadConstraints: |
+    #   - maxSkew: 1
+    #     topologyKey: topology.kubernetes.io/zone
+    #     whenUnsatisfiable: DoNotSchedule
+    #     labelSelector:
+    #       matchLabels:
+    #         app: {{ template "consul.name" . }}
+    #         release: "{{ .Release.Name }}"
+    #         component: ingress-gateway
+    # ```
+    topologySpreadConstraints: ""
+
     # Optional YAML string to specify a nodeSelector config.
     # @type: string
     nodeSelector: null
@@ -2540,6 +2587,27 @@ terminatingGateways:
     # Optional YAML string to specify tolerations.
     # @type: string
     tolerations: null
+
+    # Pod topology spread constraints for terminating gateway pods.
+    # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
+    # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+    #
+    # This requires K8S >= 1.18 (beta) or 1.19 (stable).
+    #
+    # Example:
+    #
+    # ```yaml
+    # topologySpreadConstraints: |
+    #   - maxSkew: 1
+    #     topologyKey: topology.kubernetes.io/zone
+    #     whenUnsatisfiable: DoNotSchedule
+    #     labelSelector:
+    #       matchLabels:
+    #         app: {{ template "consul.name" . }}
+    #         release: "{{ .Release.Name }}"
+    #         component: terminating-gateway
+    # ```
+    topologySpreadConstraints: ""
 
     # Optional YAML string to specify a nodeSelector config.
     # @type: string

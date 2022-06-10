@@ -1071,3 +1071,24 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "sa-role" ]
 }
+
+@test "client/SnapshotAgentDeployment: interval defaults to 1h" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=1h")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/SnapshotAgentDeployment: interval can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'client.snapshotAgent.interval=10h34m5s' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
