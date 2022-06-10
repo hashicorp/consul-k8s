@@ -28,17 +28,9 @@ spec:
     {{- else }}
       http: 8500
     {{- end }}
-  {{- if .Values.apiGateway.managedGatewayClass.deployment }}
+  {{- with .Values.apiGateway.managedGatewayClass.deployment }}
   deployment:
-    {{- if .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
-    defaultInstances: {{ .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
-    {{- end }}
-    {{- if .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
-    maxInstances: {{ .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
-    {{- end }}
-    {{- if .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
-    minInstances: {{ .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   image:
     consulAPIGateway: {{ .Values.apiGateway.image }}
