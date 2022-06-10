@@ -53,3 +53,14 @@ type PeeringDialerStatus struct {
 	// +optional
 	SecretRef *SecretRefStatus `json:"secret,omitempty"`
 }
+
+func (pd *PeeringDialer) Secret() *Secret {
+	if pd.Spec.Peer == nil {
+		return nil
+	}
+	return pd.Spec.Peer.Secret
+}
+
+func (pd *PeeringDialer) SecretRef() *SecretRefStatus {
+	return pd.Status.SecretRef
+}
