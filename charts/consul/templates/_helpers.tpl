@@ -34,6 +34,14 @@ as well as the global.name setting.
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
             "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- if .Data.ca_chain -{{ "}}" }}
+            {{ "{{" }}- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -{{ "}}" }}
+            {{ "{{" }} range $index, $cacert := .Data.ca_chain {{ "}}" }}
+            {{ "{{" }} if (lt $index $lastintermediatecertindex) {{ "}}" }}
+            {{ "{{" }} $cacert {{ "}}" }}
+            {{ "{{" }} end {{ "}}" }}
+            {{ "{{" }} end {{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
