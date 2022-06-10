@@ -123,7 +123,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 
 	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
-	// Create test consul server with ACLs and TLS
+	// Create test consul server with ACLs and TLS.
 	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		c.ACL.DefaultPolicy = "deny"
@@ -1018,7 +1018,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consul server
+			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
 			})
@@ -1683,7 +1683,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consul server
+			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
 			})

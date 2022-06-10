@@ -11,13 +11,13 @@ import (
 // the metrics merging server when metrics merging feature is enabled.
 // It always disables service registration because for connect we no longer
 // need to keep services registered as this is handled in the endpoints-controller.
-func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
-	metricsPorts, err := h.MetricsConfig.mergedMetricsServerConfiguration(pod)
+func (w *ConnectWebhook) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
+	metricsPorts, err := w.MetricsConfig.mergedMetricsServerConfiguration(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
-	resources, err := h.consulSidecarResources(pod)
+	resources, err := w.consulSidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -30,13 +30,13 @@ func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 		fmt.Sprintf("-merged-metrics-port=%s", metricsPorts.mergedPort),
 		fmt.Sprintf("-service-metrics-port=%s", metricsPorts.servicePort),
 		fmt.Sprintf("-service-metrics-path=%s", metricsPorts.servicePath),
-		fmt.Sprintf("-log-level=%s", h.LogLevel),
-		fmt.Sprintf("-log-json=%t", h.LogJSON),
+		fmt.Sprintf("-log-level=%s", w.LogLevel),
+		fmt.Sprintf("-log-json=%t", w.LogJSON),
 	}
 
 	return corev1.Container{
 		Name:  "consul-sidecar",
-		Image: h.ImageConsulK8S,
+		Image: w.ImageConsulK8S,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
@@ -48,7 +48,7 @@ func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 	}, nil
 }
 
-func (h *Handler) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
+func (w *ConnectWebhook) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},
@@ -74,8 +74,8 @@ func (h *Handler) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequire
 			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarCPULimit, anno, err)
 		}
 		resources.Limits[corev1.ResourceCPU] = cpuLimit
-	} else if h.DefaultConsulSidecarResources.Limits[corev1.ResourceCPU] != zeroQuantity {
-		resources.Limits[corev1.ResourceCPU] = h.DefaultConsulSidecarResources.Limits[corev1.ResourceCPU]
+	} else if w.DefaultConsulSidecarResources.Limits[corev1.ResourceCPU] != zeroQuantity {
+		resources.Limits[corev1.ResourceCPU] = w.DefaultConsulSidecarResources.Limits[corev1.ResourceCPU]
 	}
 
 	// CPU Request.
@@ -85,8 +85,8 @@ func (h *Handler) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequire
 			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarCPURequest, anno, err)
 		}
 		resources.Requests[corev1.ResourceCPU] = cpuRequest
-	} else if h.DefaultConsulSidecarResources.Requests[corev1.ResourceCPU] != zeroQuantity {
-		resources.Requests[corev1.ResourceCPU] = h.DefaultConsulSidecarResources.Requests[corev1.ResourceCPU]
+	} else if w.DefaultConsulSidecarResources.Requests[corev1.ResourceCPU] != zeroQuantity {
+		resources.Requests[corev1.ResourceCPU] = w.DefaultConsulSidecarResources.Requests[corev1.ResourceCPU]
 	}
 
 	// Memory Limit.
@@ -96,8 +96,8 @@ func (h *Handler) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequire
 			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarMemoryLimit, anno, err)
 		}
 		resources.Limits[corev1.ResourceMemory] = memoryLimit
-	} else if h.DefaultConsulSidecarResources.Limits[corev1.ResourceMemory] != zeroQuantity {
-		resources.Limits[corev1.ResourceMemory] = h.DefaultConsulSidecarResources.Limits[corev1.ResourceMemory]
+	} else if w.DefaultConsulSidecarResources.Limits[corev1.ResourceMemory] != zeroQuantity {
+		resources.Limits[corev1.ResourceMemory] = w.DefaultConsulSidecarResources.Limits[corev1.ResourceMemory]
 	}
 
 	// Memory Request.
@@ -107,8 +107,8 @@ func (h *Handler) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequire
 			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarMemoryRequest, anno, err)
 		}
 		resources.Requests[corev1.ResourceMemory] = memoryRequest
-	} else if h.DefaultConsulSidecarResources.Requests[corev1.ResourceMemory] != zeroQuantity {
-		resources.Requests[corev1.ResourceMemory] = h.DefaultConsulSidecarResources.Requests[corev1.ResourceMemory]
+	} else if w.DefaultConsulSidecarResources.Requests[corev1.ResourceMemory] != zeroQuantity {
+		resources.Requests[corev1.ResourceMemory] = w.DefaultConsulSidecarResources.Requests[corev1.ResourceMemory]
 	}
 
 	return resources, nil

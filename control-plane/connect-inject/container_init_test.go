@@ -46,7 +46,7 @@ func TestHandlerContainerInit(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Pod     func(*corev1.Pod) *corev1.Pod
-		Handler Handler
+		Handler ConnectWebhook
 		Cmd     string // Strings.Contains test
 		CmdNot  string // Not contains
 	}{
@@ -58,7 +58,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{},
+			ConnectWebhook{},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -85,7 +85,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				}
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				AuthMethod:       "an-auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 			},
@@ -118,7 +118,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				ConsulAPITimeout: 5 * time.Second,
 			},
 			`# Generate the envoy bootstrap code
@@ -287,7 +287,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{
+			h := ConnectWebhook{
 				EnableTransparentProxy: c.globalEnabled,
 				ConsulAPITimeout:       5 * time.Second,
 			}
@@ -384,7 +384,7 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{
+			h := ConnectWebhook{
 				EnableConsulDNS:        c.globalEnabled,
 				EnableTransparentProxy: true,
 				ResourcePrefix:         "consul-consul",
@@ -428,7 +428,7 @@ func TestHandler_constructDNSServiceHostName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.prefix, func(t *testing.T) {
-			h := Handler{ResourcePrefix: c.prefix, ConsulAPITimeout: 5 * time.Second}
+			h := ConnectWebhook{ResourcePrefix: c.prefix, ConsulAPITimeout: 5 * time.Second}
 			require.Equal(t, c.result, h.constructDNSServiceHostName())
 		})
 	}
@@ -469,7 +469,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Pod     func(*corev1.Pod) *corev1.Pod
-		Handler Handler
+		Handler ConnectWebhook
 		Cmd     string // Strings.Contains test
 	}{
 		{
@@ -478,7 +478,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
@@ -503,7 +503,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
@@ -530,7 +530,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
@@ -555,7 +555,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
@@ -582,7 +582,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = ""
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
@@ -616,7 +616,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = ""
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
@@ -651,7 +651,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
@@ -683,7 +683,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				EnableNamespaces:           true,
 				ConsulPartition:            "default",
 				ConsulDestinationNamespace: "non-default",
@@ -719,7 +719,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulPartition:            "non-default",
@@ -818,7 +818,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 	cases := []struct {
 		Name              string
 		Pod               func(*corev1.Pod) *corev1.Pod
-		Handler           Handler
+		Handler           ConnectWebhook
 		NumInitContainers int
 		MultiPortInfos    []multiPortInfo
 		Cmd               []string // Strings.Contains test
@@ -828,7 +828,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			Handler{ConsulAPITimeout: 5 * time.Second},
+			ConnectWebhook{ConsulAPITimeout: 5 * time.Second},
 			2,
 			[]multiPortInfo{
 				{
@@ -876,7 +876,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			Handler{
+			ConnectWebhook{
 				AuthMethod:       "auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 			},
@@ -951,7 +951,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require := require.New(t)
-	h := Handler{
+	h := ConnectWebhook{
 		AuthMethod:       "release-name-consul-k8s-auth-method",
 		ConsulAPITimeout: 5 * time.Second,
 	}
@@ -998,7 +998,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 // and CA cert should be set as env variable.
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
-	h := Handler{
+	h := ConnectWebhook{
 		ConsulCACert:     "consul-ca-cert",
 		ConsulAPITimeout: 5 * time.Second,
 	}
@@ -1034,7 +1034,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 
 func TestHandlerContainerInit_Resources(t *testing.T) {
 	require := require.New(t)
-	h := Handler{
+	h := ConnectWebhook{
 		InitContainerResources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("10m"),
@@ -1082,7 +1082,7 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 
 	for _, openShiftEnabled := range openShiftEnabledCases {
 		t.Run(fmt.Sprintf("openshift enabled: %t", openShiftEnabled), func(t *testing.T) {
-			h := Handler{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5 * time.Second}
+			h := ConnectWebhook{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5 * time.Second}
 
 			container := h.initCopyContainer()
 
