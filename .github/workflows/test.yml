@@ -194,7 +194,7 @@ jobs:
         working-directory: control-plane
         run: |
             mkdir -p $HOME/bin
-            wget https://github.com/ndhanushkodi/binaries/releases/download/v2ent/consul -O consulbin && \
+            wget https://github.com/ndhanushkodi/binaries/releases/download/v3ent/consul -O consulbin && \
               mv consulbin $HOME/bin/consul &&
             chmod +x $HOME/bin/consul
 
