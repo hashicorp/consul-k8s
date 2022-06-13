@@ -93,7 +93,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Release prefix of the Consul installation used to prepend on the webhook name that will have its CA bundle updated.")
 	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
-		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
+		"Enables updating the CABundle on the webhook within this controller rather than using the webhook-cert-manager.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
