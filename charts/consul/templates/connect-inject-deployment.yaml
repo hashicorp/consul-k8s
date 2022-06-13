@@ -8,6 +8,7 @@
 {{- if .Values.connectInject.centralConfig }}{{ if .Values.connectInject.centralConfig.proxyDefaults }}{{- if ne (trim .Values.connectInject.centralConfig.proxyDefaults) `{}` }}{{ fail "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.imageEnvoy }}{{ fail "connectInject.imageEnvoy must be specified in global.imageEnvoy" }}{{ end }}
 {{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
+{{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
@@ -41,9 +42,28 @@ spec:
         {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/agent-inject": "true"
+        {{- if .Values.global.secretsBackend.vault.connectInjectRole }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.connectInjectRole }}
+        {{ else }}
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        {{ end }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if .Values.global.secretsBackend.vault.connectInject.caCert.secretName }}
+        {{- with .Values.global.secretsBackend.vault.connectInject.caCert }}
+        "vault.hashicorp.com/agent-inject-secret-ca.crt": {{ .secretName }}
+        "vault.hashicorp.com/agent-inject-template-ca.crt": {{ template "consul.vaultCATemplate" . }}
+        "vault.hashicorp.com/secret-volume-path-ca.crt": "/vault/secrets/connect-injector/certs"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-secret-tls.crt": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-tls.crt": {{ include "consul.connectInjectWebhookTLSCertTemplate" . }}
+        "vault.hashicorp.com/secret-volume-path-tls.crt": "/vault/secrets/connect-injector/certs"
+        "vault.hashicorp.com/agent-inject-secret-tls.key": {{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-tls.key": {{ include "consul.connectInjectWebhookTLSKeyTemplate" . }}
+        "vault.hashicorp.com/secret-volume-path-tls.key": "/vault/secrets/connect-injector/certs"
+        {{- end }}
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
         "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
@@ -168,7 +188,12 @@ spec:
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}
+                -tls-cert-dir=/vault/secrets/connect-injector/certs \
+                -enable-webhook-ca-update \
+                {{- else }}
                 -tls-cert-dir=/etc/connect-injector/certs \
+                {{- end }}
                 {{- $resources := .Values.connectInject.sidecarProxy.resources }}
                 {{- /* kindIs is used here to differentiate between null and 0 */}}
                 {{- if not (kindIs "invalid" $resources.limits.memory) }}
@@ -252,9 +277,11 @@ spec:
             successThreshold: 1
             timeoutSeconds: 5
           volumeMounts:
+          {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
           - name: certs
             mountPath: /etc/connect-injector/certs
             readOnly: true
+          {{- end }}
           - mountPath: /consul/login
             name: consul-data
             readOnly: true
@@ -272,10 +299,12 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+      {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
       - name: certs
         secret:
           defaultMode: 420
           secretName: {{ template "consul.fullname" . }}-connect-inject-webhook-cert
+      {{- end }}
       - name: consul-data
         emptyDir:
           medium: "Memory"

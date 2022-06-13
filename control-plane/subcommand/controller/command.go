@@ -1,15 +1,18 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	cmdCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
@@ -17,11 +20,15 @@ import (
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
+
+const WebhookCAFilename = "ca.crt"
 
 type Command struct {
 	UI cli.Ui
@@ -29,12 +36,14 @@ type Command struct {
 	flagSet   *flag.FlagSet
 	httpFlags *flags.HTTPFlags
 
-	flagWebhookTLSCertDir    string
-	flagEnableLeaderElection bool
-	flagEnableWebhooks       bool
-	flagDatacenter           string
-	flagLogLevel             string
-	flagLogJSON              bool
+	flagWebhookTLSCertDir     string
+	flagEnableLeaderElection  bool
+	flagEnableWebhooks        bool
+	flagDatacenter            string
+	flagLogLevel              string
+	flagLogJSON               bool
+	flagResourcePrefix        string
+	flagEnableWebhookCAUpdate bool
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -81,6 +90,10 @@ func (c *Command) init() {
 		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 	c.flagSet.BoolVar(&c.flagEnableWebhooks, "enable-webhooks", true,
 		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
+	c.flagSet.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
+		"Release prefix of the Consul installation used to prepend on the webhook name that will have its CA bundle updated.")
+	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
+		"Enables updating the CABundle on the webhook within this controller rather than using the webhook-cert-manager.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -321,12 +334,46 @@ func (c *Command) Run(args []string) int {
 	}
 	// +kubebuilder:scaffold:builder
 
+	if c.flagEnableWebhookCAUpdate {
+		err := c.updateWebhookCABundle()
+		if err != nil {
+			setupLog.Error(err, "problem getting CA Cert")
+			return 1
+		}
+	}
+
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		return 1
 	}
 	return 0
+}
+
+func (c *Command) updateWebhookCABundle() error {
+	// Create a context to be used by the processes started in this command.
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	webhookConfigName := fmt.Sprintf("%s-controller", c.flagResourcePrefix)
+	caPath := fmt.Sprintf("%s/%s", c.flagWebhookTLSCertDir, WebhookCAFilename)
+	caCert, err := ioutil.ReadFile(caPath)
+	if err != nil {
+		return err
+	}
+	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, webhookConfigName, caCert)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Command) validateFlags() error {

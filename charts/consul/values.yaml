@@ -195,6 +195,24 @@ global:
       # and check the name of `metadata.name`.
       adminPartitionsRole: ""
 
+      # The Vault role to read Consul controller's webhook's 
+      # CA and issue a certificate and private key.
+      # A Vault policy must be created which grants issue capabilities to 
+      # `global.secretsBackend.vault.controller.tlsCert.secretName`.
+      controllerRole: ""
+
+      # The Vault role to read Consul connect-injector webhook's CA
+      # and issue a certificate and private key.
+      # A Vault policy must be created which grants issue capabilities to 
+      # `global.secretsBackend.vault.connectInject.tlsCert.secretName`.
+      connectInjectRole: ""
+
+      # The Vault role for all Consul components to read the Consul's server's CA Certificate (unauthenticated).
+      # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
+      # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
+      # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
+      consulCARole: ""
+      
       # This value defines additional annotations for
       # Vault agent on any pods where it'll be running.
       # This should be formatted as a multi-line string.
@@ -207,12 +225,6 @@ global:
       #
       # @type: string
       agentAnnotations: null
-
-      # The Vault role for all Consul components to read the Consul's server's CA Certificate (unauthenticated).
-      # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
-      # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
-      # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
-      consulCARole: ""
 
       # Configuration for Vault server CA certificate. This certificate will be mounted
       # to any pod where Vault agent needs to run.
@@ -262,6 +274,44 @@ global:
         # ```
         additionalConfig: |
           {}
+
+      controller:
+        # Configuration to the Vault Secret that Kubernetes will use on 
+        # Kubernetes CRD creation, deletion, and update, to get TLS certificates
+        # used issued from vault to send webhooks to the controller.
+        tlsCert:
+          # The Vault secret path that issues TLS certificates for controller
+          # webhooks.
+          # @type: string
+          secretName: null
+          
+        # Configuration to the Vault Secret that Kubernetes will use on 
+        # Kubernetes CRD creation, deletion, and update, to get CA certificates
+        # used issued from vault to send webhooks to the controller.
+        caCert:
+          # The Vault secret path that contains the CA certificate for controller
+          # webhooks.
+          # @type: string
+          secretName: null
+      
+      connectInject:
+        # Configuration to the Vault Secret that Kubernetes will use on 
+        # Kubernetes pod creation, deletion, and update, to get CA certificates
+        # used issued from vault to send webhooks to the ConnectInject.
+        caCert: 
+          # The Vault secret path that contains the CA certificate for
+          # Connect Inject webhooks.
+          # @type: string
+          secretName: null
+        
+        # Configuration to the Vault Secret that Kubernetes will use on 
+        # Kubernetes pod creation, deletion, and update, to get TLS certificates
+        # used issued from vault to send webhooks to the ConnectInject.
+        tlsCert:
+          # The Vault secret path that issues TLS certificates for connect
+          # inject webhooks.
+          # @type: string
+          secretName: null
 
   # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://www.consul.io/docs/agent/config/cli-flags#_encrypt)).

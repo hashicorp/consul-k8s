@@ -3,7 +3,6 @@ package webhookcertmanager
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -265,7 +264,8 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 		}
 
 		iterLog.Info("Updating webhook configuration")
-		if err = c.updateWebhookConfig(ctx, bundle, clientset); err != nil {
+		err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, bundle.WebhookConfigName, bundle.CACert)
+		if err != nil {
 			iterLog.Error("Error updating webhook configuration")
 			return err
 		}
@@ -307,39 +307,9 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 	}
 
 	iterLog.Info("Updating webhook configuration with new CA")
-	if err = c.updateWebhookConfig(ctx, bundle, clientset); err != nil {
+	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, bundle.WebhookConfigName, bundle.CACert)
+	if err != nil {
 		iterLog.Error("Error updating webhook configuration", "err", err)
-		return err
-	}
-	return nil
-}
-
-// updateWebhookConfig iterates over every webhook on the specified webhook configuration and updates
-// their caBundle with the CA from the MetaBundle.
-func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaBundle, clientset kubernetes.Interface) error {
-	if len(metaBundle.CACert) == 0 {
-		return errors.New("no CA certificate in the bundle")
-	}
-	value := base64.StdEncoding.EncodeToString(metaBundle.CACert)
-
-	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, metaBundle.WebhookConfigName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	var patches []patch
-	for i := range webhookCfg.Webhooks {
-		patches = append(patches, patch{
-			Op:    "add",
-			Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
-			Value: value,
-		})
-	}
-	patchesJson, err := json.Marshal(patches)
-	if err != nil {
-		return err
-	}
-
-	if _, err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, metaBundle.WebhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 	return nil
@@ -394,12 +364,6 @@ func (c webhookConfig) validate(ctx context.Context, client kubernetes.Interface
 		return err
 	}
 	return nil
-}
-
-type patch struct {
-	Op    string `json:"op,omitempty"`
-	Path  string `json:"path,omitempty"`
-	Value string `json:"value,omitempty"`
 }
 
 func (c *Command) Help() string {
