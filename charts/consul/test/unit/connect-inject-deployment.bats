@@ -1756,6 +1756,16 @@ EOF
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: fails if peering is enabled but connect inject is not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=false' \
+      --set 'global.peering.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "setting global.peering.enabled to true requires connectInject.enabled to be true" ]]
+}
+
 
 #--------------------------------------------------------------------
 # openshift
