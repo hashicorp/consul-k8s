@@ -131,6 +131,4 @@ require (
 
 replace github.com/hashicorp/consul/sdk v0.9.0 => github.com/hashicorp/consul/sdk v0.4.1-0.20220531155537-364758ef2f50
 
-//replace github.com/hashicorp/consul/api v1.10.1-0.20220425143126-6d0162a58a94 => /Users/nitya/workspace/hashicorp/consul/api
-
 go 1.17

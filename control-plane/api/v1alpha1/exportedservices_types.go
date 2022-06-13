@@ -68,8 +68,8 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
-	// [Experimental] PeerName is the name of the peer to export the service to.
-	PeerName string `json:"peerName,omitempty"`
+	// [Experimental] Peer is the name of the peer to export the service to.
+	Peer string `json:"peer,omitempty"`
 }
 
 func (in *ExportedServices) GetObjectMeta() metav1.ObjectMeta {
@@ -165,11 +165,10 @@ func (in *ExportedServices) ToConsul(datacenter string) api.ConfigEntry {
 func (in *ExportedService) toConsul() capi.ExportedService {
 	var consumers []capi.ServiceConsumer
 	for _, consumer := range in.Consumers {
-		if consumer.PeerName != "" {
-			consumers = append(consumers, capi.ServiceConsumer{PeerName: consumer.PeerName})
-		} else {
-			consumers = append(consumers, capi.ServiceConsumer{Partition: consumer.Partition})
-		}
+		consumers = append(consumers, capi.ServiceConsumer{
+			Partition: consumer.Partition,
+			PeerName:  consumer.Peer,
+		})
 	}
 	return capi.ExportedService{
 		Name:      in.Name,
@@ -228,11 +227,11 @@ func (in *ExportedService) validate(path *field.Path, consulMeta common.ConsulMe
 }
 
 func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMeta) *field.Error {
-	if in.Partition != "" && in.PeerName != "" {
-		return field.Invalid(path, *in, "both partition and peerName cannot be specified.")
+	if in.Partition != "" && in.Peer != "" {
+		return field.Invalid(path, *in, "both partition and peer cannot be specified.")
 	}
-	if in.Partition == "" && in.PeerName == "" {
-		return field.Invalid(path, *in, "either partition or peerName must be specified.")
+	if in.Partition == "" && in.Peer == "" {
+		return field.Invalid(path, *in, "either partition or peer must be specified.")
 	}
 	if !consulMeta.PartitionsEnabled && in.Partition != "" {
 		return field.Invalid(path.Child("partitions"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")

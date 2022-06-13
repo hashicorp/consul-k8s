@@ -22,7 +22,7 @@ import (
 )
 
 // This tests the checkAndCreate namespace function that is called
-// in handler.Mutate. Patch generation is tested in the non-enterprise
+// in meshWebhook.Mutate. Patch generation is tested in the non-enterprise
 // tests. Other namespace-specific logic is tested directly in the
 // specific methods (shouldInject, consulNamespace).
 func TestHandler_MutateWithNamespaces(t *testing.T) {
@@ -42,13 +42,13 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 	cases := []struct {
 		Name               string
-		Handler            ConnectWebhook
+		Webhook            MeshWebhook
 		Req                admission.Request
 		ExpectedNamespaces []string
 	}{
 		{
 			Name: "single destination namespace 'default' from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -70,7 +70,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "single destination namespace 'default' from k8s 'non-default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -92,7 +92,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "single destination namespace 'dest' from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -114,7 +114,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "single destination namespace 'dest' from k8s 'non-default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -136,7 +136,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "mirroring from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -159,7 +159,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "mirroring from k8s 'dest'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -182,7 +182,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "mirroring with prefix from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -206,7 +206,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 		{
 			Name: "mirroring with prefix from k8s 'dest'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -245,11 +245,11 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			})
 			require.NoError(err)
 
-			// Add the client to the test's handler
-			tt.Handler.ConsulClient = client
+			// Add the client to the test's meshWebhook
+			tt.Webhook.ConsulClient = client
 
 			// Mutate!
-			resp := tt.Handler.Handle(context.Background(), tt.Req)
+			resp := tt.Webhook.Handle(context.Background(), tt.Req)
 			require.Equal(resp.Allowed, true)
 
 			// Check all the namespace things
@@ -298,13 +298,13 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 	cases := []struct {
 		Name               string
-		Handler            ConnectWebhook
+		Webhook            MeshWebhook
 		Req                admission.Request
 		ExpectedNamespaces []string
 	}{
 		{
 			Name: "acls + single destination namespace 'default' from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -327,7 +327,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + single destination namespace 'default' from k8s 'non-default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -350,7 +350,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + single destination namespace 'dest' from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -373,7 +373,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + single destination namespace 'dest' from k8s 'non-default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -396,7 +396,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + mirroring from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -420,7 +420,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + mirroring from k8s 'dest'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -444,7 +444,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + mirroring with prefix from k8s 'default'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -469,7 +469,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 		{
 			Name: "acls + mirroring with prefix from k8s 'dest'",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -525,8 +525,8 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Add the client to the test's handler
-			tt.Handler.ConsulClient = client
+			// Add the client to the test's meshWebhook
+			tt.Webhook.ConsulClient = client
 
 			// Create cross namespace policy
 			// This would have been created by the acl bootstrapper in the
@@ -550,7 +550,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			require.NoError(t, err)
 
 			// Mutate!
-			resp := tt.Handler.Handle(context.Background(), tt.Req)
+			resp := tt.Webhook.Handle(context.Background(), tt.Req)
 			require.Equal(t, resp.Allowed, true)
 
 			// Check all the namespace things
@@ -640,7 +640,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 			})
 			require.NoError(err)
 
-			handler := ConnectWebhook{
+			webhook := MeshWebhook{
 				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -671,7 +671,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 					Namespace: sourceKubeNS,
 				},
 			}
-			resp := handler.Handle(context.Background(), request)
+			resp := webhook.Handle(context.Background(), request)
 			require.Equal(resp.Allowed, true)
 
 			// Check that the annotation was added as a patch.

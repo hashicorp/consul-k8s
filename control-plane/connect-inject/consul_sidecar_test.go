@@ -13,7 +13,7 @@ import (
 // Test that if the conditions for running a merged metrics server are true,
 // that we pass the metrics flags to consul sidecar.
 func TestConsulSidecar_MetricsFlags(t *testing.T) {
-	handler := ConnectWebhook{
+	meshWebhook := MeshWebhook{
 		Log:            logrtest.TestLogger{T: t},
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 		MetricsConfig: MetricsConfig{
@@ -21,7 +21,7 @@ func TestConsulSidecar_MetricsFlags(t *testing.T) {
 			DefaultEnableMetricsMerging: true,
 		},
 	}
-	container, err := handler.consulSidecar(corev1.Pod{
+	container, err := meshWebhook.consulSidecar(corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationMergedMetricsPort:  "20100",
@@ -53,13 +53,13 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 	zero := resource.MustParse("0")
 
 	cases := map[string]struct {
-		handler      ConnectWebhook
+		meshWebhook  MeshWebhook
 		annotations  map[string]string
 		expResources corev1.ResourceRequirements
 		expErr       string
 	}{
 		"no defaults, no annotations": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -78,7 +78,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			},
 		},
 		"all defaults, no annotations": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -113,7 +113,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			},
 		},
 		"no defaults, all annotations": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -142,7 +142,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			},
 		},
 		"annotations override defaults": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -181,7 +181,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			},
 		},
 		"defaults set to zero, no annotations": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -216,7 +216,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			},
 		},
 		"annotations set to 0": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -245,7 +245,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			},
 		},
 		"invalid cpu request": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -262,7 +262,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			expErr: "parsing annotation consul.hashicorp.com/consul-sidecar-cpu-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid cpu limit": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -279,7 +279,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			expErr: "parsing annotation consul.hashicorp.com/consul-sidecar-cpu-limit:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory request": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -296,7 +296,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 			expErr: "parsing annotation consul.hashicorp.com/consul-sidecar-memory-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory limit": {
-			handler: ConnectWebhook{
+			meshWebhook: MeshWebhook{
 				Log:            logrtest.TestLogger{T: t},
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 				MetricsConfig: MetricsConfig{
@@ -330,7 +330,7 @@ func TestHandlerConsulSidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.handler.consulSidecar(pod)
+			container, err := c.meshWebhook.consulSidecar(pod)
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)

@@ -405,7 +405,7 @@ func getProxyServiceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string
 func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
-	// The handler will always set the port annotation if one is not provided on the pod.
+	// The meshWebhook will always set the port annotation if one is not provided on the pod.
 	var consulServicePort int
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
 		if multiPort := strings.Split(raw, ","); len(multiPort) > 1 {
@@ -807,6 +807,62 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Clie
 	return nil
 }
 
+// processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
+// objects.
+func (r *EndpointsController) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints) ([]api.Upstream, error) {
+	// In a multiport pod, only the first service's proxy should have upstreams configured. This skips configuring
+	// upstreams on additional services on the pod.
+	mpIdx := getMultiPortIdx(pod, endpoints)
+	if mpIdx > 0 {
+		return []api.Upstream{}, nil
+	}
+
+	var upstreams []api.Upstream
+	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
+		for _, raw := range strings.Split(raw, ",") {
+			var upstream api.Upstream
+
+			// parts separates out the port, and determines whether it's a prepared query or not, since parts[0] would
+			// be "prepared_query" if it is.
+			parts := strings.SplitN(raw, ":", 3)
+
+			// serviceParts helps determine which format of upstream we're processing,
+			// [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter]
+			// or
+			// [service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
+			// [service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
+			// [service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port]
+			labeledFormat := false
+			serviceParts := strings.Split(parts[0], ".")
+			if len(serviceParts) >= 2 {
+				if serviceParts[1] == "svc" {
+					labeledFormat = true
+				}
+			}
+
+			if strings.TrimSpace(parts[0]) == "prepared_query" {
+				upstream = processPreparedQueryUpstream(pod, raw)
+			} else if labeledFormat {
+				var err error
+				upstream, err = r.processLabeledUpstream(pod, raw)
+				if err != nil {
+					return []api.Upstream{}, err
+				}
+			} else {
+				var err error
+				upstream, err = r.processUnlabeledUpstream(pod, raw)
+				if err != nil {
+					return []api.Upstream{}, err
+				}
+			}
+
+			upstreams = append(upstreams, upstream)
+		}
+	}
+
+	return upstreams, nil
+}
+
 // getTokenMetaFromDescription parses JSON metadata from token's description.
 func getTokenMetaFromDescription(description string) (map[string]string, error) {
 	re := regexp.MustCompile(`.*({.+})`)
@@ -855,9 +911,9 @@ func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstre
 	return upstream
 }
 
-// processNonAnnotatedUpstream processes an upstream in the format:
+// processUnlabeledUpstream processes an upstream in the format:
 // [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
-func (r *EndpointsController) processNonAnnotatedUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
+func (r *EndpointsController) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, serviceName, namespace, partition, peer string
 	var port int32
 	var upstream api.Upstream
@@ -921,11 +977,11 @@ func (r *EndpointsController) processNonAnnotatedUpstream(pod corev1.Pod, rawUps
 
 }
 
-// processAnnotatedUpstream processes an upstream in the format:
+// processLabeledUpstream processes an upstream in the format:
 // [service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
 // [service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
 // [service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
-func (r *EndpointsController) processAnnotatedUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
+func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, serviceName, namespace, partition, peer string
 	var port int32
 	var upstream api.Upstream
@@ -1002,64 +1058,6 @@ func (r *EndpointsController) processAnnotatedUpstream(pod corev1.Pod, rawUpstre
 	}
 	return upstream, nil
 
-}
-
-// processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
-// objects.
-func (r *EndpointsController) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints) ([]api.Upstream, error) {
-	// In a multiport pod, only the first service's proxy should have upstreams configured. This skips configuring
-	// upstreams on additional services on the pod.
-	mpIdx := getMultiPortIdx(pod, endpoints)
-	if mpIdx > 0 {
-		return []api.Upstream{}, nil
-	}
-
-	var upstreams []api.Upstream
-	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
-		for _, raw := range strings.Split(raw, ",") {
-			//var datacenter, serviceName, namespace, partition, peer string
-			//var port int32
-			var upstream api.Upstream
-
-			// parts separates out the port, and determines whether it's a prepared query or not, since parts[0] would
-			// be "prepared_query" if it is.
-			parts := strings.SplitN(raw, ":", 3)
-
-			// serviceParts helps determine which format of upstream we're processing,
-			// [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter]
-			// or
-			// [service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
-			// [service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
-			// [service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port]
-			annotatedFormat := false
-			serviceParts := strings.Split(parts[0], ".")
-			if len(serviceParts) >= 2 {
-				if serviceParts[1] == "svc" {
-					annotatedFormat = true
-				}
-			}
-
-			if strings.TrimSpace(parts[0]) == "prepared_query" {
-				upstream = processPreparedQueryUpstream(pod, raw)
-			} else if annotatedFormat {
-				var err error
-				upstream, err = r.processAnnotatedUpstream(pod, raw)
-				if err != nil {
-					return []api.Upstream{}, err
-				}
-			} else {
-				var err error
-				upstream, err = r.processNonAnnotatedUpstream(pod, raw)
-				if err != nil {
-					return []api.Upstream{}, err
-				}
-			}
-
-			upstreams = append(upstreams, upstream)
-		}
-	}
-
-	return upstreams, nil
 }
 
 // remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.

@@ -31,8 +31,8 @@ var (
 	kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
 )
 
-// Handler is the HTTP handler for admission webhooks.
-type ConnectWebhook struct {
+// Webhook is the HTTP meshWebhook for admission webhooks.
+type MeshWebhook struct {
 	ConsulClient *api.Client
 	Clientset    kubernetes.Interface
 
@@ -116,7 +116,7 @@ type ConnectWebhook struct {
 	DefaultProxyMemoryLimit   resource.Quantity
 
 	// MetricsConfig contains metrics configuration from the inject-connect command and has methods to determine whether
-	// configuration should come from the default flags or annotations. The handler uses this to configure prometheus
+	// configuration should come from the default flags or annotations. The meshWebhook uses this to configure prometheus
 	// annotations and the merged metrics server.
 	MetricsConfig MetricsConfig
 
@@ -167,10 +167,10 @@ type multiPortInfo struct {
 	serviceName  string
 }
 
-// Handle is the admission.Handler implementation that actually handles the
+// Handle is the admission.Webhook implementation that actually handles the
 // webhook request for admission control. This should be registered or
 // served via the controller runtime manager.
-func (w *ConnectWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var pod corev1.Pod
 
 	// Decode the pod from the request
@@ -383,7 +383,7 @@ func (w *ConnectWebhook) Handle(ctx context.Context, req admission.Request) admi
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	// Create a patches based on the Pod that was received by the handler
+	// Create a patches based on the Pod that was received by the meshWebhook
 	// and the desired Pod spec.
 	patches, err := jsonpatch.CreatePatch(origPodJson, updatedPodJson)
 	if err != nil {
@@ -402,7 +402,7 @@ func (w *ConnectWebhook) Handle(ctx context.Context, req admission.Request) admi
 	}
 
 	// Return a Patched response along with the patches we intend on applying to the
-	// Pod received by the handler.
+	// Pod received by the meshWebhook.
 	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)
 }
 
@@ -418,7 +418,7 @@ func shouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
 
 // overwriteProbes overwrites readiness/liveness probes of this pod when
 // both transparent proxy is enabled and overwrite probes is true for the pod.
-func (w *ConnectWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
+func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 	tproxyEnabled, err := transparentProxyEnabled(ns, *pod, w.EnableTransparentProxy)
 	if err != nil {
 		return err
@@ -449,7 +449,7 @@ func (w *ConnectWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) e
 	return nil
 }
 
-func (w *ConnectWebhook) injectVolumeMount(pod corev1.Pod) {
+func (w *MeshWebhook) injectVolumeMount(pod corev1.Pod) {
 	containersToInject := splitCommaSeparatedItemsFromAnnotation(annotationInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
@@ -462,7 +462,7 @@ func (w *ConnectWebhook) injectVolumeMount(pod corev1.Pod) {
 	}
 }
 
-func (w *ConnectWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
+func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 	// Don't inject in the Kubernetes system namespaces
 	if kubeSystemNamespaces.Contains(namespace) {
 		return false, nil
@@ -494,7 +494,7 @@ func (w *ConnectWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, e
 	return !w.RequireAnnotation, nil
 }
 
-func (w *ConnectWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error {
+func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error {
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
@@ -518,7 +518,7 @@ func (w *ConnectWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) err
 
 // prometheusAnnotations sets the Prometheus scraping configuration
 // annotations on the Pod.
-func (w *ConnectWebhook) prometheusAnnotations(pod *corev1.Pod) error {
+func (w *MeshWebhook) prometheusAnnotations(pod *corev1.Pod) error {
 	enableMetrics, err := w.MetricsConfig.enableMetrics(*pod)
 	if err != nil {
 		return err
@@ -540,11 +540,11 @@ func (w *ConnectWebhook) prometheusAnnotations(pod *corev1.Pod) error {
 // consulNamespace returns the namespace that a service should be
 // registered in based on the namespace options. It returns an
 // empty string if namespaces aren't enabled.
-func (w *ConnectWebhook) consulNamespace(ns string) string {
+func (w *MeshWebhook) consulNamespace(ns string) string {
 	return namespaces.ConsulNamespace(ns, w.EnableNamespaces, w.ConsulDestinationNamespace, w.EnableK8SNSMirroring, w.K8SNSMirroringPrefix)
 }
 
-func (w *ConnectWebhook) validatePod(pod corev1.Pod) error {
+func (w *MeshWebhook) validatePod(pod corev1.Pod) error {
 	if _, ok := pod.Annotations[annotationProtocol]; ok {
 		return fmt.Errorf("the %q annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
 			annotationProtocol)
@@ -609,7 +609,7 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcN
 	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
 }
 
-func (w *ConnectWebhook) annotatedServiceNames(pod corev1.Pod) []string {
+func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {
 	var annotatedSvcNames []string
 	if anno, ok := pod.Annotations[annotationService]; ok {
 		annotatedSvcNames = strings.Split(anno, ",")
@@ -617,7 +617,7 @@ func (w *ConnectWebhook) annotatedServiceNames(pod corev1.Pod) []string {
 	return annotatedSvcNames
 }
 
-func (w *ConnectWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
+func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
 	tproxyEnabled, err := transparentProxyEnabled(ns, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return fmt.Errorf("couldn't check if tproxy is enabled: %s", err)
@@ -642,7 +642,7 @@ func (w *ConnectWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod
 	return nil
 }
 
-func (w *ConnectWebhook) InjectDecoder(d *admission.Decoder) error {
+func (w *MeshWebhook) InjectDecoder(d *admission.Decoder) error {
 	w.decoder = d
 	return nil
 }

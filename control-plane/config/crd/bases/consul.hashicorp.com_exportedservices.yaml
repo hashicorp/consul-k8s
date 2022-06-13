@@ -68,9 +68,9 @@ spec:
                             description: Partition is the admin partition to export
                               the service to.
                             type: string
-                          peerName:
-                            description: '[Experimental] PeerName is the name of the
-                              peer to export the service to.'
+                          peer:
+                            description: '[Experimental] Peer is the name of the peer
+                              to export the service to.'
                             type: string
                         type: object
                       type: array

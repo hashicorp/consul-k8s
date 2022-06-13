@@ -93,7 +93,7 @@ type initContainerCommandData struct {
 
 // initCopyContainer returns the init container spec for the copy container which places
 // the consul binary into the shared volume.
-func (w *ConnectWebhook) initCopyContainer() corev1.Container {
+func (w *MeshWebhook) initCopyContainer() corev1.Container {
 	// Copy the Consul binary from the image to the shared volume.
 	cmd := "cp /bin/consul /consul/connect-inject/consul"
 	container := corev1.Container{
@@ -123,7 +123,7 @@ func (w *ConnectWebhook) initCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (w *ConnectWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
@@ -283,7 +283,7 @@ func (w *ConnectWebhook) containerInit(namespace corev1.Namespace, pod corev1.Po
 // constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
 // key of the env variable whose value is the cluster IP of the Consul DNS Service.
 // It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
-func (w *ConnectWebhook) constructDNSServiceHostName() string {
+func (w *MeshWebhook) constructDNSServiceHostName() string {
 	upcaseResourcePrefix := strings.ToUpper(w.ResourcePrefix)
 	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
 	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
