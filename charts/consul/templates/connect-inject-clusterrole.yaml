@@ -24,14 +24,6 @@ rules:
   - "get"
   - "list"
   - "watch"
-- apiGroups: [ "" ]
-  resources: ["secrets"]
-  verbs:
-    - "get"
-    - "list"
-    - "watch"
-    - "create"
-    - "delete"
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -52,6 +44,15 @@ rules:
   - watch
   - patch
 {{- end }}
+{{- if .Values.global.peering.enabled }}
+- apiGroups: [ "" ]
+  resources: ["secrets"]
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "create"
+  - "delete"
 - apiGroups: ["consul.hashicorp.com"]
   resources: ["peeringacceptors"]
   verbs:
@@ -88,6 +89,7 @@ rules:
     - get
     - patch
     - update
+{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]
   resources: [ "podsecuritypolicies" ]

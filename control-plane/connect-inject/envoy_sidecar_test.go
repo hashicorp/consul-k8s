@@ -12,7 +12,7 @@ import (
 
 func TestHandlerEnvoySidecar(t *testing.T) {
 	require := require.New(t)
-	h := ConnectWebhook{}
+	w := MeshWebhook{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -28,7 +28,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+	container, err := w.envoySidecar(testNS, pod, multiPortInfo{})
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
@@ -45,7 +45,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 
 func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 	require := require.New(t)
-	h := ConnectWebhook{}
+	w := MeshWebhook{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -79,7 +79,7 @@ func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1"},
 	}
 	for i := 0; i < 2; i++ {
-		container, err := h.envoySidecar(testNS, pod, multiPortInfos[i])
+		container, err := w.envoySidecar(testNS, pod, multiPortInfos[i])
 		require.NoError(err)
 		require.Equal(expCommand[i], container.Command)
 
@@ -136,7 +136,7 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := ConnectWebhook{
+			w := MeshWebhook{
 				EnableTransparentProxy: c.tproxyEnabled,
 				EnableOpenShift:        c.openShiftEnabled,
 			}
@@ -155,7 +155,7 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 					},
 				},
 			}
-			ec, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+			ec, err := w.envoySidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, c.expSecurityContext, ec.SecurityContext)
 		})
@@ -163,10 +163,10 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 }
 
 // Test that if the user specifies a pod security context with the same uid as `envoyUserAndGroupID` that we return
-// an error to the handler.
+// an error to the meshWebhook.
 func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
 	require := require.New(t)
-	h := ConnectWebhook{}
+	w := MeshWebhook{}
 	pod := corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -179,18 +179,18 @@ func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.
 			},
 		},
 	}
-	_, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+	_, err := w.envoySidecar(testNS, pod, multiPortInfo{})
 	require.Error(err, fmt.Sprintf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID))
 }
 
 // Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID` that we
-// return an error to the handler. If a container using the envoy image has the same uid, we don't return an error
+// return an error to the meshWebhook. If a container using the envoy image has the same uid, we don't return an error
 // because in multiport pod there can be multiple envoy sidecars.
 func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
 	cases := []struct {
 		name          string
 		pod           corev1.Pod
-		handler       ConnectWebhook
+		webhook       MeshWebhook
 		expErr        bool
 		expErrMessage error
 	}{
@@ -217,7 +217,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 					},
 				},
 			},
-			handler:       ConnectWebhook{},
+			webhook:       MeshWebhook{},
 			expErr:        true,
 			expErrMessage: fmt.Errorf("container app has runAsUser set to the same uid %q as envoy which is not allowed", envoyUserAndGroupID),
 		},
@@ -244,7 +244,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 					},
 				},
 			},
-			handler: ConnectWebhook{
+			webhook: MeshWebhook{
 				ImageEnvoy: "envoy",
 			},
 			expErr: false,
@@ -253,7 +253,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.handler.envoySidecar(testNS, tc.pod, multiPortInfo{})
+			_, err := tc.webhook.envoySidecar(testNS, tc.pod, multiPortInfo{})
 			if tc.expErr {
 				require.Error(t, err, tc.expErrMessage)
 			} else {
@@ -341,7 +341,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			h := ConnectWebhook{
+			h := MeshWebhook{
 				ImageConsul:    "hashicorp/consul:latest",
 				ImageEnvoy:     "hashicorp/consul-k8s:latest",
 				EnvoyExtraArgs: tc.envoyExtraArgs,
@@ -362,13 +362,13 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 	zero := resource.MustParse("0")
 
 	cases := map[string]struct {
-		handler      ConnectWebhook
+		webhook      MeshWebhook
 		annotations  map[string]string
 		expResources corev1.ResourceRequirements
 		expErr       string
 	}{
 		"no defaults, no annotations": {
-			handler:     ConnectWebhook{},
+			webhook:     MeshWebhook{},
 			annotations: nil,
 			expResources: corev1.ResourceRequirements{
 				Limits:   corev1.ResourceList{},
@@ -376,7 +376,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"all defaults, no annotations": {
-			handler: ConnectWebhook{
+			webhook: MeshWebhook{
 				DefaultProxyCPURequest:    cpu1,
 				DefaultProxyCPULimit:      cpu2,
 				DefaultProxyMemoryRequest: mem1,
@@ -395,7 +395,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"no defaults, all annotations": {
-			handler: ConnectWebhook{},
+			webhook: MeshWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPURequest:    "100m",
 				annotationSidecarProxyMemoryRequest: "100Mi",
@@ -414,7 +414,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"annotations override defaults": {
-			handler: ConnectWebhook{
+			webhook: MeshWebhook{
 				DefaultProxyCPURequest:    zero,
 				DefaultProxyCPULimit:      zero,
 				DefaultProxyMemoryRequest: zero,
@@ -438,7 +438,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"defaults set to zero, no annotations": {
-			handler: ConnectWebhook{
+			webhook: MeshWebhook{
 				DefaultProxyCPURequest:    zero,
 				DefaultProxyCPULimit:      zero,
 				DefaultProxyMemoryRequest: zero,
@@ -457,7 +457,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"annotations set to 0": {
-			handler: ConnectWebhook{},
+			webhook: MeshWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPURequest:    "0",
 				annotationSidecarProxyMemoryRequest: "0",
@@ -476,28 +476,28 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 			},
 		},
 		"invalid cpu request": {
-			handler: ConnectWebhook{},
+			webhook: MeshWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPURequest: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-cpu-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid cpu limit": {
-			handler: ConnectWebhook{},
+			webhook: MeshWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyCPULimit: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-cpu-limit:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory request": {
-			handler: ConnectWebhook{},
+			webhook: MeshWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyMemoryRequest: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-memory-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory limit": {
-			handler: ConnectWebhook{},
+			webhook: MeshWebhook{},
 			annotations: map[string]string{
 				annotationSidecarProxyMemoryLimit: "invalid",
 			},
@@ -521,7 +521,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.handler.envoySidecar(testNS, pod, multiPortInfo{})
+			container, err := c.webhook.envoySidecar(testNS, pod, multiPortInfo{})
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)

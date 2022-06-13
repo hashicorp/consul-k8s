@@ -444,6 +444,39 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
+			name: "annotated upstream error: both peer and partition provided",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.partition.peer1.peer:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.ns1.ns.part1.partition.peer1.peer:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "annotated upstream error: both peer and dc provided",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.peer1.peer.dc1.dc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.ns1.ns.peer1.peer.dc1.dc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream error: both dc and partition provided",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway is in local mode",
 			pod: func() *corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -5754,7 +5787,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				pod.Spec.Containers = c.podContainers
 			}
 
-			// We set these annotations explicitly as these are set by the handler and we
+			// We set these annotations explicitly as these are set by the meshWebhook and we
 			// need these values to determine which port to use for the service registration.
 			pod.Annotations[annotationPort] = "tcp"
 

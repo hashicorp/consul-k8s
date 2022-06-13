@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (w *ConnectWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
+func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
 	raw, ok := pod.Annotations[annotationUpstreams]
 	if !ok || raw == "" {
 		return []corev1.EnvVar{}
