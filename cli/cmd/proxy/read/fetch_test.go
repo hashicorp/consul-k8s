@@ -20,10 +20,10 @@ func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m
 func (m *mockPortForwarder) Close()                                   {}
 
 //go:embed test_config_dump.json
-var fs embed.FS
+var fetch_fs embed.FS
 
 func TestFetchConfig(t *testing.T) {
-	configResponse, err := fs.ReadFile("test_config_dump.json")
+	configResponse, err := fetch_fs.ReadFile("test_config_dump.json")
 	require.NoError(t, err)
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
