@@ -5,13 +5,13 @@ import "github.com/hashicorp/consul-k8s/cli/common/terminal"
 type Table string
 
 const (
-	Clusters  Table = "type.googleapis.com/envoy.admin.v3.ClustersConfigDump"
-	Endpoints       = "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump"
-	Listeners       = "type.googleapis.com/envoy.admin.v3.ListenersConfigDump"
-	Routes          = "type.googleapis.com/envoy.admin.v3.RoutesConfigDump"
-	Secrets         = "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"
+	Clusters  Table = "Clusters"
+	Endpoints       = "Endpoints"
+	Listeners       = "Listeners"
+	Routes          = "Routes"
+	Secrets         = "Secrets"
 )
 
-func Print(ui terminal.UI, config interface{}, tables ...Table) error {
+func Print(ui terminal.UI, config Config, tables ...Table) error {
 	return nil
 }
