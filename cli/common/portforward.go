@@ -44,6 +44,12 @@ type PortForward struct {
 	newForwarder   func(httpstream.Dialer, []string, <-chan struct{}, chan struct{}, io.Writer, io.Writer) (forwarder, error)
 }
 
+// PortForwarder enables a user to open and close a connection to a remote server.
+type PortForwarder interface {
+	Open(context.Context) (string, error)
+	Close()
+}
+
 // forwarder is an interface which can be used for opening a port forward session.
 type forwarder interface {
 	ForwardPorts() error
