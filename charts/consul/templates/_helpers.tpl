@@ -22,11 +22,15 @@ as well as the global.name setting.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
-{{- define "consul.serverTLSCATemplate" -}}
+{{- define "consul.vaultCATemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.global.tls.caCert.secretName }}" -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSCATemplate" -}}
+{{ include "consul.vaultCATemplate" .Values.global.tls.caCert }}
 {{- end -}}
 
 {{- define "consul.serverTLSCertTemplate" -}}
@@ -53,6 +57,38 @@ as well as the global.name setting.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.connectInjectWebhookTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-connect-injector" $name }}"
+            "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.connectInjectWebhookTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-connect-injector" $name }}"
+            "alt_names={{ include "consul.connectInjectorTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
@@ -64,7 +100,19 @@ as well as the global.name setting.
 {{- end -}}
 
 {{- define "consul.serverAdditionalIPSANs" -}}
-{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.global.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}
+{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $san := .Values.global.tls.serverAdditionalIPSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}
+{{- end -}}
+
+{{- define "consul.connectInjectorTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "%s-connect-injector,%s-connect-injector.%s,%s-connect-injector.%s.svc,%s-connect-injector.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "%s-controller-webhook,%s-controller-webhook.%s,%s-controller-webhook.%s.svc,%s-controller-webhook.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
 {{- end -}}
 
 {{- define "consul.vaultReplicationTokenTemplate" -}}
@@ -227,4 +275,27 @@ Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
 {{- if or (eq "system" $name) (eq "universal" $name) (eq "operator" $name) (eq "root" $name) }}
 {{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
 {{- end }}
+{{- end -}}
+
+{{/*
+Fails when at least one but not all of the following have been set:
+- global.secretsBackend.vault.connectInjectRole
+- global.secretsBackend.vault.connectInject.tlsCert.secretName
+- global.secretsBackend.vault.connectInject.caCert.secretName
+- global.secretsBackend.vault.controllerRole
+- global.secretsBackend.vault.controller.tlsCert.secretName
+- global.secretsBackend.vault.controller.caCert.secretName
+
+The above values are needed in full to turn off web cert manager and allow
+connect inject and controller to manage its own webhook certs.
+
+Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
+
+*/}}
+{{- define "consul.validateVaultWebhookCertConfiguration" -}}
+{{- if or .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.controllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName .Values.global.secretsBackend.vault.controller.caCert.secretName}}
+{{- if or (not .Values.global.secretsBackend.vault.connectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.controllerRole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
+{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
+{{ end }}
+{{ end }}
 {{- end -}}

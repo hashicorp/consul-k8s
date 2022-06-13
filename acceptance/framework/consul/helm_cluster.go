@@ -274,12 +274,16 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 }
 
 func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) string {
-	localPort := terratestk8s.GetAvailablePort(t)
 	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
+	return h.CreatePortForwardTunnelToResourcePort(t, serverPod, remotePort)
+}
+
+func (h *HelmCluster) CreatePortForwardTunnelToResourcePort(t *testing.T, resourceName string, remotePort int) string {
+	localPort := terratestk8s.GetAvailablePort(t)
 	tunnel := terratestk8s.NewTunnelWithLogger(
 		h.helmOptions.KubectlOptions,
 		terratestk8s.ResourceTypePod,
-		serverPod,
+		resourceName,
 		localPort,
 		remotePort,
 		h.logger)

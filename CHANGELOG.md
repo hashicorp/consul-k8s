@@ -1,6 +1,8 @@
 ## UNRELEASED
 
 IMPROVEMENTS:
+* Control Plane
+  * Enable configuring Connect Injector and Controller Webhooks' certificates to be managed by Vault. [[GH-1191](https://github.com/hashicorp/consul-k8s/pull/1191/)]
 * Helm
   * Enable the configuring of snapshot intervals in the client snapshot agent via `client.snapshotAgent.interval`. [[GH-1235](https://github.com/hashicorp/consul-k8s/pull/1235)]
   * Enable configuring the pod topologySpreadConstraints for mesh, terminating, and ingress gateways. [[GH-1257](https://github.com/hashicorp/consul-k8s/pull/1257)]

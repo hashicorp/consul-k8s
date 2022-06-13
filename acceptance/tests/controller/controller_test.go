@@ -6,13 +6,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	KubernetesAuthMethodPath = "kubernetes"
+	ManageSystemACLsRole     = "server-acl-init"
+	ClientRole               = "client"
+	ServerRole               = "server"
 )
 
 func TestController(t *testing.T) {
@@ -21,10 +32,16 @@ func TestController(t *testing.T) {
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool
+		useVault    bool
 	}{
-		{false, false},
-		{true, false},
-		{true, true},
+		{false, false, false},
+		{true, false, false},
+		{true, true, false},
+		{true, true, true},
+		{false, false, true},
+		// Vault with TLS requires autoEncrypt set to true as well, so the below
+		// is not valid
+		// {true, false, true},
 	}
 
 	// The name of a service intention in consul is
@@ -46,10 +63,21 @@ func TestController(t *testing.T) {
 			}
 
 			releaseName := helpers.RandomName()
+
+			var bootstrapToken string
+			var helmConsulValues map[string]string
+			if c.useVault {
+				helmConsulValues, bootstrapToken = configureAndGetVaultHelmValues(t, ctx, cfg, releaseName, c.secure)
+				helpers.MergeMaps(helmConsulValues, helmValues)
+			}
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+
+			if c.useVault {
+				consulCluster.ACLToken = bootstrapToken
+			}
 
 			// Test creation.
 			{
@@ -339,4 +367,199 @@ func TestController(t *testing.T) {
 			}
 		})
 	}
+}
+
+func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
+	cfg *config.TestConfig, consulReleaseName string, secure bool) (map[string]string, string) {
+	vaultReleaseName := helpers.RandomName()
+	ns := ctx.KubectlOptions(t).Namespace
+
+	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, nil)
+	vaultCluster.Create(t, ctx, "")
+	// Vault is now installed in the cluster.
+
+	// Now fetch the Vault client so we can create the policies and secrets.
+	vaultClient := vaultCluster.VaultClient(t)
+
+	// -------------------------
+	// PKI
+	// -------------------------
+	// Configure Service Mesh CA
+	connectCAPolicy := "connect-ca-dc1"
+	connectCARootPath := "connect_root"
+	connectCAIntermediatePath := "dc1/connect_inter"
+	// Configure Policy for Connect CA
+	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
+
+	// Configure Server PKI
+	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "pki",
+		PolicyName:          "consul-ca-policy",
+		RoleName:            "consul-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+		MaxTTL:              "1h",
+		AuthMethodPath:      "kubernetes",
+		CommonName:          "Consul CA",
+	}
+	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
+	webhookCertTtl := 25 * time.Second
+	// Configure controller webhook PKI
+	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "controller",
+		PolicyName:          "controller-ca-policy",
+		RoleName:            "controller-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
+		MaxTTL:              webhookCertTtl.String(),
+		AuthMethodPath:      "kubernetes",
+	}
+	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
+	// Configure controller webhook PKI
+	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "connect",
+		PolicyName:          "connect-ca-policy",
+		RoleName:            "connect-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "connect-injector"),
+		MaxTTL:              webhookCertTtl.String(),
+		AuthMethodPath:      "kubernetes",
+	}
+	connectInjectorWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
+	// -------------------------
+	// KV2 secrets
+	// -------------------------
+	// Gossip key
+	gossipKey, err := vault.GenerateGossipSecret()
+	require.NoError(t, err)
+	gossipSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/gossip",
+		Key:        "gossip",
+		Value:      gossipKey,
+		PolicyName: "gossip",
+	}
+	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+
+	// License
+	licenseSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/license",
+		Key:        "license",
+		Value:      cfg.EnterpriseLicense,
+		PolicyName: "license",
+	}
+	if cfg.EnableEnterprise {
+		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+	}
+
+	// Bootstrap Token
+	bootstrapToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
+	bootstrapTokenSecret := &vault.KV2Secret{
+		Path:       "consul/data/secret/bootstrap",
+		Key:        "token",
+		Value:      bootstrapToken,
+		PolicyName: "bootstrap",
+	}
+	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+
+	// -------------------------
+	// Additional Auth Roles
+	// -------------------------
+	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+	if cfg.EnableEnterprise {
+		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+	}
+
+	// server
+	consulServerRole := ServerRole
+	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            consulServerRole,
+		PolicyNames:         serverPolicies,
+	}
+	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// client
+	consulClientRole := ClientRole
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
+	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  consulClientServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            consulClientRole,
+		PolicyNames:         gossipSecret.PolicyName,
+	}
+	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// manageSystemACLs
+	manageSystemACLsRole := ManageSystemACLsRole
+	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
+	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  manageSystemACLsServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            manageSystemACLsRole,
+		PolicyNames:         bootstrapTokenSecret.PolicyName,
+	}
+	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	// allow all components to access server ca
+	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  "*",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            serverPKIConfig.RoleName,
+		PolicyNames:         serverPKIConfig.PolicyName,
+	}
+	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+	vaultCASecret := vault.CASecretName(vaultReleaseName)
+
+	consulHelmValues := map[string]string{
+		"server.extraVolumes[0].type": "secret",
+		"server.extraVolumes[0].name": vaultCASecret,
+		"server.extraVolumes[0].load": "false",
+
+		"global.secretsBackend.vault.enabled":              "true",
+		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
+		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
+		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
+		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+
+		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
+		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
+	}
+
+	if cfg.EnableEnterprise {
+		consulHelmValues["global.enterpriseLicense.secretName"] = licenseSecret.Path
+		consulHelmValues["global.enterpriseLicense.secretKey"] = licenseSecret.Key
+	}
+
+	if secure {
+		consulHelmValues["server.serverCert.secretName"] = serverPKIConfig.CertPath
+		consulHelmValues["global.tls.caCert.secretName"] = serverPKIConfig.CAPath
+		consulHelmValues["global.secretsBackend.vault.connectInject.tlsCert.secretName"] = connectInjectorWebhookPKIConfig.CertPath
+		consulHelmValues["global.secretsBackend.vault.connectInject.caCert.secretName"] = connectInjectorWebhookPKIConfig.CAPath
+		consulHelmValues["global.secretsBackend.vault.controller.tlsCert.secretName"] = controllerWebhookPKIConfig.CertPath
+		consulHelmValues["global.secretsBackend.vault.controller.caCert.secretName"] = controllerWebhookPKIConfig.CAPath
+		consulHelmValues["global.secretsBackend.vault.connectInjectRole"] = connectInjectorWebhookPKIConfig.RoleName
+		consulHelmValues["global.secretsBackend.vault.controllerRole"] = controllerWebhookPKIConfig.RoleName
+		consulHelmValues["global.acls.bootstrapToken.secretName"] = bootstrapTokenSecret.Path
+		consulHelmValues["global.acls.bootstrapToken.secretKey"] = bootstrapTokenSecret.Key
+		consulHelmValues["global.gossipEncryption.secretName"] = gossipSecret.Path
+		consulHelmValues["global.gossipEncryption.secretKey"] = gossipSecret.Key
+	}
+
+	return consulHelmValues, bootstrapToken
 }
