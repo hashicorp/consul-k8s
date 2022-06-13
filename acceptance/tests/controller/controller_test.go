@@ -553,8 +553,8 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 		consulHelmValues["global.secretsBackend.vault.connectInject.caCert.secretName"] = connectInjectorWebhookPKIConfig.CAPath
 		consulHelmValues["global.secretsBackend.vault.controller.tlsCert.secretName"] = controllerWebhookPKIConfig.CertPath
 		consulHelmValues["global.secretsBackend.vault.controller.caCert.secretName"] = controllerWebhookPKIConfig.CAPath
-		consulHelmValues["global.secretsBackend.vault.consulConnectInjectRole"] = connectInjectorWebhookPKIConfig.RoleName
-		consulHelmValues["global.secretsBackend.vault.consulControllerRole"] = controllerWebhookPKIConfig.RoleName
+		consulHelmValues["global.secretsBackend.vault.connectInjectRole"] = connectInjectorWebhookPKIConfig.RoleName
+		consulHelmValues["global.secretsBackend.vault.controllerRole"] = controllerWebhookPKIConfig.RoleName
 		consulHelmValues["global.acls.bootstrapToken.secretName"] = bootstrapTokenSecret.Path
 		consulHelmValues["global.acls.bootstrapToken.secretKey"] = bootstrapTokenSecret.Key
 		consulHelmValues["global.gossipEncryption.secretName"] = gossipSecret.Path

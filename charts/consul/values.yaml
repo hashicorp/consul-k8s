@@ -199,13 +199,13 @@ global:
       # CA and issue a certificate and private key.
       # A Vault policy must be created which grants issue capabilities to 
       # `global.secretsBackend.vault.controller.tlsCert.secretName`.
-      consulControllerRole: ""
+      controllerRole: ""
 
       # The Vault role to read Consul connect-injector webhook's CA
       # and issue a certificate and private key.
       # A Vault policy must be created which grants issue capabilities to 
       # `global.secretsBackend.vault.connectInject.tlsCert.secretName`.
-      consulConnectInjectRole: ""
+      connectInjectRole: ""
 
       # The Vault role for all Consul components to read the Consul's server's CA Certificate (unauthenticated).
       # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
