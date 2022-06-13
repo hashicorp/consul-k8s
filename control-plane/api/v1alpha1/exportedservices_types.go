@@ -68,7 +68,7 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
-	// PeerName is the name of the peer to export the service to.
+	// [Experimental] PeerName is the name of the peer to export the service to.
 	PeerName string `json:"peerName,omitempty"`
 }
 

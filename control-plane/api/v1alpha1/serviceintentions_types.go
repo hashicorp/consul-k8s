@@ -78,7 +78,7 @@ type SourceIntention struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace for the Name parameter.
 	Namespace string `json:"namespace,omitempty"`
-	// Peer is the peer name for the Name parameter.
+	// [Experimental] Peer is the peer name for the Name parameter.
 	Peer string `json:"peer,omitempty"`
 	// Partition is the Admin Partition for the Name parameter.
 	Partition string `json:"partition,omitempty"`

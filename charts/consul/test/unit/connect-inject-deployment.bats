@@ -1742,6 +1742,43 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# peering
+
+@test "connectInject/Deployment: peering is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-peering=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -enable-peering=true is set when global.peering.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-peering=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: fails if peering is enabled but connect inject is not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=false' \
+      --set 'global.peering.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "setting global.peering.enabled to true requires connectInject.enabled to be true" ]]
+}
+
+
+#--------------------------------------------------------------------
 # openshift
 
 @test "connectInject/Deployment: openshift is is not set by default" {
