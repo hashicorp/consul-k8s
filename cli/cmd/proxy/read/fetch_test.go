@@ -19,7 +19,7 @@ type mockPortForwarder struct {
 func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
 func (m *mockPortForwarder) Close()                                   {}
 
-//go:embed config_fixture.json
+//go:embed test_config_dump.json
 var fs embed.FS
 
 func TestFetchConfig(t *testing.T) {
