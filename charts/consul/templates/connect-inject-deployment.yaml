@@ -111,6 +111,9 @@ spec:
                 {{- else }}
                 -default-enable-transparent-proxy=false \
                 {{- end }}
+                {{- if .Values.global.peering.enabled }}
+                -enable-peering=true \
+                {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \
                 {{- end }}
