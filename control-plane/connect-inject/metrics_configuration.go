@@ -35,7 +35,7 @@ func (mc MetricsConfig) mergedMetricsServerConfiguration(pod corev1.Pod) (metric
 		return metricsPorts{}, err
 	}
 
-	// This should never happen because we only call this function in the handler if
+	// This should never happen because we only call this function in the meshWebhook if
 	// we need to run the metrics merging server. This check is here just in case.
 	if !run {
 		return metricsPorts{}, errors.New("metrics merging should be enabled in order to return the metrics server configuration")
@@ -61,7 +61,7 @@ func (mc MetricsConfig) mergedMetricsServerConfiguration(pod corev1.Pod) (metric
 	return metricsPorts, nil
 }
 
-// enableMetrics returns whether metrics are enabled either via the default value in the handler, or if it's been
+// enableMetrics returns whether metrics are enabled either via the default value in the meshWebhook, or if it's been
 // overridden via the annotation.
 func (mc MetricsConfig) enableMetrics(pod corev1.Pod) (bool, error) {
 	enabled := mc.DefaultEnableMetrics
@@ -76,7 +76,7 @@ func (mc MetricsConfig) enableMetrics(pod corev1.Pod) (bool, error) {
 }
 
 // enableMetricsMerging returns whether metrics merging functionality is enabled either via the default value in the
-// handler, or if it's been overridden via the annotation.
+// meshWebhook, or if it's been overridden via the annotation.
 func (mc MetricsConfig) enableMetricsMerging(pod corev1.Pod) (bool, error) {
 	enabled := mc.DefaultEnableMetricsMerging
 	if raw, ok := pod.Annotations[annotationEnableMetricsMerging]; ok && raw != "" {
@@ -89,19 +89,19 @@ func (mc MetricsConfig) enableMetricsMerging(pod corev1.Pod) (bool, error) {
 	return enabled, nil
 }
 
-// mergedMetricsPort returns the port to run the merged metrics server on, either via the default value in the handler,
+// mergedMetricsPort returns the port to run the merged metrics server on, either via the default value in the meshWebhook,
 // or if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (mc MetricsConfig) mergedMetricsPort(pod corev1.Pod) (string, error) {
 	return determineAndValidatePort(pod, annotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
 }
 
-// prometheusScrapePort returns the port for Prometheus to scrape from, either via the default value in the handler, or
+// prometheusScrapePort returns the port for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (mc MetricsConfig) prometheusScrapePort(pod corev1.Pod) (string, error) {
 	return determineAndValidatePort(pod, annotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
 }
 
-// prometheusScrapePath returns the path for Prometheus to scrape from, either via the default value in the handler, or
+// prometheusScrapePath returns the path for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation.
 func (mc MetricsConfig) prometheusScrapePath(pod corev1.Pod) string {
 	if raw, ok := pod.Annotations[annotationPrometheusScrapePath]; ok && raw != "" {

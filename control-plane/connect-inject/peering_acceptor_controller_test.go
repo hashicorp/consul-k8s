@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -402,7 +403,7 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			// exists". Leaving this here documents that the entire contents of an existing secret should
 			// be replaced.
 			require.Equal(t, "", createdSecret.StringData["some-old-key"])
-			decodedTokenData, err := base64.StdEncoding.DecodeString(createdSecret.StringData["data"])
+			decodedTokenData, err := base64.StdEncoding.DecodeString(string(createdSecret.Data["data"]))
 			require.NoError(t, err)
 
 			require.Contains(t, string(decodedTokenData), "\"CA\":null")
@@ -437,101 +438,83 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 // TestReconcileDeletePeeringAcceptor reconciles a PeeringAcceptor resource that is no longer in Kubernetes, but still
 // exists in Consul.
 func TestReconcileDeletePeeringAcceptor(t *testing.T) {
-	t.Parallel()
-	nodeName := "test-node"
-	cases := []struct {
-		name                  string
-		initialConsulPeerName string
-		expErr                string
-	}{
-		{
-			name:                  "PeeringAcceptor ",
-			initialConsulPeerName: "acceptor-deleted",
+	// Add the default namespace.
+	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	acceptor := &v1alpha1.PeeringAcceptor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "acceptor-deleted",
+			Namespace:         "default",
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+			Finalizers:        []string{FinalizerName},
+		},
+		Spec: v1alpha1.PeeringAcceptorSpec{
+			Peer: &v1alpha1.Peer{
+				Secret: &v1alpha1.Secret{
+					Name:    "acceptor-deleted-secret",
+					Key:     "data",
+					Backend: "kubernetes",
+				},
+			},
 		},
 	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			// Add the default namespace.
-			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	k8sObjects := []runtime.Object{&ns, acceptor}
 
-			acceptor := &v1alpha1.PeeringAcceptor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "acceptor-deleted",
-					Namespace:         "default",
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-					Finalizers:        []string{FinalizerName},
-				},
-				Spec: v1alpha1.PeeringAcceptorSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
-							Name:    "acceptor-deleted-secret",
-							Key:     "data",
-							Backend: "kubernetes",
-						},
-					},
-				},
-			}
-			k8sObjects := []runtime.Object{&ns, acceptor}
+	// Add peering types to the scheme.
+	s := scheme.Scheme
+	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
-			// Add peering types to the scheme.
-			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+	// Create test consul server.
+	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.NodeName = "test-node"
+	})
+	require.NoError(t, err)
+	defer consul.Stop()
+	consul.WaitForServiceIntentions(t)
 
-			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
-
-			// Add the initial peerings into Consul by calling the Generate token endpoint.
-			_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerName}, nil)
-			require.NoError(t, err)
-
-			// Create the peering acceptor controller.
-			controller := &PeeringAcceptorController{
-				Client:       fakeClient,
-				Log:          logrtest.TestLogger{T: t},
-				ConsulClient: consulClient,
-				Scheme:       s,
-			}
-			namespacedName := types.NamespacedName{
-				Name:      "acceptor-deleted",
-				Namespace: "default",
-			}
-
-			// Reconcile a resource that is not in K8s, but is still in Consul.
-			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
-				NamespacedName: namespacedName,
-			})
-			if tt.expErr != "" {
-				require.EqualError(t, err, tt.expErr)
-			} else {
-				require.NoError(t, err)
-			}
-			require.False(t, resp.Requeue)
-
-			// After reconciliation, Consul should not have the peering.
-			peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-deleted", nil)
-			require.Nil(t, peering)
-			require.NoError(t, err)
-
-			err = fakeClient.Get(context.Background(), namespacedName, acceptor)
-			require.EqualError(t, err, `peeringacceptors.consul.hashicorp.com "acceptor-deleted" not found`)
-
-			oldSecret := &corev1.Secret{}
-			err = fakeClient.Get(context.Background(), namespacedName, oldSecret)
-			require.EqualError(t, err, `secrets "acceptor-deleted" not found`)
-		})
+	cfg := &api.Config{
+		Address: consul.HTTPAddr,
 	}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+
+	// Add the initial peerings into Consul by calling the Generate token endpoint.
+	_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-deleted"}, nil)
+	require.NoError(t, err)
+
+	// Create the peering acceptor controller.
+	controller := &PeeringAcceptorController{
+		Client:       fakeClient,
+		Log:          logrtest.TestLogger{T: t},
+		ConsulClient: consulClient,
+		Scheme:       s,
+	}
+	namespacedName := types.NamespacedName{
+		Name:      "acceptor-deleted",
+		Namespace: "default",
+	}
+
+	// Reconcile a resource that is not in K8s, but is still in Consul.
+	resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: namespacedName,
+	})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	// After reconciliation, Consul should not have the peering.
+	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		peering, _, err := consulClient.Peerings().Read(context.Background(), "acceptor-deleted", nil)
+		require.Nil(r, peering)
+		require.NoError(r, err)
+	})
+
+	err = fakeClient.Get(context.Background(), namespacedName, acceptor)
+	require.EqualError(t, err, `peeringacceptors.consul.hashicorp.com "acceptor-deleted" not found`)
+
+	oldSecret := &corev1.Secret{}
+	err = fakeClient.Get(context.Background(), namespacedName, oldSecret)
+	require.EqualError(t, err, `secrets "acceptor-deleted" not found`)
 }
 
 func TestShouldGenerateToken(t *testing.T) {

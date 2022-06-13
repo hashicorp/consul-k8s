@@ -11,7 +11,7 @@ import (
 // the metrics merging server when metrics merging feature is enabled.
 // It always disables service registration because for connect we no longer
 // need to keep services registered as this is handled in the endpoints-controller.
-func (w *ConnectWebhook) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
+func (w *MeshWebhook) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 	metricsPorts, err := w.MetricsConfig.mergedMetricsServerConfiguration(pod)
 	if err != nil {
 		return corev1.Container{}, err
@@ -48,7 +48,7 @@ func (w *ConnectWebhook) consulSidecar(pod corev1.Pod) (corev1.Container, error)
 	}, nil
 }
 
-func (w *ConnectWebhook) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
+func (w *MeshWebhook) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},

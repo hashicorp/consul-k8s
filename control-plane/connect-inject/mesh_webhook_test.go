@@ -41,14 +41,14 @@ func TestHandlerHandle(t *testing.T) {
 
 	cases := []struct {
 		Name    string
-		Handler ConnectWebhook
+		Webhook MeshWebhook
 		Req     admission.Request
 		Err     string // expected error string, not exact
 		Patches []jsonpatch.Operation
 	}{
 		{
 			"kube-system namespace",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -68,7 +68,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"already injected",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -92,7 +92,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -134,7 +134,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"pod with upstreams specified",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -189,7 +189,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod with injection disabled",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -215,7 +215,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod with injection truthy",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -266,7 +266,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"pod with empty volume mount annotation",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -316,7 +316,7 @@ func TestHandlerHandle(t *testing.T) {
 		},
 		{
 			"pod with volume mount annotation",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -387,7 +387,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"pod with service annotation",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -438,7 +438,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"pod with existing label",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -489,7 +489,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"when metrics merging is enabled, we should inject the consul-sidecar and add prometheus annotations",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -567,7 +567,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"tproxy with overwriteProbes is enabled",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                    logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSet(),
@@ -648,7 +648,7 @@ func TestHandlerHandle(t *testing.T) {
 		},
 		{
 			"multi port pod",
-			ConnectWebhook{
+			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -706,7 +706,7 @@ func TestHandlerHandle(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
-			resp := tt.Handler.Handle(ctx, tt.Req)
+			resp := tt.Webhook.Handle(ctx, tt.Req)
 			if (tt.Err == "") != resp.Allowed {
 				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
 			}
@@ -760,7 +760,7 @@ func TestHandler_ErrorsOnDeprecatedAnnotations(t *testing.T) {
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(err)
 
-			handler := ConnectWebhook{
+			webhook := MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -785,7 +785,7 @@ func TestHandler_ErrorsOnDeprecatedAnnotations(t *testing.T) {
 				},
 			}
 
-			response := handler.Handle(context.Background(), request)
+			response := webhook.Handle(context.Background(), request)
 			require.False(response.Allowed)
 			require.Equal(c.expErr, response.Result.Message)
 		})
@@ -917,8 +917,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			podJson, err := json.Marshal(tt.Pod)
 			require.NoError(err)
 
-			var h ConnectWebhook
-			err = h.defaultAnnotations(tt.Pod, string(podJson))
+			var w MeshWebhook
+			err = w.defaultAnnotations(tt.Pod, string(podJson))
 			if (tt.Err != "") != (err != nil) {
 				t.Fatalf("actual: %v, expected err: %v", err, tt.Err)
 			}
@@ -939,12 +939,12 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 func TestHandlerPrometheusAnnotations(t *testing.T) {
 	cases := []struct {
 		Name     string
-		Handler  ConnectWebhook
+		Webhook  MeshWebhook
 		Expected map[string]string
 	}{
 		{
 			Name: "Sets the correct prometheus annotations on the pod if metrics are enabled",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				MetricsConfig: MetricsConfig{
 					DefaultEnableMetrics:        true,
 					DefaultPrometheusScrapePort: "20200",
@@ -959,7 +959,7 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 		},
 		{
 			Name: "Does not set annotations if metrics are not enabled",
-			Handler: ConnectWebhook{
+			Webhook: MeshWebhook{
 				MetricsConfig: MetricsConfig{
 					DefaultEnableMetrics:        false,
 					DefaultPrometheusScrapePort: "20200",
@@ -973,7 +973,7 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			h := tt.Handler
+			h := tt.Webhook
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
 
 			err := h.prometheusAnnotations(pod)
@@ -1157,14 +1157,14 @@ func TestConsulNamespace(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := ConnectWebhook{
+			w := MeshWebhook{
 				EnableNamespaces:           tt.EnableNamespaces,
 				ConsulDestinationNamespace: tt.ConsulDestinationNamespace,
 				EnableK8SNSMirroring:       tt.EnableK8SNSMirroring,
 				K8SNSMirroringPrefix:       tt.K8SNSMirroringPrefix,
 			}
 
-			ns := h.consulNamespace(tt.K8sNamespace)
+			ns := w.consulNamespace(tt.K8sNamespace)
 
 			require.Equal(tt.Expected, ns)
 		})
@@ -1459,14 +1459,14 @@ func TestShouldInject(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := ConnectWebhook{
+			w := MeshWebhook{
 				RequireAnnotation:     false,
 				EnableNamespaces:      tt.EnableNamespaces,
 				AllowK8sNamespacesSet: tt.AllowK8sNamespacesSet,
 				DenyK8sNamespacesSet:  tt.DenyK8sNamespacesSet,
 			}
 
-			injected, err := h.shouldInject(*tt.Pod, tt.K8sNamespace)
+			injected, err := w.shouldInject(*tt.Pod, tt.K8sNamespace)
 
 			require.Equal(nil, err)
 			require.Equal(tt.Expected, injected)
@@ -1765,11 +1765,11 @@ func TestOverwriteProbes(t *testing.T) {
 				pod.ObjectMeta.Annotations = c.additionalAnnotations
 			}
 
-			h := ConnectWebhook{
+			w := MeshWebhook{
 				EnableTransparentProxy: c.tproxyEnabled,
 				TProxyOverwriteProbes:  c.overwriteProbes,
 			}
-			err := h.overwriteProbes(corev1.Namespace{}, pod)
+			err := w.overwriteProbes(corev1.Namespace{}, pod)
 			require.NoError(t, err)
 			for i, container := range pod.Spec.Containers {
 				if container.ReadinessProbe != nil {
@@ -1811,10 +1811,10 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			h := ConnectWebhook{}
+			w := MeshWebhook{}
 			pod := minimal()
 			pod.Annotations = tt.annotations
-			err := h.checkUnsupportedMultiPortCases(corev1.Namespace{}, *pod)
+			err := w.checkUnsupportedMultiPortCases(corev1.Namespace{}, *pod)
 			require.Error(t, err)
 			require.Equal(t, tt.expErr, err.Error())
 		})

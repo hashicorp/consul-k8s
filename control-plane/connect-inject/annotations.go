@@ -136,7 +136,7 @@ const (
 	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
-	// webhook/handler.
+	// webhook/meshWebhook.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
 
 	// labelServiceIgnore is a label that can be added to a service to prevent it from being

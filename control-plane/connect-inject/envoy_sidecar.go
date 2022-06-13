@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func (w *ConnectWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	resources, err := w.envoySidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
@@ -64,7 +64,7 @@ func (w *ConnectWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod
 				return corev1.Container{}, fmt.Errorf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID)
 			}
 		}
-		// Ensure that none of the user's containers have the same UID as Envoy. At this point in injection the handler
+		// Ensure that none of the user's containers have the same UID as Envoy. At this point in injection the meshWebhook
 		// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
 		for _, c := range pod.Spec.Containers {
 			// User container and Envoy container cannot have the same UID.
@@ -82,7 +82,7 @@ func (w *ConnectWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod
 
 	return container, nil
 }
-func (w *ConnectWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcName string, multiPortSvcIdx int) ([]string, error) {
+func (w *MeshWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcName string, multiPortSvcIdx int) ([]string, error) {
 	bootstrapFile := "/consul/connect-inject/envoy-bootstrap.yaml"
 	if multiPortSvcName != "" {
 		bootstrapFile = fmt.Sprintf("/consul/connect-inject/envoy-bootstrap-%s.yaml", multiPortSvcName)
@@ -122,7 +122,7 @@ func (w *ConnectWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvc
 	return cmd, nil
 }
 
-func (w *ConnectWebhook) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
+func (w *MeshWebhook) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},

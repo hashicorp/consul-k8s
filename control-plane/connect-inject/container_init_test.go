@@ -46,7 +46,7 @@ func TestHandlerContainerInit(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Pod     func(*corev1.Pod) *corev1.Pod
-		Handler ConnectWebhook
+		Webhook MeshWebhook
 		Cmd     string // Strings.Contains test
 		CmdNot  string // Not contains
 	}{
@@ -58,7 +58,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{},
+			MeshWebhook{},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -85,7 +85,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				}
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				AuthMethod:       "an-auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 			},
@@ -118,7 +118,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				ConsulAPITimeout: 5 * time.Second,
 			},
 			`# Generate the envoy bootstrap code
@@ -135,7 +135,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := tt.Handler
+			h := tt.Webhook
 			pod := *tt.Pod(minimal())
 			container, err := h.containerInit(testNS, pod, multiPortInfo{})
 			require.NoError(err)
@@ -287,7 +287,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := ConnectWebhook{
+			w := MeshWebhook{
 				EnableTransparentProxy: c.globalEnabled,
 				ConsulAPITimeout:       5 * time.Second,
 			}
@@ -305,7 +305,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			}
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			container, err := h.containerInit(ns, *pod, multiPortInfo{})
+			container, err := w.containerInit(ns, *pod, multiPortInfo{})
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
 
@@ -384,7 +384,7 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := ConnectWebhook{
+			w := MeshWebhook{
 				EnableConsulDNS:        c.globalEnabled,
 				EnableTransparentProxy: true,
 				ResourcePrefix:         "consul-consul",
@@ -398,7 +398,7 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			container, err := h.containerInit(ns, *pod, multiPortInfo{})
+			container, err := w.containerInit(ns, *pod, multiPortInfo{})
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
 
@@ -428,8 +428,8 @@ func TestHandler_constructDNSServiceHostName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.prefix, func(t *testing.T) {
-			h := ConnectWebhook{ResourcePrefix: c.prefix, ConsulAPITimeout: 5 * time.Second}
-			require.Equal(t, c.result, h.constructDNSServiceHostName())
+			w := MeshWebhook{ResourcePrefix: c.prefix, ConsulAPITimeout: 5 * time.Second}
+			require.Equal(t, c.result, w.constructDNSServiceHostName())
 		})
 	}
 }
@@ -469,7 +469,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Pod     func(*corev1.Pod) *corev1.Pod
-		Handler ConnectWebhook
+		Webhook MeshWebhook
 		Cmd     string // Strings.Contains test
 	}{
 		{
@@ -478,7 +478,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
@@ -503,7 +503,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
@@ -530,7 +530,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
@@ -555,7 +555,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
@@ -582,7 +582,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = ""
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
@@ -616,7 +616,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = ""
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
@@ -651,7 +651,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
@@ -683,7 +683,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				EnableNamespaces:           true,
 				ConsulPartition:            "default",
 				ConsulDestinationNamespace: "non-default",
@@ -719,7 +719,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulPartition:            "non-default",
@@ -763,8 +763,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := tt.Handler
-			container, err := h.containerInit(testNS, *tt.Pod(minimal()), multiPortInfo{})
+			w := tt.Webhook
+			container, err := w.containerInit(testNS, *tt.Pod(minimal()), multiPortInfo{})
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Equal(tt.Cmd, actual)
@@ -818,7 +818,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 	cases := []struct {
 		Name              string
 		Pod               func(*corev1.Pod) *corev1.Pod
-		Handler           ConnectWebhook
+		Webhook           MeshWebhook
 		NumInitContainers int
 		MultiPortInfos    []multiPortInfo
 		Cmd               []string // Strings.Contains test
@@ -828,7 +828,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			ConnectWebhook{ConsulAPITimeout: 5 * time.Second},
+			MeshWebhook{ConsulAPITimeout: 5 * time.Second},
 			2,
 			[]multiPortInfo{
 				{
@@ -876,7 +876,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			ConnectWebhook{
+			MeshWebhook{
 				AuthMethod:       "auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 			},
@@ -938,9 +938,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := tt.Handler
+			w := tt.Webhook
 			for i := 0; i < tt.NumInitContainers; i++ {
-				container, err := h.containerInit(testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
+				container, err := w.containerInit(testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
 				require.NoError(err)
 				actual := strings.Join(container.Command, " ")
 				require.Equal(tt.Cmd[i], actual)
@@ -951,7 +951,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require := require.New(t)
-	h := ConnectWebhook{
+	w := MeshWebhook{
 		AuthMethod:       "release-name-consul-k8s-auth-method",
 		ConsulAPITimeout: 5 * time.Second,
 	}
@@ -978,7 +978,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 			ServiceAccountName: "foo",
 		},
 	}
-	container, err := h.containerInit(testNS, *pod, multiPortInfo{})
+	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -998,7 +998,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 // and CA cert should be set as env variable.
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
-	h := ConnectWebhook{
+	w := MeshWebhook{
 		ConsulCACert:     "consul-ca-cert",
 		ConsulAPITimeout: 5 * time.Second,
 	}
@@ -1017,7 +1017,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(testNS, *pod, multiPortInfo{})
+	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -1034,7 +1034,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 
 func TestHandlerContainerInit_Resources(t *testing.T) {
 	require := require.New(t)
-	h := ConnectWebhook{
+	w := MeshWebhook{
 		InitContainerResources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("10m"),
@@ -1062,7 +1062,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(testNS, *pod, multiPortInfo{})
+	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
@@ -1082,9 +1082,9 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 
 	for _, openShiftEnabled := range openShiftEnabledCases {
 		t.Run(fmt.Sprintf("openshift enabled: %t", openShiftEnabled), func(t *testing.T) {
-			h := ConnectWebhook{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5 * time.Second}
+			w := MeshWebhook{EnableOpenShift: openShiftEnabled, ConsulAPITimeout: 5 * time.Second}
 
-			container := h.initCopyContainer()
+			container := w.initCopyContainer()
 
 			if openShiftEnabled {
 				require.Nil(t, container.SecurityContext)

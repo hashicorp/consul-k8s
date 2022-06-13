@@ -72,15 +72,6 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// Get the status secret and the spec secret.
-	// Cases need to handle secretRefSet, statusSecret, secretSet, specSecret.
-	// no secretSet --> error bc spec needs to be set.
-	// no specSecret --> error bc waiting for spec secret to exist.
-	// no secretRefSet, yes secretSet, no statusSecret, yes specSecret --> initiate peering.
-	// yes secretRefSet, yes secretSet, no statusSecret, yes specSecret --> initiate peering.
-	// yes secretRefSet, yes secretSet, yes statusSecret, yes specSecret --> compare contents, if
-	// different initiate peering.
-
 	// TODO(peering): remove this once CRD validation exists.
 	secretSet := false
 	if dialer.Secret() != nil {
@@ -162,7 +153,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 		}
 
-		// Or, if the peering in Consul does exist, compare it to the contents of the spec's secret. If there's any
+		// Or, if the peering in Consul does exist, compare it to the spec's secret. If there's any
 		// differences, initiate peering.
 		if r.specStatusSecretsDifferent(dialer, specSecret) {
 			r.Log.Info("the secret in status.secretRef exists and is different from spec.peer.secret; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)

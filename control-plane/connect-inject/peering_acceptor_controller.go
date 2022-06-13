@@ -74,16 +74,15 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	} else {
 		if containsString(acceptor.Finalizers, FinalizerName) {
 			r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-			if err := r.deletePeering(ctx, req.Name); err != nil {
+			err := r.deletePeering(ctx, req.Name)
+			if acceptor.Secret().Backend == "kubernetes" {
+				err = r.deleteK8sSecret(ctx, acceptor)
+			}
+			if err != nil {
 				return ctrl.Result{}, err
 			}
-			if acceptor.Secret().Backend == "kubernetes" {
-				if err := r.deleteK8sSecret(ctx, acceptor); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
 			controllerutil.RemoveFinalizer(acceptor, FinalizerName)
-			err := r.Update(ctx, acceptor)
+			err = r.Update(ctx, acceptor)
 			return ctrl.Result{}, err
 		}
 	}
@@ -112,10 +111,11 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// If the peering doesn't exist in Consul, generate a new token, and store it in the specified backend. Store the
 	// current state in the status.
 	if peering == nil {
-		r.Log.Info("peering doesn't exist in Consul", "name", acceptor.Name)
+		r.Log.Info("peering doesn't exist in Consul; creating new peering", "name", acceptor.Name)
 
 		if statusSecretSet {
 			if existingStatusSecret != nil {
+				r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name)
 				err := r.Client.Delete(ctx, existingStatusSecret)
 				if err != nil {
 					r.updateStatusError(ctx, acceptor, err)
@@ -130,7 +130,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
-			secretResourceVersion, err = r.createK8sSecret(ctx, acceptor, resp)
+			secretResourceVersion, err = r.createOrUpdateK8sSecret(ctx, acceptor, resp)
 			if err != nil {
 				r.updateStatusError(ctx, acceptor, err)
 				return ctrl.Result{}, err
@@ -147,7 +147,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// TODO(peering): Verify that the existing peering in Consul is an acceptor peer. If it is a dialing peer, an error should be thrown.
 
 	// If the peering does exist in Consul, figure out whether to generate and store a new token by comparing the secret
-	// in the status to the actual contents of the secret. If no secret is specified in the status, shouldGenerate will
+	// in the status to the resource version of the secret. If no secret is specified in the status, shouldGenerate will
 	// be set to true.
 	var shouldGenerate bool
 	var nameChanged bool
@@ -168,7 +168,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
-			secretResourceVersion, err = r.createK8sSecret(ctx, acceptor, resp)
+			secretResourceVersion, err = r.createOrUpdateK8sSecret(ctx, acceptor, resp)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -193,8 +193,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // shouldGenerateToken returns whether a token should be generated, and whether the name of the secret has changed. It
-// compares the spec secret's name/key/backend and contents to the status secret's name/key/backend and contents. The
-// contents are compared by taking a SHA256 sum of the secret.
+// compares the spec secret's name/key/backend and resource version with the name/key/backend and resource version of the status secret's.
 func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingStatusSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
 	if acceptor.SecretRef() == nil {
 		return false, false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
@@ -210,8 +209,8 @@ func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingStatu
 	if acceptor.SecretRef().Backend != acceptor.Secret().Backend {
 		return false, false, errors.New("PeeringAcceptor backend cannot be changed")
 	}
-	// Compare the existing secret hash.
-	// Get the secret specified by the status, make sure it matches the status' secret.latestHash.
+	// Compare the existing secret resource version.
+	// Get the secret specified by the status, make sure it matches the status' secret.ResourceVersion.
 	if existingStatusSecret != nil {
 		if existingStatusSecret.ResourceVersion != acceptor.SecretRef().ResourceVersion {
 			return true, false, nil
@@ -270,9 +269,9 @@ func (r *PeeringAcceptorController) getExistingSecret(ctx context.Context, name 
 	return existingSecret, nil
 }
 
-// createK8sSecret creates a secret and uses the controller's K8s client to apply the secret. It checks if
+// createOrUpdateK8sSecret creates a secret and uses the controller's K8s client to apply the secret. It checks if
 // there's an existing secret with the same name and makes sure to update the existing secret if so.
-func (r *PeeringAcceptorController) createK8sSecret(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) (string, error) {
+func (r *PeeringAcceptorController) createOrUpdateK8sSecret(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, resp *api.PeeringGenerateTokenResponse) (string, error) {
 	secretName := acceptor.Secret().Name
 	secretNamespace := acceptor.Namespace
 	secret := createSecret(secretName, secretNamespace, acceptor.Secret().Key, resp.PeeringToken)
@@ -345,15 +344,12 @@ func (r *PeeringAcceptorController) deletePeering(ctx context.Context, peerName 
 	return nil
 }
 
-// createSecret is a helper function that creates a corev1.SecretRef when provided inputs.
+// createSecret is a helper function that creates a corev1.Secret when provided inputs.
 func createSecret(name, namespace, key, value string) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-		},
-		StringData: map[string]string{
-			key: value,
 		},
 		Data: map[string][]byte{
 			key: []byte(value),
