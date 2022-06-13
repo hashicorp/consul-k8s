@@ -274,7 +274,7 @@ func TestVault(t *testing.T) {
 	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 8080)
 	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
 	require.NoError(t, err)
-	logger.Logf(t, "RPC expiry: %s \n", connectInjectorCert.NotAfter.String())
+	logger.Logf(t, "Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String())
 
 	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
 	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
