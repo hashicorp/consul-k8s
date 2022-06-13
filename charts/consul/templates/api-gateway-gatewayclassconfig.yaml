@@ -28,6 +28,10 @@ spec:
     {{- else }}
       http: 8500
     {{- end }}
+  {{- with .Values.apiGateway.managedGatewayClass.deployment }}
+  deployment:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   image:
     consulAPIGateway: {{ .Values.apiGateway.image }}
     envoy: {{ .Values.global.imageEnvoy }}
