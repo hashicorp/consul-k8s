@@ -36,7 +36,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSCertTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans={{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- if .Data.ca_chain -{{ "}}" }}
             {{ "{{" }}- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -{{ "}}" }}
@@ -52,7 +52,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSKeyTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans={{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -100,7 +100,7 @@ as well as the global.name setting.
 {{- end -}}
 
 {{- define "consul.serverAdditionalIPSANs" -}}
-{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.global.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}
+{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $san := .Values.global.tls.serverAdditionalIPSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}
 {{- end -}}
 
 {{- define "consul.connectInjectorTLSAltNames" -}}
