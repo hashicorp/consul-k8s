@@ -1,96 +1,76 @@
 package read
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"io"
+	"net/http"
+
+	adminv3 "github.com/envoyproxy/go-control-plane/envoy/admin/v3"
+	"github.com/hashicorp/consul-k8s/cli/common"
 )
 
-type Config struct {
-	Clusters  []Cluster
-	Endpoints []Endpoint
-	Listeners []Listener
-	Routes    []Route
-	Secrets   []Secret
+type Table string
+
+// Define the different types of tables which can be printed.
+const (
+	Clusters  Table = "Clusters"
+	Endpoints       = "Endpoints"
+	Listeners       = "Listeners"
+	Routes          = "Routes"
+	Secrets         = "Secrets"
+)
+
+// EnvoyConfig represents the configuration retrieved from a config dump at the
+// admin endpoint. It wraps the Envoy ConfigDump struct to give us convenient
+// access to the different sections of the config.
+type EnvoyConfig struct {
+	configDump *adminv3.ConfigDump
 }
 
-type Cluster struct {
-	Name                     string
-	FullyQualifiedDomainName string
-	Endpoints                []string
-	Type                     string
-	LastUpdated              string
-}
+type Cluster struct{}
 
-type Endpoint struct{}
-
-type Listener struct{}
-
-type Route struct{}
-
-type Secret struct{}
-
-func ParseConfig(raw []byte) (Config, error) {
-	var config Config
-
-	// Parse the raw config into a map
-	var cfg map[string]interface{}
-	json.Unmarshal(raw, &cfg)
-
-	// Dispatch each config element to the appropriate parser. Add to config.
-	for _, element := range cfg["configs"].([]interface{}) {
-		switch element.(map[string]interface{})["@type"].(string) {
-		case "type.googleapis.com/envoy.admin.v3.ClustersConfigDump":
-			clusters, err := parseClusters(element.(map[string]interface{}))
-			if err != nil {
-				return Config{}, err
-			}
-			config.Clusters = append(config.Clusters, clusters...)
-		case "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump":
-		case "type.googleapis.com/envoy.admin.v3.ListenersConfigDump":
-		case "type.googleapis.com/envoy.admin.v3.RoutesConfigDump":
-		case "type.googleapis.com/envoy.admin.v3.SecretsConfigDump":
-		}
+// NewEnvoyConfig creates a new EnvoyConfig from the raw bytes returned from the
+// config dump endpoint.
+func NewEnvoyConfig(cfg []byte) (*EnvoyConfig, error) {
+	configDump := &adminv3.ConfigDump{}
+	err := json.Unmarshal(cfg, configDump)
+	if err != nil {
+		return nil, err
 	}
 
-	return config, nil
+	return &EnvoyConfig{configDump: configDump}, nil
 }
 
-func parseClusters(clusterCfg map[string]interface{}) ([]Cluster, error) {
-	var clusters []Cluster
+// FetchConfig opens a port forward to the Envoy admin API and fetches the
+// configuration from the config dump endpoint.
+func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyConfig, error) {
+	endpoint, err := portForward.Open(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer portForward.Close()
 
-	static := clusterCfg["static_clusters"].([]interface{})
-	dynamic := clusterCfg["dynamic_active_clusters"].([]interface{})
+	response, err := http.Get(fmt.Sprintf("http://%s/config_dump?include_eds", endpoint))
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
 
-	for _, cluster := range append(static, dynamic...) {
-		fqdn := cluster.(map[string]interface{})["cluster"].(map[string]interface{})["name"].(string)
-		name := strings.Split(fqdn, ".")[0]
-		ctype := cluster.(map[string]interface{})["cluster"].(map[string]interface{})["type"].(string)
-		lastupdated := cluster.(map[string]interface{})["last_updated"].(string)
-
-		var endpoints []string
-		if cluster.(map[string]interface{})["cluster"].(map[string]interface{})["load_assignment"] != nil {
-			for _, endpoint := range cluster.(map[string]interface{})["cluster"].(map[string]interface{})["load_assignment"].(map[string]interface{})["endpoints"].([]interface{}) {
-				lbEndpoints := endpoint.(map[string]interface{})["lb_endpoints"]
-				for _, lbEndpoint := range lbEndpoints.([]interface{}) {
-					sockaddr := lbEndpoint.(map[string]interface{})["endpoint"].(map[string]interface{})["address"].(map[string]interface{})["socket_address"].(map[string]interface{})
-					address := sockaddr["address"].(string)
-					port := sockaddr["port_value"].(float64)
-					endpoints = append(endpoints, fmt.Sprintf("%s:%d", address, int(port)))
-				}
-			}
-		}
-
-		cluster := Cluster{
-			Name:                     name,
-			FullyQualifiedDomainName: fqdn,
-			Endpoints:                endpoints,
-			Type:                     ctype,
-			LastUpdated:              lastupdated,
-		}
-
-		clusters = append(clusters, cluster)
+	raw, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	return clusters, nil
+	return NewEnvoyConfig(raw)
+}
+
+func (c *EnvoyConfig) Clusters() []Cluster {
+	return []Cluster{}
+}
+
+// JSON returns the EnvoyConfig as JSON.
+func (c *EnvoyConfig) JSON() ([]byte, error) {
+	return json.Marshal(c.configDump)
 }
