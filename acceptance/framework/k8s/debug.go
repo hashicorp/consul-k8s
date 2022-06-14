@@ -119,6 +119,17 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				writeResourceInfoToFile(t, replicaset.Name, "replicaset", testDebugDirectory, kubectlOptions)
 			}
 		}
+
+		// Describe any services.
+		services, err := client.CoreV1().Services(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			logger.Log(t, "unable to get services", "err", err)
+		} else {
+			for _, service := range services.Items {
+				// Describe service and write it to a file.
+				writeResourceInfoToFile(t, service.Name, "service", testDebugDirectory, kubectlOptions)
+			}
+		}
 	}
 }
 
