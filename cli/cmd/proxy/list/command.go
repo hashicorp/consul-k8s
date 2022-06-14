@@ -160,7 +160,7 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 
 	// Fetch all pods in the namespace with labels matching the gateway component names.
 	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway)",
+		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
 	})
 	if err != nil {
 		return nil, err
