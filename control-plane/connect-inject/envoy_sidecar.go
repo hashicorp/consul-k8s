@@ -96,6 +96,20 @@ func (h *Handler) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcName st
 		cmd = append(cmd, "--base-id", fmt.Sprintf("%d", multiPortSvcIdx))
 	}
 
+	// Check to see if the user has overriden concurrency via an annotation.
+	if pod.Annotations[annotationEnvoyProxyConcurrency] != "" {
+		_, err := strconv.ParseInt(pod.Annotations[annotationEnvoyProxyConcurrency], 10, 64)
+		if err != nil {
+			//h.Log.Error(err, "unable to parse annotation ", annotationEnvoyProxyConcurrency) //, pod.Annotations[annotationEnvoyProxyConcurrency])
+			return nil, fmt.Errorf("unable to parse annotation: %s", annotationEnvoyProxyConcurrency)
+		} else {
+			cmd = append(cmd, "--concurrency", pod.Annotations[annotationEnvoyProxyConcurrency])
+		}
+	} else {
+		// Use the default concurrency.
+		cmd = append(cmd, "--concurrency", h.DefaultEnvoyProxyConcurrency)
+	}
+
 	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
 
 	if annotationSet || h.EnvoyExtraArgs != "" {

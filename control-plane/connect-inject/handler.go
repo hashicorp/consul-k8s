@@ -115,6 +115,9 @@ type Handler struct {
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
 
+	// Default Envoy concurrency flag, this is the number of worker threads to be used by the proxy.
+	DefaultEnvoyProxyConcurrency string
+
 	// MetricsConfig contains metrics configuration from the inject-connect command and has methods to determine whether
 	// configuration should come from the default flags or annotations. The handler uses this to configure prometheus
 	// annotations and the merged metrics server.

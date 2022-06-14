@@ -1637,6 +1637,36 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# sidecarProxy.concurrency
+
+@test "connectInject/Deployment: by default envoy concurrency is set to 2" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-envoy-proxy-concurrency=2"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: envoy concurrency can bet set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.concurrency=4' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-envoy-proxy-concurrency=4"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # priorityClassName
 
 @test "connectInject/Deployment: no priorityClassName by default" {
