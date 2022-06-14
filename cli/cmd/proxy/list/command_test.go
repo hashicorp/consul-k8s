@@ -81,6 +81,7 @@ func TestFetchPods(t *testing.T) {
 						Namespace: "default",
 						Labels: map[string]string{
 							"component": "ingress-gateway",
+							"chart":     "consul-helm",
 						},
 					},
 				},
@@ -90,6 +91,7 @@ func TestFetchPods(t *testing.T) {
 						Namespace: "default",
 						Labels: map[string]string{
 							"component": "mesh-gateway",
+							"chart":     "consul-helm",
 						},
 					},
 				},
@@ -99,6 +101,7 @@ func TestFetchPods(t *testing.T) {
 						Namespace: "default",
 						Labels: map[string]string{
 							"component": "terminating-gateway",
+							"chart":     "consul-helm",
 						},
 					},
 				},
@@ -153,6 +156,7 @@ func TestFetchPods(t *testing.T) {
 						Namespace: "default",
 						Labels: map[string]string{
 							"component": "mesh-gateway",
+							"chart":     "consul-helm",
 						},
 					},
 				},
