@@ -22,6 +22,7 @@ BUG FIXES:
 BREAKING CHANGES:
 * Helm
   * Using the Vault integration requires Consul 1.12.0+. [[GH-1213](https://github.com/hashicorp/consul-k8s/pull/1213)], [[GH-1218](https://github.com/hashicorp/consul-k8s/pull/1218)]
+  * The default Envoy proxy image is now `envoyproxy/envoy:v1.22.0` which is no longer alpine based. The default trust store location is no longer `/etc/ssl/cert.pem`, please use `/etc/ssl/certs/ca-certificates.crt` when configuring Terminating Gateway configuration entries for non-alpine based Envoy images. See [[docs](https://www.consul.io/docs/k8s/connect/terminating-gateways#create-the-configuration-entry-for-the-terminating-gateway)].
 
 IMPROVEMENTS:
 * Helm
