@@ -72,7 +72,7 @@ type MeshTLSConfig struct {
 type MeshDirectionalTLSConfig struct {
 	// TLSMinVersion sets the default minimum TLS version supported.
 	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
-	// If unspecified, Envoy v1.22.0 and newer will default to TLS 1.2 as a min version,
+	// If unspecified, Envoy v1.22.2 and newer will default to TLS 1.2 as a min version,
 	// while older releases of Envoy default to TLS 1.0.
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
 	// TLSMaxVersion sets the default maximum TLS version supported. Must be greater than or equal to `TLSMinVersion`.
