@@ -31,7 +31,7 @@ type ReadCommand struct {
 	flagKubeConfig  string
 	flagKubeContext string
 
-	fetchConfig func(context.Context, common.PortForwarder) ([]byte, error)
+	fetchConfig func(context.Context, common.PortForwarder) (*EnvoyConfig, error)
 
 	once sync.Once
 	help string
@@ -118,17 +118,15 @@ func (c *ReadCommand) Run(args []string) int {
 	}
 
 	if c.flagJSON {
-		c.UI.Output(string(config))
+		configJSON, err := config.JSON()
+		if err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
+		}
+
+		c.UI.Output(string(configJSON))
 		return 0
 	}
-
-	parsedConfig, err := ParseConfig(config)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	Print(c.UI, parsedConfig)
 
 	return 0
 }
