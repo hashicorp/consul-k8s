@@ -2069,7 +2069,7 @@ connectInject:
     # advised to keep this number low for sidecars and high for edge proxies.
     # This will control the `--concurrency` flag to Envoy.
     # This setting can be overridden on a per-pod basis via this annotation:
-    # - `consul.hashicorp.com/sidecar-concurrency`
+    # - `consul.hashicorp.com/consul-envoy-proxy-concurrency`
     # See: also https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310
     # @type: string
     concurrency: 2
