@@ -50,6 +50,8 @@ type MeshSpec struct {
 	TransparentProxy TransparentProxyMeshConfig `json:"transparentProxy,omitempty"`
 	// TLS defines the TLS configuration for the service mesh.
 	TLS *MeshTLSConfig `json:"tls,omitempty"`
+	// HTTP defines the HTTP configuration for the service mesh.
+	HTTP *MeshHTTPConfig `json:"http,omitempty"`
 }
 
 // TransparentProxyMeshConfig controls configuration specific to proxies in "transparent" mode. Added in v1.10.0.
@@ -67,6 +69,10 @@ type MeshTLSConfig struct {
 	// Outgoing defines the TLS configuration for outbound mTLS connections dialing upstreams
 	// from Connect and IngressGateway proxy kinds.
 	Outgoing *MeshDirectionalTLSConfig `json:"outgoing,omitempty"`
+}
+
+type MeshHTTPConfig struct {
+	SanitizeXForwardedClientCert bool `json:"sanitizeXForwardedClientCert"`
 }
 
 type MeshDirectionalTLSConfig struct {
@@ -174,6 +180,7 @@ func (in *Mesh) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.MeshConfigEntry{
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
 		TLS:              in.Spec.TLS.toConsul(),
+		HTTP:             in.Spec.HTTP.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -208,6 +215,15 @@ func (in *MeshTLSConfig) toConsul() *capi.MeshTLSConfig {
 	return &capi.MeshTLSConfig{
 		Incoming: in.Incoming.toConsul(),
 		Outgoing: in.Outgoing.toConsul(),
+	}
+}
+
+func (in *MeshHTTPConfig) toConsul() *capi.MeshHTTPConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.MeshHTTPConfig{
+		SanitizeXForwardedClientCert: in.SanitizeXForwardedClientCert,
 	}
 }
 

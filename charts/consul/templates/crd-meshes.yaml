@@ -55,6 +55,14 @@ spec:
           spec:
             description: MeshSpec defines the desired state of Mesh.
             properties:
+              http:
+                description: HTTP defines the HTTP configuration for the service mesh.
+                properties:
+                  sanitizeXForwardedClientCert:
+                    type: boolean
+                required:
+                - sanitizeXForwardedClientCert
+                type: object
               tls:
                 description: TLS defines the TLS configuration for the service mesh.
                 properties:
