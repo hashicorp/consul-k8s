@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,7 +24,7 @@ func TestUnmarshaling(t *testing.T) {
 	err = json.Unmarshal(raw, &envoyConfig)
 	require.NoError(t, err)
 
-	require.Equal(t, testEnvoyConfig.Clusters, envoyConfig.Clusters)
+	fmt.Println(envoyConfig.OutboundListeners)
 }
 
 func TestFetchConfig(t *testing.T) {
