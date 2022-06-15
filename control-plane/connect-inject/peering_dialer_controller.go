@@ -14,8 +14,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // PeeringDialerController reconciles a PeeringDialer object.
@@ -231,7 +236,11 @@ func (r *PeeringDialerController) getSecret(ctx context.Context, name string, na
 func (r *PeeringDialerController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&consulv1alpha1.PeeringDialer{}).
-		Complete(r)
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.requestsForPeeringTokens),
+			builder.WithPredicates(predicate.NewPredicateFuncs(r.filterPeeringDialers)),
+		).Complete(r)
 }
 
 // establishPeering is a helper function that calls the Consul api to generate a token for the peer.
@@ -256,4 +265,41 @@ func (r *PeeringDialerController) deletePeering(ctx context.Context, peerName st
 		return err
 	}
 	return nil
+}
+
+// requestsForPeeringTokens creates a slice of requests for the peering dialer controller.
+// It enqueues a request for each dialer that needs to be reconciled. It iterates through
+// the list of dialers and creates a request for the dialer that has the same secret as it's
+// secret and that of the updated secret that is being watched.
+// We compare it to the secret in the spec as the resource is dependent on the secret.
+func (r *PeeringDialerController) requestsForPeeringTokens(object client.Object) []reconcile.Request {
+	r.Log.Info("received update for Peering Token Secret", "name", object.GetName(), "namespace", object.GetNamespace())
+
+	// Get the list of all dialers.
+	var dialerList consulv1alpha1.PeeringDialerList
+	if err := r.Client.List(r.Context, &dialerList); err != nil {
+		r.Log.Error(err, "failed to list PeeringDialers")
+		return []ctrl.Request{}
+	}
+	for _, dialer := range dialerList.Items {
+		if dialer.Secret().Backend == "kubernetes" {
+			if dialer.Secret().Name == object.GetName() && dialer.Namespace == object.GetNamespace() {
+				return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: dialer.Namespace, Name: dialer.Name}}}
+			}
+		}
+	}
+	return []ctrl.Request{}
+}
+
+// filterPeeringAcceptors receives meta and object information for Kubernetes resources that are being watched,
+// which in this case are Secrets. It only returns true if the Secret is a Peering Token Secret. It reads the labels
+// from the meta of the resource and uses the values of the "consul.hashicorp.com/peering-token" label to validate that
+// the Secret is a Peering Token Secret.
+func (r *PeeringDialerController) filterPeeringDialers(object client.Object) bool {
+	secretLabels := object.GetLabels()
+	isPeeringToken, ok := secretLabels[labelPeeringToken]
+	if !ok {
+		return false
+	}
+	return isPeeringToken == "true"
 }
