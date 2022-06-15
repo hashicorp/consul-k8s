@@ -51,6 +51,7 @@ const (
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
 
+	// todo: add docs
 	ConsulNodeName            = "k8s-service-mesh"
 	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
 	ConsulKubernetesCheckType = "kubernetes-readiness"
@@ -171,14 +172,14 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
-				if err := r.Client.Get(ctx, objectKey, &pod); err != nil {
+				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 					r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
 					errs = multierror.Append(errs, err)
 					continue
 				}
 
-				serviceName, ok := pod.Annotations[annotationKubernetesService]
-				if ok && serviceEndpoints.Name != serviceName {
+				svcName, ok := pod.Annotations[annotationKubernetesService]
+				if ok && serviceEndpoints.Name != svcName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 					// deregistration for service instances that don't match the annotation happens later because we don't add this pod to the endpointAddressMap.
 					continue
@@ -186,7 +187,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
-					if err := r.registerServicesAndHealthCheck(pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
+					if err = r.registerServicesAndHealthCheck(pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
 						r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						errs = multierror.Append(errs, err)
 					}
@@ -219,44 +220,40 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
 func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
-	podHostIP := pod.Status.HostIP
+	// Build the endpointAddressMap up for deregistering service instances later.
+	endpointAddressMap[pod.Status.PodIP] = true
 
-	if hasBeenInjected(pod) {
-		// Build the endpointAddressMap up for deregistering service instances later.
-		endpointAddressMap[pod.Status.PodIP] = true
-
-		var managedByEndpointsController bool
-		if raw, ok := pod.Labels[keyManagedBy]; ok && raw == managedByValue {
-			managedByEndpointsController = true
+	var managedByEndpointsController bool
+	if raw, ok := pod.Labels[keyManagedBy]; ok && raw == managedByValue {
+		managedByEndpointsController = true
+	}
+	// For pods managed by this controller, create and register the service instance.
+	if managedByEndpointsController {
+		// Get information from the pod to create service instance registrations.
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
+		if err != nil {
+			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+			return err
 		}
-		// For pods managed by this controller, create and register the service instance.
-		if managedByEndpointsController {
-			// Get information from the pod to create service instance registrations.
-			serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
-			if err != nil {
-				r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-				return err
-			}
 
-			// Register the service instance with the local agent.
-			// Note: the order of how we register services is important,
-			// and the connect-proxy service should come after the "main" service
-			// because its alias health check depends on the main service existing.
-			r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
-				"id", serviceRegistration.ID, "agentIP", podHostIP)
-			_, err = r.ConsulClient.Catalog().Register(serviceRegistration, nil)
-			if err != nil {
-				r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
-				return err
-			}
+		// Register the service instance with the local agent.
+		// Note: the order of how we register services is important,
+		// and the connect-proxy service should come after the "main" service
+		// because its alias health check depends on the main service existing.
+		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
+			"id", serviceRegistration.ID)
+		_, err = r.ConsulClient.Catalog().Register(serviceRegistration, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
+			return err
+		}
 
-			// Register the proxy service instance with the local agent.
-			r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
-			_, err = r.ConsulClient.Catalog().Register(proxyServiceRegistration, nil)
-			if err != nil {
-				r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)
-				return err
-			}
+		// Register the proxy service instance with the local agent.
+		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
+		_, err = r.ConsulClient.Catalog().Register(proxyServiceRegistration, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)
+			return err
 		}
 	}
 
@@ -268,12 +265,12 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 // endpoints name is always used since the pod annotation will have multiple service names listed (one per port).
 // Changing the Consul service name via annotations is not supported for multi port services.
 func serviceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
-	serviceName := serviceEndpoints.Name
+	svcName := serviceEndpoints.Name
 	// If the annotation has a comma, it is a multi port Pod. In that case we always use the name of the endpoint.
 	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
-		serviceName = serviceNameFromAnnotation
+		svcName = serviceNameFromAnnotation
 	}
-	return serviceName
+	return svcName
 }
 
 func serviceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
