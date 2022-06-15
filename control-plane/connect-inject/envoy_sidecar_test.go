@@ -24,7 +24,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			expCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "2",
+				"--concurrency", "0",
 			},
 		},
 		"default settings, annotation override": {
@@ -38,17 +38,17 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 				"--concurrency", "42",
 			},
 		},
-		"default settings, invalid concurrency annotation": {
+		"default settings, invalid concurrency annotation negative number": {
 			annotations: map[string]string{
 				annotationService:               "foo",
-				annotationEnvoyProxyConcurrency: "abcd",
+				annotationEnvoyProxyConcurrency: "-42",
 			},
-			expErr: "unable to parse annotation: consul.hashicorp.com/consul-envoy-proxy-concurrency",
+			expErr: "invalid envoy concurrency, must be >= 0: -42",
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{DefaultEnvoyProxyConcurrency: "2"}
+			h := Handler{}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: c.annotations,
@@ -80,7 +80,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 
 func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 	require := require.New(t)
-	h := Handler{DefaultEnvoyProxyConcurrency: "2"}
+	h := Handler{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -110,8 +110,8 @@ func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 		},
 	}
 	expCommand := map[int][]string{
-		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0", "--concurrency", "2"},
-		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1", "--concurrency", "2"},
+		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0", "--concurrency", "0"},
+		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1", "--concurrency", "0"},
 	}
 	for i := 0; i < 2; i++ {
 		container, err := h.envoySidecar(testNS, pod, multiPortInfos[i])
@@ -315,7 +315,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "2",
+				"--concurrency", "0",
 			},
 		},
 		{
@@ -325,7 +325,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "2",
+				"--concurrency", "0",
 				"--log-level", "debug",
 			},
 		},
@@ -336,7 +336,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "2",
+				"--concurrency", "0",
 				"--log-level", "debug",
 				"--admin-address-path", "\"/tmp/consul/foo bar\"",
 			},
@@ -354,7 +354,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "2",
+				"--concurrency", "0",
 				"--log-level", "debug",
 				"--admin-address-path", "\"/tmp/consul/foo bar\"",
 			},
@@ -372,7 +372,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "2",
+				"--concurrency", "0",
 				"--log-level", "debug",
 				"--admin-address-path", "\"/tmp/consul/foo bar\"",
 			},
@@ -382,10 +382,9 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			h := Handler{
-				ImageConsul:                  "hashicorp/consul:latest",
-				ImageEnvoy:                   "hashicorp/consul-k8s:latest",
-				EnvoyExtraArgs:               tc.envoyExtraArgs,
-				DefaultEnvoyProxyConcurrency: "2",
+				ImageConsul:    "hashicorp/consul:latest",
+				ImageEnvoy:     "hashicorp/consul-k8s:latest",
+				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
 			c, err := h.envoySidecar(testNS, *tc.pod, multiPortInfo{})

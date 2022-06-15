@@ -73,7 +73,7 @@ type Command struct {
 	flagDefaultSidecarProxyCPURequest    string
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
-	flagDefaultEnvoyProxyConcurrency     string
+	flagDefaultEnvoyProxyConcurrency     int
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -209,7 +209,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultConsulSidecarCPULimit, "default-consul-sidecar-cpu-limit", "20m", "Default consul sidecar CPU limit.")
 	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryRequest, "default-consul-sidecar-memory-request", "25Mi", "Default consul sidecar memory request.")
 	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryLimit, "default-consul-sidecar-memory-limit", "50Mi", "Default consul sidecar memory limit.")
-	c.flagSet.StringVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", "2", "Default Envoy proxy concurrency.")
+	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
 	c.http = &flags.HTTPFlags{}
 
@@ -526,6 +526,10 @@ func (c *Command) validateFlags() error {
 
 	if c.http.Partition() != "" && !c.flagEnablePartitions {
 		return errors.New("-enable-partitions must be set to 'true' if -partition-name is set")
+	}
+
+	if c.flagDefaultEnvoyProxyConcurrency < 0 {
+		return errors.New("-default-envoy-proxy-concurrency must be >= 0 if set")
 	}
 
 	if c.http.ConsulAPITimeout() <= 0 {
