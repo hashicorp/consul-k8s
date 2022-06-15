@@ -3,6 +3,7 @@ package read
 import (
 	"context"
 	"embed"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -42,6 +43,10 @@ func TestParseConfig(t *testing.T) {
 	envoyConfig, err := NewEnvoyConfig(testConfig)
 	require.NoError(t, err)
 	require.NotNil(t, envoyConfig)
+
+	clusters, err := envoyConfig.Clusters()
+	fmt.Println(clusters)
+	require.NoError(t, err)
 }
 
 type mockPortForwarder struct {
