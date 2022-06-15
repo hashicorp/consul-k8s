@@ -116,17 +116,7 @@ func (c *ReadCommand) Run(args []string) int {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-
-	if c.flagJSON {
-		configJSON, err := config.JSON()
-		if err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
-			return 1
-		}
-
-		c.UI.Output(string(configJSON))
-		return 0
-	}
+	fmt.Println(config)
 
 	return 0
 }
