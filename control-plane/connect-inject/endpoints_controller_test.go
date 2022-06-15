@@ -24,10 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const (
-	ttl = "ttl"
-)
-
 func TestShouldIgnore(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -1105,8 +1101,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		name                       string
 		consulSvcName              string
 		k8sObjects                 func() []runtime.Object
-		initialConsulSvcs          []*api.AgentService
-		expectedNumSvcInstances    int // todo: do we need this?
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedHealthChecks       []*api.HealthCheck
@@ -1129,8 +1123,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{endpoint}
 			},
-			initialConsulSvcs:          nil,
-			expectedNumSvcInstances:    0,
 			expectedConsulSvcInstances: []*api.CatalogService{}, // todo: can this be nil?
 			expectedProxySvcInstances:  []*api.CatalogService{},
 			expectedHealthChecks:       nil,
@@ -1163,8 +1155,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{pod1, endpoint}
 			},
-			initialConsulSvcs:       nil,
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-created",
@@ -1250,8 +1240,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
 			},
-			initialConsulSvcs:       nil,
-			expectedNumSvcInstances: 2,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-created",
@@ -1391,8 +1379,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
 			},
-			initialConsulSvcs:       nil,
-			expectedNumSvcInstances: 2,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-created",
@@ -1510,8 +1496,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{pod1, endpoint}
 			},
-			initialConsulSvcs:       nil,
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-different-consul-svc-name",
@@ -1628,8 +1612,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
 			},
-			initialConsulSvcs:       nil,
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-created",
@@ -1699,17 +1681,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 
-			// Register service and proxy in consul.
-			for _, svc := range tt.initialConsulSvcs {
-				catalogRegistration := &api.CatalogRegistration{
-					Node:    ConsulNodeName,
-					Address: "127.0.0.1", // todo: make a const
-					Service: svc,
-				}
-				_, err = consulClient.Catalog().Register(catalogRegistration, nil)
-				require.NoError(t, err)
-			}
-
 			// Create the endpoints controller.
 			ep := &EndpointsController{
 				Client:                fakeClient,
@@ -1738,7 +1709,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			// After reconciliation, Consul should have the service with the correct number of instances
 			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
 			require.NoError(t, err)
-			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
+			require.Len(t, serviceInstances, len(tt.expectedConsulSvcInstances))
 			for i, instance := range serviceInstances {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceName, instance.ServiceName)
@@ -1749,7 +1720,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			}
 			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
 			require.NoError(t, err)
-			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
+			require.Len(t, proxyServiceInstances, len(tt.expectedProxySvcInstances))
 			for i, instance := range proxyServiceInstances {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceName, instance.ServiceName)
