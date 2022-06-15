@@ -116,7 +116,6 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 				return err
 			}
 			c.Clusters = clusters
-
 		case "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump":
 			endpoints, err := parseEndpoints(config.(map[string]interface{}))
 			if err != nil {
@@ -156,8 +155,15 @@ func (c *EnvoyConfig) MarshalJSON() ([]byte, error) {
 func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 	var clusters []Cluster
 
-	static := rawCfg["static_clusters"].([]interface{})
-	dynamic := rawCfg["dynamic_active_clusters"].([]interface{})
+	var static []interface{}
+	if staticClusters, ok := rawCfg["static_clusters"]; ok {
+		static = staticClusters.([]interface{})
+	}
+
+	var dynamic []interface{}
+	if dynamicClusters, ok := rawCfg["dynamic_active_clusters"]; ok {
+		dynamic = dynamicClusters.([]interface{})
+	}
 
 	for _, cluster := range append(static, dynamic...) {
 		fqdn := cluster.(map[string]interface{})["cluster"].(map[string]interface{})["name"].(string)
@@ -195,68 +201,44 @@ func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 func parseEndpoints(rawCfg map[string]interface{}) ([]Endpoint, error) {
 	var endpoints []Endpoint
 
-	if rawCfg["static_endpoint_configs"] != nil {
-		for _, endpoint := range rawCfg["static_endpoint_configs"].([]interface{}) {
-			e := endpoint.(map[string]interface{})
-			epcfg := e["endpoint_config"].(map[string]interface{})
-
-			cluster := epcfg["cluster_name"].(string)
-
-			if epcfg["endpoints"] != nil {
-				for _, ep := range epcfg["endpoints"].([]interface{}) {
-					ep_ := ep.(map[string]interface{})
-					lbendps := ep_["lb_endpoints"].([]interface{})
-					for _, lbep := range lbendps {
-						lbep_ := lbep.(map[string]interface{})
-						e__ := lbep_["endpoint"].(map[string]interface{})
-						a__ := e__["address"].(map[string]interface{})
-						saddr := a__["socket_address"].(map[string]interface{})
-						addr := saddr["address"].(string)
-						port := saddr["port_value"].(float64)
-						_ = fmt.Sprintf("%s:%d", addr, int(port))
-						_ = fmt.Sprintf("%d", int(lbep_["load_balancing_weight"].(float64)))
-						_ = lbep_["health_status"].(string)
-					}
-				}
-			}
-
-			endpoints = append(endpoints, Endpoint{
-				Cluster: cluster,
-			})
-		}
+	var static []interface{}
+	if staticEndpoints, ok := rawCfg["static_endpoint_configs"]; ok {
+		static = staticEndpoints.([]interface{})
 	}
 
-	if rawCfg["dynamic_endpoint_configs"] != nil {
-		for _, endpoint := range rawCfg["dynamic_endpoint_configs"].([]interface{}) {
-			e := endpoint.(map[string]interface{})
-			epcfg := e["endpoint_config"].(map[string]interface{})
+	var dynamic []interface{}
+	if dynamicEndpoints, ok := rawCfg["dynamic_endpoint_configs"]; ok {
+		dynamic = dynamicEndpoints.([]interface{})
+	}
 
-			cluster := ""
-			if epcfg["cluster_name"] != nil {
-				cluster = epcfg["cluster_name"].(string)
-			}
+	for _, endpoint := range append(static, dynamic...) {
+		endpointConfig := endpoint.(map[string]interface{})["endpoint_config"].(map[string]interface{})
 
-			if epcfg["endpoints"] != nil {
-				for _, ep := range epcfg["endpoints"].([]interface{}) {
-					ep_ := ep.(map[string]interface{})
-					lbendps := ep_["lb_endpoints"].([]interface{})
-					for _, lbep := range lbendps {
-						lbep_ := lbep.(map[string]interface{})
-						e__ := lbep_["endpoint"].(map[string]interface{})
-						a__ := e__["address"].(map[string]interface{})
-						saddr := a__["socket_address"].(map[string]interface{})
-						addr := saddr["address"].(string)
-						port := saddr["port_value"].(float64)
-						_ = fmt.Sprintf("%s:%d", addr, int(port))
-						_ = fmt.Sprintf("%d", int(lbep_["load_balancing_weight"].(float64)))
-						_ = lbep_["health_status"].(string)
+		var cluster string
+		if clusterName, ok := endpointConfig["cluster_name"]; ok {
+			cluster = clusterName.(string)
+		}
+
+		if endpointCollection, ok := endpointConfig["endpoints"]; ok {
+			for _, ep := range endpointCollection.([]interface{}) {
+				if lbEndpoints, ok := ep.(map[string]interface{})["lb_endpoints"]; ok {
+					for _, lbEndpoint := range lbEndpoints.([]interface{}) {
+						socketAddr := lbEndpoint.(map[string]interface{})["endpoint"].(map[string]interface{})["address"].(map[string]interface{})["socket_address"].(map[string]interface{})
+
+						address := fmt.Sprintf("%s:%d", socketAddr["address"].(string), int(socketAddr["port_value"].(float64)))
+						weight := lbEndpoint.(map[string]interface{})["load_balancing_weight"].(float64)
+						status := lbEndpoint.(map[string]interface{})["health_status"].(string)
+
+						endpoints = append(endpoints, Endpoint{
+							Address: address,
+							Cluster: cluster,
+							Weight:  weight,
+							Status:  status,
+						})
 					}
 				}
-			}
 
-			endpoints = append(endpoints, Endpoint{
-				Cluster: cluster,
-			})
+			}
 		}
 	}
 
