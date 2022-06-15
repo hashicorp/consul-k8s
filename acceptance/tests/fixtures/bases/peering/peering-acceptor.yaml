@@ -1,0 +1,10 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: PeeringAcceptor
+metadata:
+  name: server
+spec:
+  peer:
+    secret:
+      name: "api-token"
+      key: "data"
+      backend: "kubernetes"
