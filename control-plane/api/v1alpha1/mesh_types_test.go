@@ -57,6 +57,9 @@ func TestMesh_MatchesConsul(t *testing.T) {
 							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 						},
 					},
+					HTTP: &MeshHTTPConfig{
+						SanitizeXForwardedClientCert: true,
+					},
 				},
 			},
 			Theirs: &capi.MeshConfigEntry{
@@ -74,6 +77,9 @@ func TestMesh_MatchesConsul(t *testing.T) {
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 					},
+				},
+				HTTP: &capi.MeshHTTPConfig{
+					SanitizeXForwardedClientCert: true,
 				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -145,6 +151,9 @@ func TestMesh_ToConsul(t *testing.T) {
 							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 						},
 					},
+					HTTP: &MeshHTTPConfig{
+						SanitizeXForwardedClientCert: true,
+					},
 				},
 			},
 			Exp: &capi.MeshConfigEntry{
@@ -162,6 +171,9 @@ func TestMesh_ToConsul(t *testing.T) {
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 					},
+				},
+				HTTP: &capi.MeshHTTPConfig{
+					SanitizeXForwardedClientCert: true,
 				},
 				Namespace: "",
 				Meta: map[string]string{
