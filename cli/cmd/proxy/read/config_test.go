@@ -3,7 +3,7 @@ package read
 import (
 	"context"
 	"embed"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +14,17 @@ import (
 
 //go:embed test_config_dump.json
 var fs embed.FS
+
+func TestUnmarshaling(t *testing.T) {
+	raw, err := fs.ReadFile("test_config_dump.json")
+	require.NoError(t, err)
+
+	var envoyConfig EnvoyConfig
+	err = json.Unmarshal(raw, &envoyConfig)
+	require.NoError(t, err)
+
+	require.Equal(t, testEnvoyConfig.Clusters, envoyConfig.Clusters)
+}
 
 func TestFetchConfig(t *testing.T) {
 	configResponse, err := fs.ReadFile("test_config_dump.json")
@@ -36,22 +47,19 @@ func TestFetchConfig(t *testing.T) {
 	require.NotNil(t, configDump)
 }
 
-func TestParseConfig(t *testing.T) {
-	testConfig, err := fs.ReadFile("test_config_dump.json")
-	require.NoError(t, err)
-
-	envoyConfig, err := NewEnvoyConfig(testConfig)
-	require.NoError(t, err)
-	require.NotNil(t, envoyConfig)
-
-	clusters, err := envoyConfig.Clusters()
-	fmt.Println(clusters)
-	require.NoError(t, err)
-}
-
 type mockPortForwarder struct {
 	openBehavior func(context.Context) (string, error)
 }
 
 func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
 func (m *mockPortForwarder) Close()                                   {}
+
+// testEnvoyConfig is what we expect the config at `test_config_dump.json` to be.
+var testEnvoyConfig = &EnvoyConfig{
+	Clusters:          []Cluster{},
+	Endpoints:         []Endpoint{},
+	InboundListeners:  []InboundListener{},
+	OutboundListeners: []OutboundListener{},
+	Routes:            []Route{},
+	Secrets:           []Secret{},
+}
