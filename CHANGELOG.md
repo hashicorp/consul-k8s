@@ -1,21 +1,20 @@
 ## UNRELEASED
 
 FEATURES:
-* Cluster Peering: Add support for Vault as a secrets backend for Gossip Encryption, Server TLS certs and Service Mesh TLS certificates,
-  removing the existing usage of Kubernetes Secrets for the respective secrets. [[GH-904](https://github.com/hashicorp/consul-k8s/pull/904/)]
+* [Experimental] Cluster Peering: Support Consul cluster peering, which allows service connectivity between two independent clusters.
+  [[GH-1273](https://github.com/hashicorp/consul-k8s/pull/1273)]
 
-  See the [Consul Kubernetes and Vault documentation](https://www.consul.io/docs/k8s/installation/vault)
-  for full install instructions.
+  Enabling peering will deploy the peering controllers and PeeringAcceptor and PeeringDialer CRDs. The new CRDs are used
+  to establish a peering connection between two clusters.
+
+  See the [Cluster Peering on Kubernetes](https://www.consul.io/docs/connect/cluster-peering/k8s)
+  for full instructions.
 
   Requirements:
-  * Consul 1.11+
-  * Vault 1.9+ and Vault-K8s 0.14+ must be installed with the Vault Agent Injector enabled (`injector.enabled=true`)
-    into the Kubernetes cluster that Consul is installed into.
-  * `global.tls.enableAutoEncryption=true` is required for TLS support.
-  * If TLS is enabled in Vault, `global.secretsBackend.vault.ca` must be provided and should reference a Kube secret
-    which holds a copy of the Vault CA cert.
-  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics were
-    scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
+  * Consul 1.13+
+  * `global.peering.enabled=true` and `connectInject.enabled=true` must be set to enable peering.
+  * Mesh gateways are required for service to service communication across peers, i.e `meshGateway.enabled=true`.
+
 IMPROVEMENTS:
 * Control Plane
   * Enable configuring Connect Injector and Controller Webhooks' certificates to be managed by Vault. [[GH-1191](https://github.com/hashicorp/consul-k8s/pull/1191/)]
