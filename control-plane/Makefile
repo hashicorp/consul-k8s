@@ -34,6 +34,7 @@ ci.dev-docker:
 	@echo "Building consul-k8s Development container - $(CI_DEV_DOCKER_IMAGE_NAME)"
 	@docker build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)' \
 	--target=dev \
+	--build-arg ARCH=amd64 \
 	--label COMMIT_SHA=$(CIRCLE_SHA1) \
 	--label PULL_REQUEST=$(CIRCLE_PULL_REQUEST) \
 	--label CIRCLE_BUILD_URL=$(CIRCLE_BUILD_URL) \
