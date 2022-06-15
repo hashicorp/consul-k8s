@@ -88,7 +88,9 @@ func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyC
 	if err != nil {
 		return nil, err
 	}
-	err = response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		return nil, err
+	}
 
 	envoyConfig := &EnvoyConfig{}
 	err = json.Unmarshal(raw, envoyConfig)
