@@ -122,6 +122,22 @@ load _helpers
   [[ "$output" =~ "ingress gateways must have unique names but found duplicate name foo" ]]
 }
 
+@test "ingressGateways/Deployment: does not fail if there are duplicate gateway names in different consul namespaces" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[0].consulNamespace=ns1' \
+      --set 'ingressGateways.gateways[1].name=foo' \
+      --set 'ingressGateways.gateways[1].consulNamespace=ns2' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=true' .
+  echo "status: $output"
+  [ "$status" -eq 0 ]
+}
+
 @test "ingressGateways/Deployment: fails if a terminating gateway has the same name as an ingress gateway" {
   cd `chart_dir`
   run helm template \
@@ -137,6 +153,23 @@ load _helpers
   [ "$status" -eq 1 ]
   [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways" ]]
 }
+
+@test "ingressGateways/Deployment: when consulNamespace is provided, the name inculdes the namespaces" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'ingressGateways.gateways[0].name=foo' \
+      --set 'ingressGateways.gateways[0].consulNamespace=ns1' \
+      --set 'ingressGateways.gateways[1].name=foo' \
+      --set 'ingressGateways.gateways[1].consulNamespace=ns2' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].metadata.name')
+
+  [ "${actual}" = "release-name-consul-foo-ns1" ]
+}
+
 #--------------------------------------------------------------------
 # envoyImage
 

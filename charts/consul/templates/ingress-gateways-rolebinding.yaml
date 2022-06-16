@@ -4,7 +4,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
   namespace: {{ $root.Release.Namespace }}
   labels:
     app: {{ template "consul.name" $root }}
@@ -12,14 +12,14 @@ metadata:
     heritage: {{ $root.Release.Service }}
     release: {{ $root.Release.Name }}
     component: ingress-gateway
-    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ template "consul.fullname" $root }}-{{ .name }}
+    name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
 ---
 {{- end }}
 {{- end }}

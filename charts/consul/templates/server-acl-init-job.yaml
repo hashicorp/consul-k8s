@@ -209,14 +209,14 @@ spec:
                 {{- $root := . }}
                 {{- range .Values.ingressGateways.gateways }}
                 {{- if (or $root.Values.ingressGateways.defaults.consulNamespace .consulNamespace) }}
-                -ingress-gateway-name="{{ .name }}.{{ (default $root.Values.ingressGateways.defaults.consulNamespace .consulNamespace) }}" \
+                -ingress-gateway-name="{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}.{{ (default $root.Values.ingressGateways.defaults.consulNamespace .consulNamespace) }}" \
                 {{- else }}
-                -ingress-gateway-name="{{ .name }}" \
+                -ingress-gateway-name="{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}" \
                 {{- end }}
                 {{- end }}
                 {{- else }}
                 {{- range .Values.ingressGateways.gateways }}
-                -ingress-gateway-name="{{ .name }}" \
+                -ingress-gateway-name="{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}" \
                 {{- end }}
                 {{- end }}
                 {{- end }}

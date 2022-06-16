@@ -103,7 +103,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			logger.Log(t, "creating config entry")
 			created, _, err := consulClient.ConfigEntries().Set(&api.IngressGatewayConfigEntry{
 				Kind:      api.IngressGateway,
-				Name:      igName,
+				Name:      fmt.Sprintf("%s-%s", igName, testNamespace),
 				Namespace: testNamespace,
 				Listeners: []api.IngressListener{
 					{
@@ -121,7 +121,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, fmt.Sprintf("%s-%s", igName, testNamespace), ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -139,7 +139,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 					Namespace: testNamespace,
 					Sources: []*api.SourceIntention{
 						{
-							Name:      igName,
+							Name:      fmt.Sprintf("%s-%s", igName, testNamespace),
 							Namespace: testNamespace,
 							Action:    api.IntentionActionAllow,
 						},

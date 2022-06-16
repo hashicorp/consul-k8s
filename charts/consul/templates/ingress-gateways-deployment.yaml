@@ -7,14 +7,13 @@
 
 {{- $root := . }}
 {{- $defaults := .Values.ingressGateways.defaults }}
-{{- $names := dict }}
 
 {{- /* Check if gateway names are unique. */ -}}
 {{- $gateways := .Values.ingressGateways.gateways }}
 {{- range $outerIngressIndex, $outerIngressVal := $gateways }}
 
 {{- range $innerIngressIndex, $innerIngressVal := $gateways }}
-{{- if (and (ne $outerIngressIndex $innerIngressIndex) (eq $outerIngressVal.name $innerIngressVal.name)) }}
+{{- if (and (ne $outerIngressIndex $innerIngressIndex) (eq $outerIngressVal.name $innerIngressVal.name) (eq $outerIngressVal.consulNamespace $innerIngressVal.consulNamespace)) }}
 {{ fail (cat "ingress gateways must have unique names but found duplicate name" $innerIngressVal.name) }}
 {{ end -}}
 {{ end -}}
@@ -28,16 +27,10 @@
 # Check that the gateway name is provided
 {{ fail "Ingress gateway names cannot be empty"}}
 {{ end -}}
-{{- if hasKey $names .name }}
-#  Check that the gateway name is unique
-{{ fail "Ingress gateway names must be unique"}}
-{{ end -}}
-{{- /* Add the gateway name to the $names dict to ensure uniqueness */ -}}
-{{- $_ := set $names .name .name }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
   namespace: {{ $root.Release.Namespace }}
   labels:
     app: {{ template "consul.name" $root }}
@@ -45,7 +38,7 @@ metadata:
     heritage: {{ $root.Release.Service }}
     release: {{ $root.Release.Name }}
     component: ingress-gateway
-    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
 spec:
   replicas: {{ default $defaults.replicas .replicas }}
   selector:
@@ -55,7 +48,7 @@ spec:
       heritage: {{ $root.Release.Service }}
       release: {{ $root.Release.Name }}
       component: ingress-gateway
-      ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+      ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
   template:
     metadata:
       labels:
@@ -64,7 +57,7 @@ spec:
         heritage: {{ $root.Release.Service }}
         release: {{ $root.Release.Name }}
         component: ingress-gateway
-        ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+        ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
       annotations:
         {{- if (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
@@ -107,7 +100,7 @@ spec:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
       terminationGracePeriodSeconds: {{ default $defaults.terminationGracePeriodSeconds .terminationGracePeriodSeconds }}
-      serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
+      serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}
       volumes:
         - name: consul-bin
           emptyDir: {}
@@ -186,7 +179,7 @@ spec:
             - |
                 {{- if $root.Values.global.acls.manageSystemACLs }}
                 consul-k8s-control-plane acl-init \
-                  -component-name=ingress-gateway/{{ template "consul.fullname" $root }}-{{ .name }} \
+                  -component-name=ingress-gateway/{{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }} \
                   -acl-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
                   {{- if $root.Values.global.adminPartitions.enabled }}
                   -partition={{ $root.Values.global.adminPartitions.name }} \
@@ -205,7 +198,7 @@ spec:
                   -log-level={{ $root.Values.global.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }} \
                   -k8s-namespace={{ $root.Release.Namespace }} \
-                  -name={{ template "consul.fullname" $root }}-{{ .name }} \
+                  -name={{ template "consul.fullname" $root }}-{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }} \
                   -output-file=/tmp/address.txt
                 WAN_ADDR="$(cat /tmp/address.txt)"
                 {{- else }}
@@ -248,7 +241,7 @@ spec:
                 cat > /consul/service/service.hcl << EOF
                 service {
                   kind = "ingress-gateway"
-                  name = "{{ .name }}"
+                  name = "{{ .name }}{{ template "consul.maybeAppendGatewayNamespace" . }}"
                   id = "${POD_NAME}"
                   {{- if $root.Values.global.enableConsulNamespaces }}
                   namespace = "{{ (default $defaults.consulNamespace .consulNamespace) }}"

@@ -299,3 +299,9 @@ Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{ end }}
 {{ end }}
 {{- end -}}
+
+
+
+{{- define "consul.maybeAppendGatewayNamespace" -}}
+{{- if .consulNamespace -}}{{- printf "-%s" .consulNamespace -}}{{- end -}}
+{{- end -}}
