@@ -110,7 +110,7 @@ jobs:
         working-directory: ${{ matrix.component }}
         run: |
           mkdir -p dist out
-          CGO_ENABLED=0 go build -o dist/${{ matrix.pkg_name }} .
+          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} .
           zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
       - name: Upload built binaries 
