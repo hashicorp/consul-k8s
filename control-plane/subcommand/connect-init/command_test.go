@@ -2,7 +2,6 @@ package connectinit
 
 import (
 	"fmt"
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -14,12 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -90,6 +91,7 @@ func TestRun_FlagValidation(t *testing.T) {
 // and namespace provided and write the proxy ID of the proxy service to a file.
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	cases := []struct {
 		name                       string
 		aclsEnabled                bool

@@ -12,7 +12,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
