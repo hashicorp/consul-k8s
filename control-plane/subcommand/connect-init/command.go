@@ -46,6 +46,7 @@ type Command struct {
 	flagProxyIDFile                    string // Location to write the output proxyID. Default is defaultProxyIDFile.
 	flagMultiPort                      bool
 	serviceRegistrationPollingAttempts uint64 // Number of times to poll for this service to be registered.
+	loginAttempts                      uint64 // Number of times to retry login call; only used in tests.
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -125,6 +126,7 @@ func (c *Command) Run(args []string) int {
 			BearerTokenFile: c.flagBearerTokenFile,
 			TokenSinkFile:   c.flagACLTokenSink,
 			Meta:            loginMeta,
+			NumRetries:      c.loginAttempts,
 		}
 		token, err := common.ConsulLogin(consulClient, loginParams, c.logger)
 		if err != nil {
@@ -239,6 +241,9 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
 		return errors.New("-service-account-name must be set when ACLs are enabled")
+	}
+	if c.flagConsulNodeName == "" {
+		return errors.New("-consul-node-name must be set")
 	}
 
 	if c.http.ConsulAPITimeout() <= 0 {

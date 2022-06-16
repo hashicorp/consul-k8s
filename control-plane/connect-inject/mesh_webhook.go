@@ -165,7 +165,7 @@ type MeshWebhook struct {
 	LogLevel string
 	LogJSON  bool
 
-	decoder       *admission.Decoder
+	decoder *admission.Decoder
 }
 type multiPortInfo struct {
 	serviceIndex int
