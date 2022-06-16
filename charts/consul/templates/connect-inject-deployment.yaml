@@ -1,3 +1,4 @@
+{{- if and .Values.global.peering.enabled (not .Values.connectInject.enabled) }}{{ fail "setting global.peering.enabled to true requires connectInject.enabled to be true" }}{{ end }}
 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled for connect injection" }}{{ end }}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for connect injection" }}{{ end }}
@@ -130,6 +131,9 @@ spec:
                 -default-enable-transparent-proxy=true \
                 {{- else }}
                 -default-enable-transparent-proxy=false \
+                {{- end }}
+                {{- if .Values.global.peering.enabled }}
+                -enable-peering=true \
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \

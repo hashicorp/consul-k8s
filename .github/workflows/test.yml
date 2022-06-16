@@ -4,8 +4,8 @@ on:
 
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  CONSUL_VERSION: 1.12.0 # Consul's OSS version to use in tests
-  CONSUL_ENT_VERSION: 1.12.0+ent # Consul's enterprise version to use in tests
+  CONSUL_VERSION: 1.13.0-alpha1 # Consul's OSS version to use in tests
+  CONSUL_ENT_VERSION: 1.13.0-alpha1+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.6.4 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 jobs:
@@ -142,14 +142,14 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Download consul 
-        working-directory: control-plane 
+      - name: Download consul
+        working-directory: control-plane
         run: |
-            mkdir -p $HOME/bin
-            wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
-              unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-              rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
-            chmod +x $HOME/bin/consul
+          mkdir -p $HOME/bin
+          wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
+            unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
+            rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
+          chmod +x $HOME/bin/consul
 
       - name: Run go tests
         working-directory: control-plane
@@ -191,13 +191,13 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Download consul 
-        working-directory: control-plane 
+      - name: Download consul
+        working-directory: control-plane
         run: |
-            mkdir -p $HOME/bin
-            wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
-              unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-              rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
+          mkdir -p $HOME/bin
+          wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
+            unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
+            rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
             chmod +x $HOME/bin/consul
 
       - name: Run go tests

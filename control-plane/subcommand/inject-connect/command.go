@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
@@ -19,7 +20,6 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -98,6 +98,9 @@ type Command struct {
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
 
+	// Peering flags.
+	flagEnablePeering bool
+
 	// Consul DNS flags.
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
@@ -121,7 +124,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(batchv1.AddToScheme(scheme))
+	// We need v1alpha1 here to add the peering api to the scheme
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -137,6 +141,7 @@ func (c *Command) init() {
 		"Docker image for Envoy.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
+	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
@@ -433,10 +438,33 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if c.flagEnablePeering {
+		if err = (&connectinject.PeeringAcceptorController{
+			Client:       mgr.GetClient(),
+			ConsulClient: c.consulClient,
+			Log:          ctrl.Log.WithName("controller").WithName("peering-acceptor"),
+			Scheme:       mgr.GetScheme(),
+			Context:      ctx,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "peering-acceptor")
+			return 1
+		}
+		if err = (&connectinject.PeeringDialerController{
+			Client:       mgr.GetClient(),
+			ConsulClient: c.consulClient,
+			Log:          ctrl.Log.WithName("controller").WithName("peering-dialer"),
+			Scheme:       mgr.GetScheme(),
+			Context:      ctx,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "peering-dialer")
+			return 1
+		}
+	}
+
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
-		&webhook.Admission{Handler: &connectinject.Handler{
+		&webhook.Admission{Handler: &connectinject.MeshWebhook{
 			Clientset:                     c.clientset,
 			ConsulClient:                  c.consulClient,
 			ImageConsul:                   c.flagConsulImage,

@@ -18,9 +18,10 @@ control-plane-dev: ## Build consul-k8s-control-plane binary.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o $(GOOS) -a $(GOARCH)
 
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
-	@DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t '$(DEV_IMAGE)' \
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
+	docker build -t '$(DEV_IMAGE)' \
        --target=dev \
+       --build-arg 'ARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \

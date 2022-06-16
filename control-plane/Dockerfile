@@ -21,6 +21,7 @@ FROM alpine:3.15 AS dev
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
 ARG VERSION
+ARG ARCH
 
 LABEL name=${BIN_NAME} \
       maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
@@ -40,7 +41,7 @@ RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
-COPY pkg/bin/linux_amd64/${BIN_NAME} /bin
+COPY pkg/bin/linux_${ARCH}/${BIN_NAME} /bin
 
 USER 100
 CMD /bin/${BIN_NAME}

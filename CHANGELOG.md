@@ -1,8 +1,21 @@
 ## UNRELEASED
 
+FEATURES:
+* [Experimental] Cluster Peering: Support Consul cluster peering, which allows service connectivity between two independent clusters.
+  [[GH-1273](https://github.com/hashicorp/consul-k8s/pull/1273)]
+
+  Enabling peering will deploy the peering controllers and PeeringAcceptor and PeeringDialer CRDs. The new CRDs are used
+  to establish a peering connection between two clusters.
+
+  See the [Cluster Peering on Kubernetes](https://www.consul.io/docs/connect/cluster-peering/k8s)
+  for full instructions.
+
+  Requirements:
+  * Consul 1.13+
+  * `global.peering.enabled=true` and `connectInject.enabled=true` must be set to enable peering.
+  * Mesh gateways are required for service to service communication across peers, i.e `meshGateway.enabled=true`.
+
 IMPROVEMENTS:
-* Control Plane
-  * Enable configuring Connect Injector and Controller Webhooks' certificates to be managed by Vault. [[GH-1191](https://github.com/hashicorp/consul-k8s/pull/1191/)]
 * Helm
   * Enable the configuring of snapshot intervals in the client snapshot agent via `client.snapshotAgent.interval`. [[GH-1235](https://github.com/hashicorp/consul-k8s/pull/1235)]
   * Enable configuring the pod topologySpreadConstraints for mesh, terminating, and ingress gateways. [[GH-1257](https://github.com/hashicorp/consul-k8s/pull/1257)]
@@ -11,14 +24,17 @@ IMPROVEMENTS:
   * Enable the configuration of Envoy proxy concurrency via `connectInject.sidecarProxy.concurrency` which can
     be overridden at the pod level via the annotation `consul.hashicorp.com/consul-envoy-proxy-concurrency`.
     This PR also sets the default concurrency for envoy proxies to `2`. [[GH-1277](https://github.com/hashicorp/consul-k8s/pull/1277)]
+  * Update Mesh CRD with Mesh HTTP Config. [[GH-1282](https://github.com/hashicorp/consul-k8s/pull/1282)]
 * Control Plane
   * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:8.6`. [[GH-1244](https://github.com/hashicorp/consul-k8s/pull/1244)]
   * Add additional metadata to service instances registered via catalog sync. [[GH-447](https://github.com/hashicorp/consul-k8s/pull/447)]
+  * Enable configuring Connect Injector and Controller Webhooks' certificates to be managed by Vault. [[GH-1191](https://github.com/hashicorp/consul-k8s/pull/1191/)]
 
 BUG FIXES:
 * Helm
   * Update client-snapshot-agent so that setting `client.snapshotAgent.caCert` no longer requires root access to modify the trust store. [[GH-1190](https://github.com/hashicorp/consul-k8s/pull/1190/)]
   * Add missing vault agent annotations to the `api-gateway-controller-deployment`. [[GH-1247](https://github.com/hashicorp/consul-k8s/pull/1247)]
+  * Bump default Envoy version to 1.22.2. [[GH-1276](https://github.com/hashicorp/consul-k8s/pull/1276)]
 
 ## 0.44.0 (May 17, 2022)
 

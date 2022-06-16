@@ -53,6 +53,9 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								{
 									Partition: "third",
 								},
+								{
+									Peer: "second-peer",
+								},
 							},
 						},
 						{
@@ -64,6 +67,9 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								},
 								{
 									Partition: "fifth",
+								},
+								{
+									Peer: "third-peer",
 								},
 							},
 						},
@@ -83,6 +89,9 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 							{
 								Partition: "third",
 							},
+							{
+								PeerName: "second-peer",
+							},
 						},
 					},
 					{
@@ -94,6 +103,9 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 							},
 							{
 								Partition: "fifth",
+							},
+							{
+								PeerName: "third-peer",
 							},
 						},
 					},
@@ -165,6 +177,9 @@ func TestExportedServices_ToConsul(t *testing.T) {
 								{
 									Partition: "third",
 								},
+								{
+									Peer: "second-peer",
+								},
 							},
 						},
 						{
@@ -176,6 +191,9 @@ func TestExportedServices_ToConsul(t *testing.T) {
 								},
 								{
 									Partition: "fifth",
+								},
+								{
+									Peer: "third-peer",
 								},
 							},
 						},
@@ -195,6 +213,9 @@ func TestExportedServices_ToConsul(t *testing.T) {
 							{
 								Partition: "third",
 							},
+							{
+								PeerName: "second-peer",
+							},
 						},
 					},
 					{
@@ -206,6 +227,9 @@ func TestExportedServices_ToConsul(t *testing.T) {
 							},
 							{
 								Partition: "fifth",
+							},
+							{
+								PeerName: "third-peer",
 							},
 						},
 					},
@@ -223,6 +247,204 @@ func TestExportedServices_ToConsul(t *testing.T) {
 			exportedServices, ok := act.(*capi.ExportedServicesConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, exportedServices)
+		})
+	}
+}
+
+func TestExportedServices_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input             *ExportedServices
+		namespaceEnabled  bool
+		partitionsEnabled bool
+		expectedErrMsgs   []string
+	}{
+		"valid": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{
+									Partition: "second",
+								},
+								{
+									Peer: "second-peer",
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   []string{},
+		},
+		"no consumers specified": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.services[0]: Invalid value: []v1alpha1.ServiceConsumer{}: service must have at least 1 consumer.`,
+			},
+		},
+		"both partition and peer name specified": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{
+									Partition: "second",
+									Peer:      "second-peer",
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer"}: both partition and peer cannot be specified.`,
+			},
+		},
+		"neither partition nor peer name specified": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:""}: either partition or peer must be specified.`,
+			},
+		},
+		"partition provided when partitions are disabled": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{
+									Partition: "test-partition",
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.services[0].consumers[0].partitions: Invalid value: "test-partition": Consul Admin Partitions need to be enabled to specify partition.`,
+			},
+		},
+		"namespace provided when namespaces are disabled": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{
+									Peer: "test-peer",
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  false,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.services[0]: Invalid value: "frontend": Consul Namespaces must be enabled to specify service namespace.`,
+			},
+		},
+		"multiple errors": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{
+									Partition: "second",
+									Peer:      "second-peer",
+								},
+								{},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer"}: both partition and peer cannot be specified.`,
+				`spec.services[0].consumers[1]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:""}: either partition or peer must be specified.`,
+			},
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespaceEnabled, PartitionsEnabled: testCase.partitionsEnabled, Partition: common.DefaultConsulPartition})
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

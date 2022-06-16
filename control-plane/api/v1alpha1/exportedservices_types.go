@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/google/go-cmp/cmp"
@@ -69,6 +68,8 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
+	// [Experimental] Peer is the name of the peer to export the service to.
+	Peer string `json:"peer,omitempty"`
 }
 
 func (in *ExportedServices) GetObjectMeta() metav1.ObjectMeta {
@@ -164,7 +165,10 @@ func (in *ExportedServices) ToConsul(datacenter string) api.ConfigEntry {
 func (in *ExportedService) toConsul() capi.ExportedService {
 	var consumers []capi.ServiceConsumer
 	for _, consumer := range in.Consumers {
-		consumers = append(consumers, capi.ServiceConsumer{Partition: consumer.Partition})
+		consumers = append(consumers, capi.ServiceConsumer{
+			Partition: consumer.Partition,
+			PeerName:  consumer.Peer,
+		})
 	}
 	return capi.ExportedService{
 		Name:      in.Name,
@@ -185,21 +189,17 @@ func (in *ExportedServices) MatchesConsul(candidate api.ConfigEntry) bool {
 
 func (in *ExportedServices) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
-	if !consulMeta.PartitionsEnabled {
-		return apierrors.NewForbidden(
-			schema.GroupResource{Group: ConsulHashicorpGroup, Resource: common.ExportedServices},
-			in.KubernetesName(),
-			errors.New("Consul Enterprise Admin Partitions must be enabled to create ExportedServices"))
-	}
-	if in.Name != consulMeta.Partition {
+	if consulMeta.PartitionsEnabled && in.Name != consulMeta.Partition {
 		errs = append(errs, field.Invalid(field.NewPath("name"), in.Name, fmt.Sprintf(`%s resource name must be the same name as the partition, "%s"`, in.KubeKind(), consulMeta.Partition)))
+	} else if !consulMeta.PartitionsEnabled && in.Name != "default" {
+		errs = append(errs, field.Invalid(field.NewPath("name"), in.Name, fmt.Sprintf(`%s resource name must be "default"`, in.KubeKind())))
 	}
 	if len(in.Spec.Services) == 0 {
 		errs = append(errs, field.Invalid(field.NewPath("spec").Child("services"), in.Spec.Services, "at least one service must be exported"))
 	}
 	for i, service := range in.Spec.Services {
-		if err := service.validate(field.NewPath("spec").Child("services").Index(i)); err != nil {
-			errs = append(errs, err)
+		if err := service.validate(field.NewPath("spec").Child("services").Index(i), consulMeta); err != nil {
+			errs = append(errs, err...)
 		}
 	}
 	if len(errs) > 0 {
@@ -210,9 +210,31 @@ func (in *ExportedServices) Validate(consulMeta common.ConsulMeta) error {
 	return nil
 }
 
-func (in *ExportedService) validate(path *field.Path) *field.Error {
+func (in *ExportedService) validate(path *field.Path, consulMeta common.ConsulMeta) field.ErrorList {
+	var errs field.ErrorList
 	if len(in.Consumers) == 0 {
-		return field.Invalid(path, in.Consumers, "service must have at least 1 consumer.")
+		errs = append(errs, field.Invalid(path, in.Consumers, "service must have at least 1 consumer."))
+	}
+	if !consulMeta.NamespacesEnabled && in.Namespace != "" {
+		errs = append(errs, field.Invalid(path, in.Namespace, "Consul Namespaces must be enabled to specify service namespace."))
+	}
+	for i, consumer := range in.Consumers {
+		if err := consumer.validate(path.Child("consumers").Index(i), consulMeta); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMeta) *field.Error {
+	if in.Partition != "" && in.Peer != "" {
+		return field.Invalid(path, *in, "both partition and peer cannot be specified.")
+	}
+	if in.Partition == "" && in.Peer == "" {
+		return field.Invalid(path, *in, "either partition or peer must be specified.")
+	}
+	if !consulMeta.PartitionsEnabled && in.Partition != "" {
+		return field.Invalid(path.Child("partitions"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")
 	}
 	return nil
 }

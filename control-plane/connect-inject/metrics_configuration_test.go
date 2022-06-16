@@ -18,7 +18,7 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 		Err           string
 	}{
 		{
-			Name: "Metrics enabled via handler",
+			Name: "Metrics enabled via meshWebhook",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
@@ -80,7 +80,7 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 		Err           string
 	}{
 		{
-			Name: "Metrics merging enabled via handler",
+			Name: "Metrics merging enabled via meshWebhook",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
@@ -221,7 +221,7 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 		Expected      string
 	}{
 		{
-			Name: "Defaults to the handler's value",
+			Name: "Defaults to the meshWebhook's value",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
