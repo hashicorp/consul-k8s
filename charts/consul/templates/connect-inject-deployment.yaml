@@ -212,6 +212,7 @@ spec:
                 {{- if not (kindIs "invalid" $resources.requests.cpu) }}
                 -default-sidecar-proxy-cpu-request={{ $resources.requests.cpu }} \
                 {{- end }}
+                -default-envoy-proxy-concurrency={{ .Values.connectInject.sidecarProxy.concurrency }} \
 
                 {{- if .Values.connectInject.initContainer }}
                 {{- $initResources := .Values.connectInject.initContainer.resources }}
