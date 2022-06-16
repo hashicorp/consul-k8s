@@ -1,6 +1,5 @@
 {{- if and .Values.global.peering.enabled (not .Values.connectInject.enabled) }}{{ fail "setting global.peering.enabled to true requires connectInject.enabled to be true" }}{{ end }}
 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for connect injection" }}{{ end }}
 {{- if and .Values.connectInject.consulNamespaces.mirroringK8S (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if mirroringK8S=true" }}{{ end }}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 {{- if .Values.connectInject.centralConfig }}{{- if eq (toString .Values.connectInject.centralConfig.enabled) "false" }}{{ fail "connectInject.centralConfig.enabled cannot be set to false; to disable, set enable_central_service_config to false in server.extraConfig and client.extraConfig" }}{{ end -}}{{ end -}}
