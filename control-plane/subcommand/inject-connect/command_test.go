@@ -177,6 +177,12 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-listen", ":foobar"},
 			expErr: "unable to parse port string: strconv.Atoi: parsing \"foobar\": invalid syntax",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-consul-api-timeout", "5s", "-default-envoy-proxy-concurrency=-42",
+			},
+			expErr: "-default-envoy-proxy-concurrency must be >= 0 if set",
+		},
 	}
 
 	for _, c := range cases {

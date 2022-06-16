@@ -6,6 +6,9 @@ IMPROVEMENTS:
   * Enable configuring the pod topologySpreadConstraints for mesh, terminating, and ingress gateways. [[GH-1257](https://github.com/hashicorp/consul-k8s/pull/1257)]
   * Present Consul server CA chain when using Vault secrets backend. [[GH-1251](https://github.com/hashicorp/consul-k8s/pull/1251)]
   * API Gateway: Enable configuring of the new High Availability feature (requires Consul API Gateway v0.3.0+). [[GH-1261](https://github.com/hashicorp/consul-k8s/pull/1261)]
+  * Enable the configuration of Envoy proxy concurrency via `connectInject.sidecarProxy.concurrency` which can
+    be overridden at the pod level via the annotation `consul.hashicorp.com/consul-envoy-proxy-concurrency`.
+    This PR also sets the default concurrency for envoy proxies to `2`. [[GH-1277](https://github.com/hashicorp/consul-k8s/pull/1277)]
   * Update Mesh CRD with Mesh HTTP Config. [[GH-1282](https://github.com/hashicorp/consul-k8s/pull/1282)]
 * Control Plane
   * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:8.6`. [[GH-1244](https://github.com/hashicorp/consul-k8s/pull/1244)]

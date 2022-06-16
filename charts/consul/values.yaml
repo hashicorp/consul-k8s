@@ -2070,6 +2070,18 @@ connectInject:
     secretKey: null
 
   sidecarProxy:
+    # The number of worker threads to be used by the Envoy proxy.
+    # By default the threading model of Envoy will use one thread per CPU core per envoy proxy. This
+    # leads to unnecessary thread and memory usage and leaves unnecessary idle connections open. It is
+    # advised to keep this number low for sidecars and high for edge proxies.
+    # This will control the `--concurrency` flag to Envoy.
+    # For additional information see also: https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310
+    #
+    # This setting can be overridden on a per-pod basis via this annotation:
+    # - `consul.hashicorp.com/consul-envoy-proxy-concurrency`
+    # @type: string
+    concurrency: 2
+
     # Set default resources for sidecar proxy. If null, that resource won't
     # be set.
     # These settings can be overridden on a per-pod basis via these annotations:

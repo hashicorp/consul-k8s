@@ -96,6 +96,22 @@ func (w *MeshWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcNam
 		cmd = append(cmd, "--base-id", fmt.Sprintf("%d", multiPortSvcIdx))
 	}
 
+	// Check to see if the user has overriden concurrency via an annotation.
+	if pod.Annotations[annotationEnvoyProxyConcurrency] != "" {
+		val, err := strconv.ParseInt(pod.Annotations[annotationEnvoyProxyConcurrency], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse annotation: %s", annotationEnvoyProxyConcurrency)
+		}
+		if val < 0 {
+			return nil, fmt.Errorf("invalid envoy concurrency, must be >= 0: %s", pod.Annotations[annotationEnvoyProxyConcurrency])
+		} else {
+			cmd = append(cmd, "--concurrency", pod.Annotations[annotationEnvoyProxyConcurrency])
+		}
+	} else {
+		// Use the default concurrency.
+		cmd = append(cmd, "--concurrency", fmt.Sprintf("%d", w.DefaultEnvoyProxyConcurrency))
+	}
+
 	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
 
 	if annotationSet || w.EnvoyExtraArgs != "" {

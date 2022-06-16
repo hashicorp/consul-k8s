@@ -12,35 +12,70 @@ import (
 
 func TestHandlerEnvoySidecar(t *testing.T) {
 	require := require.New(t)
-	w := MeshWebhook{}
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
+	cases := map[string]struct {
+		annotations map[string]string
+		expCommand  []string
+		expErr      string
+	}{
+		"default settings, no annotations": {
+			annotations: map[string]string{
 				annotationService: "foo",
 			},
-		},
-
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
-				},
+			expCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
 			},
 		},
-	}
-	container, err := w.envoySidecar(testNS, pod, multiPortInfo{})
-	require.NoError(err)
-	require.Equal(container.Command, []string{
-		"envoy",
-		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-	})
-
-	require.Equal(container.VolumeMounts, []corev1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
+		"default settings, annotation override": {
+			annotations: map[string]string{
+				annotationService:               "foo",
+				annotationEnvoyProxyConcurrency: "42",
+			},
+			expCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "42",
+			},
 		},
-	})
+		"default settings, invalid concurrency annotation negative number": {
+			annotations: map[string]string{
+				annotationService:               "foo",
+				annotationEnvoyProxyConcurrency: "-42",
+			},
+			expErr: "invalid envoy concurrency, must be >= 0: -42",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := MeshWebhook{}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: c.annotations,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}
+			container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+			if c.expErr != "" {
+				require.Contains(err.Error(), c.expErr)
+			} else {
+				require.NoError(err)
+				require.Equal(c.expCommand, container.Command)
+				require.Equal(container.VolumeMounts, []corev1.VolumeMount{
+					{
+						Name:      volumeName,
+						MountPath: "/consul/connect-inject",
+					},
+				})
+			}
+		})
+	}
 }
 
 func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
@@ -75,8 +110,8 @@ func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 		},
 	}
 	expCommand := map[int][]string{
-		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0"},
-		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1"},
+		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0", "--concurrency", "0"},
+		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1", "--concurrency", "0"},
 	}
 	for i := 0; i < 2; i++ {
 		container, err := w.envoySidecar(testNS, pod, multiPortInfos[i])
@@ -280,6 +315,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
 			},
 		},
 		{
@@ -289,6 +325,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
 				"--log-level", "debug",
 			},
 		},
@@ -299,6 +336,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
 				"--log-level", "debug",
 				"--admin-address-path", "\"/tmp/consul/foo bar\"",
 			},
@@ -316,6 +354,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
 				"--log-level", "debug",
 				"--admin-address-path", "\"/tmp/consul/foo bar\"",
 			},
@@ -333,6 +372,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
 				"--log-level", "debug",
 				"--admin-address-path", "\"/tmp/consul/foo bar\"",
 			},
