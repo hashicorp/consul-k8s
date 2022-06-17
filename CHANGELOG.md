@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.45.0 (June 17, 2022)
 
 IMPROVEMENTS:
 * Helm
