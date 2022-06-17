@@ -13,7 +13,7 @@ on:
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  GOTESTSUM_VERSION: 1.6.4
+  GOTESTSUM_VERSION: 1.8.1
 
 jobs:
   job:
