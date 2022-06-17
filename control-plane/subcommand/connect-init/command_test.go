@@ -454,8 +454,8 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	// Start the consul service registration in a go func and delay it so that it runs
 	// after the cmd.Run() starts.
 	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		// Wait a moment, this ensures that we are already in the retry logic.
 		time.Sleep(time.Second * 2)
