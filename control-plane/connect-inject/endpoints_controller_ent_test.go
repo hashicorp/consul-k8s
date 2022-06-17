@@ -12,8 +12,6 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -23,6 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
@@ -232,8 +233,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			consul.WaitForLeader(t)
 
 			cfg := &api.Config{
-				Address:   consul.HTTPAddr,
-				Namespace: testCase.ExpConsulNS,
+				Address: consul.HTTPAddr,
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
@@ -271,6 +271,9 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
 
+			cfg.Namespace = testCase.ExpConsulNS
+			consulClient, err = api.NewClient(cfg)
+			require.NoError(t, err)
 			// After reconciliation, Consul should have the service with the correct number of instances.
 			serviceInstances, _, err := consulClient.Catalog().Service(setup.consulSvcName, "", &api.QueryOptions{Namespace: testCase.ExpConsulNS})
 			require.NoError(t, err)

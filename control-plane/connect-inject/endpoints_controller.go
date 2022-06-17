@@ -335,13 +335,14 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	tags := consulTags(pod)
 
+	consulNS := r.consulNamespace(pod.Namespace)
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
 		Port:      consulServicePort,
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
-		Namespace: r.consulNamespace(pod.Namespace),
+		Namespace: consulNS,
 		Tags:      tags,
 	}
 	serviceRegistration := &api.CatalogRegistration{
@@ -355,6 +356,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			Status:    healthStatus,
 			ServiceID: svcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
+			Namespace: consulNS,
 		},
 	}
 
@@ -406,7 +408,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Port:      proxyPort,
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
-		Namespace: r.consulNamespace(pod.Namespace),
+		Namespace: consulNS,
 		Proxy:     proxyConfig,
 		Tags:      tags,
 	}
@@ -538,6 +540,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			Status:    healthStatus,
 			ServiceID: proxySvcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
+			Namespace: consulNS,
 		},
 		SkipNodeUpdate: true,
 	}
