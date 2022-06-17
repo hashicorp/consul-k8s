@@ -8,14 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 // TestConnectInject tests that Connect works in a default and a secure installation.
@@ -82,19 +83,6 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 		releaseName      string
 		initial, upgrade map[string]string
 	}{
-		"CLI upgrade changes nothing": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-		},
-		"CLI upgrade to enable ingressGateway": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"ingressGateways.enabled":           "true",
-				"ingressGateways.defaults.replicas": "1",
-			},
-		},
 		"CLI upgrade to enable UI": {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
