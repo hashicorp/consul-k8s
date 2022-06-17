@@ -97,7 +97,7 @@ jobs:
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
 
-      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+      - run: go install github.com/hashicorp/lint-consul-retry@master && lint-consul-retry
 
       - name: Run lint
         working-directory: control-plane
