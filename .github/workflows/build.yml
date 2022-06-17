@@ -8,7 +8,6 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
-      - "kpenfound/crt-testing"
 
 env:
   PKG_NAME: "consul-k8s-control-plane"

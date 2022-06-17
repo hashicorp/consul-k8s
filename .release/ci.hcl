@@ -8,7 +8,7 @@ project "consul-k8s" {
   github {
     organization = "hashicorp"
     repository = "consul-k8s"
-    release_branches = ["kpenfound/crt-testing"]
+    release_branches = ["main"]
   }
 }
 
