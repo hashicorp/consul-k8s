@@ -8,13 +8,14 @@ import (
 
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const StaticClientName = "static-client"
@@ -22,6 +23,7 @@ const StaticClientName = "static-client"
 // Test that prometheus metrics, when enabled, are accessible from the
 // endpoints that have been exposed on the server, client and gateways.
 func TestComponentMetrics(t *testing.T) {
+	t.Skipf("Skipping this test because it's not yet supported with agentless")
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
