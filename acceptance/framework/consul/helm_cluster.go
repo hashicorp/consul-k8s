@@ -201,9 +201,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	}
-	// Retry a few times because sometimes certain resources (like PVC) take time to delete
+	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 10}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 600}, t, func(r *retry.R) {
 		// Verify all Consul Pods are deleted.
 		pods, err = h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
 		require.NoError(r, err)
