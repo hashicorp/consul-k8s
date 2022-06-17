@@ -8,6 +8,7 @@ import (
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -27,17 +28,17 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 		containerName = fmt.Sprintf("%s-%s", envoySidecarContainer, mpi.serviceName)
 	}
 
-	container := corev1.Container{
-		Name:  containerName,
-		Image: w.ImageEnvoy,
-		Env: []corev1.EnvVar{
-			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
+	probe := &corev1.Probe{
+		Handler: corev1.Handler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(EnvoyPublicListenerPort + mpi.serviceIndex),
 			},
 		},
+		InitialDelaySeconds: 1,
+	}
+	container := corev1.Container{
+		Name:      containerName,
+		Image:     w.ImageEnvoy,
 		Resources: resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -45,7 +46,9 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		Command: cmd,
+		Command:        cmd,
+		ReadinessProbe: probe,
+		LivenessProbe:  probe,
 	}
 
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)

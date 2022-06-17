@@ -56,6 +56,7 @@ const (
 	ConsulNodeName            = "k8s-service-mesh"
 	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
 	ConsulKubernetesCheckType = "kubernetes-readiness"
+	EnvoyPublicListenerPort   = 20000
 )
 
 type EndpointsController struct {
@@ -394,7 +395,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	proxyConfig.Upstreams = upstreams
 
-	proxyPort := 20000
+	proxyPort := EnvoyPublicListenerPort
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
