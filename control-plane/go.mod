@@ -131,4 +131,4 @@ require (
 
 replace github.com/hashicorp/consul/sdk v0.9.0 => github.com/hashicorp/consul/sdk v0.4.1-0.20220531155537-364758ef2f50
 
-go 1.17
+go 1.18
