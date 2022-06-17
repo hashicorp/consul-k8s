@@ -657,7 +657,10 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(serviceName, k8s
 		return nil
 	}
 
-	tokens, _, err := r.ConsulClient.ACL().TokenList(nil)
+	consulNS := r.consulNamespace(k8sNS)
+	tokens, _, err := r.ConsulClient.ACL().TokenList(&api.QueryOptions{
+		Namespace: consulNS,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
 	}
@@ -679,7 +682,7 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(serviceName, k8s
 			// If we can't find token's pod, delete it.
 			if tokenPodName == podName {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
-				_, err = r.ConsulClient.ACL().TokenDelete(token.AccessorID, nil)
+				_, err = r.ConsulClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: consulNS})
 				if err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
 				}

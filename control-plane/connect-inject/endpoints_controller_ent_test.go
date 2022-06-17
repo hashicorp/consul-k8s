@@ -1222,9 +1222,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consul.WaitForSerfCheck(t)
 
 				cfg := &api.Config{
-					Scheme:    "http",
-					Address:   consul.HTTPAddr,
-					Namespace: ts.ExpConsulNS,
+					Scheme:  "http",
+					Address: consul.HTTPAddr,
 				}
 				if tt.enableACLs {
 					cfg.Token = adminToken
@@ -1252,6 +1251,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							// When mirroring is enabled, the auth method will be created in the "default" Consul namespace.
 							if ts.Mirror {
 								writeOpts.Namespace = "default"
+							} else {
+								writeOpts.Namespace = ts.ExpConsulNS
 							}
 							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service.Service, svc.Service.Meta[MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
 							token, _, err := consulClient.ACL().Login(&api.ACLLoginParams{
@@ -1316,6 +1317,11 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.False(t, resp.Requeue)
+
+				// Create new consul client with the expected consul ns so we can make calls for assertions.
+				cfg.Namespace = ts.ExpConsulNS
+				consulClient, err = api.NewClient(cfg)
+				require.NoError(t, err)
 
 				// After reconciliation, Consul should have service-updated with the correct number of instances.
 				serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", &api.QueryOptions{Namespace: ts.ExpConsulNS})
@@ -1543,8 +1549,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 
 				consul.WaitForLeader(t)
 				cfg := &api.Config{
-					Address:   consul.HTTPAddr,
-					Namespace: ts.ExpConsulNS,
+					Address: consul.HTTPAddr,
 				}
 				if tt.enableACLs {
 					cfg.Token = adminToken
@@ -1574,6 +1579,8 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 							// When mirroring is enabled, the auth method will be created in the "default" Consul namespace.
 							if ts.Mirror {
 								writeOpts.Namespace = "default"
+							} else {
+								writeOpts.Namespace = ts.ExpConsulNS
 							}
 							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
 							token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
@@ -1620,6 +1627,10 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.False(t, resp.Requeue)
+
+				cfg.Namespace = ts.ExpConsulNS
+				consulClient, err = api.NewClient(cfg)
+				require.NoError(t, err)
 
 				// After reconciliation, Consul should not have any instances of service-deleted.
 				serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", &api.QueryOptions{Namespace: ts.ExpConsulNS})
