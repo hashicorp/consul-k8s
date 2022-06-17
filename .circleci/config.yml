@@ -101,6 +101,7 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
+                          -consul-imae=docker.mirror.hashicorp.services/hashicorp/consul-enterprise:1.13.0-alpha1-ent
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
