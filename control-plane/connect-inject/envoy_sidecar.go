@@ -60,6 +60,11 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount...)
 	}
 
+	ports, err := w.envoySidecarPorts(pod)
+	if err == nil {
+		container.Ports = ports
+	}
+
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -214,4 +219,34 @@ func (w *MeshWebhook) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequ
 	}
 
 	return resources, nil
+}
+
+func (w *MeshWebhook) envoySidecarPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
+
+	ports := []corev1.ContainerPort{}
+
+	enableMetrics, err := w.MetricsConfig.enableMetrics(pod)
+	if err != nil {
+		return ports, err
+	}
+
+	prometheusScrapePort, err := w.MetricsConfig.prometheusScrapePort(pod)
+	if err != nil {
+		return ports, err
+	}
+
+	scrapePort, err := strconv.ParseInt(prometheusScrapePort, 10, 32)
+	if err != nil {
+		return ports, err
+	}
+
+	if enableMetrics {
+		ports = append(ports, corev1.ContainerPort{
+			Name:          "envoy-metrics",
+			ContainerPort: int32(scrapePort),
+			Protocol:      corev1.ProtocolTCP,
+		})
+	}
+
+	return ports, nil
 }
