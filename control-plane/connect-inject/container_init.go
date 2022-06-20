@@ -36,12 +36,17 @@ type initContainerCommandData struct {
 	ConsulNamespace           string
 	NamespaceMirroringEnabled bool
 
-	// The PEM-encoded CA certificate to use when
+	// ConsulCACert is the PEM-encoded CA certificate to use when
 	// communicating with Consul clients
 	ConsulCACert string
 
-	ConsulAddress  string
+	// ConsulAddress is the address of the Consul server. This should be only the
+	// host (i.e. not including port or protocol).
+	ConsulAddress string
+
+	// ConsulNodeName is the node name in Consul where services are registered.
 	ConsulNodeName string
+
 	// EnableMetrics adds a listener to Envoy where Prometheus will scrape
 	// metrics from.
 	EnableMetrics bool
