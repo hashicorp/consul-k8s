@@ -111,7 +111,7 @@ type routeConfigMap struct {
 type routeConfig struct {
 	Name         string        `json:"name"`
 	VirtualHosts []virtualHost `json:"virtual_hosts"`
-	LastUpdate   string        `json:"last_updated"`
+	LastUpdated  string        `json:"last_updated"`
 }
 
 type virtualHost struct {
