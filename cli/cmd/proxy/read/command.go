@@ -46,11 +46,6 @@ func (c *ReadCommand) init() {
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "pod",
-		Aliases: []string{"p"},
-		Target:  &c.flagPodName,
-	})
-	f.StringVar(&flag.StringVar{
 		Name:    "namespace",
 		Target:  &c.flagNamespace,
 		Usage:   "The namespace to list proxies in.",
@@ -88,6 +83,15 @@ func (c *ReadCommand) Run(args []string) int {
 
 	if err := c.set.Parse(args); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	if arguments := c.set.Args(); len(arguments) > 0 {
+		c.flagPodName = arguments[0]
+	}
+
+	if c.flagPodName == "" {
+		c.UI.Output("Missing pod name.")
 		return 1
 	}
 
