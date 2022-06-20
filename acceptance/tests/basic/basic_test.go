@@ -23,18 +23,18 @@ func TestBasicInstallation(t *testing.T) {
 		secure      bool
 		autoEncrypt bool
 	}{
-		// {
-		// 	false,
-		// 	false,
-		// },
+		{
+			false,
+			false,
+		},
 		{
 			true,
 			false,
 		},
-		// {
-		// 	true,
-		// 	true,
-		// },
+		{
+			true,
+			true,
+		},
 	}
 
 	for _, c := range cases {
