@@ -3,6 +3,7 @@ package read
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -116,7 +117,8 @@ func (c *ReadCommand) Run(args []string) int {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	fmt.Println(config)
+
+	c.outputConfig(config)
 
 	return 0
 }
@@ -154,4 +156,24 @@ func (c *ReadCommand) initKubernetes() error {
 	}
 
 	return nil
+}
+
+func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
+	if c.flagJSON {
+		c.UI.Output(string(config.rawCfg))
+		return
+	}
+
+	c.UI.Output("Clusters:")
+	clusters := terminal.NewTable("Name", "FQDN", "Endpoints", "Type", "Last Updated")
+	for _, cluster := range config.Clusters {
+		clusters.AddRow([]string{cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
+			cluster.Type, cluster.LastUpdated}, []string{})
+	}
+
+	c.UI.Output("Endpoints:")
+	endpoints := terminal.NewTable("Endpoint", "Cluster", "Weight", "Status")
+	for _, endpoint := range config.Endpoints {
+		endpoints.AddRow([]string{endpoint.Address, endpoint.Cluster, fmt.Sprintf("%f", endpoint.Weight), endpoint.Status}, []string{})
+	}
 }
