@@ -1135,6 +1135,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=1h")' | tee /dev/stderr)
@@ -1145,6 +1146,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.interval=10h34m5s' \
       . | tee /dev/stderr |

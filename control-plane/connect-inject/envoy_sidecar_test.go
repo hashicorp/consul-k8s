@@ -34,6 +34,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 	require.Equal(t, container.Command, []string{
 		"envoy",
 		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+		"--concurrency", "0",
 	})
 
 	require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
