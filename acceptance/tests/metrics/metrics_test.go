@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -78,14 +77,14 @@ func TestComponentMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
-	// Ingress Gateway Metrics
-	assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
-
-	// Terminating Gateway Metrics
-	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
-
-	// Mesh Gateway Metrics
-	assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway"`)
+	//// Ingress Gateway Metrics
+	//assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
+	//
+	//// Terminating Gateway Metrics
+	//assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
+	//
+	//// Mesh Gateway Metrics
+	//assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway"`)
 }
 
 // Test that merged service and envoy metrics are accessible from the
@@ -138,13 +137,13 @@ func TestAppMetrics(t *testing.T) {
 	})
 }
 
-func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
-	pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("component=%s", label)})
-	require.NoError(t, err)
-	for _, pod := range pods.Items {
-		podIP := pod.Status.PodIP
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
-		require.NoError(t, err)
-		require.Contains(t, metricsOutput, metricsAssertion)
-	}
-}
+//func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
+//	pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("component=%s", label)})
+//	require.NoError(t, err)
+//	for _, pod := range pods.Items {
+//		podIP := pod.Status.PodIP
+//		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
+//		require.NoError(t, err)
+//		require.Contains(t, metricsOutput, metricsAssertion)
+//	}
+//}
