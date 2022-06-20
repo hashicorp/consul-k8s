@@ -1,6 +1,20 @@
 ## UNRELEASED
 
 ## 0.45.0 (June 17, 2022)
+FEATURES:
+* [Experimental] Cluster Peering: Support Consul cluster peering, which allows service connectivity between two independent clusters.
+  [[GH-1273](https://github.com/hashicorp/consul-k8s/pull/1273)]
+
+  Enabling peering will deploy the peering controllers and PeeringAcceptor and PeeringDialer CRDs. The new CRDs are used
+  to establish a peering connection between two clusters.
+
+  See the [Cluster Peering on Kubernetes](https://www.consul.io/docs/connect/cluster-peering/k8s)
+  for full instructions.
+
+  Requirements:
+  * Consul 1.13+
+  * `global.peering.enabled=true` and `connectInject.enabled=true` must be set to enable peering.
+  * Mesh gateways are required for service to service communication across peers, i.e `meshGateway.enabled=true`.
 
 IMPROVEMENTS:
 * Helm
