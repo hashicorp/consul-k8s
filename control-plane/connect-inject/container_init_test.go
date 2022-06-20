@@ -1039,7 +1039,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 // Consul addresses should use HTTPS
 // and CA cert should be set as env variable.
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
-	h := MeshWebhook{
+	w := MeshWebhook{
 		ConsulCACert:     "consul-ca-cert",
 		ConsulAPITimeout: 5 * time.Second,
 		ConsulAddress:    "10.0.0.0",

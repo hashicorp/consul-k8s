@@ -410,7 +410,6 @@ func (c *Command) Run(args []string) int {
 		AllowK8sNamespacesSet:      allowK8sNamespaces,
 		DenyK8sNamespacesSet:       denyK8sNamespaces,
 		MetricsConfig:              metricsConfig,
-		ConsulClientCfg:            cfg,
 		EnableConsulPartitions:     c.flagEnablePartitions,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,

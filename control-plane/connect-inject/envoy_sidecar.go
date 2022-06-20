@@ -31,7 +31,7 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 	probe := &corev1.Probe{
 		Handler: corev1.Handler{
 			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(EnvoyPublicListenerPort + mpi.serviceIndex),
+				Port: intstr.FromInt(EnvoyInboundListenerPort + mpi.serviceIndex),
 			},
 		},
 		InitialDelaySeconds: 1,

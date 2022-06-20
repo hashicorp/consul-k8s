@@ -112,7 +112,6 @@ func TestHasBeenInjected(t *testing.T) {
 
 func TestProcessUpstreams(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := []struct {
 		name                    string
 		pod                     func() *corev1.Pod
@@ -670,9 +669,7 @@ func TestProcessUpstreams(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
+			consul, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(t, err)
 			defer consul.Stop()
 
@@ -685,8 +682,6 @@ func TestProcessUpstreams(t *testing.T) {
 				Address: httpAddr,
 			})
 			require.NoError(t, err)
-			addr := strings.Split(httpAddr, ":")
-			consulPort := addr[1]
 
 			if tt.configEntry != nil {
 				consulClient.ConfigEntries().Set(tt.configEntry(), &api.WriteOptions{})
@@ -695,8 +690,6 @@ func TestProcessUpstreams(t *testing.T) {
 			ep := &EndpointsController{
 				Log:                    logrtest.TestLogger{T: t},
 				ConsulClient:           consulClient,
-				ConsulPort:             consulPort,
-				ConsulScheme:           "http",
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSetWith(),
 				EnableConsulNamespaces: tt.consulNamespacesEnabled,
@@ -786,7 +779,6 @@ func TestGetServiceName(t *testing.T) {
 
 func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := []struct {
 		name                       string
 		consulSvcName              string
@@ -798,7 +790,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 		expectedHealthChecks       []*api.HealthCheck
 	}{
 		{
-			name:          "Multiport service", // todo: could be a case in createendpoint test?
+			name:          "Multiport service",
 			consulSvcName: "web,web-admin",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -814,8 +806,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -835,8 +826,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -969,24 +959,15 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			// The agent pod needs to have the address 127.0.0.1 so when the
-			// code gets the agent pods via the label component=client, and
-			// makes requests against the agent API, it will actually hit the
-			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
-
 			// Add the default namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 			// Create fake k8s client
-			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+			k8sObjects := append(tt.k8sObjects(), &ns)
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
+			consul, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(t, err)
 			defer consul.Stop()
 			consul.WaitForServiceIntentions(t)
@@ -1001,7 +982,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			for _, svc := range tt.initialConsulSvcs {
 				catalogRegistration := &api.CatalogRegistration{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1", // todo: make a const
+					Address: ConsulNodeAddress,
 					Service: svc,
 				}
 				_, err = consulClient.Catalog().Register(catalogRegistration, nil)
@@ -1096,7 +1077,6 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 // This test covers EndpointsController.createServiceRegistrations.
 func TestReconcileCreateEndpoint(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := []struct {
 		name                       string
 		consulSvcName              string
@@ -1123,8 +1103,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				}
 				return []runtime.Object{endpoint}
 			},
-			expectedConsulSvcInstances: []*api.CatalogService{}, // todo: can this be nil?
-			expectedProxySvcInstances:  []*api.CatalogService{},
+			expectedConsulSvcInstances: nil,
+			expectedProxySvcInstances:  nil,
 			expectedHealthChecks:       nil,
 		},
 		{
@@ -1141,8 +1121,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1217,8 +1196,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1226,8 +1204,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 									},
 								},
 								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
+									IP: "2.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod2",
@@ -1346,8 +1323,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							Addresses: []corev1.EndpointAddress{
 								// This is an invalid address because pod3 will not exist in k8s.
 								{
-									IP:       "9.9.9.9",
-									NodeName: &nodeName,
+									IP: "9.9.9.9",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod3",
@@ -1356,8 +1332,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 								},
 								// The next two are valid addresses.
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1365,8 +1340,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 									},
 								},
 								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
+									IP: "2.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod2",
@@ -1482,8 +1456,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1589,8 +1562,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "2.3.4.5",
-									NodeName: &nodeName,
+									IP: "2.3.4.5",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod2",
@@ -1598,8 +1570,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 									},
 								},
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1771,7 +1742,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 // since the map will not be nil.
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := []struct {
 		name                       string
 		consulSvcName              string
@@ -1796,8 +1766,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1813,7 +1782,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -1902,8 +1871,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							NotReadyAddresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -1919,7 +1887,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2008,8 +1976,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "4.4.4.4",
-									NodeName: &nodeName,
+									IP: "4.4.4.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -2025,7 +1992,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2089,8 +2056,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "4.4.4.4",
-									NodeName: &nodeName,
+									IP: "4.4.4.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -2106,7 +2072,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2170,8 +2136,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -2179,8 +2144,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 									},
 								},
 								{
-									IP:       "2.2.3.4",
-									NodeName: &nodeName,
+									IP: "2.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod2",
@@ -2196,7 +2160,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2294,8 +2258,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -2311,7 +2274,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2338,7 +2301,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				},
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
 						Service: "service-updated",
@@ -2392,8 +2355,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -2409,7 +2371,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2436,7 +2398,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				},
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2492,7 +2454,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2519,7 +2481,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				},
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
 						Service: "service-updated",
@@ -2565,7 +2527,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2592,7 +2554,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				},
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2635,8 +2597,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "4.4.4.4",
-									NodeName: &nodeName,
+									IP: "4.4.4.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod2",
@@ -2652,7 +2613,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2728,8 +2689,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "1.2.3.4",
-									NodeName: &nodeName,
+									IP: "1.2.3.4",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod1",
@@ -2745,7 +2705,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2782,7 +2742,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				},
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
 						Service: "service-updated",
@@ -2862,8 +2822,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
-									IP:       "2.3.4.5",
-									NodeName: &nodeName,
+									IP: "2.3.4.5",
 									TargetRef: &corev1.ObjectReference{
 										Kind:      "Pod",
 										Name:      "pod2",
@@ -2879,7 +2838,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2921,17 +2880,10 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			// The agent pod needs to have the address 127.0.0.1 so when the
-			// code gets the agent pods via the label component=client, and
-			// makes requests against the agent API, it will actually hit the
-			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
-
 			// Add the default namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 			// Create fake k8s client.
-			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+			k8sObjects := append(tt.k8sObjects(), &ns)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
@@ -2941,13 +2893,10 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					c.ACL.Enabled = tt.enableACLs
 					c.ACL.Tokens.InitialManagement = adminToken
 				}
-				c.NodeName = nodeName
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
 			consul.WaitForServiceIntentions(t)
-			addr := strings.Split(consul.HTTPAddr, ":")
-			consulPort := addr[1]
 
 			cfg := &api.Config{Scheme: "http", Address: consul.HTTPAddr}
 			if tt.enableACLs {
@@ -3004,13 +2953,10 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
 				ConsulClient:          consulClient,
-				ConsulPort:            consulPort,
-				ConsulScheme:          cfg.Scheme,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				ConsulClientCfg:       cfg,
 			}
 			if tt.enableACLs {
 				ep.AuthMethod = test.AuthMethod
@@ -3084,7 +3030,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 // This test covers EndpointsController.deregisterService when the map is nil (not selectively deregistered).
 func TestReconcileDeleteEndpoint(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := []struct {
 		name                      string
 		consulSvcName             string
@@ -3210,17 +3155,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			// The agent pod needs to have the address 127.0.0.1 so when the
-			// code gets the agent pods via the label component=client, and
-			// makes requests against the agent API, it will actually hit the
-			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
-
 			// Add the default namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 			// Create fake k8s client.
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod, &ns).Build()
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&ns).Build()
 
 			// Create test consul server.
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -3229,7 +3167,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					c.ACL.Enabled = true
 					c.ACL.Tokens.InitialManagement = adminToken
 				}
-				c.NodeName = nodeName
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
@@ -3241,15 +3178,13 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
-			addr := strings.Split(consul.HTTPAddr, ":")
-			consulPort := addr[1]
 
 			// Register service and proxy in consul
 			var token *api.ACLToken
 			for _, svc := range tt.initialConsulSvcs {
 				serviceRegistration := &api.CatalogRegistration{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: svc,
 				}
 				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
@@ -3277,13 +3212,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
 				ConsulClient:          consulClient,
-				ConsulPort:            consulPort,
-				ConsulScheme:          "http",
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				ConsulClientCfg:       cfg,
 			}
 			if tt.enableACLs {
 				ep.AuthMethod = test.AuthMethod
@@ -3327,7 +3259,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 // label is added.
 func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	svcName := "service-ignored"
 	namespace := "default"
 
@@ -3375,8 +3306,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					{
 						Addresses: []corev1.EndpointAddress{
 							{
-								IP:       "1.2.3.4",
-								NodeName: &nodeName,
+								IP: "1.2.3.4",
 								TargetRef: &corev1.ObjectReference{
 									Kind:      "Pod",
 									Name:      "pod1",
@@ -3388,28 +3318,24 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				},
 			}
 			pod1 := createPod("pod1", "1.2.3.4", true, true)
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-			k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
+			k8sObjects := []runtime.Object{endpoint, pod1, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test Consul server.
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
+			consul, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(t, err)
 			defer consul.Stop()
 			consul.WaitForServiceIntentions(t)
 			cfg := &api.Config{Address: consul.HTTPAddr}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
-			addr := strings.Split(consul.HTTPAddr, ":")
-			consulPort := addr[1]
 
 			// Set up the initial Consul services.
 			if tt.svcInitiallyRegistered {
 				serviceRegistration := &api.CatalogRegistration{
 					Node:    ConsulNodeName,
-					Address: "127.0.0.1",
+					Address: ConsulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-" + svcName,
 						Service: svcName,
@@ -3433,13 +3359,10 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
 				ConsulClient:          consulClient,
-				ConsulPort:            consulPort,
-				ConsulScheme:          "http",
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      namespace,
-				ConsulClientCfg:       cfg,
 			}
 
 			// Run the reconcile process to deregister the service if it was registered before.
@@ -3462,7 +3385,6 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 // Test that when an endpoints pod specifies the name for the Kubernetes service it wants to use
 // for registration, all other endpoints for that pod are skipped.
 func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
-	nodeName := "test-node"
 	namespace := "default"
 
 	// Set up the fake Kubernetes client with a few endpoints, pod, consul client, and the default namespace.
@@ -3475,8 +3397,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 			{
 				Addresses: []corev1.EndpointAddress{
 					{
-						IP:       "1.2.3.4",
-						NodeName: &nodeName,
+						IP: "1.2.3.4",
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Name:      "pod1",
@@ -3496,8 +3417,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 			{
 				Addresses: []corev1.EndpointAddress{
 					{
-						IP:       "1.2.3.4",
-						NodeName: &nodeName,
+						IP: "1.2.3.4",
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Name:      "pod1",
@@ -3510,35 +3430,28 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	}
 	pod1 := createPod("pod1", "1.2.3.4", true, true)
 	pod1.Annotations[annotationKubernetesService] = endpoint.Name
-	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, fakeClientPod, &ns}
+	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, &ns}
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 	// Create test Consul server.
-	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
+	consul, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer consul.Stop()
 	consul.WaitForServiceIntentions(t)
 	cfg := &api.Config{Address: consul.HTTPAddr}
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
-	addr := strings.Split(consul.HTTPAddr, ":")
-	consulPort := addr[1]
 
 	// Create the endpoints controller.
 	ep := &EndpointsController{
 		Client:                fakeClient,
 		Log:                   logrtest.TestLogger{T: t},
 		ConsulClient:          consulClient,
-		ConsulPort:            consulPort,
-		ConsulScheme:          "http",
 		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 		DenyK8sNamespacesSet:  mapset.NewSetWith(),
 		ReleaseName:           "consul",
 		ReleaseNamespace:      namespace,
-		ConsulClientCfg:       cfg,
 	}
 
 	svcName := badEndpoint.Name
@@ -3546,7 +3459,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	// Initially register the pod with the bad endpoint
 	_, err = consulClient.Catalog().Register(&api.CatalogRegistration{
 		Node:    ConsulNodeName,
-		Address: "127.0.0.1",
+		Address: ConsulNodeAddress,
 		Service: &api.AgentService{
 			ID:      "pod1-" + svcName,
 			Service: svcName,
@@ -5131,8 +5044,7 @@ func createPod(name, ip string, inject bool, managedByEndpointsController bool) 
 			Annotations: map[string]string{},
 		},
 		Status: corev1.PodStatus{
-			PodIP:  ip,
-			HostIP: "127.0.0.1",
+			PodIP: ip,
 			Conditions: []corev1.PodCondition{
 				{
 					Type:   corev1.PodReady,

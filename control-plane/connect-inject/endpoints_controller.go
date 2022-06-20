@@ -12,6 +12,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
@@ -22,8 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
@@ -52,25 +51,28 @@ const (
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
 
-	// todo: add docs
-	ConsulNodeName            = "k8s-service-mesh"
-	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
+	// ConsulNodeName is the node name that we'll use to register and deregister services.
+	ConsulNodeName = "k8s-service-mesh"
+
+	// ConsulNodeAddress is the address of the consul node (defined by ConsulNodeName).
+	// This address does not need to be routable as this node is ephemeral, and we're only providing it because
+	// Consul's API currently requires node address to be provided when registering a node.
+	ConsulNodeAddress = "127.0.0.1"
+
+	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	ConsulKubernetesCheckType = "kubernetes-readiness"
-	EnvoyPublicListenerPort   = 20000
+
+	// ConsulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
+	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
+
+	// EnvoyInboundListenerPort is the port where envoy's inbound listener is listening.
+	EnvoyInboundListenerPort = 20000
 )
 
 type EndpointsController struct {
 	client.Client
-	// ConsulClient points at the agent local to the connect-inject deployment pod.
+	// ConsulClient is the client to use for API calls to Consul.
 	ConsulClient *api.Client
-	// todo: remove these 3 values
-	// ConsulClientCfg is the client config used by the ConsulClient when calling NewClient().
-	ConsulClientCfg *api.Config
-	// ConsulScheme is the scheme to use when making API calls to Consul,
-	// i.e. "http" or "https".
-	ConsulScheme string
-	// ConsulPort is the port to make HTTP API calls to Consul agents on.
-	ConsulPort string
 	// Only endpoints in the AllowK8sNamespacesSet are reconciled.
 	AllowK8sNamespacesSet mapset.Set
 	// Endpoints in the DenyK8sNamespacesSet are ignored.
@@ -202,7 +204,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
 	if err = r.deregisterService(serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
-		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+		r.Log.Error(err, "failed to deregister endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
 	}
 
@@ -238,10 +240,7 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 			return err
 		}
 
-		// Register the service instance with the local agent.
-		// Note: the order of how we register services is important,
-		// and the connect-proxy service should come after the "main" service
-		// because its alias health check depends on the main service existing.
+		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
 			"id", serviceRegistration.ID)
 		_, err = r.ConsulClient.Catalog().Register(serviceRegistration, nil)
@@ -250,7 +249,7 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 			return err
 		}
 
-		// Register the proxy service instance with the local agent.
+		// Register the proxy service instance with Consul.
 		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
 		_, err = r.ConsulClient.Catalog().Register(proxyServiceRegistration, nil)
 		if err != nil {
@@ -347,7 +346,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    ConsulNodeName,
-		Address: "127.0.0.1",
+		Address: ConsulNodeAddress,
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, svcID),
@@ -358,6 +357,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
 			Namespace: consulNS,
 		},
+		SkipNodeUpdate: true,
 	}
 
 	proxySvcName := proxyServiceName(pod, serviceEndpoints)
@@ -397,7 +397,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	proxyConfig.Upstreams = upstreams
 
-	proxyPort := EnvoyPublicListenerPort
+	proxyPort := EnvoyInboundListenerPort
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
@@ -531,7 +531,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 
 	proxyServiceRegistration := &api.CatalogRegistration{
 		Node:    ConsulNodeName,
-		Address: "127.0.0.1",
+		Address: ConsulNodeAddress,
 		Service: proxyService,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, proxySvcID),
@@ -564,10 +564,9 @@ func portValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (int, err
 	return int(portVal), nil
 }
 
-// consulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
-// where the health check is registered and deregistered.
-func consulHealthCheckID(podNS string, serviceID string) string {
-	return fmt.Sprintf("%s/%s", podNS, serviceID)
+// consulHealthCheckID deterministically generates a health check ID based on service ID and Kubernetes namespace.
+func consulHealthCheckID(k8sNS string, serviceID string) string {
+	return fmt.Sprintf("%s/%s", k8sNS, serviceID)
 }
 
 // getHealthCheckStatusReason takes an Consul's health check status (either passing or critical)
@@ -580,13 +579,11 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
 }
 
-// todo: update (we now need to deregister all service instances)
-// deregisterService queries all agents for service instances that have the metadata
+// deregisterService queries all services on the node for service instances that have the metadata
 // "k8s-service-name"=k8sSvcName and "k8s-namespace"=k8sSvcNamespace. The k8s service name may or may not match the
 // consul service name, but the k8s service name will always match the metadata on the Consul service
-// "k8s-service-name". So, we query Consul services by "k8s-service-name" metadata, which is only exposed on the agent
-// API. Therefore, we need to query all agents who have services matching that metadata, and deregister each service
-// instance. When querying by the k8s service name and namespace, the request will return service instances and
+// "k8s-service-name". So, we query Consul services by "k8s-service-name" metadata.
+// When querying by the k8s service name and namespace, the request will return service instances and
 // associated proxy service instances.
 // The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map

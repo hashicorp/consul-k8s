@@ -45,7 +45,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 	expectedProbe := &corev1.Probe{
 		Handler: corev1.Handler{
 			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(EnvoyPublicListenerPort),
+				Port: intstr.FromInt(EnvoyInboundListenerPort),
 			},
 		},
 		InitialDelaySeconds: 1,
@@ -163,7 +163,7 @@ func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 			},
 		})
 
-		port := EnvoyPublicListenerPort + i
+		port := EnvoyInboundListenerPort + i
 		expectedProbe := &corev1.Probe{
 			Handler: corev1.Handler{
 				TCPSocket: &corev1.TCPSocketAction{
