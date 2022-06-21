@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -150,7 +151,6 @@ func (c *ReadCommand) Run(args []string) int {
 	}
 
 	c.outputConfig(config)
-
 	return 0
 }
 
@@ -187,6 +187,9 @@ func (c *ReadCommand) parseFlags(args []string) error {
 }
 
 func (c *ReadCommand) validateFlags() error {
+	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
+		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
+	}
 	return nil
 }
 
