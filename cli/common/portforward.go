@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 )
@@ -30,16 +29,13 @@ type PortForward struct {
 
 	// KubeClient is the Kubernetes Client to use for port forwarding.
 	KubeClient kubernetes.Interface
-	// KubeConfig is the Kubernetes configuration to use for port forwarding.
-	KubeConfig string
-	// KubeContext is the Kubernetes context to use for port forwarding.
-	KubeContext string
+	// RestConfig is the REST client configuration to use for port forwarding.
+	RestConfig *rest.Config
 
 	localPort int
 	stopChan  chan struct{}
 	readyChan chan struct{}
 
-	restConfig     *rest.Config
 	portForwardURL *url.URL
 	newForwarder   func(httpstream.Dialer, []string, <-chan struct{}, chan struct{}, io.Writer, io.Writer) (forwarder, error)
 }
@@ -64,11 +60,6 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to allocate local port: %v", err)
 	}
 
-	// Load the Kubernetes REST client configuration.
-	if err := pf.loadRestConfig(); err != nil {
-		return "", fmt.Errorf("failed to load REST client configuration: %v", err)
-	}
-
 	// Configure the URL for starting the port forward.
 	if pf.portForwardURL == nil {
 		pf.portForwardURL = pf.KubeClient.CoreV1().RESTClient().Post().Resource("pods").Namespace(pf.Namespace).
@@ -76,7 +67,7 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 	}
 
 	// Create a dialer for the port forward target.
-	transport, upgrader, err := spdy.RoundTripperFor(pf.restConfig)
+	transport, upgrader, err := spdy.RoundTripperFor(pf.RestConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to create roundtripper: %v", err)
 	}
@@ -142,26 +133,6 @@ func (pf *PortForward) allocateLocalPort() error {
 
 	pf.localPort, err = strconv.Atoi(port)
 	return err
-}
-
-// loadRestConfig loads the Kubernetes REST client configuration using the
-// provided Kubernetes configuration file and context.
-func (pf *PortForward) loadRestConfig() (err error) {
-	overrides := clientcmd.ConfigOverrides{}
-	if pf.KubeContext != "" {
-		overrides.CurrentContext = pf.KubeContext
-	}
-
-	if pf.restConfig == nil {
-		pf.restConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: pf.KubeConfig},
-			&overrides).ClientConfig()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // newDefaultForwarder creates a new Kubernetes port forwarder.
