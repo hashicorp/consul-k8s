@@ -35,7 +35,7 @@ func TestPortForwardingSuccess(t *testing.T) {
 
 	pf := &PortForward{
 		KubeClient:     fake.NewSimpleClientset(),
-		restConfig:     &rest.Config{},
+		RestConfig:     &rest.Config{},
 		portForwardURL: &url.URL{},
 		newForwarder:   newMockForwarder,
 	}
@@ -60,7 +60,7 @@ func TestPortForwardingError(t *testing.T) {
 
 	pf := &PortForward{
 		KubeClient:     fake.NewSimpleClientset(),
-		restConfig:     &rest.Config{},
+		RestConfig:     &rest.Config{},
 		portForwardURL: &url.URL{},
 		newForwarder:   newMockForwarder,
 	}
@@ -86,7 +86,7 @@ func TestPortForwardingContextCancel(t *testing.T) {
 
 	pf := &PortForward{
 		KubeClient:     fake.NewSimpleClientset(),
-		restConfig:     &rest.Config{},
+		RestConfig:     &rest.Config{},
 		portForwardURL: &url.URL{},
 		newForwarder:   newMockForwarder,
 	}
@@ -114,7 +114,7 @@ func TestPortForwardingTimeout(t *testing.T) {
 
 	pf := &PortForward{
 		KubeClient:     fake.NewSimpleClientset(),
-		restConfig:     &rest.Config{},
+		RestConfig:     &rest.Config{},
 		portForwardURL: &url.URL{},
 		newForwarder:   newMockForwarder,
 	}
