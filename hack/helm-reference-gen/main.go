@@ -407,7 +407,7 @@ func generateTOC(node DocNode) string {
 	toc := tocPrefix
 
 	for _, c := range node.Children {
-		toc += fmt.Sprintf("- [`%s`](#%s)\n", c.Key, strings.ToLower(c.Key))
+		toc += fmt.Sprintf("- [`%s`](#h-%s)\n", c.Key, strings.ToLower(c.Key))
 	}
 
 	return toc + tocSuffix
