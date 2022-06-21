@@ -1,6 +1,7 @@
 package read
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -18,8 +19,6 @@ var fs embed.FS
 const testConfigDump string = "test_config_dump.json"
 
 func TestUnmarshaling(t *testing.T) {
-	t.Skip("Haven't filled out all parsing functions yet.")
-
 	raw, err := fs.ReadFile(testConfigDump)
 	require.NoError(t, err)
 
@@ -34,25 +33,21 @@ func TestUnmarshaling(t *testing.T) {
 	require.Equal(t, testEnvoyConfig.Secrets, envoyConfig.Secrets)
 }
 
-func TestMarshaling(t *testing.T) {
-	t.Skip("Marshalling isn't working properly?")
-
+func TestJSON(t *testing.T) {
 	raw, err := fs.ReadFile(testConfigDump)
 	require.NoError(t, err)
+	expected := bytes.TrimSpace(raw)
 
 	var envoyConfig EnvoyConfig
 	err = json.Unmarshal(raw, &envoyConfig)
 	require.NoError(t, err)
 
-	actual, err := json.Marshal(envoyConfig)
-	require.NoError(t, err)
+	actual := envoyConfig.JSON()
 
-	require.Equal(t, string(raw), string(actual))
+	require.Equal(t, expected, actual)
 }
 
 func TestFetchConfig(t *testing.T) {
-	t.Skip("Haven't filled out all parsing functions yet.")
-
 	configResponse, err := fs.ReadFile(testConfigDump)
 	require.NoError(t, err)
 
@@ -67,10 +62,15 @@ func TestFetchConfig(t *testing.T) {
 		},
 	}
 
-	configDump, err := FetchConfig(context.Background(), mpf)
+	envoyConfig, err := FetchConfig(context.Background(), mpf)
 
 	require.NoError(t, err)
-	require.NotNil(t, configDump)
+
+	require.Equal(t, testEnvoyConfig.Clusters, envoyConfig.Clusters)
+	require.Equal(t, testEnvoyConfig.Endpoints, envoyConfig.Endpoints)
+	require.Equal(t, testEnvoyConfig.Listeners, envoyConfig.Listeners)
+	require.Equal(t, testEnvoyConfig.Routes, envoyConfig.Routes)
+	require.Equal(t, testEnvoyConfig.Secrets, envoyConfig.Secrets)
 }
 
 type mockPortForwarder struct {
