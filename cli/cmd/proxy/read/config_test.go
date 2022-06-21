@@ -171,6 +171,22 @@ var testEnvoyConfig = &EnvoyConfig{
 			Status:  "HEALTHY",
 		},
 	},
+	Listeners: []Listener{
+		{
+			Name:               "public_listener",
+			Address:            "192.168.69.179:20000",
+			Direction:          "",
+			DestinationCluster: "",
+			LastUpdated:        "",
+		},
+		{
+			Name:               "outbound_listener",
+			Address:            "127.0.0.1:15001",
+			Direction:          "",
+			DestinationCluster: "",
+			LastUpdated:        "",
+		},
+	},
 	Routes: []Route{
 		{
 			Name:               "public_listener",
@@ -183,5 +199,4 @@ var testEnvoyConfig = &EnvoyConfig{
 			LastUpdated:        "2022-05-24T17:41:59.078Z",
 		},
 	},
-	Secrets: []Secret{},
 }
