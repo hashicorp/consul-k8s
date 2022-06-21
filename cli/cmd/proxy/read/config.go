@@ -265,7 +265,7 @@ func parseRoutes(rawCfg map[string]interface{}) ([]Route, error) {
 		routes = append(routes, Route{
 			Name:               route.RouteConfig.Name,
 			DestinationCluster: strings.Join(destinationClusters, ", "),
-			LastUpdated:        route.RouteConfig.LastUpdated,
+			LastUpdated:        route.LastUpdated,
 		})
 	}
 
