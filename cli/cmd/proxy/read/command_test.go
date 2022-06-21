@@ -19,10 +19,6 @@ func TestArgumentParsing(t *testing.T) {
 			args: []string{},
 			out:  1,
 		},
-		"Only podname passed": {
-			args: []string{"podname"},
-			out:  0,
-		},
 		"Multiple podnames passed": {
 			args: []string{"podname", "podname2"},
 			out:  1,
