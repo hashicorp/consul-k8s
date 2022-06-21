@@ -160,7 +160,9 @@ func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 	}
 
 	var clustersCD clustersConfigDump
-	err = json.Unmarshal(raw, &clustersCD)
+	if err = json.Unmarshal(raw, &clustersCD); err != nil {
+		return clusters, err
+	}
 
 	for _, cluster := range append(clustersCD.StaticClusters, clustersCD.DynamicActiveClusters...) {
 		// Join nested endpoint data into a slice of strings.
@@ -193,8 +195,7 @@ func parseEndpoints(rawCfg map[string]interface{}) ([]Endpoint, error) {
 	}
 
 	var endpointsCD endpointsConfigDump
-	err = json.Unmarshal(raw, &endpointsCD)
-	if err != nil {
+	if err = json.Unmarshal(raw, &endpointsCD); err != nil {
 		return endpoints, err
 	}
 
@@ -224,8 +225,7 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 	}
 
 	var listenersCD listenersConfigDump
-	err = json.Unmarshal(raw, &listenersCD)
-	if err != nil {
+	if err = json.Unmarshal(raw, &listenersCD); err != nil {
 		return listeners, err
 	}
 
@@ -248,8 +248,7 @@ func parseRoutes(rawCfg map[string]interface{}) ([]Route, error) {
 	}
 
 	var routesCD routesConfigDump
-	err = json.Unmarshal(raw, &routesCD)
-	if err != nil {
+	if err = json.Unmarshal(raw, &routesCD); err != nil {
 		return routes, err
 	}
 
