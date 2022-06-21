@@ -32,6 +32,7 @@ type Cluster struct {
 	LastUpdated              string
 }
 
+// Endpoint represents an endpoint in the Envoy config.
 type Endpoint struct {
 	Address string
 	Cluster string
@@ -39,26 +40,25 @@ type Endpoint struct {
 	Status  string
 }
 
+// Listener represents a listener in the Envoy config.
 type Listener struct {
 	Name               string
 	Address            string
-	Filters            []Filter
-	FilterChainMatches []FilterChainMatch
+	Filters            []string
+	FilterChainMatches []string
 	Direction          string
 	DestinationCluster string
 	LastUpdated        string
 }
 
-type Filter struct{}
-
-type FilterChainMatch struct{}
-
+// Route represents a route in the Envoy config.
 type Route struct {
 	Name               string
 	DestinationCluster string
 	LastUpdated        string
 }
 
+// Secret represents a secret in the Envoy config.
 type Secret struct {
 	Name      string
 	Type      string
@@ -95,6 +95,12 @@ func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyC
 		return nil, err
 	}
 	return envoyConfig, nil
+}
+
+// JSON returns the original JSON Envoy config dump data which was used to create
+// the Config object.
+func (c *EnvoyConfig) JSON() []byte {
+	return c.rawCfg
 }
 
 // UnmarshalJSON unmarshals the raw config dump bytes into EnvoyConfig.
@@ -143,11 +149,6 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	}
 
 	return err
-}
-
-// MarshalJSON marshals the EnvoyConfig into the raw config dump bytes.
-func (c *EnvoyConfig) MarshalJSON() ([]byte, error) {
-	return json.Marshal(c.rawCfg)
 }
 
 func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
@@ -273,6 +274,6 @@ func parseRoutes(rawCfg map[string]interface{}) ([]Route, error) {
 
 func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
 	var secrets []Secret
-
+	// TODO need a sample of a config dump with secrets.
 	return secrets, nil
 }
