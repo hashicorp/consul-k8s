@@ -193,7 +193,7 @@ func (c *ReadCommand) validateFlags() error {
 	return nil
 }
 
-func (c *ReadCommand) initKubernetes() error {
+func (c *ReadCommand) initKubernetes() (err error) {
 	settings := helmCLI.New()
 
 	if c.flagKubeConfig == "" {
@@ -204,12 +204,13 @@ func (c *ReadCommand) initKubernetes() error {
 		settings.KubeContext = c.flagKubeContext
 	}
 
-	if c.kubernetes == nil {
-		var err error
-		c.restConfig, err = settings.RESTClientGetter().ToRESTConfig()
-		if err != nil {
-			return fmt.Errorf("error retrieving Kubernetes authentication %v", err)
+	if c.restConfig == nil {
+		if c.restConfig, err = settings.RESTClientGetter().ToRESTConfig(); err != nil {
+			return fmt.Errorf("error creating Kubernetes REST config %v", err)
 		}
+	}
+
+	if c.kubernetes == nil {
 		if c.kubernetes, err = kubernetes.NewForConfig(c.restConfig); err != nil {
 			return fmt.Errorf("error creating Kubernetes client %v", err)
 		}
