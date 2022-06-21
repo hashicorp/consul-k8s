@@ -225,6 +225,8 @@ func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
 		return
 	}
 
+	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in Namespace %s:", c.flagPodName, c.flagNamespace))
+
 	// Track if any filters are passed in. If not, print everything; if so, only
 	// print the filters that are passed in.
 	filtersPassed := c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
