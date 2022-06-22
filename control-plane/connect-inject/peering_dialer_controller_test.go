@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// TestReconcileCreateUpdatePeeringDialer creates a peering dialer.
-func TestReconcileCreateUpdatePeeringDialer(t *testing.T) {
+// TestReconcile_CreateUpdatePeeringDialer creates a peering dialer.
+func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	node2Name := "test-node2"
@@ -213,6 +213,58 @@ func TestReconcileCreateUpdatePeeringDialer(t *testing.T) {
 			},
 			peeringExists: true,
 		},
+		"Initiates peering when version annotation is set": {
+			peeringName: "peering",
+			k8sObjects: func() []runtime.Object {
+				dialer := &v1alpha1.PeeringDialer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "peering",
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationPeeringVersion: "2",
+						},
+					},
+					Spec: v1alpha1.PeeringDialerSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "dialer-token",
+								Key:     "token",
+								Backend: "kubernetes",
+							},
+						},
+					},
+					Status: v1alpha1.PeeringDialerStatus{
+						SecretRef: &v1alpha1.SecretRefStatus{
+							Secret: v1alpha1.Secret{
+								Name:    "dialer-token",
+								Key:     "token",
+								Backend: "kubernetes",
+							},
+							ResourceVersion: "test-version",
+						},
+					},
+				}
+				return []runtime.Object{dialer}
+			},
+			expectedConsulPeerings: &api.Peering{
+				Name:  "peering",
+				State: api.PeeringStateActive,
+			},
+			peeringSecret: func(token string) *corev1.Secret {
+				return createSecret("dialer-token", "default", "token", token)
+			},
+			expectedStatus: &v1alpha1.PeeringDialerStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
+					Secret: v1alpha1.Secret{
+						Name:    "dialer-token",
+						Key:     "token",
+						Backend: "kubernetes",
+					},
+				},
+				LatestPeeringVersion: pointerToUint64(2),
+			},
+			peeringExists: true,
+		},
 	}
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -327,9 +379,205 @@ func TestReconcileCreateUpdatePeeringDialer(t *testing.T) {
 					require.Equal(t, tt.expectedStatus.SecretRef.Key, dialer.SecretRef().Key)
 					require.Equal(t, tt.expectedStatus.SecretRef.Backend, dialer.SecretRef().Backend)
 					require.Equal(t, "latest-version", dialer.SecretRef().ResourceVersion)
+					require.Equal(t, tt.expectedStatus.LatestPeeringVersion, dialer.Status.LatestPeeringVersion)
 					require.Contains(t, dialer.Finalizers, FinalizerName)
 					require.NotEmpty(t, dialer.SecretRef().ResourceVersion)
 					require.NotEqual(t, "test-version", dialer.SecretRef().ResourceVersion)
+				}
+			}
+		})
+	}
+}
+
+func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	node2Name := "test-node2"
+	cases := map[string]struct {
+		annotations    map[string]string
+		expErr         string
+		expectedStatus *v1alpha1.PeeringDialerStatus
+	}{
+		"fails if annotation is not a number": {
+			annotations: map[string]string{
+				annotationPeeringVersion: "foo",
+			},
+			expErr: `strconv.ParseUint: parsing "foo": invalid syntax`,
+		},
+		"is no/op if annotation value is less than value in status": {
+			annotations: map[string]string{
+				annotationPeeringVersion: "2",
+			},
+			expectedStatus: &v1alpha1.PeeringDialerStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
+					Secret: v1alpha1.Secret{
+						Name:    "dialer-token",
+						Key:     "token",
+						Backend: "kubernetes",
+					},
+				},
+				LatestPeeringVersion: pointerToUint64(3),
+			},
+		},
+		"is no/op if annotation value is equal to value in status": {
+			annotations: map[string]string{
+				annotationPeeringVersion: "3",
+			},
+			expectedStatus: &v1alpha1.PeeringDialerStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
+					Secret: v1alpha1.Secret{
+						Name:    "dialer-token",
+						Key:     "token",
+						Backend: "kubernetes",
+					},
+				},
+				LatestPeeringVersion: pointerToUint64(3),
+			},
+		},
+		"updates if annotation value is greater than value in status": {
+			annotations: map[string]string{
+				annotationPeeringVersion: "4",
+			},
+			expectedStatus: &v1alpha1.PeeringDialerStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
+					Secret: v1alpha1.Secret{
+						Name:    "dialer-token",
+						Key:     "token",
+						Backend: "kubernetes",
+					},
+				},
+				LatestPeeringVersion: pointerToUint64(4),
+			},
+		},
+	}
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			// Create test consul server.
+			acceptorPeerServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer acceptorPeerServer.Stop()
+			acceptorPeerServer.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: acceptorPeerServer.HTTPAddr,
+			}
+			acceptorClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			dialer := &v1alpha1.PeeringDialer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "peering",
+					Namespace:   "default",
+					Annotations: tt.annotations,
+				},
+				Spec: v1alpha1.PeeringDialerSpec{
+					Peer: &v1alpha1.Peer{
+						Secret: &v1alpha1.Secret{
+							Name:    "dialer-token",
+							Key:     "token",
+							Backend: "kubernetes",
+						},
+					},
+				},
+				Status: v1alpha1.PeeringDialerStatus{
+					SecretRef: &v1alpha1.SecretRefStatus{
+						Secret: v1alpha1.Secret{
+							Name:    "dialer-token",
+							Key:     "token",
+							Backend: "kubernetes",
+						},
+						ResourceVersion: "latest-version",
+					},
+					LatestPeeringVersion: pointerToUint64(3),
+				},
+			}
+			// Create fake k8s client
+			k8sObjects := []runtime.Object{dialer, ns}
+
+			// This is responsible for updating the token generated by the acceptor side with the IP
+			// of the Consul server as the generated token currently does not have that set on it.
+			var encodedPeeringToken string
+			var token struct {
+				CA              string
+				ServerAddresses []string
+				ServerName      string
+				PeerID          string
+			}
+			// Create the initial token.
+			baseToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "peering"}, nil)
+			require.NoError(t, err)
+			// Decode the token to extract the ServerName and PeerID from the token. CA is always NULL.
+			decodeBytes, err := base64.StdEncoding.DecodeString(baseToken.PeeringToken)
+			require.NoError(t, err)
+			err = json.Unmarshal(decodeBytes, &token)
+			require.NoError(t, err)
+			// Get the IP of the Consul server.
+			addr := strings.Split(acceptorPeerServer.HTTPAddr, ":")[0]
+			// Generate expected token for Peering Initiate.
+			tokenString := fmt.Sprintf(`{"CA":null,"ServerAddresses":["%s:8300"],"ServerName":"%s","PeerID":"%s"}`, addr, token.ServerName, token.PeerID)
+			// Create peering initiate secret in Kubernetes.
+			encodedPeeringToken = base64.StdEncoding.EncodeToString([]byte(tokenString))
+			secret := createSecret("dialer-token", "default", "token", encodedPeeringToken)
+			secret.SetResourceVersion("latest-version")
+			k8sObjects = append(k8sObjects, secret)
+
+			// Create test consul server.
+			dialerPeerServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = node2Name
+			})
+			require.NoError(t, err)
+			defer dialerPeerServer.Stop()
+			dialerPeerServer.WaitForServiceIntentions(t)
+
+			cfg = &api.Config{
+				Address: dialerPeerServer.HTTPAddr,
+			}
+			dialerClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+
+			_, _, err = dialerClient.Peerings().Establish(context.Background(), api.PeeringEstablishRequest{PeerName: "peering", PeeringToken: encodedPeeringToken}, nil)
+			require.NoError(t, err)
+			k8sObjects = append(k8sObjects, createSecret("dialer-token-old", "default", "token", "old-token"))
+
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create the peering dialer controller
+			controller := &PeeringDialerController{
+				Client:       fakeClient,
+				Log:          logrtest.TestLogger{T: t},
+				ConsulClient: dialerClient,
+				Scheme:       s,
+			}
+			namespacedName := types.NamespacedName{
+				Name:      "peering",
+				Namespace: "default",
+			}
+
+			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+				require.False(t, resp.Requeue)
+
+				// Get the reconciled PeeringDialer and make assertions on the status
+				dialer := &v1alpha1.PeeringDialer{}
+				err = fakeClient.Get(context.Background(), namespacedName, dialer)
+				require.NoError(t, err)
+				if tt.expectedStatus != nil {
+					require.Equal(t, tt.expectedStatus.SecretRef.Name, dialer.SecretRef().Name)
+					require.Equal(t, tt.expectedStatus.SecretRef.Key, dialer.SecretRef().Key)
+					require.Equal(t, tt.expectedStatus.SecretRef.Backend, dialer.SecretRef().Backend)
+					require.Equal(t, "latest-version", dialer.SecretRef().ResourceVersion)
+					require.Equal(t, tt.expectedStatus.LatestPeeringVersion, dialer.Status.LatestPeeringVersion)
 				}
 			}
 		})

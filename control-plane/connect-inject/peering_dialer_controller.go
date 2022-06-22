@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -161,7 +162,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		// Or, if the peering in Consul does exist, compare it to the spec's secret. If there's any
 		// differences, initiate peering.
 		if r.specStatusSecretsDifferent(dialer, specSecret) {
-			r.Log.Info("the secret in status.secretRef exists and is different from spec.peer.secret; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
+			r.Log.Info("the version annotation was incremented; re-establishing peering with spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
 			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, err)
@@ -170,6 +171,21 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 				err := r.updateStatus(ctx, dialer, specSecret.ResourceVersion)
 				return ctrl.Result{}, err
 			}
+		}
+
+		if updated, err := r.versionAnnotationUpdated(dialer); err == nil && updated {
+			r.Log.Info("status.secret exists, but the peering doesn't exist in Consul; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
+			peeringToken := specSecret.Data[dialer.Secret().Key]
+			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+				r.updateStatusError(ctx, dialer, err)
+				return ctrl.Result{}, err
+			} else {
+				err := r.updateStatus(ctx, dialer, specSecret.ResourceVersion)
+				return ctrl.Result{}, err
+			}
+		} else if err != nil {
+			r.updateStatusError(ctx, dialer, err)
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -198,6 +214,16 @@ func (r *PeeringDialerController) updateStatus(ctx context.Context, dialer *cons
 	dialer.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
 		Error:   pointerToBool(false),
 		Message: pointerToString(""),
+	}
+	if peeringVersionString, ok := dialer.Annotations[annotationPeeringVersion]; ok {
+		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
+		if err != nil {
+			r.Log.Error(err, "failed to update PeeringDialer status", "name", dialer.Name, "namespace", dialer.Namespace)
+			return err
+		}
+		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < peeringVersion {
+			dialer.Status.LatestPeeringVersion = pointerToUint64(peeringVersion)
+		}
 	}
 	err := r.Status().Update(ctx, dialer)
 	if err != nil {
@@ -267,6 +293,19 @@ func (r *PeeringDialerController) deletePeering(ctx context.Context, peerName st
 	return nil
 }
 
+func (r *PeeringDialerController) versionAnnotationUpdated(dialer *consulv1alpha1.PeeringDialer) (bool, error) {
+	if peeringVersionString, ok := dialer.Annotations[annotationPeeringVersion]; ok {
+		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
+		if err != nil {
+			return false, err
+		}
+		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < peeringVersion {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // requestsForPeeringTokens creates a slice of requests for the peering dialer controller.
 // It enqueues a request for each dialer that needs to be reconciled. It iterates through
 // the list of dialers and creates a request for the dialer that has the same secret as it's
@@ -291,7 +330,7 @@ func (r *PeeringDialerController) requestsForPeeringTokens(object client.Object)
 	return []ctrl.Request{}
 }
 
-// filterPeeringAcceptors receives meta and object information for Kubernetes resources that are being watched,
+// filterPeeringDialers receives meta and object information for Kubernetes resources that are being watched,
 // which in this case are Secrets. It only returns true if the Secret is a Peering Token Secret. It reads the labels
 // from the meta of the resource and uses the values of the "consul.hashicorp.com/peering-token" label to validate that
 // the Secret is a Peering Token Secret.

@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+FEATURES:
+* [Experimental] Cluster Peering:
+  * Add support for secret watchers on the Peering Acceptor and Peering Dialer controllers. [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
+  * Add support for version annotation on the Peering Acceptor and Peering Dialer controllers. [[GH-1302](https://github.com/hashicorp/consul-k8s/pull/1302)]
+
 ## 0.45.0 (June 17, 2022)
 FEATURES:
 * [Experimental] Cluster Peering: Support Consul cluster peering, which allows service connectivity between two independent clusters.

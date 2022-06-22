@@ -142,6 +142,10 @@ const (
 	// webhook/meshWebhook.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
 
+	// annotationPeeringVersion is the version of the peering resource and can be utilized
+	// to explicitly perform the peering operation again.
+	annotationPeeringVersion = "consul.hashicorp.com/peering-version"
+
 	// labelServiceIgnore is a label that can be added to a service to prevent it from being
 	// registered with Consul.
 	labelServiceIgnore = "consul.hashicorp.com/service-ignore"

@@ -33,16 +33,14 @@ type PeeringDialerList struct {
 
 // PeeringDialerSpec defines the desired state of PeeringDialer.
 type PeeringDialerSpec struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Peer describes the information needed to create a peering.
 	Peer *Peer `json:"peer"`
 }
 
 // PeeringDialerStatus defines the observed state of PeeringDialer.
 type PeeringDialerStatus struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
+	// LatestPeeringVersion is the latest version of the resource that was reconciled.
+	LatestPeeringVersion *uint64 `json:"latestPeeringVersion,omitempty"`
 	// LastReconcileTime is the last time the resource was reconciled.
 	// +optional
 	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
