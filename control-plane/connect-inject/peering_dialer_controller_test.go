@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // TestReconcileCreateUpdatePeeringDialer creates a peering dialer.
@@ -778,6 +779,279 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, *tt.expStatus.ReconcileError.Error, *dialer.Status.ReconcileError.Error)
 
+		})
+	}
+}
+
+func TestDialer_FilterPeeringDialers(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		secret *corev1.Secret
+		result bool
+	}{
+		"returns true if label is set to true": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Labels: map[string]string{
+						labelPeeringToken: "true",
+					},
+				},
+			},
+			result: true,
+		},
+		"returns false if label is set to false": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Labels: map[string]string{
+						labelPeeringToken: "false",
+					},
+				},
+			},
+			result: false,
+		},
+		"returns false if label is set to a non-true value": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Labels: map[string]string{
+						labelPeeringToken: "foo",
+					},
+				},
+			},
+			result: false,
+		},
+		"returns false if label is not set": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			result: false,
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			controller := PeeringDialerController{}
+			result := controller.filterPeeringDialers(tt.secret)
+			require.Equal(t, tt.result, result)
+		})
+	}
+}
+
+func TestDialer_RequestsForPeeringTokens(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		secret  *corev1.Secret
+		dialers v1alpha1.PeeringDialerList
+		result  []reconcile.Request
+	}{
+		"secret matches existing acceptor": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			dialers: v1alpha1.PeeringDialerList{
+				Items: []v1alpha1.PeeringDialer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering",
+							Namespace: "test",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: "test",
+						Name:      "peering",
+					},
+				},
+			},
+		},
+		"does not match if backend is not kubernetes": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			dialers: v1alpha1.PeeringDialerList{
+				Items: []v1alpha1.PeeringDialer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering",
+							Namespace: "test",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "vault",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{},
+		},
+		"only matches with the correct dialer": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			dialers: v1alpha1.PeeringDialerList{
+				Items: []v1alpha1.PeeringDialer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-1",
+							Namespace: "test",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-2",
+							Namespace: "test-2",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-3",
+							Namespace: "test",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test-2",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: "test",
+						Name:      "peering-1",
+					},
+				},
+			},
+		},
+		"can match with zero dialer": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			dialers: v1alpha1.PeeringDialerList{
+				Items: []v1alpha1.PeeringDialer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-1",
+							Namespace: "test",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "fest",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-2",
+							Namespace: "test-2",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-3",
+							Namespace: "test",
+						},
+						Spec: v1alpha1.PeeringDialerSpec{
+							Peer: &v1alpha1.Peer{
+								Secret: &v1alpha1.Secret{
+									Name:    "test-2",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{},
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.dialers).Build()
+			controller := PeeringDialerController{
+				Client: fakeClient,
+				Log:    logrtest.TestLogger{T: t},
+			}
+			result := controller.requestsForPeeringTokens(tt.secret)
+
+			require.Equal(t, tt.result, result)
 		})
 	}
 }
