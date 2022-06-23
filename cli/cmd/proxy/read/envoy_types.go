@@ -130,3 +130,38 @@ type routeMatch struct {
 type routeRoute struct {
 	Cluster string `json:"cluster"`
 }
+
+type secretsConfigDump struct {
+	ConfigType            string            `json:"@type"`
+	StaticSecrets         []secretConfigMap `json:"static_secrets"`
+	DynamicActiveSecrets  []secretConfigMap `json:"dynamic_active_secrets"`
+	DynamicWarmingSecrets []secretConfigMap `json:"dynamic_warming_secrets"`
+}
+
+type secretConfigMap struct {
+	Name        string `json:"name"`
+	Secret      secret `json:"secret"`
+	LastUpdated string `json:"last_updated"`
+}
+
+type secret struct {
+	Type              string            `json:"@type"`
+	TLSCertificate    tlsCertificate    `json:"tls_certificate"`
+	ValidationContext validationContext `json:"validation_context"`
+}
+
+type tlsCertificate struct {
+	CertificateChain certificateChain `json:"certificate_chain"`
+}
+
+type validationContext struct {
+	TrustedCA trustedCA `json:"trusted_ca"`
+}
+
+type certificateChain struct {
+	InlineBytes string `json:"inline_bytes"`
+}
+
+type trustedCA struct {
+	InlineBytes string `json:"inline_bytes"`
+}
