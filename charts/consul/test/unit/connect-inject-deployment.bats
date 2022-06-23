@@ -1068,7 +1068,6 @@ EOF
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "connect-injector-acl-init")' | tee /dev/stderr)
@@ -1725,7 +1724,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1746,7 +1744,6 @@ EOF
       --set 'global.acls.bootstrapToken.secretKey=bar' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1766,7 +1763,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-webhook-ca-update"))' | tee /dev/stderr)
@@ -1779,7 +1775,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1806,7 +1801,6 @@ EOF
     -s templates/connect-inject-deployment.yaml  \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1827,7 +1821,6 @@ EOF
     -s templates/connect-inject-deployment.yaml  \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1849,7 +1842,6 @@ EOF
     -s templates/connect-inject-deployment.yaml  \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1871,7 +1863,6 @@ EOF
     -s templates/connect-inject-deployment.yaml  \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1894,7 +1885,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -1912,7 +1902,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=connectInject/Deployment: enable-webhook-ca-update flag is not set on command when using vaulttest' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -1930,7 +1919,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -1952,7 +1940,6 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       --set 'global.secretsBackend.vault.connectInjectRole=test' \
@@ -2062,7 +2049,6 @@ EOF
       --set 'global.secretsBackend.vault.controllerRole=test' \
       --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       . | tee /dev/stderr |
@@ -2089,7 +2075,6 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.connectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
@@ -2112,7 +2097,6 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.connectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
@@ -2134,7 +2118,6 @@ EOF
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
@@ -2168,7 +2151,6 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
