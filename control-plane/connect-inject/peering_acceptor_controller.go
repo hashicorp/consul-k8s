@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -214,6 +215,15 @@ func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingStatu
 	if acceptor.SecretRef().Backend != acceptor.Secret().Backend {
 		return false, false, errors.New("PeeringAcceptor backend cannot be changed")
 	}
+	if peeringVersionString, ok := acceptor.Annotations[annotationPeeringVersion]; ok {
+		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
+		if err != nil {
+			return false, false, err
+		}
+		if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < peeringVersion {
+			return true, false, nil
+		}
+	}
 	// Compare the existing secret resource version.
 	// Get the secret specified by the status, make sure it matches the status' secret.ResourceVersion.
 	if existingStatusSecret != nil {
@@ -237,6 +247,16 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptor *
 	acceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
 		Error:   pointerToBool(false),
 		Message: pointerToString(""),
+	}
+	if peeringVersionString, ok := acceptor.Annotations[annotationPeeringVersion]; ok {
+		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
+		if err != nil {
+			r.Log.Error(err, "failed to update PeeringAcceptor status", "name", acceptor.Name, "namespace", acceptor.Namespace)
+			return err
+		}
+		if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < peeringVersion {
+			acceptor.Status.LatestPeeringVersion = pointerToUint64(peeringVersion)
+		}
 	}
 	err := r.Status().Update(ctx, acceptor)
 	if err != nil {
