@@ -199,4 +199,16 @@ var testEnvoyConfig = &EnvoyConfig{
 			LastUpdated:        "2022-05-24T17:41:59.078Z",
 		},
 	},
+	Secrets: []Secret{
+		{
+			Name:        "default",
+			Type:        "Dynamic Active",
+			LastUpdated: "2022-05-24T17:41:59.078Z",
+		},
+		{
+			Name:        "ROOTCA",
+			Type:        "Dynamic Warming",
+			LastUpdated: "2022-03-15T05:14:22.868Z",
+		},
+	},
 }
