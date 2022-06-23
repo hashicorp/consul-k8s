@@ -33,8 +33,6 @@ type PeeringAcceptorList struct {
 
 // PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
 type PeeringAcceptorSpec struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Peer describes the information needed to create a peering.
 	Peer *Peer `json:"peer"`
 }
@@ -55,8 +53,8 @@ type Secret struct {
 
 // PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
 type PeeringAcceptorStatus struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
+	// LatestPeeringVersion is the latest version of the resource that was reconciled.
+	LatestPeeringVersion *uint64 `json:"latestPeeringVersion,omitempty"`
 	// LastReconcileTime is the last time the resource was reconciled.
 	// +optional
 	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`

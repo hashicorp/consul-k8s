@@ -64,6 +64,11 @@ spec:
                 description: LastReconcileTime is the last time the resource was reconciled.
                 format: date-time
                 type: string
+              latestPeeringVersion:
+                description: LatestPeeringVersion is the latest version of the resource
+                  that was reconciled.
+                format: int64
+                type: integer
               reconcileError:
                 description: ReconcileError shows any errors during the last reconciliation
                   of this resource.

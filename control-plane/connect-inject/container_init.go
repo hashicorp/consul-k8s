@@ -326,6 +326,11 @@ func pointerToInt64(i int64) *int64 {
 	return &i
 }
 
+// pointerToUInt64 takes an int64 and returns a pointer to it.
+func pointerToUint64(i uint64) *uint64 {
+	return &i
+}
+
 // pointerToBool takes a bool and returns a pointer to it.
 func pointerToBool(b bool) *bool {
 	return &b
