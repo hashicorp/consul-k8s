@@ -100,6 +100,12 @@ const (
 	annotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
 	annotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
 
+	// annotations for configuring TLS for Prometheus.
+	annotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
+	annotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
+	annotationPrometheusCertFile = "consul.hashicorp.com/prometheus-cert-file"
+	annotationPrometheusKeyFile  = "consul.hashicorp.com/prometheus-key-file"
+
 	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
 	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
 	// e.g. consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"
