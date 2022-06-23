@@ -60,12 +60,9 @@ type Route struct {
 
 // Secret represents a secret in the Envoy config.
 type Secret struct {
-	Name      string
-	Type      string
-	Status    string
-	Valid     bool
-	ValidFrom string
-	ValidTo   string
+	Name        string
+	Type        string
+	LastUpdated string
 }
 
 // FetchConfig opens a port forward to the Envoy admin API and fetches the
@@ -273,6 +270,40 @@ func parseRoutes(rawCfg map[string]interface{}) ([]Route, error) {
 
 func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
 	var secrets []Secret
-	// TODO need a sample of a config dump with secrets.
+
+	raw, err := json.Marshal(rawCfg)
+	if err != nil {
+		return secrets, err
+	}
+
+	var secretsCD secretsConfigDump
+	if err = json.Unmarshal(raw, &secretsCD); err != nil {
+		return secrets, err
+	}
+
+	for _, secret := range secretsCD.StaticSecrets {
+		secrets = append(secrets, Secret{
+			Name:        secret.Name,
+			Type:        "Static",
+			LastUpdated: secret.LastUpdated,
+		})
+	}
+
+	for _, secret := range secretsCD.DynamicActiveSecrets {
+		secrets = append(secrets, Secret{
+			Name:        secret.Name,
+			Type:        "Dynamic Active",
+			LastUpdated: secret.LastUpdated,
+		})
+	}
+
+	for _, secret := range secretsCD.DynamicWarmingSecrets {
+		secrets = append(secrets, Secret{
+			Name:        secret.Name,
+			Type:        "Dynamic Warming",
+			LastUpdated: secret.LastUpdated,
+		})
+	}
+
 	return secrets, nil
 }
