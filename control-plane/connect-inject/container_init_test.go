@@ -116,6 +116,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationServiceMetricsPort] = "1234"
 				pod.Annotations[annotationPrometheusScrapePort] = "22222"
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
+				pod.Annotations[annotationPrometheusCAFile] = "/certs/ca.crt"
+				pod.Annotations[annotationPrometheusCAPath] = "/certs/ca/"
+				pod.Annotations[annotationPrometheusCertFile] = "/certs/server.crt"
+				pod.Annotations[annotationPrometheusKeyFile] = "/certs/key.pem"
 				return pod
 			},
 			MeshWebhook{
@@ -126,6 +130,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -prometheus-scrape-path="/scrape-path" \
   -prometheus-backend-port="20100" \
+  -prometheus-ca-file="/certs/ca.crt" \
+  -prometheus-ca-path="/certs/ca/" \
+  -prometheus-cert-file="/certs/server.crt" \
+  -prometheus-key-file="/certs/key.pem" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},

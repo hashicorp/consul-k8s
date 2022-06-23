@@ -47,6 +47,11 @@ type initContainerCommandData struct {
 	PrometheusScrapePath string
 	// PrometheusBackendPort configures where the listener on Envoy will point to.
 	PrometheusBackendPort string
+	// The file paths to use for configuring TLS on the Prometheus metrics endpoint.
+	PrometheusCAFile   string
+	PrometheusCAPath   string
+	PrometheusCertFile string
+	PrometheusKeyFile  string
 	// EnvoyUID is the Linux user id that will be used when tproxy is enabled.
 	EnvoyUID int
 
@@ -213,6 +218,19 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		}
 		data.PrometheusScrapePath = prometheusScrapePath
 		data.PrometheusBackendPort = mergedMetricsPort
+	}
+	// Pull the TLS config from the relevant annotations.
+	if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
+		data.PrometheusCAFile = raw
+	}
+	if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
+		data.PrometheusCAPath = raw
+	}
+	if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
+		data.PrometheusCertFile = raw
+	}
+	if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
+		data.PrometheusKeyFile = raw
 	}
 
 	// Render the command
@@ -407,6 +425,18 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- if .PrometheusBackendPort }}
   -prometheus-backend-port="{{ .PrometheusBackendPort }}" \
+  {{- end }}
+  {{- if .PrometheusCAFile }}
+  -prometheus-ca-file="{{ .PrometheusCAFile }}" \
+  {{- end }}
+  {{- if .PrometheusCAPath }}
+  -prometheus-ca-path="{{ .PrometheusCAPath }}" \
+  {{- end }}
+  {{- if .PrometheusCertFile }}
+  -prometheus-cert-file="{{ .PrometheusCertFile }}" \
+  {{- end }}
+  {{- if .PrometheusKeyFile }}
+  -prometheus-key-file="{{ .PrometheusKeyFile }}" \
   {{- end }}
   {{- if .AuthMethod }}
   {{- if .MultiPort }}
