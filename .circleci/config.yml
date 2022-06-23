@@ -864,7 +864,79 @@ jobs:
           path: /tmp/test-results
       - slack/status:
           fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
+  acceptance-kind-1-23-consul-nightly-1-11:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.11-dev"
+      - ENVOY_IMAGE: "envoyproxy/envoy:1.20.2"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.44.0"
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - install-prereqs
+      - create-kind-clusters:
+          version: "v1.23.0"
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+      - run: mkdir -p $TEST_RESULTS
+      - run-acceptance-tests:
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11-dev" -envoy-image=$ENVOY_IMAGE
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+      - slack/status:
+          fail_only: true
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11.x nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
+  acceptance-kind-1-23-consul-nightly-1-12:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.12-dev"
+      - ENVOY_IMAGE: "envoyproxy/envoy:1.22.2"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.44.0"
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - install-prereqs
+      - create-kind-clusters:
+          version: "v1.23.0"
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+      - run: mkdir -p $TEST_RESULTS
+      - run-acceptance-tests:
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12-dev" -envoy-image=$ENVOY_IMAGE
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+      - slack/status:
+          fail_only: true
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
 workflows:
   version: 2
@@ -929,3 +1001,15 @@ workflows:
       - acceptance-kind-1-23:
           requires:
             - dev-upload-docker
+
+  nightly-acceptance-tests-consul:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - acceptance-kind-1-23-consul-nightly-1-11
+      - acceptance-kind-1-23-consul-nightly-1-12
