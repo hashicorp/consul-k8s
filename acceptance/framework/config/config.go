@@ -43,6 +43,7 @@ type TestConfig struct {
 	ConsulImage    string
 	ConsulK8SImage string
 	ConsulVersion  *version.Version
+	EnvoyImage     string
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string
@@ -84,6 +85,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
+	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 
 	return helmValues, nil
 }
