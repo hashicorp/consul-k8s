@@ -16,10 +16,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const staticClientName = "static-client"
+const staticServerName = "static-server"
+const staticServerNamespace = "ns1"
+const staticClientNamespace = "ns2"
+
 // Test that Connect works in installations for X-Peers networking.
-func TestPeering_Connect(t *testing.T) {
+func TestPeering_ConnectNamespaces(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
 
 	if cfg.EnableTransparentProxy {
 		t.Skipf("skipping this test because Transparent Proxy is enabled")
@@ -27,12 +36,29 @@ func TestPeering_Connect(t *testing.T) {
 
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
+	const defaultNamespace = "default"
 	cases := []struct {
 		name                      string
+		destinationNamespace      string
+		mirrorK8S                 bool
 		ACLsAndAutoEncryptEnabled bool
 	}{
 		{
-			"default installation",
+			"default destination namespace",
+			defaultNamespace,
+			false,
+			false,
+		},
+		{
+			"single destination namespace",
+			staticServerNamespace,
+			false,
+			false,
+		},
+		{
+			"mirror k8s namespaces",
+			staticServerNamespace,
+			true,
 			false,
 		},
 	}
@@ -43,9 +69,10 @@ func TestPeering_Connect(t *testing.T) {
 			staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
 
 			commonHelmValues := map[string]string{
-				"global.peering.enabled": "true",
+				"global.peering.enabled":        "true",
+				"global.enableConsulNamespaces": "true",
 
-				"global.image": "hashicorp/consul:1.13.0-alpha2",
+				"global.image": "hashicorp/consul-enterprise:1.13.0-alpha2-ent",
 
 				"global.tls.enabled":           "false",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -55,6 +82,9 @@ func TestPeering_Connect(t *testing.T) {
 
 				"connectInject.enabled":                         "true",
 				"connectInject.transparentProxy.defaultEnabled": "false",
+				// When mirroringK8S is set, this setting is ignored.
+				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
+				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -141,6 +171,14 @@ func TestPeering_Connect(t *testing.T) {
 			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
 			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
 
+			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
+			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
+
+			if !c.mirrorK8S {
+				serverQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
+				clientQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
+			}
+
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways.
 			logger.Log(t, "creating proxy-defaults config")
@@ -160,7 +198,11 @@ func TestPeering_Connect(t *testing.T) {
 			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Log(t, "creating static-client deployments in client peer")
-			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default")
+			if c.destinationNamespace == defaultNamespace {
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
+			} else {
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "app=static-server",
@@ -177,32 +219,47 @@ func TestPeering_Connect(t *testing.T) {
 			require.Len(t, podList.Items[0].Spec.Containers, 2)
 
 			// Make sure that services are registered in the correct namespace.
+			// If mirroring is enabled, we expect services to be registered in the
+			// Consul namespace with the same name as their source
+			// Kubernetes namespace.
+			// If a single destination namespace is set, we expect all services
+			// to be registered in that destination Consul namespace.
 			// Server cluster.
-			services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", &api.QueryOptions{})
+			services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
 			// Client cluster.
-			services, _, err = staticClientPeerClient.Catalog().Service(staticClientName, "", &api.QueryOptions{})
+			services, _, err = staticClientPeerClient.Catalog().Service(staticClientName, "", clientQueryOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
 			logger.Log(t, "creating exported services")
-			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
-			})
+			if c.destinationNamespace == defaultNamespace {
+				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-namespace")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-namespace")
+				})
+			} else {
+				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
+				})
+			}
+
 			logger.Log(t, "checking that connection is successful")
 			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 
 			denyAllIntention := &api.ServiceIntentionsConfigEntry{
-				Name: "*",
-				Kind: api.ServiceIntentions,
+				Name:      "*",
+				Kind:      api.ServiceIntentions,
+				Namespace: "*",
 				Sources: []*api.SourceIntention{
 					{
-						Name:   "*",
-						Action: api.IntentionActionDeny,
-						Peer:   staticClientPeer,
+						Name:      "*",
+						Namespace: "*",
+						Action:    api.IntentionActionDeny,
+						Peer:      staticClientPeer,
 					},
 				},
 			}
@@ -213,15 +270,24 @@ func TestPeering_Connect(t *testing.T) {
 			k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 
 			intention := &api.ServiceIntentionsConfigEntry{
-				Name: staticServerName,
-				Kind: api.ServiceIntentions,
+				Name:      staticServerName,
+				Kind:      api.ServiceIntentions,
+				Namespace: staticServerNamespace,
 				Sources: []*api.SourceIntention{
 					{
-						Name:   staticClientName,
-						Action: api.IntentionActionAllow,
-						Peer:   staticClientPeer,
+						Name:      staticClientName,
+						Namespace: staticClientNamespace,
+						Action:    api.IntentionActionAllow,
+						Peer:      staticClientPeer,
 					},
 				},
+			}
+
+			// Set the destination namespace to be the same
+			// unless mirrorK8S is true.
+			if !c.mirrorK8S {
+				intention.Namespace = c.destinationNamespace
+				intention.Sources[0].Namespace = c.destinationNamespace
 			}
 
 			logger.Log(t, "creating intentions in server peer")
