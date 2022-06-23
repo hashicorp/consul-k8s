@@ -3,7 +3,6 @@ package read
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -290,17 +289,9 @@ func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
 
 	if !filtersPassed || c.flagSecrets {
 		c.UI.Output(fmt.Sprintf("Secrets (%d)", len(config.Secrets)), terminal.WithHeaderStyle())
-		secrets := terminal.NewTable("Name", "Type", "Status", "Valid", "Valid from", "Valid to")
+		secrets := terminal.NewTable("Name", "Type", "Last Updated")
 		for _, secret := range config.Secrets {
-			var validColor string
-			if secret.Valid {
-				validColor = "green"
-			} else {
-				validColor = "red"
-			}
-			secrets.AddRow(
-				[]string{secret.Name, secret.Type, secret.Status, strconv.FormatBool(secret.Valid), secret.ValidFrom, secret.ValidTo},
-				[]string{"", "", "", validColor, "", ""})
+			secrets.AddRow([]string{secret.Name, secret.Type, secret.LastUpdated}, []string{})
 		}
 
 		c.UI.Table(secrets)
