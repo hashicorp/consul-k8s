@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // TestReconcileCreateUpdatePeeringAcceptor creates a peering acceptor.
@@ -396,6 +397,8 @@ func TestReconcileCreateUpdatePeeringAcceptor(t *testing.T) {
 			require.NoError(t, err)
 			expSecrets := tt.expectedK8sSecrets()
 			require.Equal(t, expSecrets[0].Name, createdSecret.Name)
+			require.Contains(t, createdSecret.Labels, labelPeeringToken)
+			require.Equal(t, createdSecret.Labels[labelPeeringToken], "true")
 			// This assertion needs to be on StringData rather than Data because in the fake K8s client the contents are
 			// stored in StringData if that's how the secret was initialized in the fake client. In a real cluster, this
 			// StringData is an input only field, and shouldn't be read from.
@@ -940,6 +943,279 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, *tt.expStatus.ReconcileError.Error, *acceptor.Status.ReconcileError.Error)
 
+		})
+	}
+}
+
+func TestAcceptor_FilterPeeringAcceptor(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		secret *corev1.Secret
+		result bool
+	}{
+		"returns true if label is set to true": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Labels: map[string]string{
+						labelPeeringToken: "true",
+					},
+				},
+			},
+			result: true,
+		},
+		"returns false if label is set to false": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Labels: map[string]string{
+						labelPeeringToken: "false",
+					},
+				},
+			},
+			result: false,
+		},
+		"returns false if label is set to a non-true value": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Labels: map[string]string{
+						labelPeeringToken: "foo",
+					},
+				},
+			},
+			result: false,
+		},
+		"returns false if label is not set": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			result: false,
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			controller := PeeringAcceptorController{}
+			result := controller.filterPeeringAcceptors(tt.secret)
+			require.Equal(t, tt.result, result)
+		})
+	}
+}
+
+func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		secret    *corev1.Secret
+		acceptors v1alpha1.PeeringAcceptorList
+		result    []reconcile.Request
+	}{
+		"secret matches existing acceptor": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			acceptors: v1alpha1.PeeringAcceptorList{
+				Items: []v1alpha1.PeeringAcceptor{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering",
+							Namespace: "test",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: "test",
+						Name:      "peering",
+					},
+				},
+			},
+		},
+		"does not match if backend is not kubernetes": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			acceptors: v1alpha1.PeeringAcceptorList{
+				Items: []v1alpha1.PeeringAcceptor{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering",
+							Namespace: "test",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "vault",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{},
+		},
+		"only matches with the correct acceptor": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			acceptors: v1alpha1.PeeringAcceptorList{
+				Items: []v1alpha1.PeeringAcceptor{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-1",
+							Namespace: "test",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-2",
+							Namespace: "test-2",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-3",
+							Namespace: "test",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test-2",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Namespace: "test",
+						Name:      "peering-1",
+					},
+				},
+			},
+		},
+		"can match with zero acceptors": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			acceptors: v1alpha1.PeeringAcceptorList{
+				Items: []v1alpha1.PeeringAcceptor{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-1",
+							Namespace: "test",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "fest",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-2",
+							Namespace: "test-2",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peering-3",
+							Namespace: "test",
+						},
+						Status: v1alpha1.PeeringAcceptorStatus{
+							SecretRef: &v1alpha1.SecretRefStatus{
+								Secret: v1alpha1.Secret{
+									Name:    "test-2",
+									Key:     "test",
+									Backend: "kubernetes",
+								},
+							},
+						},
+					},
+				},
+			},
+			result: []reconcile.Request{},
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.acceptors).Build()
+			controller := PeeringAcceptorController{
+				Client: fakeClient,
+				Log:    logrtest.TestLogger{T: t},
+			}
+			result := controller.requestsForPeeringTokens(tt.secret)
+
+			require.Equal(t, tt.result, result)
 		})
 	}
 }

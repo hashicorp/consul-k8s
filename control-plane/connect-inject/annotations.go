@@ -146,6 +146,10 @@ const (
 	// registered with Consul.
 	labelServiceIgnore = "consul.hashicorp.com/service-ignore"
 
+	// labelPeeringToken is a label that can be added to a secret to allow it to be watched
+	// by the peering controllers.
+	labelPeeringToken = "consul.hashicorp.com/peering-token"
+
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"
 
