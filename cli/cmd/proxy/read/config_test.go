@@ -173,18 +173,42 @@ var testEnvoyConfig = &EnvoyConfig{
 	},
 	Listeners: []Listener{
 		{
-			Name:               "public_listener",
-			Address:            "192.168.69.179:20000",
-			Direction:          "",
-			DestinationCluster: "",
-			LastUpdated:        "",
+			Name:    "public_listener",
+			Address: "192.168.69.179:20000",
+			FilterChain: []FilterChain{
+				{
+					FilterChainMatch: "Any",
+					Filters:          []string{"* -> local_app/\n  DENY ^spiffe://[^/]+/ns/default/dc/[^/]+/svc/client$"},
+				},
+			},
+			Direction:   "INBOUND",
+			LastUpdated: "2022-06-09T00:39:27.668Z",
 		},
 		{
-			Name:               "outbound_listener",
-			Address:            "127.0.0.1:15001",
-			Direction:          "",
-			DestinationCluster: "",
-			LastUpdated:        "",
+			Name:    "outbound_listener",
+			Address: "127.0.0.1:15001",
+			FilterChain: []FilterChain{
+				{
+					FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
+					Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
+				},
+				{
+					FilterChainMatch: "10.100.254.176/32, 240.0.0.4/32",
+					Filters:          []string{"* -> server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul/"},
+				},
+				{
+					FilterChainMatch: "10.100.31.2/32, 240.0.0.2/32",
+					Filters: []string{
+						"-> frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+					},
+				},
+				{
+					FilterChainMatch: "Any",
+					Filters:          []string{"-> original-destination"},
+				},
+			},
+			Direction:   "OUTBOUND",
+			LastUpdated: "2022-05-24T17:41:59.079Z",
 		},
 	},
 	Routes: []Route{
