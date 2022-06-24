@@ -54,29 +54,6 @@ load _helpers
   [[ "$output" =~ "client.grpc must be true" ]]
 }
 
-@test "meshGateway/Deployment: fails if global.enabled is false and clients are not explicitly enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enabled=false' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "clients must be enabled" ]]
-}
-
-@test "meshGateway/Deployment: fails if global.enabled is true but clients are explicitly disabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enabled=true' \
-      --set 'client.enabled=false' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "clients must be enabled" ]]
-}
-
 #--------------------------------------------------------------------
 # annotations
 

@@ -1128,9 +1128,8 @@ client:
   # If true, the chart will install all
   # the resources necessary for a Consul client on every Kubernetes node. This _does not_ require
   # `server.enabled`, since the agents can be configured to join an external cluster.
-  # @default: global.enabled
   # @type: boolean
-  enabled: "-"
+  enabled: false
 
   # The name of the Docker image (including any tag) for the containers
   # running Consul client agents.
