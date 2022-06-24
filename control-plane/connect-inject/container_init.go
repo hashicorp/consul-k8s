@@ -37,7 +37,7 @@ type initContainerCommandData struct {
 	NamespaceMirroringEnabled bool
 
 	// ConsulCACert is the PEM-encoded CA certificate to use when
-	// communicating with Consul clients
+	// communicating with Consul.
 	ConsulCACert string
 
 	// ConsulAddress is the address of the Consul server. This should be only the
