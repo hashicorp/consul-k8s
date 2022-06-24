@@ -42,13 +42,16 @@ type Endpoint struct {
 
 // Listener represents a listener in the Envoy config.
 type Listener struct {
-	Name               string
-	Address            string
-	Filters            []string
-	FilterChainMatches []string
-	Direction          string
-	DestinationCluster string
-	LastUpdated        string
+	Name        string
+	Address     string
+	FilterChain []FilterChain
+	Direction   string
+	LastUpdated string
+}
+
+type FilterChain struct {
+	Filters          []string
+	FilterChainMatch string
 }
 
 // Route represents a route in the Envoy config.
@@ -240,8 +243,11 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 		}
 
 		listeners = append(listeners, Listener{
-			Name:    strings.Split(listener.Name, ":")[0],
-			Address: fmt.Sprintf("%s:%d", listener.ActiveState.Listener.Address.SocketAddress.Address, int(listener.ActiveState.Listener.Address.SocketAddress.PortValue)),
+			Name:        strings.Split(listener.Name, ":")[0],
+			Address:     address,
+			FilterChain: filterChain,
+			Direction:   listener.ActiveState.Listener.TrafficDirection,
+			LastUpdated: listener.ActiveState.LastUpdated,
 		})
 	}
 
@@ -318,4 +324,45 @@ func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
 	}
 
 	return secrets, nil
+}
+
+func formatFilterChain(filterChain filterChain) (filterChainMatch string, filters []string) {
+	fcm := []string{}
+	for _, prefixRange := range filterChain.FilterChainMatch.PrefixRanges {
+		fcm = append(fcm, fmt.Sprintf("%s/%d", prefixRange.AddressPrefix, int(prefixRange.PrefixLen)))
+	}
+	if len(fcm) == 0 {
+		fcm = append(fcm, "Any")
+	}
+	filterChainMatch = strings.Join(fcm, ", ")
+
+	for _, chainFilter := range filterChain.Filters {
+		filter := ""
+
+		for _, host := range chainFilter.TypedConfig.RouteConfig.VirtualHosts {
+			filter += strings.Join(host.Domains, ", ")
+			filter += " -> "
+
+			routes := ""
+			for _, route := range host.Routes {
+				routes += fmt.Sprintf("%s%s", route.Route.Cluster, route.Match.Prefix)
+			}
+			filter += routes
+		}
+
+		for _, httpFilter := range chainFilter.TypedConfig.HttpFilters {
+			action := httpFilter.TypedConfig.Rules.Action
+			for _, principal := range httpFilter.TypedConfig.Rules.Policies.ConsulIntentions.Principals {
+				regex := principal.Authenticated.PrincipalName.SafeRegex.Regex
+				filter += fmt.Sprintf("\n  %s %s", action, regex)
+			}
+		}
+
+		if chainFilter.TypedConfig.Cluster != "" {
+			filter += fmt.Sprintf("-> %s", chainFilter.TypedConfig.Cluster)
+		}
+
+		filters = append(filters, filter)
+	}
+	return
 }
