@@ -227,6 +227,18 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 	}
 
 	for _, listener := range listenersCD.DynamicListeners {
+		address := fmt.Sprintf("%s:%d", listener.ActiveState.Listener.Address.SocketAddress.Address, int(listener.ActiveState.Listener.Address.SocketAddress.PortValue))
+
+		// Format the filter chain configs into something more readable.
+		filterChain := []FilterChain{}
+		for _, chain := range listener.ActiveState.Listener.FilterChains {
+			filterChainMatch, filters := formatFilterChain(chain)
+			filterChain = append(filterChain, FilterChain{
+				FilterChainMatch: filterChainMatch,
+				Filters:          filters,
+			})
+		}
+
 		listeners = append(listeners, Listener{
 			Name:    strings.Split(listener.Name, ":")[0],
 			Address: fmt.Sprintf("%s:%d", listener.ActiveState.Listener.Address.SocketAddress.Address, int(listener.ActiveState.Listener.Address.SocketAddress.PortValue)),
