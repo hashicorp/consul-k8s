@@ -31,6 +31,7 @@ type Command struct {
 	UI cli.Ui
 
 	flagACLAuthMethod          string // Auth Method to use for ACLs, if enabled.
+	flagConsulNodeName         string
 	flagPodName                string // Pod name.
 	flagPodNamespace           string // Pod namespace.
 	flagAuthMethodNamespace    string // Consul namespace the auth-method is defined in.
@@ -45,6 +46,7 @@ type Command struct {
 	flagProxyIDFile                    string // Location to write the output proxyID. Default is defaultProxyIDFile.
 	flagMultiPort                      bool
 	serviceRegistrationPollingAttempts uint64 // Number of times to poll for this service to be registered.
+	loginAttempts                      uint64 // Number of times to retry login call; only used in tests.
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -58,6 +60,7 @@ func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
+	c.flagSet.StringVar(&c.flagConsulNodeName, "consul-node-name", "", "Name of the Consul node where services are registered.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 	c.flagSet.StringVar(&c.flagAuthMethodNamespace, "auth-method-namespace", "", "Consul namespace the auth-method is defined in")
 	c.flagSet.StringVar(&c.flagConsulServiceNamespace, "consul-service-namespace", "", "Consul destination namespace of the service.")
@@ -123,6 +126,7 @@ func (c *Command) Run(args []string) int {
 			BearerTokenFile: c.flagBearerTokenFile,
 			TokenSinkFile:   c.flagACLTokenSink,
 			Meta:            loginMeta,
+			NumRetries:      c.loginAttempts,
 		}
 		token, err := common.ConsulLogin(consulClient, loginParams, c.logger)
 		if err != nil {
@@ -159,13 +163,13 @@ func (c *Command) Run(args []string) int {
 			// this one Pod. If so, we want to ensure the service and proxy matching our expected name is registered.
 			filter += fmt.Sprintf(` and (Service == %q or Service == "%s-sidecar-proxy")`, c.flagServiceName, c.flagServiceName)
 		}
-		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
+		serviceList, _, err := consulClient.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter})
 		if err != nil {
-			c.logger.Error("Unable to get Agent services", "error", err)
+			c.logger.Error("Unable to get services", "error", err)
 			return err
 		}
 		// Wait for the service and the connect-proxy service to be registered.
-		if len(serviceList) != 2 {
+		if len(serviceList.Services) != 2 {
 			c.logger.Info("Unable to find registered services; retrying")
 			// Once every 10 times we're going to print this informational message to the pod logs so that
 			// it is not "lost" to the user at the end of the retries when the pod enters a CrashLoop.
@@ -173,15 +177,15 @@ func (c *Command) Run(args []string) int {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
 					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
-			if len(serviceList) > 2 {
+			if len(serviceList.Services) > 2 {
 				c.logger.Error("There are multiple Consul services registered for this pod when there must only be one." +
 					" Check if there are multiple Kubernetes services selecting this pod and add the label" +
 					" `consul.hashicorp.com/service-ignore: \"true\"` to all services except the one used by Consul for handling requests.")
 			}
 
-			return fmt.Errorf("did not find correct number of services, found: %d, services: %+v", len(serviceList), serviceList)
+			return fmt.Errorf("did not find correct number of services, found: %d, services: %+v", len(serviceList.Services), serviceList)
 		}
-		for _, svc := range serviceList {
+		for _, svc := range serviceList.Services {
 			c.logger.Info("Registered service has been detected", "service", svc.Service)
 			if c.flagACLAuthMethod != "" {
 				if c.flagServiceName != "" && c.flagServiceAccountName != c.flagServiceName {
@@ -237,6 +241,9 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
 		return errors.New("-service-account-name must be set when ACLs are enabled")
+	}
+	if c.flagConsulNodeName == "" {
+		return errors.New("-consul-node-name must be set")
 	}
 
 	if c.http.ConsulAPITimeout() <= 0 {

@@ -37,9 +37,17 @@ type initContainerCommandData struct {
 	ConsulNamespace           string
 	NamespaceMirroringEnabled bool
 
-	// The PEM-encoded CA certificate to use when
-	// communicating with Consul clients
+	// ConsulCACert is the PEM-encoded CA certificate to use when
+	// communicating with Consul.
 	ConsulCACert string
+
+	// ConsulAddress is the address of the Consul server. This should be only the
+	// host (i.e. not including port or protocol).
+	ConsulAddress string
+
+	// ConsulNodeName is the node name in Consul where services are registered.
+	ConsulNodeName string
+
 	// EnableMetrics adds a listener to Envoy where Prometheus will scrape
 	// metrics from.
 	EnableMetrics bool
@@ -164,6 +172,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		ConsulNamespace:            w.consulNamespace(namespace.Name),
 		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
 		ConsulCACert:               w.ConsulCACert,
+		ConsulAddress:              w.ConsulAddress,
+		ConsulNodeName:             ConsulNodeName,
 		EnableTransparentProxy:     tproxyEnabled,
 		EnableCNI:                  w.EnableCNI,
 		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
@@ -385,18 +395,19 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // the init container.
 const initContainerCommandTpl = `
 {{- if .ConsulCACert}}
-export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
-export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="https://{{ .ConsulAddress }}:8501"
+export CONSUL_GRPC_ADDR="https://{{ .ConsulAddress }}:8502"
 export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
 cat <<EOF >/consul/connect-inject/consul-ca.pem
 {{ .ConsulCACert }}
 EOF
 {{- else}}
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="{{ .ConsulAddress }}:8500"
+export CONSUL_GRPC_ADDR="{{ .ConsulAddress }}:8502"
 {{- end}}
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout={{ .ConsulAPITimeout }} \
+  -consul-node-name={{ .ConsulNodeName }} \
   {{- if .AuthMethod }}
   -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \
@@ -431,6 +442,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name={{ .ConsulNodeName }} \
   {{- if .MultiPort }}
   -proxy-id="$(cat /consul/connect-inject/proxyid-{{.ServiceName}})" \
   {{- else }}
