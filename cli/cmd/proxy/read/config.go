@@ -229,25 +229,43 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 		return listeners, err
 	}
 
+	listenersConfig := []listenerConfig{}
 	for _, listener := range listenersCD.DynamicListeners {
-		address := fmt.Sprintf("%s:%d", listener.ActiveState.Listener.Address.SocketAddress.Address, int(listener.ActiveState.Listener.Address.SocketAddress.PortValue))
+		listenersConfig = append(listenersConfig, listener.ActiveState)
+	}
+	listenersConfig = append(listenersConfig, listenersCD.StaticListeners...)
+
+	for _, listener := range listenersConfig {
+		address := fmt.Sprintf("%s:%d", listener.Listener.Address.SocketAddress.Address, int(listener.Listener.Address.SocketAddress.PortValue))
 
 		// Format the filter chain configs into something more readable.
 		filterChain := []FilterChain{}
-		for _, chain := range listener.ActiveState.Listener.FilterChains {
-			filterChainMatch, filters := formatFilterChain(chain)
+		for _, chain := range listener.Listener.FilterChains {
+			filterChainMatch := []string{}
+			for _, prefixRange := range chain.FilterChainMatch.PrefixRanges {
+				filterChainMatch = append(filterChainMatch, fmt.Sprintf("%s/%d", prefixRange.AddressPrefix, int(prefixRange.PrefixLen)))
+			}
+			if len(filterChainMatch) == 0 {
+				filterChainMatch = append(filterChainMatch, "Any")
+			}
+
 			filterChain = append(filterChain, FilterChain{
-				FilterChainMatch: filterChainMatch,
-				Filters:          filters,
+				FilterChainMatch: strings.Join(filterChainMatch, ", "),
+				Filters:          formatFilters(chain),
 			})
 		}
 
+		direction := "UNSPECIFIED"
+		if listener.Listener.TrafficDirection != "" {
+			direction = listener.Listener.TrafficDirection
+		}
+
 		listeners = append(listeners, Listener{
-			Name:        strings.Split(listener.Name, ":")[0],
+			Name:        strings.Split(listener.Listener.Name, ":")[0],
 			Address:     address,
 			FilterChain: filterChain,
-			Direction:   listener.ActiveState.Listener.TrafficDirection,
-			LastUpdated: listener.ActiveState.LastUpdated,
+			Direction:   direction,
+			LastUpdated: listener.LastUpdated,
 		})
 	}
 
@@ -326,43 +344,45 @@ func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
 	return secrets, nil
 }
 
-func formatFilterChain(filterChain filterChain) (filterChainMatch string, filters []string) {
-	fcm := []string{}
-	for _, prefixRange := range filterChain.FilterChainMatch.PrefixRanges {
-		fcm = append(fcm, fmt.Sprintf("%s/%d", prefixRange.AddressPrefix, int(prefixRange.PrefixLen)))
+func formatFilters(filterChain filterChain) (filters []string) {
+	// Filters can have many custom configurations, each must be handled differently.
+	formatters := map[string]func(typedConfig) string{
+		"type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC":                                     formatFilterRBAC,
+		"type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy":                            formatFilterTCPProxy,
+		"type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager": formatFilterHTTPConnectionManager,
 	}
-	if len(fcm) == 0 {
-		fcm = append(fcm, "Any")
-	}
-	filterChainMatch = strings.Join(fcm, ", ")
 
 	for _, chainFilter := range filterChain.Filters {
-		filter := ""
-
-		for _, host := range chainFilter.TypedConfig.RouteConfig.VirtualHosts {
-			filter += strings.Join(host.Domains, ", ")
-			filter += " -> "
-
-			routes := ""
-			for _, route := range host.Routes {
-				routes += fmt.Sprintf("%s%s", route.Route.Cluster, route.Match.Prefix)
-			}
-			filter += routes
+		if formatter, ok := formatters[chainFilter.TypedConfig.Type]; ok {
+			filters = append(filters, formatter(chainFilter.TypedConfig))
 		}
+	}
+	return
+}
 
-		for _, httpFilter := range chainFilter.TypedConfig.HttpFilters {
-			action := httpFilter.TypedConfig.Rules.Action
-			for _, principal := range httpFilter.TypedConfig.Rules.Policies.ConsulIntentions.Principals {
-				regex := principal.Authenticated.PrincipalName.SafeRegex.Regex
-				filter += fmt.Sprintf("\n  %s %s", action, regex)
-			}
+func formatFilterTCPProxy(config typedConfig) (filter string) {
+	return "-> " + config.Cluster
+}
+
+func formatFilterRBAC(cfg typedConfig) (filter string) {
+	action := cfg.Rules.Action
+	for _, principal := range cfg.Rules.Policies.ConsulIntentions.Principals {
+		regex := principal.Authenticated.PrincipalName.SafeRegex.Regex
+		filter += fmt.Sprintf("%s %s", action, regex)
+	}
+	return
+}
+
+func formatFilterHTTPConnectionManager(cfg typedConfig) (filter string) {
+	for _, host := range cfg.RouteConfig.VirtualHosts {
+		filter += strings.Join(host.Domains, ", ")
+		filter += " -> "
+
+		routes := ""
+		for _, route := range host.Routes {
+			routes += fmt.Sprintf("%s%s", route.Route.Cluster, route.Match.Prefix)
 		}
-
-		if chainFilter.TypedConfig.Cluster != "" {
-			filter += fmt.Sprintf("-> %s", chainFilter.TypedConfig.Cluster)
-		}
-
-		filters = append(filters, filter)
+		filter += routes
 	}
 	return
 }
