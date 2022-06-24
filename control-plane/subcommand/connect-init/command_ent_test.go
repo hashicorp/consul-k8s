@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -18,102 +19,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
+func TestRun_WithNamespaces(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name                   string
-		tls                    bool
 		consulServiceNamespace string
 		acls                   bool
 		authMethodNamespace    string
 		adminPartition         string
 	}{
 		{
-			name:                   "ACLs enabled, no tls, serviceNS=default, authMethodNS=default, partition=default",
-			tls:                    false,
+			name:                   "ACLs enabled; serviceNS=default, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
 			acls:                   true,
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, tls, serviceNS=default, authMethodNS=default, partition=default",
-			tls:                    true,
+			name:                   "ACLs enabled, serviceNS=default, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
 			acls:                   true,
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, no tls, serviceNS=default-ns, authMethodNS=default, partition=default",
-			tls:                    false,
+			name:                   "ACLs enabled, serviceNS=default-ns, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
 			acls:                   true,
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, tls, serviceNS=default-ns, authMethodNS=default, partition=default",
-			tls:                    true,
+			name:                   "ACLs enabled, serviceNS=default-ns, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
 			acls:                   true,
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, no tls, serviceNS=other, authMethodNS=other, partition=default",
-			tls:                    false,
+			name:                   "ACLs enabled, serviceNS=other, authMethodNS=other, partition=default",
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
 			acls:                   true,
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, tls, serviceNS=other, authMethodNS=other, partition=default",
-			tls:                    true,
+			name:                   "ACLs enabled, serviceNS=other, authMethodNS=other, partition=default",
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
 			acls:                   true,
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, no tls, serviceNS=default, authMethodNS=default, partition=default",
-			tls:                    false,
+			name:                   "ACLs disabled, serviceNS=default, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, tls, serviceNS=default, authMethodNS=default, partition=default",
-			tls:                    true,
+			name:                   "ACLs disabled, serviceNS=default, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, no tls, serviceNS=default-ns, authMethodNS=default, partition=default",
-			tls:                    false,
+			name:                   "ACLs disabled, serviceNS=default-ns, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, tls, serviceNS=default-ns, authMethodNS=default, partition=default",
-			tls:                    true,
+			name:                   "ACLs disabled, serviceNS=default-ns, authMethodNS=default, partition=default",
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, no tls, serviceNS=other, authMethodNS=other, partition=default",
-			tls:                    false,
+			name:                   "ACLs disabled, serviceNS=other, authMethodNS=other, partition=default",
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
 			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, tls, serviceNS=other, authMethodNS=other, partition=default",
-			tls:                    true,
+			name:                   "ACLs disabled, serviceNS=other, authMethodNS=other, partition=default",
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
 			adminPartition:         "default",
@@ -129,20 +117,13 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				os.Remove(tokenFile)
 			})
 
-			var caFile, certFile, keyFile string
 			// Start Consul server with ACLs enabled and default deny policy.
-			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+			initialMgmtToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
 			server, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				if c.acls {
 					cfg.ACL.Enabled = true
 					cfg.ACL.DefaultPolicy = "deny"
-					cfg.ACL.Tokens.InitialManagement = masterToken
-				}
-				if c.tls {
-					caFile, certFile, keyFile = test.GenerateServerCerts(t)
-					cfg.CAFile = caFile
-					cfg.CertFile = certFile
-					cfg.KeyFile = keyFile
+					cfg.ACL.Tokens.InitialManagement = initialMgmtToken
 				}
 			})
 			require.NoError(t, err)
@@ -155,14 +136,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				Partition: c.adminPartition,
 			}
 			if c.acls {
-				cfg.Token = masterToken
-			}
-			if c.tls {
-				cfg.Address = server.HTTPSAddr
-				cfg.Scheme = "https"
-				cfg.TLSConfig = api.TLSConfig{
-					CAFile: caFile,
-				}
+				cfg.Token = initialMgmtToken
 			}
 
 			consulClient, err := api.NewClient(cfg)
@@ -176,9 +150,15 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 			}
 
 			// Register Consul services.
-			testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+			testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
 			for _, svc := range testConsulServices {
-				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+				serviceRegistration := &api.CatalogRegistration{
+					Node:    connectinject.ConsulNodeName,
+					Address: "127.0.0.1",
+					Service: &svc,
+				}
+				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				require.NoError(t, err)
 			}
 
 			ui := cli.NewMockUi()
@@ -197,14 +177,12 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				"-bearer-token-file", bearerFile,
 				"-proxy-id-file", proxyFile,
 				"-consul-api-timeout", "5s",
+				"-consul-node-name", connectinject.ConsulNodeName,
 			}
 			if c.acls {
 				flags = append(flags, "-acl-auth-method", test.AuthMethod, "-auth-method-namespace", c.authMethodNamespace)
 			}
-			// Add the CA File if necessary since we're not setting CONSUL_CACERT in test ENV.
-			if c.tls {
-				flags = append(flags, "-ca-file", caFile)
-			}
+
 			// Run the command.
 			code := cmd.Run(flags)
 			require.Equal(t, 0, code, ui.ErrorWriter.String())

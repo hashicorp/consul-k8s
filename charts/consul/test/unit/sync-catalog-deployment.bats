@@ -653,6 +653,7 @@ load _helpers
   local object=$(helm template \
       -s templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -750,6 +751,7 @@ load _helpers
   cd `chart_dir`
   local env=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'syncCatalog.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -804,6 +806,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -816,6 +819,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -840,6 +844,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'syncCatalog.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -853,6 +858,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -1279,6 +1285,7 @@ load _helpers
   local command=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |

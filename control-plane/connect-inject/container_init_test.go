@@ -60,15 +60,19 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			MeshWebhook{},
+			MeshWebhook{
+				ConsulAddress: "10.0.0.0",
+			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=0s \
+  -consul-node-name=k8s-service-mesh \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
@@ -91,12 +95,14 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			MeshWebhook{
 				AuthMethod:       "an-auth-method",
 				ConsulAPITimeout: 5 * time.Second,
+				ConsulAddress:    "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="an-auth-method" \
   -service-account-name="a-service-account-name" \
   -service-name="web" \
@@ -131,6 +137,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			},
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -prometheus-scrape-path="/scrape-path" \
   -prometheus-backend-port="20100" \
@@ -206,20 +213,14 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-
 			h := tt.Webhook
 			pod := *tt.Pod(minimal())
 			container, err := h.containerInit(testNS, pod, multiPortInfo{})
-			if tt.ErrStr == "" {
-				require.NoError(err)
-			} else {
-				require.Contains(err.Error(), tt.ErrStr)
-			}
+			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
-			require.Contains(actual, tt.Cmd)
+			require.Contains(t, actual, tt.Cmd)
 			if tt.CmdNot != "" {
-				require.NotContains(actual, tt.CmdNot)
+				require.NotContains(t, actual, tt.CmdNot)
 			}
 		})
 	}
@@ -560,16 +561,19 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -consul-service-namespace="default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -namespace="default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
@@ -585,17 +589,20 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -partition="default" \
   -consul-service-namespace="default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -partition="default" \
   -namespace="default" \
@@ -612,16 +619,19 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
@@ -637,17 +647,20 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -partition="non-default-part" \
   -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -partition="non-default-part" \
   -namespace="non-default" \
@@ -665,12 +678,14 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "default",
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="" \
@@ -681,6 +696,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
   -partition="default" \
@@ -700,12 +716,14 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableK8SNSMirroring:       true,
 				ConsulPartition:            "non-default",
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="" \
@@ -716,6 +734,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
   -partition="non-default" \
@@ -734,16 +753,19 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "",
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -consul-service-namespace="default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -namespace="default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
@@ -766,17 +788,20 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulDestinationNamespace: "non-default",
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -partition="default" \
   -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -partition="default" \
   -namespace="non-default" \
@@ -804,12 +829,14 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableK8SNSMirroring:       true,
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
+				ConsulAddress:              "10.0.0.0",
 			},
 			`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="web" \
@@ -820,6 +847,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
   -partition="non-default" \
@@ -838,13 +866,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-
-			w := tt.Webhook
-			container, err := w.containerInit(testNS, *tt.Pod(minimal()), multiPortInfo{})
-			require.NoError(err)
+			h := tt.Webhook
+			container, err := h.containerInit(testNS, *tt.Pod(minimal()), multiPortInfo{})
+			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
-			require.Equal(tt.Cmd, actual)
+			require.Equal(t, tt.Cmd, actual)
 		})
 	}
 }
@@ -905,7 +931,10 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			MeshWebhook{ConsulAPITimeout: 5 * time.Second},
+			MeshWebhook{
+				ConsulAPITimeout: 5 * time.Second,
+				ConsulAddress:    "10.0.0.0",
+			},
 			2,
 			[]multiPortInfo{
 				{
@@ -918,31 +947,35 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 			},
 			[]string{`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web \
   -service-name="web" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
   -admin-bind=127.0.0.1:19000 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
 
 				`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
   -service-name="web-admin" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
   -admin-bind=127.0.0.1:19001 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
@@ -956,6 +989,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			MeshWebhook{
 				AuthMethod:       "auth-method",
 				ConsulAPITimeout: 5 * time.Second,
+				ConsulAddress:    "10.0.0.0",
 			},
 			2,
 			[]multiPortInfo{
@@ -969,10 +1003,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				},
 			},
 			[]string{`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="web" \
@@ -983,16 +1018,18 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
   -token-file="/consul/connect-inject/acl-token-web" \
   -admin-bind=127.0.0.1:19000 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
 
 				`/bin/sh -ec 
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="auth-method" \
   -service-account-name="web-admin" \
   -service-name="web-admin" \
@@ -1003,6 +1040,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
   -token-file="/consul/connect-inject/acl-token-web-admin" \
   -admin-bind=127.0.0.1:19001 \
@@ -1013,24 +1051,22 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-
-			w := tt.Webhook
+			h := tt.Webhook
 			for i := 0; i < tt.NumInitContainers; i++ {
-				container, err := w.containerInit(testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
-				require.NoError(err)
+				container, err := h.containerInit(testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
+				require.NoError(t, err)
 				actual := strings.Join(container.Command, " ")
-				require.Equal(tt.Cmd[i], actual)
+				require.Equal(t, tt.Cmd[i], actual)
 			}
 		})
 	}
 }
 
 func TestHandlerContainerInit_authMethod(t *testing.T) {
-	require := require.New(t)
 	w := MeshWebhook{
 		AuthMethod:       "release-name-consul-k8s-auth-method",
 		ConsulAPITimeout: 5 * time.Second,
+		ConsulAddress:    "10.0.0.0",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1056,15 +1092,17 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 		},
 	}
 	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
-	require.NoError(err)
+	require.NoError(t, err)
 	actual := strings.Join(container.Command, " ")
-	require.Contains(actual, `
+	require.Contains(t, actual, `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout=5s \
+  -consul-node-name=k8s-service-mesh \
   -acl-auth-method="release-name-consul-k8s-auth-method"`)
-	require.Contains(actual, `
+	require.Contains(t, actual, `
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  -node-name=k8s-service-mesh \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`)
@@ -1074,10 +1112,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 // Consul addresses should use HTTPS
 // and CA cert should be set as env variable.
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
-	require := require.New(t)
 	w := MeshWebhook{
 		ConsulCACert:     "consul-ca-cert",
 		ConsulAPITimeout: 5 * time.Second,
+		ConsulAddress:    "10.0.0.0",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1095,18 +1133,18 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 		},
 	}
 	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
-	require.NoError(err)
+	require.NoError(t, err)
 	actual := strings.Join(container.Command, " ")
-	require.Contains(actual, `
-export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
-export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+	require.Contains(t, actual, `
+export CONSUL_HTTP_ADDR="https://10.0.0.0:8501"
+export CONSUL_GRPC_ADDR="https://10.0.0.0:8502"
 export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
 cat <<EOF >/consul/connect-inject/consul-ca.pem
 consul-ca-cert
 EOF`)
-	require.NotContains(actual, `
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
+	require.NotContains(t, actual, `
+export CONSUL_HTTP_ADDR="10.0.0.0:8500"
+export CONSUL_GRPC_ADDR="10.0.0.0:8502"`)
 }
 
 func TestHandlerContainerInit_Resources(t *testing.T) {

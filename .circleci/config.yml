@@ -99,7 +99,6 @@ commands:
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
-                          -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
@@ -1004,10 +1003,10 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
-      - acceptance-tproxy:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
+#      - acceptance-tproxy:
+#          context: consul-ci
+#          requires:
+#            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:

@@ -29,7 +29,7 @@ func TestConnectInject(t *testing.T) {
 		secure      bool
 		autoEncrypt bool
 	}{
-		"Helm install without secure or auto-encrypt": {
+		"Helm install without secure": {
 			clusterKind: consul.Helm,
 			releaseName: helpers.RandomName(),
 		},
@@ -38,13 +38,7 @@ func TestConnectInject(t *testing.T) {
 			releaseName: helpers.RandomName(),
 			secure:      true,
 		},
-		"Helm install with secure and auto-encrypt": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-			secure:      true,
-			autoEncrypt: true,
-		},
-		"CLI install without secure or auto-encrypt": {
+		"CLI install without secure": {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 		},
@@ -52,12 +46,6 @@ func TestConnectInject(t *testing.T) {
 			clusterKind: consul.CLI,
 			releaseName: consul.CLIReleaseName,
 			secure:      true,
-		},
-		"CLI install with secure and auto-encrypt": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-			secure:      true,
-			autoEncrypt: true,
 		},
 	}
 
@@ -129,6 +117,7 @@ func TestConnectInject(t *testing.T) {
 // TestConnectInjectOnUpgrade tests that Connect works before and after an
 // upgrade is performed on the cluster.
 func TestConnectInjectOnUpgrade(t *testing.T) {
+	t.Skipf("skipping this test because it's not yet supported with agentless")
 	cases := map[string]struct {
 		clusterKind      consul.ClusterKind
 		releaseName      string
@@ -256,48 +245,6 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 				}
 			})
 		})
-	}
-}
-
-// Test that when Consul clients are restarted and lose all their registrations,
-// the services get re-registered and can continue to talk to each other.
-func TestConnectInject_RestartConsulClients(t *testing.T) {
-	cfg := suite.Config()
-	ctx := suite.Environment().DefaultContext(t)
-
-	helmValues := map[string]string{
-		"connectInject.enabled": "true",
-	}
-
-	releaseName := helpers.RandomName()
-	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-
-	consulCluster.Create(t)
-
-	logger.Log(t, "creating static-server and static-client deployments")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-	if cfg.EnableTransparentProxy {
-		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-	} else {
-		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
-	}
-
-	logger.Log(t, "checking that connection is successful")
-	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
-	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
-	}
-
-	logger.Log(t, "restarting Consul client daemonset")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("ds/%s-consul-client", releaseName))
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "status", fmt.Sprintf("ds/%s-consul-client", releaseName))
-
-	logger.Log(t, "checking that connection is still successful")
-	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
-	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 	}
 }
 

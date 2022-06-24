@@ -1,7 +1,5 @@
 {{- if and .Values.global.peering.enabled (not .Values.connectInject.enabled) }}{{ fail "setting global.peering.enabled to true requires connectInject.enabled to be true" }}{{ end }}
 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled for connect injection" }}{{ end }}
-{{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for connect injection" }}{{ end }}
 {{- if and .Values.connectInject.consulNamespaces.mirroringK8S (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if mirroringK8S=true" }}{{ end }}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 {{- if .Values.connectInject.centralConfig }}{{- if eq (toString .Values.connectInject.centralConfig.enabled) "false" }}{{ fail "connectInject.centralConfig.enabled cannot be set to false; to disable, set enable_central_service_config to false in server.extraConfig and client.extraConfig" }}{{ end -}}{{ end -}}
@@ -97,14 +95,6 @@ spec:
             - name: CONSUL_HTTP_TOKEN_FILE
               value: "/consul/login/acl-token"
             {{- end }}
-            {{- if .Values.global.tls.enabled }}
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
-            {{- end }}
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
             {{- if (and .Values.connectInject.aclInjectToken.secretName .Values.connectInject.aclInjectToken.secretKey) }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
@@ -114,10 +104,18 @@ spec:
             {{- end }}
             - name: CONSUL_HTTP_ADDR
               {{- if .Values.global.tls.enabled }}
-              value: https://$(HOST_IP):8501
+              value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
               {{- else }}
-              value: http://$(HOST_IP):8500
+              value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
+            {{- end }}
+            {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
+            - name: CONSUL_CACERT
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: "/vault/secrets/serverca.crt"
+              {{- else }}
+              value: "/consul/tls/ca/tls.crt"
               {{- end }}
+            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -314,11 +312,7 @@ spec:
             name: consul-data
             readOnly: true
           {{- if .Values.global.tls.enabled }}
-          {{- if .Values.global.tls.enableAutoEncrypt }}
-          - name: consul-auto-encrypt-ca-cert
-          {{- else }}
           - name: consul-ca-cert
-          {{- end }}
             mountPath: /consul/tls/ca
             readOnly: true
           {{- end }}
@@ -349,45 +343,32 @@ spec:
           - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
             path: tls.crt
       {{- end }}
-      {{- if .Values.global.tls.enableAutoEncrypt }}
-      - name: consul-auto-encrypt-ca-cert
-        emptyDir:
-          medium: "Memory"
-      {{- end }}
-      {{- end }}
-      {{- if or (and .Values.global.acls.manageSystemACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
-      initContainers:
-      {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
-      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
       {{- end }}
       {{- if .Values.global.acls.manageSystemACLs }}
+      initContainers:
       - name: connect-injector-acl-init
         env:
-        - name: HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-          {{- if .Values.global.tls.enabled }}
-        - name: CONSUL_CACERT
-          value: /consul/tls/ca/tls.crt
-          {{- end }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.global.tls.enabled }}
-          value: https://$(HOST_IP):8501
+          value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
           {{- else }}
-          value: http://$(HOST_IP):8500
+          value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
           {{- end }}
+        {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
+        - name: CONSUL_CACERT
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          value: "/vault/secrets/serverca.crt"
+          {{- else }}
+          value: "/consul/tls/ca/tls.crt"
+          {{- end }}
+        {{- end }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
         {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-        {{- else }}
         - name: consul-ca-cert
-        {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
         {{- end }}
@@ -416,7 +397,6 @@ spec:
           limits:
             memory: "25Mi"
             cpu: "50m"
-      {{- end }}
       {{- end }}
       {{- if .Values.connectInject.priorityClassName }}
       priorityClassName: {{ .Values.connectInject.priorityClassName | quote }}
