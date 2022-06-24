@@ -24,7 +24,6 @@ func TestConnectInject(t *testing.T) {
 		clusterKind consul.ClusterKind
 		releaseName string
 		secure      bool
-		autoEncrypt bool
 	}{
 		"Helm install without secure": {
 			clusterKind: consul.Helm,
@@ -54,7 +53,6 @@ func TestConnectInject(t *testing.T) {
 			connHelper := ConnectHelper{
 				ClusterKind: c.clusterKind,
 				Secure:      c.secure,
-				AutoEncrypt: c.autoEncrypt,
 				ReleaseName: c.releaseName,
 				Ctx:         ctx,
 				Cfg:         cfg,
