@@ -73,40 +73,6 @@ load _helpers
   [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
-@test "ingressGateways/Deployment: fails if client.grpc=false" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'client.grpc=false' \
-      --set 'connectInject.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "client.grpc must be true" ]]
-}
-
-@test "ingressGateways/Deployment: fails if global.enabled is false and clients are not explicitly enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enabled=false' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "clients must be enabled" ]]
-}
-
-@test "ingressGateways/Deployment: fails if global.enabled is true but clients are explicitly disabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enabled=true' \
-      --set 'client.enabled=false' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "clients must be enabled" ]]
-}
-
 @test "ingressGateways/Deployment: fails if there are duplicate gateway names" {
   cd `chart_dir`
   run helm template \

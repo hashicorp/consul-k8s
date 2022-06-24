@@ -100,8 +100,8 @@ type LoginParams struct {
 	// Meta is the metadata to set on the token.
 	Meta map[string]string
 
-	// numRetries is only used in tests to make them run faster.
-	numRetries uint64
+	// NumRetries is the number of times to try to log in.
+	NumRetries uint64
 }
 
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
@@ -117,8 +117,8 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 		return "", fmt.Errorf("no bearer token found in %q", params.BearerTokenFile)
 	}
 
-	if params.numRetries == 0 {
-		params.numRetries = numLoginRetries
+	if params.NumRetries == 0 {
+		params.NumRetries = numLoginRetries
 	}
 	var token *api.ACLToken
 	err = backoff.Retry(func() error {
@@ -145,7 +145,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 			}
 		}
 		return err
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), params.numRetries))
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), params.NumRetries))
 	if err != nil {
 		log.Error("Hit maximum retries for consul login", "error", err)
 		return "", err

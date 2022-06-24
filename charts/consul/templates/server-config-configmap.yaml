@@ -27,6 +27,7 @@ data:
       "data_dir": "/consul/data",
       "domain": "{{ .Values.global.domain }}",
       "ports": {
+        "grpc": 8502,
         "serf_lan": {{ .Values.server.ports.serflan.port }}
       },
       "recursors": {{ .Values.global.recursors | toJson }},

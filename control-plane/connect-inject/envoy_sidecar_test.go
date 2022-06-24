@@ -8,10 +8,55 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestHandlerEnvoySidecar(t *testing.T) {
-	require := require.New(t)
+	h := MeshWebhook{}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+
+	container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+	require.NoError(t, err)
+	require.Equal(t, container.Command, []string{
+		"envoy",
+		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+		"--concurrency", "0",
+	})
+
+	require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: "/consul/connect-inject",
+		},
+	})
+	expectedProbe := &corev1.Probe{
+		Handler: corev1.Handler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(EnvoyInboundListenerPort),
+			},
+		},
+		InitialDelaySeconds: 1,
+	}
+	require.Equal(t, expectedProbe, container.ReadinessProbe)
+	require.Equal(t, expectedProbe, container.LivenessProbe)
+	require.Nil(t, container.StartupProbe)
+}
+
+func TestHandlerEnvoySidecar_Concurrency(t *testing.T) {
 	cases := map[string]struct {
 		annotations map[string]string
 		expCommand  []string
@@ -46,6 +91,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			expErr: "invalid envoy concurrency, must be >= 0: -42",
 		},
 	}
+
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			h := MeshWebhook{}
@@ -63,24 +109,17 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			}
 			container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
 			if c.expErr != "" {
-				require.Contains(err.Error(), c.expErr)
+				require.EqualError(t, err, c.expErr)
 			} else {
-				require.NoError(err)
-				require.Equal(c.expCommand, container.Command)
-				require.Equal(container.VolumeMounts, []corev1.VolumeMount{
-					{
-						Name:      volumeName,
-						MountPath: "/consul/connect-inject",
-					},
-				})
+				require.NoError(t, err)
+				require.Equal(t, c.expCommand, container.Command)
 			}
 		})
 	}
 }
 
 func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
-	require := require.New(t)
-	w := MeshWebhook{}
+	h := MeshWebhook{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -114,16 +153,29 @@ func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1", "--concurrency", "0"},
 	}
 	for i := 0; i < 2; i++ {
-		container, err := w.envoySidecar(testNS, pod, multiPortInfos[i])
-		require.NoError(err)
-		require.Equal(expCommand[i], container.Command)
+		container, err := h.envoySidecar(testNS, pod, multiPortInfos[i])
+		require.NoError(t, err)
+		require.Equal(t, expCommand[i], container.Command)
 
-		require.Equal(container.VolumeMounts, []corev1.VolumeMount{
+		require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
 			{
 				Name:      volumeName,
 				MountPath: "/consul/connect-inject",
 			},
 		})
+
+		port := EnvoyInboundListenerPort + i
+		expectedProbe := &corev1.Probe{
+			Handler: corev1.Handler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(port),
+				},
+			},
+			InitialDelaySeconds: 1,
+		}
+		require.Equal(t, expectedProbe, container.ReadinessProbe)
+		require.Equal(t, expectedProbe, container.LivenessProbe)
+		require.Nil(t, container.StartupProbe)
 	}
 }
 

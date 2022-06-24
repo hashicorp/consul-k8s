@@ -7,16 +7,6 @@ load _helpers
   assert_empty helm template -s templates/client-snapshot-agent-serviceaccount.yaml .
 }
 
-@test "client/SnapshotAgentServiceAccount: enabled with client.snapshotAgent.enabled=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-serviceaccount.yaml  \
-      --set 'client.snapshotAgent.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "client/SnapshotAgentServiceAccount: enabled with client.enabled=true and client.snapshotAgent.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -44,6 +34,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-serviceaccount.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \
@@ -65,6 +56,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-serviceaccount.yaml \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.metadata.annotations | length > 0' | tee /dev/stderr)
@@ -75,6 +67,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-serviceaccount.yaml \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set "client.snapshotAgent.serviceAccount.annotations=foo: bar" \
       . | tee /dev/stderr |
