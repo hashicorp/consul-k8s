@@ -34,6 +34,10 @@ type HelmCluster struct {
 	// a bootstrap token from a Kubernetes secret stored in the cluster.
 	ACLToken string
 
+	// SkipCheckForPreviousInstallations is a toggle for skipping the check
+	// if there are any previous installations of this Helm chart in the cluster.
+	SkipCheckForPreviousInstallations bool
+
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
@@ -107,7 +111,9 @@ func (h *HelmCluster) Create(t *testing.T) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	if !h.SkipCheckForPreviousInstallations {
+		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	}
 
 	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 
