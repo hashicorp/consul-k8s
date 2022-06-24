@@ -74,20 +74,22 @@ type endpointConfig struct {
 
 type listenersConfigDump struct {
 	ConfigType       string           `json:"@type"`
-	DynamicListeners []listenerConfig `json:"dynamic_listeners"`
+	DynamicListeners []dynamicConfig  `json:"dynamic_listeners"`
+	StaticListeners  []listenerConfig `json:"static_listeners"`
+}
+
+type dynamicConfig struct {
+	Name        string         `json:"name"`
+	ActiveState listenerConfig `json:"active_state"`
 }
 
 type listenerConfig struct {
-	Name        string      `json:"name"`
-	ActiveState activeState `json:"active_state"`
-}
-
-type activeState struct {
 	Listener    listener `json:"listener"`
 	LastUpdated string   `json:"last_updated"`
 }
 
 type listener struct {
+	Name             string        `json:"name"`
 	Address          address       `json:"address"`
 	FilterChains     []filterChain `json:"filter_chains"`
 	TrafficDirection string        `json:"traffic_direction"`
@@ -104,10 +106,11 @@ type filter struct {
 }
 
 type typedConfig struct {
-	StatPrefix  string            `json:"stat_prefix"`
+	Type        string            `json:"@type"`
 	Cluster     string            `json:"cluster"`
 	RouteConfig filterRouteConfig `json:"route_config"`
 	HttpFilters []httpFilter      `json:"http_filters"`
+	Rules       rules             `json:"rules"`
 }
 
 type filterRouteConfig struct {
@@ -148,10 +151,10 @@ type httpFilter struct {
 }
 
 type httpTypedConfig struct {
-	Rules httpTypedConfigRules `json:"rules"`
+	Rules rules `json:"rules"`
 }
 
-type httpTypedConfigRules struct {
+type rules struct {
 	Action   string                  `json:"action"`
 	Policies httpTypedConfigPolicies `json:"policies"`
 }
