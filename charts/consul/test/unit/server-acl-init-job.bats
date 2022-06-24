@@ -99,17 +99,6 @@ load _helpers
   [[ "$output" =~ "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" ]]
 }
 
-@test "serverACLInit/Job: does not set -client=false when client is enabled (the default)" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command[2] | contains("-client=false")' |
-      tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
 @test "serverACLInit/Job: sets -consul-api-timeout=5s" {
   cd `chart_dir`
   local actual=$(helm template \
