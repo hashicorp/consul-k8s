@@ -266,7 +266,7 @@ func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
 
 	if !filtersPassed || c.flagListeners {
 		c.UI.Output(fmt.Sprintf("Listeners (%d)", len(config.Listeners)), terminal.WithHeaderStyle())
-		listeners := terminal.NewTable("Name", "Address:Port", "Direction", "Filter Chain Match", "Filters")
+		listeners := terminal.NewTable("Name", "Address:Port", "Direction", "Filter Chain Match", "Filters", "Last Updated")
 		for _, listener := range config.Listeners {
 
 			for index, filter := range listener.FilterChain {
@@ -275,7 +275,7 @@ func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
 				filters := strings.Join(filter.Filters, "\n")
 				if index == 0 {
 					listeners.AddRow(
-						[]string{listener.Name, listener.Address, listener.Direction, filter.FilterChainMatch, filters},
+						[]string{listener.Name, listener.Address, listener.Direction, filter.FilterChainMatch, filters, listener.LastUpdated},
 						[]string{})
 				} else {
 					listeners.AddRow(
