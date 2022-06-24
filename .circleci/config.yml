@@ -646,7 +646,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies
 
       - store_test_results:
           path: /tmp/test-results
@@ -701,7 +701,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig"
 
       - store_test_results:
           path: /tmp/test-results
@@ -762,7 +762,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig"
 
       - store_test_results:
           path: /tmp/test-results
@@ -857,7 +857,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2"
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
