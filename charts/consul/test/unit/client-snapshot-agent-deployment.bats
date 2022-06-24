@@ -13,6 +13,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -43,6 +44,7 @@ load _helpers
     cd `chart_dir`
     run helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=' \
       --set 'client.snapshotAgent.configSecret.secretKey=bar' \
@@ -55,6 +57,7 @@ load _helpers
     cd `chart_dir`
     run helm template \
         -s templates/client-snapshot-agent-deployment.yaml  \
+        --set 'client.enabled=true' \
         --set 'client.snapshotAgent.enabled=true' \
         --set 'client.snapshotAgent.configSecret.secretName=foo' \
         --set 'client.snapshotAgent.configSecret.secretKey=' \
@@ -67,6 +70,7 @@ load _helpers
   cd `chart_dir`
   local vol=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
       --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
@@ -90,6 +94,7 @@ load _helpers
   cd `chart_dir`
   local vol=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
       --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
@@ -110,6 +115,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=a/b/c/d' \
       --set 'client.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
@@ -125,6 +131,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.tolerations | length > 0' | tee /dev/stderr)
@@ -135,6 +142,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.tolerations=allow' \
       . | tee /dev/stderr |
@@ -149,6 +157,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.priorityClassName | length > 0' | tee /dev/stderr)
@@ -159,6 +168,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.priorityClassName=allow' \
       . | tee /dev/stderr |
@@ -173,6 +183,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -184,6 +195,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
@@ -194,6 +206,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -205,6 +218,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -236,6 +250,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -272,6 +287,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
@@ -319,6 +335,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -356,6 +373,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -375,6 +393,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector | length > 0' | tee /dev/stderr)
@@ -385,6 +404,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.nodeSelector=allow' \
       . | tee /dev/stderr |
@@ -399,6 +419,7 @@ load _helpers
   cd `chart_dir`
   local env=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -416,6 +437,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -427,6 +449,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -438,6 +461,7 @@ load _helpers
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
@@ -464,6 +488,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -476,6 +501,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -488,6 +514,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -500,6 +527,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
@@ -513,6 +541,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
@@ -530,6 +559,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
@@ -540,6 +570,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.resources.requests.memory=100Mi' \
       --set 'client.snapshotAgent.resources.requests.cpu=100m' \
@@ -557,6 +588,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -569,6 +601,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -585,6 +618,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -603,6 +637,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
@@ -615,6 +650,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
@@ -627,6 +663,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
@@ -639,6 +676,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
@@ -652,6 +690,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
@@ -665,6 +704,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
@@ -681,6 +721,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -711,6 +752,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -744,6 +786,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
@@ -765,6 +808,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
@@ -787,6 +831,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
@@ -809,6 +854,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
@@ -832,6 +878,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -856,6 +903,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local env=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'client.snapshotAgent.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -875,6 +923,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -890,6 +939,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -905,6 +955,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-snapshot-agent-deployment.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -932,6 +983,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -947,6 +999,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -962,6 +1015,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -980,6 +1034,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -995,6 +1050,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -1014,6 +1070,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -1034,6 +1091,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -1053,6 +1111,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -1076,6 +1135,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=1h")' | tee /dev/stderr)
@@ -1086,6 +1146,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.interval=10h34m5s' \
       . | tee /dev/stderr |

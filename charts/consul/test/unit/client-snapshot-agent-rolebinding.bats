@@ -9,16 +9,6 @@ load _helpers
       .
 }
 
-@test "client/SnapshotAgentRoleBinding: enabled with client.snapshotAgent.enabled=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-snapshot-agent-rolebinding.yaml  \
-      --set 'client.snapshotAgent.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "client/SnapshotAgentRoleBinding: enabled with client.enabled=true and client.snapshotAgent.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -34,6 +24,7 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/client-snapshot-agent-rolebinding.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.enabled=false' \
       .

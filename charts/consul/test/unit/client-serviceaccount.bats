@@ -2,15 +2,6 @@
 
 load _helpers
 
-@test "client/ServiceAccount: enabled by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-serviceaccount.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "client/ServiceAccount: disabled with global.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \
@@ -55,6 +46,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-serviceaccount.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \
       . | tee /dev/stderr)
@@ -75,6 +67,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-serviceaccount.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.metadata.annotations | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -84,6 +77,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-serviceaccount.yaml \
+      --set 'client.enabled=true' \
       --set "client.serviceAccount.annotations=foo: bar" \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations.foo' | tee /dev/stderr)

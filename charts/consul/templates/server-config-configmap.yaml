@@ -27,8 +27,8 @@ data:
       "data_dir": "/consul/data",
       "domain": "{{ .Values.global.domain }}",
       "ports": {
-        "serf_lan": {{ .Values.server.ports.serflan.port }},
-        "grpc": 8503
+        "grpc": 8502,
+        "serf_lan": {{ .Values.server.ports.serflan.port }}
       },
       "recursors": {{ .Values.global.recursors | toJson }},
       "retry_join": ["{{template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.ports.serflan.port }}"],

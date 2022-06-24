@@ -10,7 +10,6 @@
 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.secretsBackend.vault.consulServerRole)) }}{{ fail "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
 {{- if (and .Values.server.serverCert.secretName (not .Values.global.tls.caCert.secretName)) }}{{ fail "If server.serverCert.secretName is provided, global.tls.caCert.secretName must also be provided" }}{{ end }}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
-{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}{{ fail "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.secretsBackend.vault.consulCARole)) }}{{ fail "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
@@ -338,11 +337,12 @@ spec:
             - name: https
               containerPort: 8501
             {{- end }}
-            - containerPort: 8503
+            - name: grpc
+              containerPort: 8502
               {{- if .Values.server.exposeGossipAndRPCPorts }}
-              hostPort: 8503
+              hostPort: 8502
               {{- end }}
-              name: grpc
+              protocol: "TCP"
             - name: serflan-tcp
               containerPort: {{ .Values.server.ports.serflan.port }}
               {{- if .Values.server.exposeGossipAndRPCPorts }}

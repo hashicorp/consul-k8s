@@ -22,6 +22,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-snapshot-agent-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
