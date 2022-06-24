@@ -252,7 +252,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// TestRun_ServicePollingErrors tests that when registered services could not be found,
+// TestRun_Errors tests that when registered services could not be found,
 // we error out.
 func TestRun_Errors(t *testing.T) {
 	t.Parallel()
