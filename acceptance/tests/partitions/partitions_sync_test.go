@@ -128,19 +128,19 @@ func TestPartitions_Sync(t *testing.T) {
 			caKeySecretName := fmt.Sprintf("%s-consul-ca-key", releaseName)
 
 			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
-			copySecret(t, primaryClusterContext, secondaryClusterContext, caCertSecretName)
+			k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, caCertSecretName)
 
 			if !c.ACLsAndAutoEncryptEnabled {
 				// When auto-encrypt is disabled, we need both
 				// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
 				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
-				copySecret(t, primaryClusterContext, secondaryClusterContext, caKeySecretName)
+				k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, caKeySecretName)
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
 			if c.ACLsAndAutoEncryptEnabled {
 				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
-				copySecret(t, primaryClusterContext, secondaryClusterContext, partitionToken)
+				k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, partitionToken)
 			}
 
 			partitionServiceName := fmt.Sprintf("%s-consul-partition", releaseName)

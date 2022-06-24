@@ -125,3 +125,17 @@ func ServiceHost(t *testing.T, cfg *config.TestConfig, ctx environment.TestConte
 		return host
 	}
 }
+
+// CopySecret copies a Kubernetes secret from one cluster to another.
+func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext, secretName string) {
+	t.Helper()
+	var secret *corev1.Secret
+	var err error
+	retry.Run(t, func(r *retry.R) {
+		secret, err = sourceContext.KubernetesClient(t).CoreV1().Secrets(sourceContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+		secret.ResourceVersion = ""
+		require.NoError(r, err)
+	})
+	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destContext.KubectlOptions(t).Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+}
