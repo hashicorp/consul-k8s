@@ -538,11 +538,7 @@ func (c *Command) Run(args []string) int {
 			RequireAnnotation:             !c.flagDefaultInject,
 			AuthMethod:                    c.flagACLAuthMethod,
 			ConsulCACert:                  string(consulCACert),
-			TLSEnabled:                    consulURL.Scheme == "https",
-			ConsulHTTPPort:                consulURL.Port(),
-			ConsulGRPCPort:                "8502", // todo(ishustava): should be passed via flag
 			ConsulAddress:                 consulURL.Hostname(),
-			ConsulTLSServerName:           c.http.TLSServerName(),
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,

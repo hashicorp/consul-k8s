@@ -109,8 +109,7 @@ spec:
               {{- else }}
               value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
             {{- end }}
-            {{- end }}
-            {{- if (and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))) }}
+            {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
             - name: CONSUL_CACERT
               {{- if .Values.global.secretsBackend.vault.enabled }}
               value: "/vault/secrets/serverca.crt"
@@ -328,7 +327,7 @@ spec:
           - mountPath: /consul/login
             name: consul-data
             readOnly: true
-          {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
+          {{- if .Values.global.tls.enabled }}
           - name: consul-ca-cert
             mountPath: /consul/tls/ca
             readOnly: true
@@ -365,15 +364,13 @@ spec:
       initContainers:
       - name: connect-injector-acl-init
         env:
-        {{- if not .Values.externalServers.enabled }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.global.tls.enabled }}
           value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
           {{- else }}
           value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
           {{- end }}
-        {{- end }}
-        {{- if (and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))) }}
+        {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
         - name: CONSUL_CACERT
           {{- if .Values.global.secretsBackend.vault.enabled }}
           value: "/vault/secrets/serverca.crt"
@@ -386,7 +383,7 @@ spec:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
-        {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
+        {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
           readOnly: true

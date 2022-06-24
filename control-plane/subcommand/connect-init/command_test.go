@@ -12,12 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -227,7 +229,7 @@ func TestRun(t *testing.T) {
 
 			if tt.aclsEnabled {
 				// Validate the ACL token was written.
-				tokenData, err := os.ReadFile(tokenFile)
+				tokenData, err := ioutil.ReadFile(tokenFile)
 				require.NoError(t, err)
 				require.NotEmpty(t, tokenData)
 
@@ -251,7 +253,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// TestRun_ServicePollingErrors tests that when registered services could not be found,
+// TestRun_Errors tests that when registered services could not be found,
 // we error out.
 func TestRun_Errors(t *testing.T) {
 	t.Parallel()
