@@ -257,7 +257,7 @@ func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
 			}
 
 			endpoints.AddRow(
-				[]string{endpoint.Address, endpoint.Cluster, fmt.Sprintf("%f", endpoint.Weight), endpoint.Status},
+				[]string{endpoint.Address, endpoint.Cluster, fmt.Sprintf("%.2f", endpoint.Weight), endpoint.Status},
 				[]string{"", "", "", statusColor})
 		}
 		c.UI.Table(endpoints)
