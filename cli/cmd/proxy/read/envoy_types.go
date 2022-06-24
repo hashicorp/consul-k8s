@@ -83,20 +83,101 @@ type listenerConfig struct {
 }
 
 type activeState struct {
-	Listener         listener `json:"listener"`
-	TrafficDirection string   `json:"traffic_direction"`
+	Listener    listener `json:"listener"`
+	LastUpdated string   `json:"last_updated"`
 }
 
 type listener struct {
-	Address      address       `json:"address"`
-	FilterChains []filterChain `json:"filter_chains"`
+	Address          address       `json:"address"`
+	FilterChains     []filterChain `json:"filter_chains"`
+	TrafficDirection string        `json:"traffic_direction"`
 }
 
 type filterChain struct {
-	Filters []filter `json:"filter"`
+	Filters          []filter         `json:"filters"`
+	FilterChainMatch filterChainMatch `json:"filter_chain_match"`
 }
 
 type filter struct {
+	Name        string      `json:"name"`
+	TypedConfig typedConfig `json:"typed_config"`
+}
+
+type typedConfig struct {
+	StatPrefix  string            `json:"stat_prefix"`
+	Cluster     string            `json:"cluster"`
+	RouteConfig filterRouteConfig `json:"route_config"`
+	HttpFilters []httpFilter      `json:"http_filters"`
+}
+
+type filterRouteConfig struct {
+	Name         string              `json:"name"`
+	VirtualHosts []filterVirtualHost `json:"virtual_hosts"`
+}
+
+type filterVirtualHost struct {
+	Name    string        `json:"name"`
+	Domains []string      `json:"domains"`
+	Routes  []filterRoute `json:"routes"`
+}
+
+type filterRoute struct {
+	Match filterMatch        `json:"match"`
+	Route filterRouteCluster `json:"route"`
+}
+
+type filterMatch struct {
+	Prefix string `json:"prefix"`
+}
+
+type filterRouteCluster struct {
+	Cluster string `json:"cluster"`
+}
+
+type filterChainMatch struct {
+	PrefixRanges []prefixRange `json:"prefix_ranges"`
+}
+
+type prefixRange struct {
+	AddressPrefix string  `json:"address_prefix"`
+	PrefixLen     float64 `json:"prefix_len"`
+}
+
+type httpFilter struct {
+	TypedConfig httpTypedConfig `json:"typed_config"`
+}
+
+type httpTypedConfig struct {
+	Rules httpTypedConfigRules `json:"rules"`
+}
+
+type httpTypedConfigRules struct {
+	Action   string                  `json:"action"`
+	Policies httpTypedConfigPolicies `json:"policies"`
+}
+
+type httpTypedConfigPolicies struct {
+	ConsulIntentions httpTypedConfigConsulIntentions `json:"consul-intentions-layer4"`
+}
+
+type httpTypedConfigConsulIntentions struct {
+	Principals []principal `json:"principals"`
+}
+
+type principal struct {
+	Authenticated authenticated `json:"authenticated"`
+}
+
+type authenticated struct {
+	PrincipalName principalName `json:"principal_name"`
+}
+
+type principalName struct {
+	SafeRegex safeRegex `json:"safe_regex"`
+}
+
+type safeRegex struct {
+	Regex string `json:"regex"`
 }
 
 type routesConfigDump struct {
