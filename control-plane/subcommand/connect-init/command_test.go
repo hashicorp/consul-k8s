@@ -16,6 +16,10 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
