@@ -469,11 +469,18 @@ func (c *Command) Run(args []string) int {
 			Mirroring:            c.flagEnableK8SNSMirroring,
 			Prefix:               c.flagK8SNSMirroringPrefix,
 		}
-		mgr.GetWebhookServer().Register("/mutate",
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
 			&webhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
 				Client:       mgr.GetClient(),
 				ConsulClient: c.consulClient,
 				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
+				ConsulMeta:   consulMeta,
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
+			&webhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
+				Client:       mgr.GetClient(),
+				ConsulClient: c.consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
 				ConsulMeta:   consulMeta,
 			}})
 	}

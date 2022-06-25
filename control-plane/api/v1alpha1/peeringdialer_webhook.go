@@ -15,7 +15,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type PeeringAcceptorWebhook struct {
+type PeeringDialerWebhook struct {
 	client.Client
 	ConsulClient *capi.Client
 	Logger       logr.Logger
@@ -30,38 +30,38 @@ type PeeringAcceptorWebhook struct {
 // NOTE: The below line cannot be combined with any other comment. If it is
 // it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-peeringacceptors,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=peeringacceptors,versions=v1alpha1,name=mutate-peeringacceptors.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-peeringdialers,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=peeringdialers,versions=v1alpha1,name=mutate-peeringdialers.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
-func (v *PeeringAcceptorWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var acceptor PeeringAcceptor
-	var acceptorList PeeringAcceptorList
-	err := v.decoder.Decode(req, &acceptor)
+func (v *PeeringDialerWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var dialer PeeringDialer
+	var dialerList PeeringDialerList
+	err := v.decoder.Decode(req, &dialer)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	if req.Operation == admissionv1.Create {
-		v.Logger.Info("validate create", "name", acceptor.KubernetesName())
+		v.Logger.Info("validate create", "name", dialer.KubernetesName())
 
-		if err := v.Client.List(ctx, &acceptorList); err != nil {
+		if err := v.Client.List(ctx, &dialerList); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 
-		if len(acceptorList.Items) == 0 {
+		if len(dialerList.Items) == 0 {
 			return admission.Errored(http.StatusBadRequest,
 				fmt.Errorf("%s validation wh cant create resource already defined - only one exportedservices entry is supported per Kubernetes cluster",
-					acceptor.KubeKind()))
+					dialer.KubeKind()))
 		}
 	}
 
-	if err := acceptor.Validate(v.ConsulMeta); err != nil {
+	if err := dialer.Validate(v.ConsulMeta); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return admission.Allowed(fmt.Sprintf("valid %s request", acceptor.KubeKind()))
+	return admission.Allowed(fmt.Sprintf("valid %s request", dialer.KubeKind()))
 }
 
-func (v *PeeringAcceptorWebhook) InjectDecoder(d *admission.Decoder) error {
+func (v *PeeringDialerWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }
