@@ -1,10 +1,13 @@
 package v1alpha1
 
 import (
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const PeeringAcceptorKubeKind = "peeringacceptor"
 
 func init() {
 	SchemeBuilder.Register(&PeeringAcceptor{}, &PeeringAcceptorList{})
@@ -85,4 +88,13 @@ func (pa *PeeringAcceptor) Secret() *Secret {
 
 func (pa *PeeringAcceptor) SecretRef() *SecretRefStatus {
 	return pa.Status.SecretRef
+}
+func (pa *PeeringAcceptor) KubeKind() string {
+	return PeeringAcceptorKubeKind
+}
+func (pa *PeeringAcceptor) KubernetesName() string {
+	return pa.ObjectMeta.Name
+}
+func (pa *PeeringAcceptor) Validate(consulMeta common.ConsulMeta) error {
+	return nil
 }
