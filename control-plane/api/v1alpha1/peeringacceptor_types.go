@@ -7,7 +7,7 @@ import (
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-const PeeringAcceptorKubeKind = "peeringacceptor"
+const PeeringAcceptorKubeKind = "peeringacceptors"
 
 func init() {
 	SchemeBuilder.Register(&PeeringAcceptor{}, &PeeringAcceptorList{})
