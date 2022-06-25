@@ -239,6 +239,27 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# extra-config
+
+@test "client/DaemonSet: has extra-config volume" {
+  cd `chart_dir`
+
+  # check that the extra-config volume is defined
+  local volume_name=$(helm template \
+      -s templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name == "extra-config") | .name' | tee /dev/stderr)
+  [ "${volume_name}" = "extra-config" ]
+
+  # check that the consul container mounts the volume at /consul/extra-config
+  local mount_path=$(helm template \
+      -s templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "extra-config") | .mountPath' | tee /dev/stderr)
+  [ "${mount_path}" = "/consul/extra-config" ]
+}
+
+#--------------------------------------------------------------------
 # extraVolumes
 
 @test "client/DaemonSet: adds extra volume" {
