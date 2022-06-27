@@ -139,6 +139,7 @@ spec:
                 {{- else }}
                 -default-enable-transparent-proxy=false \
                 {{- end }}
+                -enable-cni={{ .Values.connectInject.cni.enabled }} \
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
                 {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") }}
