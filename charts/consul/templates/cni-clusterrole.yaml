@@ -1,0 +1,23 @@
+{{- if .Values.connectInject.cni.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: cni 
+rules:
+- apiGroups: [""]
+  resources: 
+  - pods
+  verbs: 
+  - get
+  - list
+  - watch
+  - patch
+  - update
+{{- end }}

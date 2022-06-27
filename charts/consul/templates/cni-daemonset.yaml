@@ -1,0 +1,85 @@
+{{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.enabled)) }}{{ fail "connectInject.enabled must be true if connectInject.cni.enabled is true" }}{{ end -}}
+{{- if .Values.connectInject.cni.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: cni 
+spec:
+  {{- if .Values.connectInject.cni.updateStrategy }}
+  updateStrategy:
+    {{ tpl .Values.connectInject.cni.updateStrategy . | nindent 4 | trim }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: cni
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: cni
+      annotations:
+        consul.hashicorp.com/connect-inject: "false"
+    spec:
+      # consul-cni only runs on linux operating systems
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        # Mark the pod as a critical add-on for rescheduling.
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+      # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
+      priorityClassName: system-node-critical
+      serviceAccountName: {{ template "consul.fullname" . }}-cni
+      {{- if not .Values.global.openshift.enabled }}
+      securityContext:
+        {{- toYaml .Values.connectInject.cni.securityContext | nindent 8 -}}
+      {{- end }}
+      # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
+      # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
+      terminationGracePeriodSeconds: 10
+      containers:
+        # This container installs the consul CNI binaries and CNI network config file on each node
+        - name: install-cni
+          image: {{ .Values.global.imageK8S }}
+          securityContext:
+            privileged: true
+          command:
+            - consul-k8s-control-plane
+            - install-cni
+            - -multus={{ .Values.connectInject.cni.multus }}
+            - -log-level={{ default .Values.global.logLevel .Values.connectInject.cni.logLevel }}
+            - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
+            - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
+            - -dns-prefix={{ template "consul.fullname" . }}
+          {{- with .Values.connectInject.cni.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: {{ .Values.connectInject.cni.cniBinDir }}
+              name: cni-bin-dir
+            - mountPath: {{ .Values.connectInject.cni.cniNetDir }}
+              name: cni-net-dir
+      volumes:
+        # Used to install CNI.
+        - name: cni-bin-dir
+          hostPath:
+            path: {{ .Values.connectInject.cni.cniBinDir }} 
+        - name: cni-net-dir
+          hostPath:
+            path: {{ .Values.connectInject.cni.cniNetDir }} 
+{{- end }}
