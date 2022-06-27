@@ -20,11 +20,11 @@ func Test(t *testing.T) {
 # Line 1
 # Line 2
 key: value`,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($string: value$) - Line 1\n  Line 2
 `,
@@ -34,11 +34,11 @@ key: value`,
 # Line 1
 # Line 2
 replicas: 3`,
-			Exp: `- [$replicas$](#replicas)
+			Exp: `- [$replicas$](#h-replicas)
 
 ## All Values
 
-### replicas
+### replicas ((#h-replicas))
 
 - $replicas$ ((#v-replicas)) ($integer: 3$) - Line 1\n  Line 2
 `,
@@ -48,11 +48,11 @@ replicas: 3`,
 # Line 1
 # Line 2
 enabled: true`,
-			Exp: `- [$enabled$](#enabled)
+			Exp: `- [$enabled$](#h-enabled)
 
 ## All Values
 
-### enabled
+### enabled ((#h-enabled))
 
 - $enabled$ ((#v-enabled)) ($boolean: true$) - Line 1\n  Line 2
 `,
@@ -65,11 +65,11 @@ map:
   # Key line 1
   # Key line 2
   key: value`,
-			Exp: `- [$map$](#map)
+			Exp: `- [$map$](#h-map)
 
 ## All Values
 
-### map
+### map ((#h-map))
 
 - $map$ ((#v-map)) - Map line 1\n  Map line 2
 
@@ -88,11 +88,11 @@ map:
   int: 1
   # Bool docs
   bool: true`,
-			Exp: `- [$map$](#map)
+			Exp: `- [$map$](#h-map)
 
 ## All Values
 
-### map
+### map ((#h-map))
 
 - $map$ ((#v-map)) - Map line 1\n  Map line 2
 
@@ -109,11 +109,11 @@ map:
 # key docs
 # @type: string
 key: null`,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($string: null$) - key docs
 `,
@@ -124,11 +124,11 @@ key: null`,
 #
 # line 2
 key: value`,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($string: value$) - line 1\n\n  line 2
 `,
@@ -139,11 +139,11 @@ key: value`,
 # @type: array<string>
 serverAdditionalDNSSANs: []
 `,
-			Exp: `- [$serverAdditionalDNSSANs$](#serveradditionaldnssans)
+			Exp: `- [$serverAdditionalDNSSANs$](#h-serveradditionaldnssans)
 
 ## All Values
 
-### serverAdditionalDNSSANs
+### serverAdditionalDNSSANs ((#h-serveradditionaldnssans))
 
 - $serverAdditionalDNSSANs$ ((#v-serveradditionaldnssans)) ($array<string>: []$) - line 1
 `,
@@ -157,11 +157,11 @@ gossipEncryption:
   # secretKey
   secretKey: ""
 `,
-			Exp: `- [$gossipEncryption$](#gossipencryption)
+			Exp: `- [$gossipEncryption$](#h-gossipencryption)
 
 ## All Values
 
-### gossipEncryption
+### gossipEncryption ((#h-gossipencryption))
 
 - $gossipEncryption$ ((#v-gossipencryption)) - gossipEncryption
 
@@ -178,11 +178,11 @@ bootstrapToken:
   # @type: string
   secretKey: null
 `,
-			Exp: `- [$bootstrapToken$](#bootstraptoken)
+			Exp: `- [$bootstrapToken$](#h-bootstraptoken)
 
 ## All Values
 
-### bootstrapToken
+### bootstrapToken ((#h-bootstraptoken))
 
 - $bootstrapToken$ ((#v-bootstraptoken))
 
@@ -217,11 +217,11 @@ lifecycleSidecarContainer:
       memory: "50Mi"
       cpu: "20m"
 `,
-			Exp: `- [$lifecycleSidecarContainer$](#lifecyclesidecarcontainer)
+			Exp: `- [$lifecycleSidecarContainer$](#h-lifecyclesidecarcontainer)
 
 ## All Values
 
-### lifecycleSidecarContainer
+### lifecycleSidecarContainer ((#h-lifecyclesidecarcontainer))
 
 - $lifecycleSidecarContainer$ ((#v-lifecyclesidecarcontainer)) - lifecycle
 
@@ -263,11 +263,11 @@ server:
   # @type: boolean
   enabled: "-"
 `,
-			Exp: `- [$server$](#server)
+			Exp: `- [$server$](#h-server)
 
 ## All Values
 
-### server
+### server ((#h-server))
 
 - $server$ ((#v-server))
 
@@ -281,11 +281,11 @@ server:
 extraConfig: |
   {}
 `,
-			Exp: `- [$extraConfig$](#extraconfig)
+			Exp: `- [$extraConfig$](#h-extraconfig)
 
 ## All Values
 
-### extraConfig
+### extraConfig ((#h-extraconfig))
 
 - $extraConfig$ ((#v-extraconfig)) ($string: {}$)
 `,
@@ -303,11 +303,11 @@ affinity: |
             component: server
         topologyKey: kubernetes.io/hostname
 `,
-			Exp: `- [$affinity$](#affinity)
+			Exp: `- [$affinity$](#h-affinity)
 
 ## All Values
 
-### affinity
+### affinity ((#h-affinity))
 
 - $affinity$ ((#v-affinity)) ($string$) - Affinity Settings
 `,
@@ -316,11 +316,11 @@ affinity: |
 			Input: `---
 # @type: array<string>
 k8sAllowNamespaces: ["*"]`,
-			Exp: `- [$k8sAllowNamespaces$](#k8sallownamespaces)
+			Exp: `- [$k8sAllowNamespaces$](#h-k8sallownamespaces)
 
 ## All Values
 
-### k8sAllowNamespaces
+### k8sAllowNamespaces ((#h-k8sallownamespaces))
 
 - $k8sAllowNamespaces$ ((#v-k8sallownamespaces)) ($array<string>: ["*"]$)
 `,
@@ -329,11 +329,11 @@ k8sAllowNamespaces: ["*"]`,
 			Input: `---
 # @type: array<string>
 k8sDenyNamespaces: ["kube-system", "kube-public"]`,
-			Exp: `- [$k8sDenyNamespaces$](#k8sdenynamespaces)
+			Exp: `- [$k8sDenyNamespaces$](#h-k8sdenynamespaces)
 
 ## All Values
 
-### k8sDenyNamespaces
+### k8sDenyNamespaces ((#h-k8sdenynamespaces))
 
 - $k8sDenyNamespaces$ ((#v-k8sdenynamespaces)) ($array<string>: ["kube-system", "kube-public"]$)
 `,
@@ -343,11 +343,11 @@ k8sDenyNamespaces: ["kube-system", "kube-public"]`,
 # @type: array<map>
 gateways:
   - name: ingress-gateway`,
-			Exp: `- [$gateways$](#gateways)
+			Exp: `- [$gateways$](#h-gateways)
 
 ## All Values
 
-### gateways
+### gateways ((#h-gateways))
 
 - $gateways$ ((#v-gateways)) ($array<map>$)
 
@@ -360,11 +360,11 @@ gateways:
 # line 2
 key: value
 `,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($string: value$) - <EnterpriseAlert inline /> line 1\n  line 2
 `,
@@ -381,11 +381,11 @@ key: value
 # $$$
 key: value
 `,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($string: value$) - Examples:
 
@@ -403,11 +403,11 @@ key: value
 # @type: override-2
 key: value
 `,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($override-2: value$)
 `,
@@ -424,16 +424,16 @@ ports:
 - port: 8443
   nodePort: null
 `,
-			Exp: `- [$key$](#key)
-- [$ports$](#ports)
+			Exp: `- [$key$](#h-key)
+- [$ports$](#h-ports)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($string: value$)
 
-### ports
+### ports ((#h-ports))
 
 - $ports$ ((#v-ports)) ($array<map>$) - port docs
 `,
@@ -443,11 +443,11 @@ ports:
 # @type: map
 key: null
 `,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key)) ($map$)
 `,
@@ -457,11 +457,11 @@ key: null
 key:
   foo: bar
 `,
-			Exp: `- [$key$](#key)
+			Exp: `- [$key$](#h-key)
 
 ## All Values
 
-### key
+### key ((#h-key))
 
 - $key$ ((#v-key))
 
