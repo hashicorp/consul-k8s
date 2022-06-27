@@ -2,23 +2,23 @@
 
 Use these links to navigate to a particular top-level stanza.
 
-- [`global`](#global)
-- [`server`](#server)
-- [`externalServers`](#externalservers)
-- [`client`](#client)
-- [`dns`](#dns)
-- [`ui`](#ui)
-- [`syncCatalog`](#synccatalog)
-- [`connectInject`](#connectinject)
-- [`controller`](#controller)
-- [`meshGateway`](#meshgateway)
-- [`ingressGateways`](#ingressgateways)
-- [`terminatingGateways`](#terminatinggateways)
-- [`tests`](#tests)
+- [`global`](#h-global)
+- [`server`](#h-server)
+- [`externalServers`](#h-externalservers)
+- [`client`](#h-client)
+- [`dns`](#h-dns)
+- [`ui`](#h-ui)
+- [`syncCatalog`](#h-synccatalog)
+- [`connectInject`](#h-connectinject)
+- [`controller`](#h-controller)
+- [`meshGateway`](#h-meshgateway)
+- [`ingressGateways`](#h-ingressgateways)
+- [`terminatingGateways`](#h-terminatinggateways)
+- [`tests`](#h-tests)
 
 ## All Values
 
-### global
+### global ((#h-global))
 
 - `global` ((#v-global)) - Holds values that affect multiple components of the chart.
 
@@ -245,7 +245,7 @@ Use these links to navigate to a particular top-level stanza.
     - `enabled` ((#v-global-openshift-enabled)) (`boolean: false`) - If true, the Helm chart will create necessary configuration for running
       its components on OpenShift.
 
-### server
+### server ((#h-server))
 
 - `server` ((#v-server)) - Server, when enabled, configures a server cluster to run. This should
   be disabled if you plan on connecting to a Consul cluster external to
@@ -459,7 +459,7 @@ Use these links to navigate to a particular top-level stanza.
     feature, in case kubernetes cluster is behind egress http proxies. Additionally,
     it could be used to configure custom consul parameters.
 
-### externalServers
+### externalServers ((#h-externalservers))
 
 - `externalServers` ((#v-externalservers)) - Configuration for Consul servers when the servers are running outside of Kubernetes.
   When running external servers, configuring these values is recommended
@@ -503,7 +503,7 @@ Use these links to navigate to a particular top-level stanza.
       -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
     ```
 
-### client
+### client ((#h-client))
 
 - `client` ((#v-client)) - Values that configure running a Consul client on Kubernetes nodes.
 
@@ -712,7 +712,7 @@ Use these links to navigate to a particular top-level stanza.
         ...
       ```
 
-### dns
+### dns ((#h-dns))
 
 - `dns` ((#v-dns)) - Configuration for DNS configuration within the Kubernetes cluster.
   This creates a service that routes to all agents (client or server)
@@ -739,7 +739,7 @@ Use these links to navigate to a particular top-level stanza.
     This should be a multi-line string mapping directly to a Kubernetes
     ServiceSpec object.
 
-### ui
+### ui ((#h-ui))
 
 - `ui` ((#v-ui)) - Values that configure the Consul UI.
 
@@ -773,7 +773,7 @@ Use these links to navigate to a particular top-level stanza.
       This should be a multi-line string mapping directly to a Kubernetes
       ServiceSpec object.
 
-### syncCatalog
+### syncCatalog ((#h-synccatalog))
 
 - `syncCatalog` ((#v-synccatalog)) - syncCatalog will run the catalog sync process to sync K8S with Consul
   services. This can run bidirectional (default) or unidirectionally (Consul
@@ -938,7 +938,7 @@ Use these links to navigate to a particular top-level stanza.
 
   - `consulWriteInterval` ((#v-synccatalog-consulwriteinterval)) (`string: null`) - Override the default interval to perform syncing operations creating Consul services.
 
-### connectInject
+### connectInject ((#h-connectinject))
 
 - `connectInject` ((#v-connectinject)) - ConnectInject will enable the automatic Connect sidecar injector.
 
@@ -1170,7 +1170,7 @@ Use these links to navigate to a particular top-level stanza.
 
         - `cpu` ((#v-connectinject-initcontainer-resources-limits-cpu)) (`string: 50m`)
 
-### controller
+### controller ((#h-controller))
 
 - `controller` ((#v-controller)) - Controller handles config entry custom resources.
   Requires consul >= 1.8.4.
@@ -1205,7 +1205,7 @@ Use these links to navigate to a particular top-level stanza.
 
   - `priorityClassName` ((#v-controller-priorityclassname)) (`string: ""`) - Optional priorityClassName.
 
-### meshGateway
+### meshGateway ((#h-meshgateway))
 
 - `meshGateway` ((#v-meshgateway)) - Mesh Gateways enable Consul Connect to work across Consul datacenters.
 
@@ -1354,7 +1354,7 @@ Use these links to navigate to a particular top-level stanza.
         "annotation-key": "annotation-value"
     ```
 
-### ingressGateways
+### ingressGateways ((#h-ingressgateways))
 
 - `ingressGateways` ((#v-ingressgateways)) - Configuration options for ingress gateways. Default values for all
   ingress gateways are defined in `ingressGateways.defaults`. Any of
@@ -1460,7 +1460,7 @@ Use these links to navigate to a particular top-level stanza.
 
     - `name` ((#v-ingressgateways-gateways-name)) (`string: ingress-gateway`)
 
-### terminatingGateways
+### terminatingGateways ((#h-terminatinggateways))
 
 - `terminatingGateways` ((#v-terminatinggateways)) - Configuration options for terminating gateways. Default values for all
   terminating gateways are defined in `terminatingGateways.defaults`. Any of
@@ -1555,7 +1555,7 @@ Use these links to navigate to a particular top-level stanza.
 
     - `name` ((#v-terminatinggateways-gateways-name)) (`string: terminating-gateway`)
 
-### tests
+### tests ((#h-tests))
 
 - `tests` ((#v-tests)) - Control whether a test Pod manifest is generated when running helm template.
   When using helm install, the test Pod is not submitted to the cluster so this

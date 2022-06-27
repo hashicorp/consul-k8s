@@ -54,13 +54,17 @@ var (
 	// And will not match the "# yaml comment" incorrectly.
 	commentPrefix = regexp.MustCompile(`(?m)^[^\S\n]*#[^\S\n]?`)
 
+	funcMap = template.FuncMap{
+		"ToLower": strings.ToLower,
+	}
+
 	// docNodeTmpl is the go template used to print a DocNode node.
 	// We use $ instead of ` in the template so we can use the golang raw string
 	// format. We then do the replace from $ => `.
 	docNodeTmpl = template.Must(
-		template.New("").Parse(
+		template.New("").Funcs(funcMap).Parse(
 			strings.Replace(
-				`{{- if eq .Column 1 }}### {{ .Key }}
+				`{{- if eq .Column 1 }}### {{ .Key }} ((#h-{{ .Key | ToLower }}))
 
 {{ end }}{{ .LeadingIndent }}- ${{ .Key }}$ ((#v{{ .HTMLAnchor }})){{ if ne .FormattedKind "" }} (${{ .FormattedKind }}{{ if .FormattedDefault }}: {{ .FormattedDefault }}{{ end }}$){{ end }}{{ if .FormattedDocumentation}} - {{ .FormattedDocumentation }}{{ end }}`,
 				"$", "`", -1)),
@@ -407,7 +411,7 @@ func generateTOC(node DocNode) string {
 	toc := tocPrefix
 
 	for _, c := range node.Children {
-		toc += fmt.Sprintf("- [`%s`](#%s)\n", c.Key, strings.ToLower(c.Key))
+		toc += fmt.Sprintf("- [`%s`](#h-%s)\n", c.Key, strings.ToLower(c.Key))
 	}
 
 	return toc + tocSuffix
