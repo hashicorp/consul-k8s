@@ -1,0 +1,76 @@
+{{- if .Values.global.imageK8s }}{{ fail "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" }}{{ end -}}
+{{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.transparentProxy.defaultEnabled)) }}{{ fail "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled=true" }}{{ end -}}
+{{- if (and .Values.connectInject.cni.enabled .Values.connectInject.transparentProxy.defaultEnabled) }}
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: consul-cni-node
+  namespace: consul
+  labels:
+    k8s-app: consul-cni-node
+    release: cni-poc
+spec:
+  selector:
+    matchLabels:
+      k8s-app: consul-cni-node
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: consul-cni-node
+        sidecar.consul.io/inject: "false"
+      annotations:
+        sidecar.consul.io/inject: "false"
+        # Add Prometheus Scrape annotations
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: "15014"
+        prometheus.io/path: '/metrics'
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        # Make sure consul-cni-node gets scheduled on all nodes.
+        - effect: NoSchedule
+          operator: Exists
+        # Mark the pod as a critical add-on for rescheduling.
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+      priorityClassName: system-node-critical
+      serviceAccountName: consul-cni
+      # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
+      # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
+      terminationGracePeriodSeconds: 5
+      containers:
+        # This container installs the consul CNI binaries
+        # and CNI network config file on each node.
+        - name: install-cni
+          image: "curtbushko/cni-poc:0.2"
+          # readinessProbe:
+          #   httpGet:
+          #     path: /readyz
+          #     port: 8000
+          securityContext:
+            runAsGroup: 0
+            runAsUser: 0
+            runAsNonRoot: false
+            privileged: true 
+          command: ["/bin/sh", "-ec", "/bin/consul-k8s install-cni", "-cni-net-dir=/etc/cni/net.d/multus.d", "-multus=true"]
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
+      volumes:
+        # Used to install CNI.
+        - name: cni-bin-dir
+          hostPath:
+            path: "/opt/cni/bin"
+        - name: cni-net-dir
+          hostPath:
+            path: "/etc/cni/net.d"
+{{- end }}
