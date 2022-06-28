@@ -1,6 +1,5 @@
 {{- if .Values.global.imageK8s }}{{ fail "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" }}{{ end -}}
 {{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
-# {{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (and .Values.global.adminPartitions.enabled $serverEnabled (ne .Values.global.adminPartitions.name "default"))}}{{ fail "global.adminPartitions.name has to be \"default\" in the server cluster" }}{{ end -}}
 {{- if (and (not .Values.global.secretsBackend.vault.consulClientRole) .Values.global.secretsBackend.vault.enabled) }}{{ fail "global.secretsBackend.vault.consulClientRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}

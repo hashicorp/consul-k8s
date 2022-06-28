@@ -528,20 +528,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, global.tls.enabled=true and global.tls.httpsOnly=true, fail" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'global.metrics.enabled=true'  \
-      --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.tls.enabled=true'  \
-      --set 'global.tls.httpsOnly=true'  \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" ]]
-}
-
 #--------------------------------------------------------------------
 # config-configmap
 
