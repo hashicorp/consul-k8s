@@ -1,33 +1,37 @@
 {{- if .Values.global.imageK8s }}{{ fail "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" }}{{ end -}}
-{{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.transparentProxy.defaultEnabled)) }}{{ fail "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled=true" }}{{ end -}}
+{{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.transparentProxy.defaultEnabled)) }}{{ fail "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled is true" }}{{ end -}}
 {{- if (and .Values.connectInject.cni.enabled .Values.connectInject.transparentProxy.defaultEnabled) }}
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: consul-cni-node
-  namespace: consul
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ .Release.Namespace }}
   labels:
-    k8s-app: consul-cni-node
-    release: cni-poc
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: consul-cni 
 spec:
+  {{- if .Values.connectInject.cni.updateStrategy }}
+  updateStrategy:
+    {{ tpl .Values.connectInject.cni.updateStrategy . | nindent 4 | trim }}
+  {{- end }}
   selector:
     matchLabels:
-      k8s-app: consul-cni-node
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: consul-cni
   template:
     metadata:
       labels:
-        k8s-app: consul-cni-node
-        sidecar.consul.io/inject: "false"
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: consul-cni
       annotations:
-        sidecar.consul.io/inject: "false"
-        # Add Prometheus Scrape annotations
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: "15014"
-        prometheus.io/path: '/metrics'
+        consul.hashicorp.com/connect-inject: false
     spec:
       nodeSelector:
         kubernetes.io/os: linux
@@ -40,37 +44,46 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
+      # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
       priorityClassName: system-node-critical
-      serviceAccountName: consul-cni
+      serviceAccountName: {{ template "consul.fullname" . }}-cni
+      {{- if not .Values.global.openshift.enabled }}
+      securityContext:
+        {{- toYaml .Values.connectInject.cni.securityContext | nindent 8 -}}
+      {{- end }}
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 5
       containers:
-        # This container installs the consul CNI binaries
-        # and CNI network config file on each node.
+        # This container installs the consul CNI binaries and CNI network config file on each node
         - name: install-cni
-          image: "curtbushko/cni-poc:0.2"
-          # readinessProbe:
-          #   httpGet:
-          #     path: /readyz
-          #     port: 8000
+          image: {{ .Values.global.imageK8S }}
           securityContext:
-            runAsGroup: 0
-            runAsUser: 0
-            runAsNonRoot: false
-            privileged: true 
-          command: ["/bin/sh", "-ec", "/bin/consul-k8s install-cni", "-cni-net-dir=/etc/cni/net.d/multus.d", "-multus=true"]
+            privileged: {{ .Values.connectInject.cni.privileged }}
+          command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s-control-plane install-cni \
+              -multus={{ .Values.connectInject.cni.multus }} \
+              -log-level={{ default .Values.global.logLevel .Values.connectInject.cni.logLevel }} \
+              -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }} \
+              -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
+          {{- with .Values.connectInject.cni.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
-            - mountPath: /host/opt/cni/bin
+            - mountPath: /host{{ .Values.connectInject.cni.cniBinDir }}
               name: cni-bin-dir
-            - mountPath: /host/etc/cni/net.d
+            - mountPath: /host{{ .Values.connectInject.cni.cniNetDir }}
               name: cni-net-dir
       volumes:
         # Used to install CNI.
         - name: cni-bin-dir
           hostPath:
-            path: "/opt/cni/bin"
+            path: {{ .Values.connectInject.cni.cniBinDir }} 
         - name: cni-net-dir
           hostPath:
-            path: "/etc/cni/net.d"
+            path: {{ .Values.connectInject.cni.cniNetDir }} 
 {{- end }}

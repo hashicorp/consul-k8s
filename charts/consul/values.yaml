@@ -1,4 +1,4 @@
-# Available parameters and their default values for the Consul chart.
+# Available parameters and tienteir default values for the Consul chart.
 
 # Holds values that affect multiple components of the chart.
 global:
@@ -1863,7 +1863,71 @@ connectInject:
   # Using this feature requires Consul 1.13.0-beta+
   cni:
     # If true, then all traffic redirection setup with use the consul-cni plugin
+    # @type: boolean
     enabled: false
+ 
+    # If multus plugin is enabled or not. If true, the cni installer will generate a consul cni configuration
+    # in a location for the multus program to use. Also, the helm chart will create a custom resource for
+    # NetworkAttachmentDefintion that multis. cniBinDir and cniNetDir must be changed to work with multus.
+    # Please refer to your cloud platform for more informaton on using multus.
+    # @type: boolean
+    multus: false
+
+    # Log level for the installer and plugin. Overrides global.logLevel
+    # @type: string
+    logLevel: null 
+    
+    # Location on the kubernetes node where the CNI plugin is installed
+    # @type: string
+    cniBinDir: "/opt/cni/bin"
+
+    # Location on the kubernetes node of all CNI configuration
+    # @type: string
+    cniNetDir: "/etc/cni/net.d"
+
+    # Allow the cni daemonset to run in privileged mode
+    privileged: true
+  
+    # The resource settings for cni daemonset.
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+ 
+    # The security context for the cni installer daemonset. This should be a YAML map corresponding to a
+    # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
+    # By default, servers will run as non-root, with user ID `100` and group ID `1000`,
+    # which correspond to the consul user and group created by the Consul docker image.
+    # Note: if running on OpenShift, this setting is ignored because the user and group are set automatically
+    # by the OpenShift platform.
+    # @type: map
+    # @recurse: false
+    securityContext:
+      runAsNonRoot: false
+      runAsGroup: 0
+      runAsUser: 0
+
+    # updateStrategy for the cni DaemonSet.
+    # See https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
+    # This should be a multi-line string mapping directly to the updateStrategy
+    #
+    # Example:
+    #
+    # ```yaml
+    # updateStrategy: |
+    #   rollingUpdate:
+    #     maxUnavailable: 5
+    #   type: RollingUpdate
+    # ```
+    #
+    # @type: string
+    updateStrategy: null
+
 
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.
