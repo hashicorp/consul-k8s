@@ -233,6 +233,19 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		data.PrometheusKeyFile = raw
 	}
 
+	// Validate required Prometheus TLS config is present if set.
+	if data.PrometheusCertFile != "" || data.PrometheusKeyFile != "" || data.PrometheusCAFile != "" || data.PrometheusCAPath != "" {
+		if data.PrometheusCAFile == "" && data.PrometheusCAPath == "" {
+			return corev1.Container{}, fmt.Errorf("Must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
+		}
+		if data.PrometheusCertFile == "" {
+			return corev1.Container{}, fmt.Errorf("Must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
+		}
+		if data.PrometheusKeyFile == "" {
+			return corev1.Container{}, fmt.Errorf("Must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
+		}
+	}
+
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
