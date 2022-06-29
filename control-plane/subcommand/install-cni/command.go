@@ -189,7 +189,6 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// appendCNIConfig appends the consul-cni configuration to the main configuration file.
 //The format of the main cni config file is unstructured json consisting of a header and list of plugins
 //
 // {
@@ -204,7 +203,7 @@ func (c *Command) Run(args []string) int {
 //    }
 //   ]
 // }
-//
+// appendCNIConfig appends the consul-cni configuration to the main configuration file.
 func appendCNIConfig(consulCfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
 
 	// Check if file exists

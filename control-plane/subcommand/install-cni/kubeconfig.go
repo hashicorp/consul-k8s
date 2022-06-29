@@ -63,7 +63,7 @@ func createKubeConfig(mountedPath, kubeconfigFile string, logger hclog.Logger) e
 	return nil
 }
 
-// kubeConfigYaml creates the kubeconfig in yaml format using kubectl packages
+// kubeConfigYaml creates the kubeconfig in yaml format using kubectl packages.
 func kubeConfigYaml(server, token, certificateAuthority string) ([]byte, error) {
 	// Use the same struct that kubectl uses to create the kubeconfig file
 	kubeconfig := clientcmdapi.Config{
@@ -97,7 +97,7 @@ func kubeConfigYaml(server, token, certificateAuthority string) ([]byte, error) 
 	return data, nil
 }
 
-// kubernetesServer gets the protocol, host and port from the server environment
+// kubernetesServer gets the protocol, host and port from the server environment.
 func kubernetesServer() (string, error) {
 	protocol, ok := os.LookupEnv("KUBERNETES_SERVICE_PROTOCOL")
 	if !ok {
@@ -118,7 +118,7 @@ func kubernetesServer() (string, error) {
 	return server, nil
 }
 
-// certificatAuthority gets the certificate authority from the caData
+// certificatAuthority gets the certificate authority from the caData.
 func certificatAuthority(caData []byte) (string, error) {
 	if len(caData) == 0 {
 		return "", fmt.Errorf("Empty certificate authority returned from kubernetes rest api")
