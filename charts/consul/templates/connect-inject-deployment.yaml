@@ -54,6 +54,7 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
       containers:
