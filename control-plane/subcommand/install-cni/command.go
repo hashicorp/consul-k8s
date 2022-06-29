@@ -28,6 +28,7 @@ const (
 	defaultKubeconfig      = "ZZZZ-consul-cni-kubeconfig"
 	defaultLogLevel        = "info"
 	defaultCNIBinSourceDir = "/bin"
+	consulCNIBinName       = "consul-cni"
 )
 
 // TODO: Add description that explains the difference between CNIConfig and installConfig
@@ -337,13 +338,11 @@ func destConfigFile(srcFile string, logger hclog.Logger) (string, error) {
 
 // copyCNIBinary copies the cni plugin from inside the installer container to the host.
 func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
-	filename := "consul-cni"
-
 	// If the src file does not exist then either the incorrect command line argument was used or
 	// the docker container we built is broken somehow.
+	logger.Info("Copying CNI binary", "name", consulCNIBinName, "source", srcDir, "dest", destDir)
 
-	logger.Info("Copying CNI binary", "name", filename, "source", srcDir, "dest", destDir)
-	srcFile := filepath.Join(srcDir, filename)
+	srcFile := filepath.Join(srcDir, consulCNIBinName)
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return fmt.Errorf("source cni binary %s does not exist: %v", srcFile, err)
 	}
@@ -359,7 +358,7 @@ func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
 		return fmt.Errorf("could not read %s file: %v", srcFile, err)
 	}
 
-	err = os.WriteFile(filepath.Join(destDir, filename), srcBytes, os.FileMode(0o755))
+	err = os.WriteFile(filepath.Join(destDir, consulCNIBinName), srcBytes, os.FileMode(0o755))
 	if err != nil {
 		return fmt.Errorf("error copying consul-cni binary to %s: %v", destDir, err)
 	}

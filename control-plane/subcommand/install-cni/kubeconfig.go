@@ -1,150 +1,136 @@
 package installcni
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"text/template"
 
 	"github.com/hashicorp/go-hclog"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-type KubeConfigFields struct {
-	KubernetesServiceProtocol string
-	KubernetesServiceHost     string
-	KubernetesServicePort     string
-	TLSConfig                 string
-	ServiceAccountToken       string
-}
+const (
+	tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+)
 
 // createKubeConfig creates the kubeconfig file that the consul-cni plugin will use to communicate with the
 // kubernetes API.
 func createKubeConfig(mountedPath, kubeconfigFile string, logger hclog.Logger) error {
-	var kubecfg *rest.Config
+	var restCfg *rest.Config
 
 	// Get kube config information from cluster
-	kubecfg, err := rest.InClusterConfig()
+	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		return err
 	}
-	err = rest.LoadTLSFiles(kubecfg)
-	if err != nil {
-		return err
-	}
-
-	// Get the host, port and protocol used to talk to the kube API
-	kubeFields, err := kubernetesFields(kubecfg.CAData, logger)
+	err = rest.LoadTLSFiles(restCfg)
 	if err != nil {
 		return err
 	}
 
-	// Write out the kubeconfig file
+	server, err := kubernetesServer()
+	if err != nil {
+		return err
+	}
+
+	ca, err := certificatAuthority(restCfg.CAData)
+	if err != nil {
+		return err
+	}
+
+	token, err := serviceAccountToken()
+	if err != nil {
+		return err
+	}
+
+	data, err := kubeConfigYaml(server, token, ca)
+	if err != nil {
+		return err
+	}
+
+	// Write the kubeconfig file to the host
 	destFile := filepath.Join(mountedPath, kubeconfigFile)
-	err = writeKubeConfig(kubeFields, destFile, logger)
+	err = os.WriteFile(destFile, data, os.FileMode(0o644))
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing kube config file %s: %v", destFile, err)
 	}
 
 	logger.Info("Wrote kubeconfig file", "name", destFile)
 	return nil
 }
 
-// kubernetesFields gets the needed fields from the in cluster config.
-func kubernetesFields(caData []byte, logger hclog.Logger) (*KubeConfigFields, error) {
-	protocol := "https"
-	if val, ok := os.LookupEnv("KUBERNETES_SERVICE_PROTOCOL"); ok {
-		protocol = val
+// kubeConfigYaml creates the kubeconfig in yaml format using kubectl packages
+func kubeConfigYaml(server, token, certificateAuthority string) ([]byte, error) {
+	// Use the same struct that kubectl uses to create the kubeconfig file
+	kubeconfig := clientcmdapi.Config{
+		APIVersion: "v1",
+		Kind:       "Config",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"local": {
+				Server:               server,
+				CertificateAuthority: certificateAuthority,
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"consul-cni": {
+				Token: token,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"consul-cni-context": {
+				Cluster:  "local",
+				AuthInfo: "consul-cni",
+			},
+		},
+		CurrentContext: "consul-cni-context",
 	}
 
-	var serviceHost string
-	if val, ok := os.LookupEnv("KUBERNETES_SERVICE_HOST"); ok {
-		serviceHost = val
-	}
-
-	var servicePort string
-	if val, ok := os.LookupEnv("KUBERNETES_SERVICE_PORT"); ok {
-		servicePort = val
-	}
-
-	ca := "certificate-authority-data: " + base64.StdEncoding.EncodeToString(caData)
-
-	serviceToken, err := serviceAccountToken()
+	// Create yaml from the kubeconfig using kubectls yaml writer
+	data, err := clientcmd.Write(kubeconfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating kubeconfig yaml: %v", err)
+	}
+	return data, nil
+}
+
+// kubernetesServer gets the protocol, host and port from the server environment
+func kubernetesServer() (string, error) {
+	protocol, ok := os.LookupEnv("KUBERNETES_SERVICE_PROTOCOL")
+	if !ok {
+		return "", fmt.Errorf("Unable to get kubernetes api server protocol from environment")
 	}
 
-	logger.Debug(
-		"KubernetesFields: got fields",
-		"protocol",
-		protocol,
-		"kubernetes host",
-		serviceHost,
-		"kubernetes port",
-		servicePort,
-	)
-	return &KubeConfigFields{
-		KubernetesServiceProtocol: protocol,
-		KubernetesServiceHost:     serviceHost,
-		KubernetesServicePort:     servicePort,
-		TLSConfig:                 ca,
-		ServiceAccountToken:       serviceToken,
-	}, nil
+	host, ok := os.LookupEnv("KUBERNETES_SERVICE_HOST")
+	if !ok {
+		return "", fmt.Errorf("Unable to get kubernetes api server host from environment")
+	}
+
+	port, ok := os.LookupEnv("KUBERNETES_SERVICE_PORT")
+	if !ok {
+		return "", fmt.Errorf("Unable to get kubernetes api server port from environment")
+	}
+
+	server := fmt.Sprintf("%s//%s/%s", protocol, host, port)
+	return server, nil
+}
+
+// certificatAuthority gets the certificate authority from the caData
+func certificatAuthority(caData []byte) (string, error) {
+	if len(caData) == 0 {
+		return "", fmt.Errorf("Empty certificate authority returned from kubernetes rest api")
+	}
+	return base64.StdEncoding.EncodeToString(caData), nil
 }
 
 // serviceAccountToken gets the service token from a directory on the host.
 func serviceAccountToken() (string, error) {
-	// serviceAccounttoken = /var/run/secrets/kubernetes.io/serviceaccount/token
 	token, err := ioutil.ReadFile(tokenPath)
 	if err != nil {
 		return "", fmt.Errorf("could not read service account token: %v", err)
 	}
 	return string(token), nil
 }
-
-// writeKubeConfig writes out the kubeconfig file using a template.
-func writeKubeConfig(fields *KubeConfigFields, destFile string, logger hclog.Logger) error {
-	tmpl, err := template.New("kubeconfig").Parse(kubeconfigTmpl)
-	if err != nil {
-		return fmt.Errorf("could not parse kube config template: %v", err)
-	}
-
-	var templateBuffer bytes.Buffer
-	if err := tmpl.Execute(&templateBuffer, fields); err != nil {
-		return fmt.Errorf("could not execute kube config template: %v", err)
-	}
-
-	err = os.WriteFile(destFile, templateBuffer.Bytes(), os.FileMode(0o644))
-	if err != nil {
-		return fmt.Errorf("error writing kube config file %s: %v", destFile, err)
-	}
-
-	logger.Debug("writeKubeConfig:", "destFile", destFile)
-	return nil
-}
-
-const (
-	tokenPath      = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	kubeconfigTmpl = `# Kubeconfig file for consul CNI plugin.
-apiVersion: v1
-kind: Config
-clusters:
-- name: local
-  cluster:
-    server: {{.KubernetesServiceProtocol}}://[{{.KubernetesServiceHost}}]:{{.KubernetesServicePort}}
-    {{.TLSConfig}}
-users:
-- name: consul-cni
-  user:
-    token: "{{.ServiceAccountToken}}"
-contexts:
-- name: consul-cni-context
-  context:
-    cluster: local
-    user: consul-cni
-current-context: consul-cni-context
-`
-)
