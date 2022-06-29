@@ -34,12 +34,12 @@ const (
 
 // installConfig are the values by the installer when running inside a container.
 type installConfig struct {
-	// Mounted location of config files for the installer to use .
+	// MountedCNIBinDir is the location of config files for the installer to use .
 	MountedCNIBinDir string
-	// Mounted location of the cni binaries for the installer to use.
+	// MountedCNINetDir is location of the cni binaries for the installer to use.
 	MountedCNINetDir string
-	// Location of the consul-cni binary from inside the installer container. Where the binaries
-	// are copied to during consul-k8s docker build.
+	// CNIBinSourceDir is the location of the consul-cni binary from inside the installer container. Where
+	// the binaries are copied to during consul-k8s docker build.
 	CNIBinSourceDir string
 }
 
@@ -47,19 +47,19 @@ type installConfig struct {
 type Command struct {
 	UI cli.Ui
 
-	// Location that consul-cni binary on the host
+	// flagCNIBinDir is the location on the host of the consul-cni binary
 	flagCNIBinDir string
-	// Location of cni configuration on the host
+	// flagCNINetDir is the location on the host of cni configuration
 	flagCNINetDir string
-	// True/false flag for multus support
+	// flagMultus is a boolean flag for multus support.
 	flagMultus bool
-	// Kubernetes config file that plugin will need for communication with kubernetes api
+	// flageKubeconfig is the filename of the generated kubeconfig that the plugin will use to communicate with the kubernetes api
 	flagKubeconfig string
-	// Location of consul-cni binary inside the installer container
+	// flagCNIBinSourceDir is the location of consul-cni binary inside the installer container (/bin)
 	flagCNIBinSourceDir string
-	// Log level
+	// flagLogLevel is the logging level
 	flagLogLevel string
-	// Json support for logging
+	// flagLogJson is a boolean flag for json logging  format
 	flagLogJSON bool
 
 	flagSet *flag.FlagSet
@@ -70,15 +70,29 @@ type Command struct {
 }
 
 func (c *Command) init() {
-
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagCNIBinDir, "cni-bin-dir", defaultCNIBinDir, "Location of CNI plugin binaries.")
-	c.flagSet.StringVar(&c.flagCNINetDir, "cni-net-dir", defaultCNINetDir, "Location to write the CNI plugin configuration.")
-	c.flagSet.StringVar(&c.flagCNIBinSourceDir, "bin-source-dir", defaultCNIBinSourceDir, "Host location to copy the binary from")
+	c.flagSet.StringVar(
+		&c.flagCNINetDir,
+		"cni-net-dir",
+		defaultCNINetDir,
+		"Location to write the CNI plugin configuration.",
+	)
+	c.flagSet.StringVar(
+		&c.flagCNIBinSourceDir,
+		"bin-source-dir",
+		defaultCNIBinSourceDir,
+		"Host location to copy the binary from",
+	)
 	c.flagSet.StringVar(&c.flagKubeconfig, "kubeconfig", defaultKubeconfig, "Name of the kubernetes config file")
 	c.flagSet.BoolVar(&c.flagMultus, "multus", false, "If the plugin is a multus plugin (default = false)")
-	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "debug", "Log verbosity level. Supported values (in order of detail) are \"trace\", "+
-		"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flagSet.StringVar(
+		&c.flagLogLevel,
+		"log-level",
+		"debug",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".",
+	)
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
 
 	c.help = flags.Usage(help, c.flagSet)
@@ -86,14 +100,11 @@ func (c *Command) init() {
 
 // Run runs the command.
 func (c *Command) Run(args []string) int {
-	var err error
 	c.once.Do(c.init)
 
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
-
-	// TODO: Validate flags, especially log level
 
 	// Set up logging.
 	if c.logger == nil {
@@ -106,11 +117,17 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Create the CNI Config from command flags
-	cfg, err := c.newCNIConfig()
-	if err != nil {
-		c.logger.Error("Unable create new CNI config from command flags", "error", err)
-		return 1
+	cfg := &config.CNIConfig{
+		Name:       defaultName,
+		Type:       defaultType,
+		CNIBinDir:  c.flagCNIBinDir,
+		CNINetDir:  c.flagCNINetDir,
+		Multus:     c.flagMultus,
+		Kubeconfig: c.flagKubeconfig,
+		LogLevel:   c.flagLogLevel,
 	}
+
+	// TODO: Validate config, especially log level
 
 	c.logger.Info("Running CNI install with configuration",
 		"name", cfg.Name,
@@ -120,15 +137,16 @@ func (c *Command) Run(args []string) int {
 		"multus", cfg.Multus,
 		"kubeconfig", cfg.Kubeconfig,
 		"log_level", cfg.LogLevel)
+
 	// Create the install Config for working with files
-	install, err := c.newInstallConfig()
-	if err != nil {
-		c.logger.Error("Unable create new install config", "error", err)
-		return 1
+	install := &installConfig{
+		MountedCNIBinDir: "/host" + c.flagCNIBinDir,
+		MountedCNINetDir: "/host" + c.flagCNINetDir,
+		CNIBinSourceDir:  c.flagCNIBinSourceDir,
 	}
 
 	// Get the config file that is on the host
-	srcFileName, err := defaultCNINetwork(install.MountedCNINetDir, c.logger)
+	srcFileName, err := defaultCNIConfigFile(install.MountedCNINetDir, c.logger)
 	if err != nil {
 		c.logger.Error("Unable get default config file", "error", err)
 		return 1
@@ -142,11 +160,11 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Get the correct mounted file paths from inside the container
-	srcFile := filepath.Join(install.MountedCNINetDir, srcFileName)
-	destFile := filepath.Join(install.MountedCNINetDir, destFileName)
+	absSrcFilePath := filepath.Join(install.MountedCNINetDir, srcFileName)
+	absDestFilePath := filepath.Join(install.MountedCNINetDir, destFileName)
 
 	// Append the consul configuration to the config that is there
-	err = appendCNIConfig(cfg, srcFile, destFile, c.logger)
+	err = appendCNIConfig(cfg, absSrcFilePath, absDestFilePath, c.logger)
 	if err != nil {
 		c.logger.Error("Unable add the consul-cni config to the config file", "error", err)
 		return 1
@@ -166,35 +184,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// TODO: Do not exit, should run in loop with file watcher
 	return 0
-
-}
-
-// newCNIConfig creates the consul-cni configuration based on flags that are passed to the command.
-func (c *Command) newCNIConfig() (*config.CNIConfig, error) {
-	return &config.CNIConfig{
-		Name:       defaultName,
-		Type:       defaultType,
-		CNIBinDir:  c.flagCNIBinDir,
-		CNINetDir:  c.flagCNINetDir,
-		Multus:     c.flagMultus,
-		Kubeconfig: c.flagKubeconfig,
-		LogLevel:   c.flagLogLevel,
-	}, nil
-}
-
-// newInstallConfig creates the install configuration that is needed for host level operations.
-func (c *Command) newInstallConfig() (*installConfig, error) {
-	return &installConfig{
-		MountedCNIBinDir: "/host" + c.flagCNIBinDir,
-		MountedCNINetDir: "/host" + c.flagCNINetDir,
-		CNIBinSourceDir:  c.flagCNIBinSourceDir,
-	}, nil
 }
 
 // appendCNIConfig appends the consul-cni configuration to the main configuration file.
 func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
-
 	// Needed to convert the config struct for inserting
 	// Check if file exists
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
@@ -216,6 +211,7 @@ func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hcl
 
 	// Convert the json config file into a map. The map that is created has 2 parts:
 	// [0] the cni header ()
+	// [1] the plugins
 	var existingMap map[string]interface{}
 	err = json.Unmarshal(existingCNIConfig, &existingMap)
 	if err != nil {
@@ -263,9 +259,9 @@ func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hcl
 	return nil
 }
 
-// Get the correct config file
+// defaultCNIConfigFile gets the the correct config file from the cni net dir
 // Adapted from kubelet: https://github.com/kubernetes/kubernetes/blob/954996e231074dc7429f7be1256a579bedd8344c/pkg/kubelet/dockershim/network/cni/cni.go#L134
-func defaultCNINetwork(confDir string, logger hclog.Logger) (string, error) {
+func defaultCNIConfigFile(confDir string, logger hclog.Logger) (string, error) {
 	files, err := libcni.ConfFiles(confDir, []string{".conf", ".conflist", ".json"})
 	switch {
 	case err != nil:
@@ -325,7 +321,7 @@ func destConfigFile(srcFile string, logger hclog.Logger) (string, error) {
 
 // copyCNIBinary copies the cni plugin from inside the installer container to the host.
 func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
-	var filename = "consul-cni"
+	filename := "consul-cni"
 
 	// If the src file does not exist then either the incorrect command line argument was used or
 	// the docker container we built is broken somehow.
@@ -337,7 +333,7 @@ func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
 	}
 
 	// If the destDir does not exist then the incorrect command line argument was used or
-	// the CNI settings for the kublet are not correct
+	// the CNI settings for the kubelet are not correct
 	if _, err := os.Stat(destDir); os.IsNotExist(err) {
 		return fmt.Errorf("destination directory %s does not exist: %v", destDir, err)
 	}
@@ -364,10 +360,12 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Consul CNI plugin installer"
-const help = `
+const (
+	synopsis = "Consul CNI plugin installer"
+	help     = `
 Usage: consul-k8s-control-plane cni-install [options]
 
   Install Consul CNI plugin
   Not intended for stand-alone use.
 `
+)

@@ -35,13 +35,10 @@ type CNIArgs struct {
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 }
 
-// PluginConf is whatever you expect your configuration json to be. This is whatever
-// is passed in on stdin. Your plugin may wish to expose its functionality via
-// runtime args, see CONVENTIONS.md in the CNI spec.
+// PluginConf is is the configuration used by the plugin.
 type PluginConf struct {
-	// This embeds the standard NetConf structure which allows your plugin
-	// to more easily parse standard fields like Name, Type, CNIVersion,
-	// and PrevResult.
+	// NetConf is the CNI Specification configuration for standard fields like Name, Type,
+	// CNIVersion and PrevResult
 	types.NetConf
 
 	RuntimeConfig *struct {
@@ -71,20 +68,13 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 		return nil, fmt.Errorf("failed to parse network configuration: %v", err)
 	}
 
-	// Parse previous result. This will parse, validate, and place the
-	// previous result object into conf.PrevResult. If you need to modify
-	// or inspect the PrevResult you will need to convert it to a concrete
-	// versioned Result struct.
+	// The previous result is passed from the previously run plugin to our plugin. We do not
+	// do anything with the result but instead just pass it on when our plugin is finished
 	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
 		return nil, fmt.Errorf("could not parse prevResult: %v", err)
 	}
-	// End previous result parsing
 
-	// Do any validation here
-	// TODO: Do validation
-	//	if conf.AnotherAwesomeArg == "" {
-	//		return nil, fmt.Errorf("anotherAwesomeArg must be specified")
-	//	}
+	// TODO: Do validation of the config that is passed in.
 
 	return &cfg, nil
 }
@@ -180,23 +170,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 // cmdDel is called for DELETE requests.
 func cmdDel(args *skel.CmdArgs) error {
-	conf, err := parseConfig(args.StdinData)
-	if err != nil {
-		return err
-	}
-	_ = conf
-
 	// Nothing for consul-cni plugin to do as everything is removed once the pod is gone
+	return nil
+}
+
+func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
 
 func main() {
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
-}
-
-func cmdCheck(args *skel.CmdArgs) error {
-	// TODO: implement
-	return fmt.Errorf("not implemented")
 }
 
 func hasBeenInjected(pod corev1.Pod) bool {

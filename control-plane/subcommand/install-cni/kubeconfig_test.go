@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestWriteKubeConfig tests the generated kubeconfig file.
 func TestWriteKubeConfig(t *testing.T) {
 	logger := hclog.New(nil)
 	cases := []struct {
@@ -35,7 +36,6 @@ func TestWriteKubeConfig(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-
 			tempDir := t.TempDir()
 			tempDestFile := filepath.Join(tempDir, c.destFile)
 
