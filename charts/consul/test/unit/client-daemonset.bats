@@ -1277,7 +1277,7 @@ local actual=$(echo $object |
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
-      . | yq '.spec.template.spec.initContainers[0].volumeMounts[2]' | tee /dev/stderr)
+      . | yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.name' | tee /dev/stderr)
@@ -1298,7 +1298,7 @@ local actual=$(echo $object |
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=false' \
-      . | yq '.spec.template.spec.initContainers[0].volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+      . | yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
   [ "${object}" == "" ]
 }
 
@@ -1325,7 +1325,7 @@ local actual=$(echo $object |
       --set 'externalServers.hosts[0]=foo'  \
       --set 'externalServers.hosts[1]=bar'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"foo\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1345,7 +1345,7 @@ local actual=$(echo $object |
       --set 'externalServers.hosts[0]=computer'  \
       --set 'externalServers.tlsServerName=foo'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1360,7 +1360,7 @@ local actual=$(echo $object |
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=computer'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -1375,7 +1375,7 @@ local actual=$(echo $object |
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=computer'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -1391,7 +1391,7 @@ local actual=$(echo $object |
       --set 'externalServers.hosts[0]=computer'  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1407,7 +1407,7 @@ local actual=$(echo $object |
       --set 'global.tls.enabled=true' \
       --set 'externalServers.hosts[0]=computer'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -1422,7 +1422,7 @@ local actual=$(echo $object |
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=computer'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -1437,7 +1437,7 @@ local actual=$(echo $object |
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=computer'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
   local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
