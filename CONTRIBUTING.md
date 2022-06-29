@@ -573,7 +573,7 @@ very quickly. These should be used for fast feedback during development.
 The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
 
 ### Prerequisites
-* [Bats](https://github.com/bats-core/bats-core)
+* [Bats](https://github.com/bats-core/bats-core) (Currently, must use v1.6.0+.)
   ```bash
   brew install bats-core
   ```
@@ -581,7 +581,7 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install python-yq
   ```
-* [Helm 3](https://helm.sh) (Currently, must use v3.6.3. Also, Helm 2 is not supported) 
+* [Helm 3](https://helm.sh) (Currently, must use v3.8.0+.) 
   ```bash
   brew install kubernetes-helm
   ```
