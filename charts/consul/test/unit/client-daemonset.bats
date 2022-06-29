@@ -1299,7 +1299,7 @@ local actual=$(echo $object |
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=false' \
       . | yq '.spec.template.spec.initContainers[0].volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" == "" ]
+  [ "${object}" == "" ]
 }
 
 @test "client/DaemonSet: fail when externalServers is enabled but the externalServers.hosts is not provided" {
