@@ -49,6 +49,7 @@ func TestHandlerContainerInit(t *testing.T) {
 		Webhook MeshWebhook
 		Cmd     string // Strings.Contains test
 		CmdNot  string // Not contains
+		ErrStr  string // Error contains
 	}{
 		// The first test checks the whole template. Subsequent tests check
 		// the parts that change.
@@ -69,6 +70,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+			"",
 			"",
 		},
 
@@ -99,6 +101,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -service-name="web" \
 `,
 			"",
+			"",
 		},
 		{
 			"When running the merged metrics server, configures consul connect envoy command",
@@ -116,6 +119,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				pod.Annotations[annotationServiceMetricsPort] = "1234"
 				pod.Annotations[annotationPrometheusScrapePort] = "22222"
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
+				pod.Annotations[annotationPrometheusCAFile] = "/certs/ca.crt"
+				pod.Annotations[annotationPrometheusCAPath] = "/certs/ca/"
+				pod.Annotations[annotationPrometheusCertFile] = "/certs/server.crt"
+				pod.Annotations[annotationPrometheusKeyFile] = "/certs/key.pem"
 				return pod
 			},
 			MeshWebhook{
@@ -126,8 +133,73 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -prometheus-scrape-path="/scrape-path" \
   -prometheus-backend-port="20100" \
+  -prometheus-ca-file="/certs/ca.crt" \
+  -prometheus-ca-path="/certs/ca/" \
+  -prometheus-cert-file="/certs/server.crt" \
+  -prometheus-key-file="/certs/key.pem" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
+			"",
+		},
+		{
+			"When providing Prometheus TLS config, missing CA gives an error",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationEnableMetrics] = "true"
+				pod.Annotations[annotationEnableMetricsMerging] = "true"
+				pod.Annotations[annotationMergedMetricsPort] = "20100"
+				pod.Annotations[annotationPrometheusScrapePort] = "22222"
+				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
+				pod.Annotations[annotationPrometheusCertFile] = "/certs/server.crt"
+				pod.Annotations[annotationPrometheusKeyFile] = "/certs/key.pem"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAPITimeout: 5 * time.Second,
+			},
+			"",
+			"",
+			fmt.Sprintf("Must set one of %q or %q", annotationPrometheusCAFile, annotationPrometheusCAPath),
+		},
+		{
+			"When providing Prometheus TLS config, missing cert gives an error",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationEnableMetrics] = "true"
+				pod.Annotations[annotationEnableMetricsMerging] = "true"
+				pod.Annotations[annotationMergedMetricsPort] = "20100"
+				pod.Annotations[annotationPrometheusScrapePort] = "22222"
+				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
+				pod.Annotations[annotationPrometheusCAFile] = "/certs/ca.crt"
+				pod.Annotations[annotationPrometheusKeyFile] = "/certs/key.pem"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAPITimeout: 5 * time.Second,
+			},
+			"",
+			"",
+			fmt.Sprintf("Must set %q", annotationPrometheusCertFile),
+		},
+		{
+			"When providing Prometheus TLS config, missing key gives an error",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationEnableMetrics] = "true"
+				pod.Annotations[annotationEnableMetricsMerging] = "true"
+				pod.Annotations[annotationMergedMetricsPort] = "20100"
+				pod.Annotations[annotationPrometheusScrapePort] = "22222"
+				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
+				pod.Annotations[annotationPrometheusCAPath] = "/certs/ca/"
+				pod.Annotations[annotationPrometheusCertFile] = "/certs/server.crt"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAPITimeout: 5 * time.Second,
+			},
+			"",
+			"",
+			fmt.Sprintf("Must set %q", annotationPrometheusKeyFile),
 		},
 	}
 
@@ -138,7 +210,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			h := tt.Webhook
 			pod := *tt.Pod(minimal())
 			container, err := h.containerInit(testNS, pod, multiPortInfo{})
-			require.NoError(err)
+			if tt.ErrStr == "" {
+				require.NoError(err)
+			} else {
+				require.Contains(err.Error(), tt.ErrStr)
+			}
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
 			if tt.CmdNot != "" {
