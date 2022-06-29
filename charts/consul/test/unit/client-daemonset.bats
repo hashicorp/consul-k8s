@@ -1453,7 +1453,7 @@ local actual=$(echo $object |
       --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=false' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers | map(select(.name=="consul")) | .[0].env | map(select(.name=="ADVERTISE_IP")) | .[0] | .valueFrom.fieldRef.fieldPath'  |
+      yq -r '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name=="ADVERTISE_IP") | .valueFrom.fieldRef.fieldPath' |
       tee /dev/stderr)
   [ "${actual}" = "status.podIP" ]
 }
@@ -1465,33 +1465,33 @@ local actual=$(echo $object |
       --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers | map(select(.name=="consul")) | .[0].env | map(select(.name=="ADVERTISE_IP")) | .[0] | .valueFrom.fieldRef.fieldPath'  |
+      yq -r '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name=="ADVERTISE_IP") | .valueFrom.fieldRef.fieldPath' |
       tee /dev/stderr)
   [ "${actual}" = "status.hostIP" ]
 }
 
 @test "client/DaemonSet: client doesn't expose hostPorts when client.exposeGossipPorts=false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local has_exposed_host_ports=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'server.enabled=true' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports | map(select(.containerPort==8301)) | .[0].hostPort'  |
+      yq '[.spec.template.spec.containers[] | select(.name=="consul") | .ports[] | select(.containerPort==8301)] | any(has("hostPort"))' |
       tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${has_exposed_host_ports}" = "false" ]
 }
 
 @test "client/DaemonSet: client exposes hostPorts when client.exposeGossipPorts=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local has_exposed_host_ports=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports | map(select(.containerPort==8301)) | .[0].hostPort'  |
+      yq '[.spec.template.spec.containers[] | select(.name=="consul") | .ports[] | select(.containerPort==8301)] | all(has("hostPort"))' |
       tee /dev/stderr)
-  [ "${actual}" = "8301" ]
+  [ "${has_exposed_host_ports}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -1682,13 +1682,13 @@ rollingUpdate:
       --set 'client.containerSecurityContext.tlsInit.readOnlyRootFileSystem=true' \
       . | tee /dev/stderr)
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext.privileged')
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .securityContext.privileged')
   [ "${actual}" = "false" ]
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-acl-init")) | .[0].securityContext.allowPrivilegeEscalation')
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .securityContext.allowPrivilegeEscalation')
   [ "${actual}" = "false" ]
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-tls-init")) | .[0].securityContext.readOnlyRootFileSystem')
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-tls-init") | .securityContext.readOnlyRootFileSystem')
   [ "${actual}" = "true" ]
 }
 
@@ -1708,13 +1708,13 @@ rollingUpdate:
       --set 'client.containerSecurityContext.tlsInit.readOnlyRootFileSystem=true' \
       . | tee /dev/stderr)
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .securityContext')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-acl-init")) | .[0].securityContext')
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .securityContext')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-tls-init")) | .[0].securityContext')
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-tls-init") | .securityContext')
   [ "${actual}" = "null" ]
 }
 
