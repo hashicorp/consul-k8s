@@ -1811,6 +1811,18 @@ syncCatalog:
   # @type: map
   extraLabels: null
 
+  # This value defines additional annotations for
+  # the catalog sync pods. This should be formatted as a multi-line string.
+  #
+  # ```yaml
+  # annotations: |
+  #   "sample/annotation1": "foo"
+  #   "sample/annotation2": "bar"
+  # ```
+  #
+  # @type: string
+  annotations: null
+  
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
@@ -1894,6 +1906,18 @@ connectInject:
   # Optional priorityClassName.
   priorityClassName: ""
 
+  # This value defines additional annotations for
+  # connect inject pods. This should be formatted as a multi-line string.
+  #
+  # ```yaml
+  # annotations: |
+  #   "sample/annotation1": "foo"
+  #   "sample/annotation2": "bar"
+  # ```
+  #
+  # @type: string
+  annotations: null
+  
   # The Docker image for Consul to use when performing Connect injection.
   # Defaults to global.image.
   # @type: string

@@ -33,6 +33,9 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if .Values.syncCatalog.annotations }}
+        {{- tpl .Values.syncCatalog.annotations . | nindent 8 }}
+        {{- end }}
         {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/agent-inject": "true"

@@ -1693,6 +1693,30 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# annotations
+
+@test "connectInject/Deployment: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "connectInject/Deployment: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
 # logLevel
 
 @test "connectInject/Deployment: logLevel info by default from global" {
