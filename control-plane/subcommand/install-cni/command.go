@@ -189,28 +189,37 @@ func (c *Command) Run(args []string) int {
 }
 
 // appendCNIConfig appends the consul-cni configuration to the main configuration file.
-func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
-	// Needed to convert the config struct for inserting
+//The format of the main cni config file is unstructured json consisting of a header and list of plugins
+//
+// {
+//  "cniVersion": "0.3.1",
+//  "name": "kindnet",
+//  "plugins": [
+//    {
+//        <plugin 1>
+//    },
+//    {
+//       <plugin 2>
+//    }
+//   ]
+// }
+//
+func appendCNIConfig(consulCfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
+
 	// Check if file exists
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return fmt.Errorf("source cni config file %s does not exist: %v", srcFile, err)
 	}
 	logger.Debug("appendCNIConfig: using files", "srcFile", srcFile, "destFile", destFile)
-	// This section overwrites an existing plugins list entry for istio-cni
+
+	// Read the main config file
 	existingCNIConfig, err := os.ReadFile(srcFile)
 	if err != nil {
 		return err
 	}
 
-	// convert the consul-cni struct into a map
-	var cfgMap map[string]interface{}
-	err = mapstructure.Decode(cfg, &cfgMap)
-	if err != nil {
-		return fmt.Errorf("error loading Consul CNI config: %v", err)
-	}
-
 	// Convert the json config file into a map. The map that is created has 2 parts:
-	// [0] the cni header ()
+	// [0] the cni header
 	// [1] the plugins
 	var existingMap map[string]interface{}
 	err = json.Unmarshal(existingCNIConfig, &existingMap)
@@ -218,15 +227,22 @@ func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hcl
 		return fmt.Errorf("error unmarshalling existing CNI config: %v", err)
 	}
 
+	// convert the consul-cni struct into a map
+	var consulMap map[string]interface{}
+	err = mapstructure.Decode(consulCfg, &consulMap)
+	if err != nil {
+		return fmt.Errorf("error loading Consul CNI config: %v", err)
+	}
+
 	// Get the 'plugins' map embedded inside of the exisingMap
 	plugins, ok := existingMap["plugins"].([]interface{})
 	if !ok {
 		return fmt.Errorf("error reading plugin list from CNI config")
 	}
+	logger.Debug("appendCNIConfig: plugins are", "plugins", plugins)
 
 	// Check to see if 'type: consul-cni' already exists and remove it before appending.
 	// This can happen in a CrashLoop and we end up with many entries in the config file
-	logger.Debug("appendCNIConfig: plugins are", "plugins", plugins)
 	for i, p := range plugins {
 		plugin, ok := p.(map[string]interface{})
 		if !ok {
@@ -240,7 +256,7 @@ func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hcl
 	}
 
 	// Append the consul-cni map to the already existing plugins
-	existingMap["plugins"] = append(plugins, cfgMap)
+	existingMap["plugins"] = append(plugins, consulMap)
 
 	// Marshal into a new json file
 	existingJSON, err := json.MarshalIndent(existingMap, "", "  ")
