@@ -1503,14 +1503,14 @@ local actual=$(echo $object |
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[0].hostPath == null' | tee /dev/stderr )
+      yq '.spec.template.spec.volumes[] | select(.name == "data") | .hostPath == null' | tee /dev/stderr )
   [ "${actual}" = "true" ]
 
   # Test that emptyDir is set instead.
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[0].emptyDir == {}' | tee /dev/stderr )
+      yq '.spec.template.spec.volumes[] | select(.name == "data") | .emptyDir == {}' | tee /dev/stderr )
   [ "${actual}" = "true" ]
 }
 
@@ -1520,7 +1520,7 @@ local actual=$(echo $object |
       -s templates/client-daemonset.yaml  \
       --set 'client.dataDirectoryHostPath=/opt/consul' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[0].hostPath.path == "/opt/consul"' | tee /dev/stderr)
+      yq '.spec.template.spec.volumes[] | select(.name == "data") | .hostPath.path == "/opt/consul"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
