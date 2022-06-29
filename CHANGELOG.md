@@ -13,6 +13,7 @@ FEATURES:
 IMPROVEMENTS:
 * Helm
   * Bump default Envoy version to 1.23.0. [[GH-1377](https://github.com/hashicorp/consul-k8s/pull/1377)]
+  * Added support for Consul API Gateway to read ReferenceGrant custom resources. This will require either installing Consul API Gateway CRDs from the upcoming v0.4.0 release with `kubectl apply --kustomize "github.com/hashicorp/consul-api-gateway/config/crd?ref=v0.4.0"` or manually installing the ReferenceGrant CRD from the Gateway API v0.5 [Experimental Channel](https://gateway-api.sigs.k8s.io/concepts/versioning/#release-channels-eg-experimental-standard) when setting `apiGateway.enabled=true` [[GH-1299](https://github.com/hashicorp/consul-k8s/pull/1299)]
 
 ## 0.46.1 (July 26, 2022)
 
