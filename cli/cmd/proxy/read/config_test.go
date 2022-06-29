@@ -178,7 +178,7 @@ var testEnvoyConfig = &EnvoyConfig{
 			FilterChain: []FilterChain{
 				{
 					FilterChainMatch: "Any",
-					Filters:          []string{"* -> local_app/\n  DENY ^spiffe://[^/]+/ns/default/dc/[^/]+/svc/client$"},
+					Filters:          []string{"* -> local_app/"},
 				},
 			},
 			Direction:   "INBOUND",
