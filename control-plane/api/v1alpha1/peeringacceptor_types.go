@@ -1,8 +1,10 @@
 package v1alpha1
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -95,6 +97,28 @@ func (pa *PeeringAcceptor) KubeKind() string {
 func (pa *PeeringAcceptor) KubernetesName() string {
 	return pa.ObjectMeta.Name
 }
-func (pa *PeeringAcceptor) Validate(consulMeta common.ConsulMeta) error {
+func (pa *PeeringAcceptor) Validate() error {
+	var errs field.ErrorList
+	// The nil checks must return since you can't do further validations.
+	if pa.Spec.Peer == nil {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("peer"), pa.Spec.Peer, "peer must be specified"))
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: PeeringAcceptorKubeKind},
+			pa.KubernetesName(), errs)
+	}
+	if pa.Spec.Peer.Secret == nil {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("peer").Child("secret"), pa.Spec.Peer.Secret, "secret must be specified"))
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: PeeringAcceptorKubeKind},
+			pa.KubernetesName(), errs)
+	}
+	if pa.Spec.Peer.Secret.Backend != "kubernetes" {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("peer").Child("secret").Child("backend"), pa.Spec.Peer.Secret.Backend, `backend must be "kubernetes"`))
+	}
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: PeeringAcceptorKubeKind},
+			pa.KubernetesName(), errs)
+	}
 	return nil
 }
