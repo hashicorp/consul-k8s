@@ -394,6 +394,32 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 	}
 }
 
+func TestHandlerEnvoySidecar_UserVolumeMounts(t *testing.T) {
+
+	h := MeshWebhook{
+		ImageConsul: "hashicorp/consul:latest",
+		ImageEnvoy:  "hashicorp/consul-k8s:latest",
+	}
+
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+				annotationConsulSidecarUserVolumeMount: "[{\"name\": \"tls-cert\", \"mountPath\": \"/custom/path\"}]",
+			},
+		},
+	}
+	volMount1 := corev1.VolumeMount{
+		Name:      "tls-cert",
+		MountPath: "/custom/path",
+	}
+
+	c, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+	require.NoError(t, err)
+	require.Len(t, c.VolumeMounts, 2)
+	require.Equal(t, c.VolumeMounts[1], volMount1)
+}
+
 func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 	mem1 := resource.MustParse("100Mi")
 	mem2 := resource.MustParse("200Mi")

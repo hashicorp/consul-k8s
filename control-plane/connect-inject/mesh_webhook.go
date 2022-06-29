@@ -328,6 +328,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
+	// Optionally add any volumes that are to be used by the envoy sidecar.
+	if _, ok := pod.Annotations[annotationConsulSidecarUserVolume]; ok {
+		var userVolumes []corev1.Volume
+		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolume]), &userVolumes)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error unmarshalling sidecar user volumes: %s", err))
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, userVolumes...)
+	}
+
 	// Now that the consul-sidecar no longer needs to re-register services periodically
 	// (that functionality lives in the endpoints-controller),
 	// we only need the consul sidecar to run the metrics merging server.

@@ -86,6 +86,10 @@ const (
 	annotationConsulSidecarMemoryLimit   = "consul.hashicorp.com/consul-sidecar-memory-limit"
 	annotationConsulSidecarMemoryRequest = "consul.hashicorp.com/consul-sidecar-memory-request"
 
+	// annotations for sidecar volumes.
+	annotationConsulSidecarUserVolume      = "consul.hashicorp.com/consul-sidecar-user-volume"
+	annotationConsulSidecarUserVolumeMount = "consul.hashicorp.com/consul-sidecar-user-volume-mount"
+
 	// annotations for sidecar concurrency.
 	annotationEnvoyProxyConcurrency = "consul.hashicorp.com/consul-envoy-proxy-concurrency"
 
