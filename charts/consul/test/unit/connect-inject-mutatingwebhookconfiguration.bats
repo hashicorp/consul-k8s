@@ -47,3 +47,21 @@ load _helpers
       yq '.webhooks[0].clientConfig.service.namespace' | tee /dev/stderr)
   [ "${actual}" = "\"foo\"" ]
 }
+
+@test "connectInject/MutatingWebhookConfiguration: peering is enabled, so webhooks for peering exist" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.webhooks[1].name | contains("peeringacceptors.consul.hashicorp.com")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(helm template \
+      -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.webhooks[2].name | contains("peeringdialers.consul.hashicorp.com")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
