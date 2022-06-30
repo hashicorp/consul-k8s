@@ -1,8 +1,8 @@
 {{- if .Values.global.imageK8s }}{{ fail "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" }}{{ end -}}
 {{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.transparentProxy.defaultEnabled)) }}{{ fail "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled is true" }}{{ end -}}
 {{- if (and .Values.connectInject.cni.enabled .Values.connectInject.transparentProxy.defaultEnabled) }}
-kind: DaemonSet
 apiVersion: apps/v1
+kind: DaemonSet
 metadata:
   name: {{ template "consul.fullname" . }}-cni
   namespace: {{ .Release.Namespace }}
@@ -31,7 +31,7 @@ spec:
         release: {{ .Release.Name }}
         component: consul-cni
       annotations:
-        consul.hashicorp.com/connect-inject: false
+        consul.hashicorp.com/connect-inject: "false"
     spec:
       nodeSelector:
         kubernetes.io/os: linux
