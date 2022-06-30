@@ -112,6 +112,7 @@ func (pa *PeeringAcceptor) Validate() error {
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: PeeringAcceptorKubeKind},
 			pa.KubernetesName(), errs)
 	}
+	// Currently, the only supported backend is "kubernetes".
 	if pa.Spec.Peer.Secret.Backend != "kubernetes" {
 		errs = append(errs, field.Invalid(field.NewPath("spec").Child("peer").Child("secret").Child("backend"), pa.Spec.Peer.Secret.Backend, `backend must be "kubernetes"`))
 	}
