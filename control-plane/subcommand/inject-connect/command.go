@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	apiCommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -461,27 +460,17 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		consulMeta := apiCommon.ConsulMeta{
-			PartitionsEnabled:    c.http.Partition() != "",
-			Partition:            c.http.Partition(),
-			NamespacesEnabled:    c.flagEnableNamespaces,
-			DestinationNamespace: c.flagConsulDestinationNamespace,
-			Mirroring:            c.flagEnableK8SNSMirroring,
-			Prefix:               c.flagK8SNSMirroringPrefix,
-		}
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
 			&webhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
 				Client:       mgr.GetClient(),
 				ConsulClient: c.consulClient,
 				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
-				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
 			&webhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
 				Client:       mgr.GetClient(),
 				ConsulClient: c.consulClient,
 				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
-				ConsulMeta:   consulMeta,
 			}})
 	}
 

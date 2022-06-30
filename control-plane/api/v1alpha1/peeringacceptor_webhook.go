@@ -55,9 +55,8 @@ func (v *PeeringAcceptorWebhook) Handle(ctx context.Context, req admission.Reque
 			// If any peering acceptor resource has the same secret name as this one, reject it.
 			if item.Namespace == acceptor.Namespace && item.Secret().Name == acceptor.Secret().Name {
 				return admission.Errored(http.StatusBadRequest,
-					fmt.Errorf("an existing PeeringAcceptor resource has the same secret name `name: %s, namespace: %s`", acceptor.Spec.Peer.Secret.Name, acceptor.Namespace))
+					fmt.Errorf("an existing PeeringAcceptor resource has the same secret name `name: %s, namespace: %s`", acceptor.Secret().Name, acceptor.Namespace))
 			}
-
 		}
 	}
 

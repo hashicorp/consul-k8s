@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,7 +19,6 @@ type PeeringDialerWebhook struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 	decoder      *admission.Decoder
-	ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -40,6 +38,11 @@ func (v *PeeringDialerWebhook) Handle(ctx context.Context, req admission.Request
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
+	// Call validate first to ensure all the fields are validated before checking for secret name duplicates.
+	if err := dialer.Validate(); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
 	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", dialer.KubernetesName())
 
@@ -47,15 +50,12 @@ func (v *PeeringDialerWebhook) Handle(ctx context.Context, req admission.Request
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 
-		if len(dialerList.Items) == 0 {
-			return admission.Errored(http.StatusBadRequest,
-				fmt.Errorf("%s validation wh cant create resource already defined - only one exportedservices entry is supported per Kubernetes cluster",
-					dialer.KubeKind()))
+		for _, item := range dialerList.Items {
+			if item.Namespace == dialer.Namespace && item.Secret().Name == dialer.Secret().Name {
+				return admission.Errored(http.StatusBadRequest,
+					fmt.Errorf("an existing PeeringDialer resource has the same secret name `name: %s, namespace: %s`", dialer.Secret().Name, dialer.Namespace))
+			}
 		}
-	}
-
-	if err := dialer.Validate(v.ConsulMeta); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	return admission.Allowed(fmt.Sprintf("valid %s request", dialer.KubeKind()))
