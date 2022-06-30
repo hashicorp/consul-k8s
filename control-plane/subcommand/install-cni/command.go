@@ -20,11 +20,12 @@ import (
 )
 
 const (
-	defaultName            = "consul-cni"
-	defaultType            = "consul-cni"
-	defaultCNIBinDir       = "/opt/cni/bin"
-	defaultCNINetDir       = "/etc/cni/net.d"
-	defaultMultus          = false
+	defaultName      = "consul-cni"
+	defaultType      = "consul-cni"
+	defaultCNIBinDir = "/opt/cni/bin"
+	defaultCNINetDir = "/etc/cni/net.d"
+	defaultMultus    = false
+	// defaultKubeconfig is named ZZZ-.. as part of a convention that other CNI plugins use.
 	defaultKubeconfig      = "ZZZZ-consul-cni-kubeconfig"
 	defaultLogLevel        = "info"
 	defaultCNIBinSourceDir = "/bin"
@@ -263,6 +264,8 @@ func appendCNIConfig(consulCfg *config.CNIConfig, srcFile, destFile string, logg
 	if err != nil {
 		return fmt.Errorf("error marshalling existing CNI config: %v", err)
 	}
+
+	// libcni nuance/bug. If the newline is missing, the cni plugin will throw errors saying that it cannot get parse the config
 	existingJSON = append(existingJSON, "\n"...)
 
 	// Write the file out

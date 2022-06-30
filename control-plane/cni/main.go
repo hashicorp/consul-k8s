@@ -108,7 +108,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// Check to see if the plugin is a chained plugin
 	if cfg.PrevResult == nil {
-		return fmt.Errorf("must be called as chained plugin")
+		return fmt.Errorf("must be called as final chained plugin")
 	}
 
 	logger.Debug("consul-cni plugin config", "config", cfg)

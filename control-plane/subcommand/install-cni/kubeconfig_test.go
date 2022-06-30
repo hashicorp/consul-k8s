@@ -19,7 +19,7 @@ func TestWriteKubeConfig(t *testing.T) {
 	}{
 		{
 			name:                 "valid kubeconfig file",
-			server:               "https://172.30.0.1:443",
+			server:               "https://[172.30.0.1]:443",
 			token:                "eyJhbGciOiJSUzI1NiIsImtp",
 			certificateAuthority: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0",
 			goldenFile:           "ZZZ-consul-cni-kubeconfig.golden",

@@ -114,7 +114,8 @@ func kubernetesServer() (string, error) {
 		return "", fmt.Errorf("Unable to get kubernetes api server port from environment")
 	}
 
-	server := fmt.Sprintf("%s//%s/%s", protocol, host, port)
+	// Server string format is https://[127.0.0.1]:443. The [] are what other plugins are using in their kubeconfig.
+	server := fmt.Sprintf("%s//[%s]:%s", protocol, host, port)
 	return server, nil
 }
 
