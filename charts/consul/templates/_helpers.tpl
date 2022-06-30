@@ -197,6 +197,20 @@ Add a special case for replicas=1, where it should default to 0 as well.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.pdb.connectInject.maxUnavailable" -}}
+{{- if eq (int .Values.connectInject.replicas) 1 -}}
+{{ 0 }}
+{{- else if .Values.connectInject.disruptionBudget.maxUnavailable -}}
+{{ .Values.server.disruptionBudget.maxUnavailable -}}
+{{- else -}}
+{{- if eq (int .Values.connectInject.replicas) 3 -}}
+{{- 1 -}}
+{{- else -}}
+{{- sub (div (int .Values.connectInject.replicas) 2) 1 -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Inject extra environment vars in the format key:value, if populated
 */}}

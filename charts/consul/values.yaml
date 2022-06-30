@@ -1847,6 +1847,12 @@ connectInject:
     # This value is also overridable via the "consul.hashicorp.com/transparent-proxy-overwrite-probes" annotation.
     # Note: This value has no effect if transparent proxy is disabled on the pod.
     defaultOverwriteProbes: true
+  
+  disruptionBudget: 
+    # True if you want to turn on disruptionBudget for connectInjector deployment
+    enabled: false
+
+    maxUnavailable: null
 
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.
