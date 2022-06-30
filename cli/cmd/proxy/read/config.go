@@ -103,7 +103,9 @@ func (c *EnvoyConfig) JSON() []byte {
 	return c.rawCfg
 }
 
-// UnmarshalJSON unmarshals the raw config dump bytes into EnvoyConfig.
+// UnmarshalJSON implements the json.Unmarshaler interface to unmarshal the raw
+// config dump bytes into EnvoyConfig. It saves a copy of the original bytes 
+// which can be fetched with the JSON method.
 func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	// Save the original config dump bytes for marshalling. We should treat this
 	// struct as immutable so this should be safe.
