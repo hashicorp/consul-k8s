@@ -20,14 +20,15 @@ load _helpers
   [[ "${actual}" == *"true"* ]]
 }
 
-@test "cni/clusterrole: disabled with connectInject.enabled=false and connectInject.transparentProxy.defaultEnabled=true" {
+@test "cni/clusterrole: disabled with connectInject.cni.enabled=false and connectInject.transparentProxy.defaultEnabled=true" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/cni-clusterrole.yaml  \
+      --set connectInject.cni.enabled=false \
       .
 }
 
-@test "cni/clusterrole: throws error when connectInject.enabled=true and connectInject.transparentProxy.defaultEnabled=false" {
+@test "cni/clusterrole: throws error when connectInject.cni.enabled=true and connectInject.transparentProxy.defaultEnabled=false" {
   cd `chart_dir`
   run helm template \
       -s templates/cni-clusterrole.yaml  \
