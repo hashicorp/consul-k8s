@@ -104,7 +104,7 @@ func (c *EnvoyConfig) JSON() []byte {
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface to unmarshal the raw
-// config dump bytes into EnvoyConfig. It saves a copy of the original bytes 
+// config dump bytes into EnvoyConfig. It saves a copy of the original bytes
 // which can be fetched with the JSON method.
 func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	// Save the original config dump bytes for marshalling. We should treat this
