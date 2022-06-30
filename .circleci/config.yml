@@ -1038,15 +1038,15 @@ workflows:
           requires:
             - dev-upload-docker
 
-  nightly-acceptance-tests-consul:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
-    jobs:
+#  nightly-acceptance-tests-consul:
+#    triggers:
+#      - schedule:
+#          cron: "0 0 * * *"
+#          filters:
+#            branches:
+#              only:
+#                - main
+#    jobs:
 #      - acceptance-kind-1-23-consul-nightly-1-11
 #      - acceptance-kind-1-23-consul-nightly-1-12
 #      - acceptance-kind-1-23-consul-nightly-1-13
