@@ -394,6 +394,69 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 	}
 }
 
+func TestHandlerEnvoySidecar_UserVolumeMounts(t *testing.T) {
+	cases := []struct {
+		name                          string
+		pod                           corev1.Pod
+		expectedContainerVolumeMounts []corev1.VolumeMount
+		expErr                        string
+	}{
+		{
+			name: "able to set a sidecar container volume mount via annotation",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+						annotationConsulSidecarUserVolumeMount: "[{\"name\": \"tls-cert\", \"mountPath\": \"/custom/path\"}, {\"name\": \"tls-ca\", \"mountPath\": \"/custom/path2\"}]",
+					},
+				},
+			},
+			expectedContainerVolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "consul-connect-inject-data",
+					MountPath: "/consul/connect-inject",
+				},
+				{
+					Name:      "tls-cert",
+					MountPath: "/custom/path",
+				},
+				{
+					Name:      "tls-ca",
+					MountPath: "/custom/path2",
+				},
+			},
+		},
+		{
+			name: "invalid annotation results in error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+						annotationConsulSidecarUserVolumeMount: "[abcdefg]",
+					},
+				},
+			},
+			expErr: "invalid character 'a' looking ",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := MeshWebhook{
+				ImageConsul: "hashicorp/consul:latest",
+				ImageEnvoy:  "hashicorp/consul-k8s:latest",
+			}
+			c, err := h.envoySidecar(testNS, tc.pod, multiPortInfo{})
+			if tc.expErr == "" {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedContainerVolumeMounts, c.VolumeMounts)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expErr)
+			}
+		})
+	}
+}
+
 func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 	mem1 := resource.MustParse("100Mi")
 	mem2 := resource.MustParse("200Mi")
