@@ -2,6 +2,7 @@ package peering
 
 import (
 	"context"
+	"github.com/hashicorp/go-version"
 	"strconv"
 	"testing"
 
@@ -23,6 +24,12 @@ func TestPeering_Connect(t *testing.T) {
 
 	if cfg.EnableTransparentProxy {
 		t.Skipf("skipping this test because Transparent Proxy is enabled")
+	}
+
+	ver, err := version.NewVersion("1.13.0")
+	require.NoError(t, err)
+	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+		t.Skipf("skipping this test because peering is not supported in version %v", cfg.ConsulVersion.String())
 	}
 
 	const staticServerPeer = "server"
