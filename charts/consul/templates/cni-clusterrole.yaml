@@ -1,14 +1,24 @@
+{{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.transparentProxy.defaultEnabled)) }}{{ fail "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled is true" }}{{ end -}}
+{{- if (and .Values.connectInject.cni.enabled .Values.connectInject.transparentProxy.defaultEnabled) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: consul-cni
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: consul-cni
-    release: cni-poc
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: consul-cni 
 rules:
 - apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch", "patch", "update"]
-- apiGroups: [""]
-  resources: ["nodes"]
-  verbs: ["get", "list", "watch", "patch", "update"]
+  resources: 
+  - pods
+  verbs: 
+  - get
+  - list
+  - watch
+  - patch
+  - update
+{{- end }}

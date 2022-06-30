@@ -1877,15 +1877,17 @@ connectInject:
     # @type: string
     logLevel: null 
     
-    # Location on the kubernetes node where the CNI plugin is installed
+    # Location on the kubernetes node where the CNI plugin is installed. Shoud be the absolute path and start with a '/'
     # @type: string
     cniBinDir: "/opt/cni/bin"
 
-    # Location on the kubernetes node of all CNI configuration
+    # Location on the kubernetes node of all CNI configuration. Should be the absolute path and start with a '/'
     # @type: string
     cniNetDir: "/etc/cni/net.d"
 
-    # Allow the cni daemonset to run in privileged mode
+    # The daemonset should in privileged mode on all kubernetes platforms as it needs to interact with the
+    # kubernetes host file system
+    # @type: boolean
     privileged: true
   
     # The resource settings for cni daemonset.
