@@ -412,15 +412,15 @@ func TestHandlerEnvoySidecar_UserVolumeMounts(t *testing.T) {
 				},
 			},
 			expectedContainerVolumeMounts: []corev1.VolumeMount{
-				corev1.VolumeMount{
+				{
 					Name:      "consul-connect-inject-data",
 					MountPath: "/consul/connect-inject",
 				},
-				corev1.VolumeMount{
+				{
 					Name:      "tls-cert",
 					MountPath: "/custom/path",
 				},
-				corev1.VolumeMount{
+				{
 					Name:      "tls-ca",
 					MountPath: "/custom/path2",
 				},
