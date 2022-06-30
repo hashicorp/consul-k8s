@@ -20,7 +20,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "connect-injector/DisruptionBudget: disabled with connect-injector.enabled=false" {
+@test "connect-injector/DisruptionBudget: disabled with connectInject.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/connect-injector-disruptionbudget.yaml  \
@@ -28,7 +28,7 @@ load _helpers
       .
 }
 
-@test "connect-injector/DisruptionBudget: disabled with connect-injector.disruptionBudget.enabled=false" {
+@test "connect-injector/DisruptionBudget: disabled with connectInject.disruptionBudget.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/connect-injector-disruptionbudget.yaml  \
