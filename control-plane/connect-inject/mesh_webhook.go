@@ -220,6 +220,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)
 
+	// Optionally add any volumes that are to be used by the envoy sidecar.
+	if _, ok := pod.Annotations[annotationConsulSidecarUserVolume]; ok {
+		var userVolumes []corev1.Volume
+		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolume]), &userVolumes)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error unmarshalling sidecar user volumes: %s", err))
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, userVolumes...)
+	}
+
 	// Add the upstream services as environment variables for easy
 	// service discovery.
 	containerEnvVars := w.containerEnvVars(pod)

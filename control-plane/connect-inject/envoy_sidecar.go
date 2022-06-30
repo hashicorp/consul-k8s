@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,6 +47,16 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 			},
 		},
 		Command: cmd,
+	}
+
+	// Add any extra Envoy VolumeMounts.
+	if _, ok := pod.Annotations[annotationConsulSidecarUserVolumeMount]; ok {
+		var volumeMount []corev1.VolumeMount
+		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolumeMount]), &volumeMount)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		container.VolumeMounts = append(container.VolumeMounts, volumeMount...)
 	}
 
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
