@@ -51,8 +51,8 @@ func TestCreateCNIConfigFile(t *testing.T) {
 
 	// Create a default config
 	cfg := &config.CNIConfig{
-		Name:       defaultName,
-		Type:       defaultType,
+		Name:       pluginName,
+		Type:       pluginType,
 		CNIBinDir:  defaultCNIBinDir,
 		CNINetDir:  defaultCNINetDir,
 		Multus:     defaultMultus,

@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	defaultName      = "consul-cni"
-	defaultType      = "consul-cni"
+	pluginName       = "consul-cni"
+	pluginType       = "consul-cni"
 	defaultCNIBinDir = "/opt/cni/bin"
 	defaultCNINetDir = "/etc/cni/net.d"
 	defaultMultus    = false
@@ -120,8 +120,8 @@ func (c *Command) Run(args []string) int {
 
 	// Create the CNI Config from command flags
 	cfg := &config.CNIConfig{
-		Name:       defaultName,
-		Type:       defaultType,
+		Name:       pluginName,
+		Type:       pluginType,
 		CNIBinDir:  c.flagCNIBinDir,
 		CNINetDir:  c.flagCNINetDir,
 		Multus:     c.flagMultus,
@@ -206,7 +206,6 @@ func (c *Command) Run(args []string) int {
 // }
 // appendCNIConfig appends the consul-cni configuration to the main configuration file.
 func appendCNIConfig(consulCfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
-
 	// Check if file exists
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return fmt.Errorf("source cni config file %s does not exist: %v", srcFile, err)
