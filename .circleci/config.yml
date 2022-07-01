@@ -271,9 +271,12 @@ jobs:
           root: .
           paths:
             - control-plane/pkg/bin
+            - control-plane/cni/pkg/bin
       # save dev build to CircleCI
       - store_artifacts:
           path: ./control-plane/pkg/bin
+      - store_artifacts:
+          path: ./control-plane/cni/pkg/bin
 
   # upload dev docker image
   dev-upload-docker:
