@@ -534,7 +534,8 @@ global:
     # `<helm-release-name>-consul-federation`.
     createFederationSecret: false
 
-    # The name of the primary datacenter.
+    # The name of the primary datacenter.  This should only be set for datacenters
+    # that are not the primary datacenter.
     # @type: string
     primaryDatacenter: null
 
