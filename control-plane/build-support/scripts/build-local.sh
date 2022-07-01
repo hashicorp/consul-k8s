@@ -99,6 +99,7 @@ function main {
    done
 
    build_consul_local "${sdir}" "${build_os}" "${build_arch}" "consul-k8s-control-plane" || return 1
+   build_consul_local "${sdir}/cni" "${build_os}" "${build_arch}" "consul-cni" || return 1
 
    return 0
 }
