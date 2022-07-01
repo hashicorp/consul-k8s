@@ -57,8 +57,11 @@ control-plane-clean: ## Delete bin and pkg dirs.
 		$(CURDIR)/control-plane/bin \
 		$(CURDIR)/control-plane/pkg
 
-control-plane-lint: ## Run linter in the control-plane directory.
+control-plane-lint: cni-plugin-lint ## Run linter in the control-plane directory.
 	cd control-plane; golangci-lint run -c ../.golangci.yml
+
+cni-plugin-lint:
+	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
 	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
@@ -85,8 +88,8 @@ acceptance-lint: ## Run linter in the control-plane directory.
 help: ## Show targets and their descriptions.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-38s\033[0m %s\n", $$1, $$2}'
 
-lint: ## Run linter in the control-plane, cli, and acceptance directories.
-	for p in control-plane cli acceptance; do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
+lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance directories.
+	for p in control-plane cli acceptance;  do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
 
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
