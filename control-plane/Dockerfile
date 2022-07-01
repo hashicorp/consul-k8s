@@ -20,6 +20,7 @@ FROM alpine:3.15 AS dev
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
+ARG CNI_BIN_NAME=consul-cni
 ARG VERSION
 ARG TARGETARCH
 ARG TARGETOS
@@ -69,6 +70,7 @@ FROM alpine:3.15 AS release-default
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
+ARG CNI_BIN_NAME=consul-cni
 ARG VERSION
 
 LABEL name=${BIN_NAME} \
@@ -92,7 +94,9 @@ ARG TARGETARCH
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
+
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
+COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
@@ -113,6 +117,7 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5 as ubi
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME
+ARG CNI_BIN_NAME=consul-cni
 ARG VERSION
 
 LABEL name=${BIN_NAME} \
@@ -144,6 +149,7 @@ RUN groupadd --gid 1000 ${BIN_NAME} && \
     usermod -a -G root ${BIN_NAME}
 
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
+COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}

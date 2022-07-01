@@ -1,0 +1,42 @@
+{
+  "cniVersion": "0.3.1",
+  "name": "kindnet",
+  "plugins": [
+    {
+      "ipMasq": false,
+      "ipam": {
+        "dataDir": "/run/cni-ipam-state",
+        "ranges": [
+          [
+            {
+              "subnet": "10.244.0.0/24"
+            }
+          ]
+        ],
+        "routes": [
+          {
+            "dst": "0.0.0.0/0"
+          }
+        ],
+        "type": "host-local"
+      },
+      "mtu": 1500,
+      "type": "ptp"
+    },
+    {
+      "capabilities": {
+        "portMappings": true
+      },
+      "type": "portmap"
+    },
+    {
+      "cni_bin_dir": "/opt/cni/bin",
+      "cni_net_dir": "/etc/cni/net.d",
+      "kubeconfig": "ZZZZ-consul-cni-kubeconfig",
+      "log_level": "info",
+      "multus": false,
+      "name": "consul-cni",
+      "type": "consul-cni"
+    }
+  ]
+}
