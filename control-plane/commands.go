@@ -13,6 +13,7 @@ import (
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
+	cmdInstallCNI "github.com/hashicorp/consul-k8s/control-plane/subcommand/install-cni"
 	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
 	cmdServiceAddress "github.com/hashicorp/consul-k8s/control-plane/subcommand/service-address"
@@ -97,6 +98,9 @@ func init() {
 
 		"gossip-encryption-autogenerate": func() (cli.Command, error) {
 			return &cmdGossipEncryptionAutogenerate.Command{UI: ui}, nil
+		},
+		"install-cni": func() (cli.Command, error) {
+			return &cmdInstallCNI.Command{UI: ui}, nil
 		},
 	}
 }

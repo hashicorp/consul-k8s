@@ -233,7 +233,7 @@ function build_consul_local {
    is_set "${NOGOX}" && use_gox=0
    which gox > /dev/null || use_gox=0
 
-   status_stage "==> Building Consul - OSes: ${build_os}, Architectures: ${build_arch}"
+   status_stage "==> Building ${bin_name} - OSes: ${build_os}, Architectures: ${build_arch}"
    mkdir pkg.bin.new 2> /dev/null
    if is_set "${use_gox}"
    then
