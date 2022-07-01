@@ -69,6 +69,7 @@ CMD /bin/${BIN_NAME}
 FROM alpine:3.16 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
+ARG CNI_BIN_NAME=consul-cni
 ARG PRODUCT_VERSION
 
 LABEL name=${BIN_NAME} \
