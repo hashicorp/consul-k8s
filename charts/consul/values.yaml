@@ -1854,7 +1854,7 @@ connectInject:
     # This will enable/disable registering a PodDisruptionBudget for the 
     # service mesh sidecar injector. If this is enabled, it will only register the budget so long as
     # the service mesh is enabled.
-    enabled: false
+    enabled: true
 
     # The maximum number of unavailable pods. By default, this will be
     # automatically computed based on the `connectInject.replicas` value to be `(n/2)-1`.
