@@ -207,7 +207,7 @@ load _helpers
         . | tee /dev/stderr )
 
     local actual=$(echo "$object" |
-        yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
+        yq -r '.spec.template.spec.volumes[] | select(.name == "consul-server-cert") | .secret.secretName' | tee /dev/stderr)
     [ "${actual}" = "release-name-consul-server-cert" ]
 }
 
@@ -221,7 +221,7 @@ load _helpers
         . | tee /dev/stderr )
 
     local actual=$(echo "$object" |
-        yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
+        yq -r '.spec.template.spec.volumes[] | select(.name == "consul-server-cert") | .secret.secretName' | tee /dev/stderr)
     [ "${actual}" = "server-cert" ]
 }
 
