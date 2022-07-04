@@ -1620,12 +1620,12 @@ rollingUpdate:
 
 @test "client/DaemonSet: securityContext is not set when global.openshift.enabled=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local has_security_context=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq -r '.spec.template.spec | has("securityContext")' | tee /dev/stderr)
+  [ "${has_security_context}" = "false" ]
 }
 
 #--------------------------------------------------------------------
@@ -1708,14 +1708,14 @@ rollingUpdate:
       --set 'client.containerSecurityContext.tlsInit.readOnlyRootFileSystem=true' \
       . | tee /dev/stderr)
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .securityContext')
-  [ "${actual}" = "null" ]
+  local has_security_context=$(echo "$manifest" | yq -r '.spec.template.spec.containers[] | select(.name == "consul") | has("securityContext")')
+  [ "${has_security_context}" = "false" ]
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .securityContext')
-  [ "${actual}" = "null" ]
+  local has_security_context=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | has("securityContext")')
+  [ "${has_security_context}" = "false" ]
 
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-tls-init") | .securityContext')
-  [ "${actual}" = "null" ]
+  local has_security_context=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers[] | select(.name == "client-tls-init") | has("securityContext")')
+  [ "${has_security_context}" = "false" ]
 }
 
 #--------------------------------------------------------------------
