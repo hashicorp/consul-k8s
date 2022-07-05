@@ -11,7 +11,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: consul-cni 
+    component: cni 
 spec:
   {{- if .Values.connectInject.cni.updateStrategy }}
   updateStrategy:
@@ -22,17 +22,18 @@ spec:
       app: {{ template "consul.name" . }}
       chart: {{ template "consul.chart" . }}
       release: {{ .Release.Name }}
-      component: consul-cni
+      component: cni
   template:
     metadata:
       labels:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: consul-cni
+        component: cni
       annotations:
         consul.hashicorp.com/connect-inject: "false"
     spec:
+      # consul-cni only runs on linux operating systems
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
