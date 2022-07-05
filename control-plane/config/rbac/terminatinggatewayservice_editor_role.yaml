@@ -1,0 +1,24 @@
+# permissions for end users to edit terminatinggatewayservices.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: terminatinggatewayservice-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices/status
+  verbs:
+  - get

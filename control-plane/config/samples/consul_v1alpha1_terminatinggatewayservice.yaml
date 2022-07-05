@@ -1,0 +1,9 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: TerminatingGatewayService
+metadata:
+  name: terminatinggatewayservice-sample
+spec:
+  service:
+    iD: counting1
+    service: counting
+    port: 9003

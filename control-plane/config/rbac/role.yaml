@@ -263,3 +263,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices/status
+  verbs:
+  - get
+  - patch
+  - update
