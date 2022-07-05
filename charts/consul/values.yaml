@@ -1,4 +1,4 @@
-# Available parameters and tienteir default values for the Consul chart.
+# Available parameters and their default values for the Consul chart.
 
 # Holds values that affect multiple components of the chart.
 global:
@@ -1859,7 +1859,7 @@ connectInject:
     # Note: This value has no effect if transparent proxy is disabled on the pod.
     defaultOverwriteProbes: true
 
-  # Configures consul-cni pluging for Consul Service mesh services
+  # Configures consul-cni plugin for Consul Service mesh services
   # Using this feature requires Consul 1.13.0-beta+
   cni:
     # If true, then all traffic redirection setup with use the consul-cni plugin
@@ -1911,8 +1911,7 @@ connectInject:
 
     # The security context for the cni installer daemonset. This should be a YAML map corresponding to a
     # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
-    # By default, servers will run as non-root, with user ID `100` and group ID `1000`,
-    # which correspond to the consul user and group created by the Consul docker image.
+    # By default, servers will run as root, with user ID `0` and group ID `0`.
     # Note: if running on OpenShift, this setting is ignored because the user and group are set automatically
     # by the OpenShift platform.
     # @type: map
