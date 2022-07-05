@@ -75,8 +75,9 @@ load _helpers
       -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.transparentProxy.defaultEnabled=true' \
+      --namespace foo \
       . | tee /dev/stderr |
       yq -r '.subjects[0].namespace' | tee /dev/stderr)
-  [ "${actual}" = "default" ]
+  [ "${actual}" = "foo" ]
 }
 

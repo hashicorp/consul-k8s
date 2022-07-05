@@ -1,0 +1,18 @@
+{{- if .Values.global.imageK8s }}{{ fail "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" }}{{ end -}}
+{{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.transparentProxy.defaultEnabled)) }}{{ fail "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled is true" }}{{ end -}}
+{{- if (and .Values.connectInject.cni.enabled .Values.connectInject.transparentProxy.defaultEnabled) }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: consul-cni-resource-quota
+  namespace: {{ .Release.Namespace }}
+spec:
+  hard:
+    pods: {{ .Values.connectInject.cni.resourceQuota.pods | quote }}
+  scopeSelector:
+    matchExpressions:
+    - operator: In
+      scopeName: PriorityClass
+      values:
+      - system-node-critical
+{{- end }}

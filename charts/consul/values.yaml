@@ -1900,7 +1900,11 @@ connectInject:
       limits:
         memory: "50Mi"
         cpu: "50m"
- 
+
+    # Resource quotas for running the daemonset as system critical pods
+    resourceQuota:
+      pods: 5000
+
     # The security context for the cni installer daemonset. This should be a YAML map corresponding to a
     # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
     # By default, servers will run as non-root, with user ID `100` and group ID `1000`,
