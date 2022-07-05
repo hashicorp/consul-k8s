@@ -5,7 +5,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: consul-cni-resource-quota
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.connectInject.cni.namespace }}
 spec:
   hard:
     pods: {{ .Values.connectInject.cni.resourceQuota.pods | quote }}

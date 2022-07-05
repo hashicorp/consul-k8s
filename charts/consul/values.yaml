@@ -1865,6 +1865,10 @@ connectInject:
     # If true, then all traffic redirection setup with use the consul-cni plugin
     # @type: boolean
     enabled: false
+
+    # Namespace to install cni plugin.
+    # @type: string
+    namespace: kube-system
  
     # If multus plugin is enabled or not. If true, the cni installer will generate a consul cni configuration
     # in a location for the multus program to use. Also, the helm chart will create a custom resource for

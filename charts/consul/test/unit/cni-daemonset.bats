@@ -51,6 +51,17 @@ load _helpers
   [ "${actual}" = "foo" ]
 }
 
+@test "cni/DaemonSet: can set cni.namespace" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.cni.namespace=foo' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.namespace' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+}
+
 @test "cni/DaemonSet: no updateStrategy when not updating" {
   cd `chart_dir`
   local actual=$(helm template \
