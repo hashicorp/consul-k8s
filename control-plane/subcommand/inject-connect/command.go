@@ -461,6 +461,17 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if err = (&connectinject.TerminatingGatewayServiceController{
+		Client:       mgr.GetClient(),
+		ConsulClient: c.consulClient,
+		Log:          ctrl.Log.WithName("controller").WithName("terminating-gateway-service"),
+		Scheme:       mgr.GetScheme(),
+		Context:      ctx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "terminating-gateway-service")
+		return 1
+	}
+
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
