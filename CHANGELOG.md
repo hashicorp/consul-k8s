@@ -9,9 +9,13 @@ FEATURES:
 IMPROVEMENTS:
 * Control Plane
   * Added annotations `consul.hashicorp.com/prometheus-ca-file`, `consul.hashicorp.com/prometheus-ca-path`, `consul.hashicorp.com/prometheus-cert-file`, and `consul.hashicorp.com/prometheus-key-file` for configuring TLS scraping on Prometheus metrics endpoints for Envoy sidecars. To enable, set the cert and key file annotations along with one of the ca file/path annotations. [[GH-1303](https://github.com/hashicorp/consul-k8s/pull/1303)]
- * Added annotations `consul.hashicorp.com/consul-sidecar-user-volume` and `consul.hashicorp.com/consul-sidecar-user-volume-mount` for attaching Volumes and VolumeMounts to the Envoy sidecar. Both should be JSON objects. [[GH-1315](https://github.com/hashicorp/consul-k8s/pull/1315)]
+  * Added annotations `consul.hashicorp.com/consul-sidecar-user-volume` and `consul.hashicorp.com/consul-sidecar-user-volume-mount` for attaching Volumes and VolumeMounts to the Envoy sidecar. Both should be JSON objects. [[GH-1315](https://github.com/hashicorp/consul-k8s/pull/1315)]
 * Helm
   * Added `connectInject.annotations` and `syncCatalog.annotations` values for setting annotations on connect inject and sync catalog deployments. [[GH-775](https://github.com/hashicorp/consul-k8s/pull/775)]
+
+BUG FIXES:
+* Helm
+  * When using Openshift do not set securityContext in gossip-encryption-autogenerate job. [[GH-1308](https://github.com/hashicorp/consul-k8s/pull/1308)]
 
 ## 0.45.0 (June 17, 2022)
 FEATURES:
