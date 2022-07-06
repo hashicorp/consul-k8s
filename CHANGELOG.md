@@ -13,6 +13,10 @@ IMPROVEMENTS:
 * Helm
   * Added `connectInject.annotations` and `syncCatalog.annotations` values for setting annotations on connect inject and sync catalog deployments. [[GH-775](https://github.com/hashicorp/consul-k8s/pull/775)]
 
+BUG FIXES:
+* Helm
+  * When using Openshift do not set securityContext in gossip-encryption-autogenerate job. [[GH-1308](https://github.com/hashicorp/consul-k8s/pull/1308)]
+
 ## 0.45.0 (June 17, 2022)
 FEATURES:
 * [Experimental] Cluster Peering: Support Consul cluster peering, which allows service connectivity between two independent clusters.
