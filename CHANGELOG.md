@@ -4,6 +4,7 @@ FEATURES:
 * [Experimental] Cluster Peering:
   * Add support for secret watchers on the Peering Acceptor and Peering Dialer controllers. [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
   * Add support for version annotation on the Peering Acceptor and Peering Dialer controllers. [[GH-1302](https://github.com/hashicorp/consul-k8s/pull/1302)]
+  * Add validation webhooks for the Peering Acceptor and Peering Dialer CRDs [[GH-1310](https://github.com/hashicorp/consul-k8s/pull/1310)]
 
 IMPROVEMENTS:
 * Control Plane
