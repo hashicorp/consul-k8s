@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/cli"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,12 +17,15 @@ func TestProxyList(t *testing.T) {
 	// to validate the test output.
 	expected := map[string]string{
 		"default/consul-consul-ingress-gateway-": "Ingress Gateway",
+		"default/static-client-":                 "Sidecar",
+		"default/static-server-":                 "Sidecar",
 	}
 
 	// Install Consul in the cluster
 	helmValues := map[string]string{
-		"controller.enabled":                "true",
-		"connectInject.enabled":             "true",
+		"controller.enabled":    "true",
+		"connectInject.enabled": "true",
+
 		"ingressGateways.enabled":           "true",
 		"ingressGateways.defaults.replicas": "1",
 	}
@@ -29,6 +33,10 @@ func TestProxyList(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, "consul")
 	consulCluster.Create(t)
+
+	// Deploy Pods into the Cluster
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 	// Run consul-k8s proxy list
 	actual, err := cli.RunCmd("proxy", "list", "-A")
