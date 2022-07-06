@@ -459,6 +459,19 @@ func (c *Command) Run(args []string) int {
 			setupLog.Error(err, "unable to create controller", "controller", "peering-dialer")
 			return 1
 		}
+
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
+			&webhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
+				Client:       mgr.GetClient(),
+				ConsulClient: c.consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
+			&webhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
+				Client:       mgr.GetClient(),
+				ConsulClient: c.consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
+			}})
 	}
 
 	mgr.GetWebhookServer().CertDir = c.flagCertDir

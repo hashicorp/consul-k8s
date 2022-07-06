@@ -38,4 +38,48 @@ webhooks:
     namespaceSelector:
 {{ tpl .Values.connectInject.namespaceSelector . | indent 6 }}
 {{- end }}
+{{- if .Values.global.peering.enabled }}
+  - name: {{ template "consul.fullname" . }}-mutate-peeringacceptors.consul.hashicorp.com
+    clientConfig:
+      service:
+        name: {{ template "consul.fullname" . }}-connect-injector
+        namespace: {{ .Release.Namespace }}
+        path: "/mutate-v1alpha1-peeringacceptors"
+    rules:
+      - apiGroups:
+          - consul.hashicorp.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - peeringacceptors
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - "v1beta1"
+      - "v1"
+  - name: {{ template "consul.fullname" . }}-mutate-peeringdialers.consul.hashicorp.com
+    clientConfig:
+      service:
+        name: {{ template "consul.fullname" . }}-connect-injector
+        namespace: {{ .Release.Namespace }}
+        path: "/mutate-v1alpha1-peeringdialers"
+    rules:
+      - apiGroups:
+          - consul.hashicorp.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - peeringdialers
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - "v1beta1"
+      - "v1"
+{{- end }}
 {{- end }}

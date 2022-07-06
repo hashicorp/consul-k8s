@@ -388,7 +388,7 @@ func (r *PeeringAcceptorController) requestsForPeeringTokens(object client.Objec
 		return []ctrl.Request{}
 	}
 	for _, acceptor := range acceptorList.Items {
-		if acceptor.SecretRef().Backend == "kubernetes" {
+		if acceptor.SecretRef() != nil && acceptor.SecretRef().Backend == "kubernetes" {
 			if acceptor.SecretRef().Name == object.GetName() && acceptor.Namespace == object.GetNamespace() {
 				return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: acceptor.Namespace, Name: acceptor.Name}}}
 			}
