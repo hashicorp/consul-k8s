@@ -32,7 +32,7 @@ func TestValidatePeeringDialer(t *testing.T) {
 						Secret: &Secret{
 							Name:    "foo",
 							Key:     "data",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},
@@ -47,7 +47,7 @@ func TestValidatePeeringDialer(t *testing.T) {
 						Secret: &Secret{
 							Name:    "foo2",
 							Key:     "data2",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},
@@ -65,7 +65,7 @@ func TestValidatePeeringDialer(t *testing.T) {
 						Secret: &Secret{
 							Name:    "foo",
 							Key:     "data",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},
@@ -80,14 +80,14 @@ func TestValidatePeeringDialer(t *testing.T) {
 						Secret: &Secret{
 							Name:    "foo",
 							Key:     "data",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},
 			},
 			expAllow: true,
 		},
-		"invalid, unique secret name": {
+		"invalid, duplicate secret name and namespace": {
 			existingResources: []runtime.Object{&PeeringDialer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "peer1",
@@ -98,7 +98,7 @@ func TestValidatePeeringDialer(t *testing.T) {
 						Secret: &Secret{
 							Name:    "foo",
 							Key:     "data",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},
@@ -113,7 +113,7 @@ func TestValidatePeeringDialer(t *testing.T) {
 						Secret: &Secret{
 							Name:    "foo",
 							Key:     "data",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},

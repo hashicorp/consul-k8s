@@ -22,7 +22,7 @@ func TestPeeringDialer_Validate(t *testing.T) {
 						Secret: &Secret{
 							Name:    "api-token",
 							Key:     "data",
-							Backend: "kubernetes",
+							Backend: SecretBackendTypeKubernetes,
 						},
 					},
 				},

@@ -10,6 +10,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const PeeringAcceptorKubeKind = "peeringacceptors"
+const SecretBackendTypeKubernetes = "kubernetes"
 
 func init() {
 	SchemeBuilder.Register(&PeeringAcceptor{}, &PeeringAcceptorList{})
@@ -113,7 +114,7 @@ func (pa *PeeringAcceptor) Validate() error {
 			pa.KubernetesName(), errs)
 	}
 	// Currently, the only supported backend is "kubernetes".
-	if pa.Spec.Peer.Secret.Backend != "kubernetes" {
+	if pa.Spec.Peer.Secret.Backend != SecretBackendTypeKubernetes {
 		errs = append(errs, field.Invalid(field.NewPath("spec").Child("peer").Child("secret").Child("backend"), pa.Spec.Peer.Secret.Backend, `backend must be "kubernetes"`))
 	}
 	if len(errs) > 0 {
