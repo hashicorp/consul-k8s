@@ -11,7 +11,12 @@ import (
 )
 
 func TestProxyList(t *testing.T) {
-	expected := map[string]string{}
+	// Because the Kubernetes Pods will have a random string appended to their
+	// names, the expected mapping only includes how the Pod name will start
+	// to validate the test output.
+	expected := map[string]string{
+		"default/consul-consul-ingress-gateway-": "Ingress Gateway",
+	}
 
 	// Install Consul in the cluster
 	helmValues := map[string]string{
@@ -21,7 +26,6 @@ func TestProxyList(t *testing.T) {
 		"ingressGateways.defaults.replicas": "1",
 	}
 	cfg := suite.Config()
-	cfg.KubeNamespace = "consul"
 	ctx := suite.Environment().DefaultContext(t)
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, "consul")
 	consulCluster.Create(t)
@@ -29,9 +33,14 @@ func TestProxyList(t *testing.T) {
 	// Run consul-k8s proxy list
 	actual, err := cli.RunCmd("proxy", "list", "-A")
 	require.NoError(t, err)
+	fmt.Println(string(actual))
 
 	// Verify the output
-	require.Equal(t, expected, translateListOutput(actual))
+	for podName, proxyType := range translateListOutput(actual) {
+		// Remove the 16 random character appended to each Pod name.
+		podName = podName[:len(podName)-16]
+		require.Equal(t, expected[podName], proxyType)
+	}
 }
 
 func TestTranslateListOutput(t *testing.T) {
@@ -95,13 +104,13 @@ default  	server-7685b4fc97-vphq9                	Sidecar`),
 // translates the table into a map.
 func translateListOutput(raw []byte) map[string]string {
 	formatted := make(map[string]string)
-	for _, pod := range strings.Split(string(raw), "\n")[3:] {
-		row := strings.Split(pod, "\t")
+	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[3:] {
+		row := strings.Split(strings.TrimSpace(pod), "\t")
 
 		var name string
 		if len(row) == 3 { // Handle the case where namespace is present
 			name = fmt.Sprintf("%s/%s", strings.TrimSpace(row[0]), strings.TrimSpace(row[1]))
-		} else {
+		} else if len(row) == 2 {
 			name = strings.TrimSpace(row[0])
 		}
 		formatted[name] = row[len(row)-1]
