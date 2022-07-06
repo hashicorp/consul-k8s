@@ -6,27 +6,32 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/cli"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProxyList(t *testing.T) {
+	expected := map[string]string{}
+
+	// Install Consul in the cluster
 	helmValues := map[string]string{
-		"connectInject.enabled":   "true",
-		"ingressGateways.enabled": "true",
+		"controller.enabled":                "true",
+		"connectInject.enabled":             "true",
+		"ingressGateways.enabled":           "true",
+		"ingressGateways.defaults.replicas": "1",
 	}
-	fmt.Println(helmValues)
+	cfg := suite.Config()
+	cfg.KubeNamespace = "consul"
+	ctx := suite.Environment().DefaultContext(t)
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, "consul")
+	consulCluster.Create(t)
 
-	expected := map[string]string{
-		"default/pod1": "Sidecar",
-	}
-
-	// Run proxy proxy list
-	actual, err := cli.RunCmd("proxy", "list")
-	fmt.Println(err)
+	// Run consul-k8s proxy list
+	actual, err := cli.RunCmd("proxy", "list", "-A")
 	require.NoError(t, err)
 
 	// Verify the output
-	fmt.Println(expected, actual)
+	require.Equal(t, expected, translateListOutput(actual))
 }
 
 func TestTranslateListOutput(t *testing.T) {
