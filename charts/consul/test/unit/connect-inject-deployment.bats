@@ -1796,6 +1796,32 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# cni 
+
+@test "connectInject/Deployment: cni is disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-cni=false"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: cni can be enabled by setting connectInject.cni.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cni.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-cni=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # peering
 
 @test "connectInject/Deployment: peering is not set by default" {
