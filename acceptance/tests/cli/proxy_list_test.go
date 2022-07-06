@@ -16,18 +16,35 @@ func TestProxyList(t *testing.T) {
 	// names, the expected mapping only includes how the Pod name will start
 	// to validate the test output.
 	expected := map[string]string{
-		"default/consul-consul-ingress-gateway-": "Ingress Gateway",
-		"default/static-client-":                 "Sidecar",
-		"default/static-server-":                 "Sidecar",
+		"default/consul-consul-ingress-gateway-":     "Ingress Gateway",
+		"default/consul-consul-terminating-gateway-": "Terminating Gateway",
+		"default/static-client-":                     "Sidecar",
+		"default/static-server-":                     "Sidecar",
 	}
 
 	// Install Consul in the cluster
 	helmValues := map[string]string{
 		"controller.enabled":    "true",
 		"connectInject.enabled": "true",
+		"global.tls.enabled":    "true",
 
 		"ingressGateways.enabled":           "true",
 		"ingressGateways.defaults.replicas": "1",
+
+		"terminatingGateways.enabled":           "true",
+		"terminatingGateways.defaults.replicas": "1",
+
+		/* TODO having an issue with this running in KIND (no ingress or IP)
+
+		"meshGateway.enabled":  "true",
+		"meshGateway.replicas": "1",
+		*/
+
+		/* TODO having an issue here with API gateway saying CRDs are not installed.
+
+		"apiGateway.enabled": "true",
+		"apiGateway.image":   "hashicorp/consul-api-gateway:0.1.0",
+		*/
 	}
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
