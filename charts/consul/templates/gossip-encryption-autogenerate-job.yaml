@@ -32,11 +32,13 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+      {{- if not .Values.global.openshift.enabled }}
       securityContext:
         runAsNonRoot: true
         runAsGroup: 1000 
         runAsUser: 100 
         fsGroup: 1000
+      {{- end }}
       containers:
         - name: gossip-encryption-autogen
           image: "{{ .Values.global.imageK8S }}"

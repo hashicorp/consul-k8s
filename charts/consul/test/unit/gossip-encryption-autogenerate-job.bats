@@ -51,3 +51,13 @@ load _helpers
   [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
 }
 
+@test "gossipEncryptionAutogenerate/Job: securityContext is not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local has_security_context=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec | has("securityContext")' | tee /dev/stderr)
+  [ "${has_security_context}" = "false" ]
+}
