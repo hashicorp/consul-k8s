@@ -122,6 +122,8 @@ github.com/cockroachdb/errors v1.2.4/go.mod h1:rQD95gz6FARkaKkQXUksEje/d9a6wBJoC
 github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f/go.mod h1:i/u985jwjWRlyHXQbwatDASoW0RMlZ/3i9yJHE2xLkI=
 github.com/containernetworking/cni v1.1.1 h1:ky20T7c0MvKvbMOwS/FrlbNwjEoqJEUUYfsL4b0mc4k=
 github.com/containernetworking/cni v1.1.1/go.mod h1:sDpYKmGVENF3s6uvMvGgldDWeG8dMxakj/u+i9ht9vw=
+github.com/containernetworking/plugins v1.1.1 h1:+AGfFigZ5TiQH00vhR8qPeSatj53eNGz0C1d3wVYlHE=
+github.com/containernetworking/plugins v1.1.1/go.mod h1:Sr5TH/eBsGLXK/h71HeLfX19sZPp3ry5uHSkI4LPxV8=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/etcd v3.3.13+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
@@ -300,6 +302,8 @@ github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220622202014-ebf6603ca2ab h1:DInGQF0fNYC6/KpF0nMP0n0qB3MYc23TyB0wKeW1dFE=
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220622202014-ebf6603ca2ab/go.mod h1:CXKRHv/8P7v7Y5Uw9Uk+vn72bBKyOLzCBrPrgnULtJI=
+github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220707164020-2288f6426f64 h1:rkAFv5eDTFpf0L193s4ijykurLfIlfZdRs32AbdtbS0=
+github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220707164020-2288f6426f64/go.mod h1:CXKRHv/8P7v7Y5Uw9Uk+vn72bBKyOLzCBrPrgnULtJI=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/api v1.10.1-0.20220614213650-6453375ab228 h1:BqzKe5O+75uYcFfJI0mJz3rhCgdVztvEj3rEs4xpPr0=
 github.com/hashicorp/consul/api v1.10.1-0.20220614213650-6453375ab228/go.mod h1:ZlVrynguJKcYr54zGaDbaL3fOvKC9m72FhPvA8T35KQ=

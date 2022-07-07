@@ -148,6 +148,8 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
+	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
+
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/meshWebhook.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"

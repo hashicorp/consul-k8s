@@ -136,6 +136,11 @@ type MeshWebhook struct {
 	// so that all traffic will go through the Envoy proxy.
 	EnableTransparentProxy bool
 
+	// EnableCNI enables the CNI plugin and prevents the connect-inject init container
+	// from running the consul redirect-traffic command as the CNI plugin handles traffic
+	// redirection
+	EnableCNI bool
+
 	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
 	// to point them to the Envoy proxy.
 	TProxyOverwriteProbes bool

@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -158,7 +159,13 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
 	if isLabeledIgnore(serviceEndpoints.Labels) {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
-		r.Log.Info("Ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
+		r.Log.Info(
+			"Ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`",
+			"name",
+			req.Name,
+			"namespace",
+			req.Namespace,
+		)
 		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil)
 		return ctrl.Result{}, err
 	}
@@ -181,7 +188,13 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 				serviceName, ok := pod.Annotations[annotationKubernetesService]
 				if ok && serviceEndpoints.Name != serviceName {
-					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+					r.Log.Info(
+						"ignoring endpoint because it doesn't match explicit service annotation",
+						"name",
+						serviceEndpoints.Name,
+						"ns",
+						serviceEndpoints.Namespace,
+					)
 					// deregistration for service instances that don't match the annotation happens later because we don't add this pod to the endpointAddressMap.
 					continue
 				}
@@ -189,7 +202,14 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err := r.registerServicesAndHealthCheck(pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
-						r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						r.Log.Error(
+							err,
+							"failed to register services or health check",
+							"name",
+							serviceEndpoints.Name,
+							"ns",
+							serviceEndpoints.Namespace,
+						)
 						errs = multierror.Append(errs, err)
 					}
 				}
@@ -201,7 +221,14 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
 	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
-		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+		r.Log.Error(
+			err,
+			"failed to deregister endpoints on all agents",
+			"name",
+			serviceEndpoints.Name,
+			"ns",
+			serviceEndpoints.Namespace,
+		)
 		errs = multierror.Append(errs, err)
 	}
 
@@ -224,7 +251,12 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
+func (r *EndpointsController) registerServicesAndHealthCheck(
+	pod corev1.Pod,
+	serviceEndpoints corev1.Endpoints,
+	healthStatus string,
+	endpointAddressMap map[string]bool,
+) error {
 	podHostIP := pod.Status.HostIP
 
 	if hasBeenInjected(pod) {
@@ -246,7 +278,14 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 			// Get information from the pod to create service instance registrations.
 			serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints)
 			if err != nil {
-				r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+				r.Log.Error(
+					err,
+					"failed to create service registrations for endpoints",
+					"name",
+					serviceEndpoints.Name,
+					"ns",
+					serviceEndpoints.Namespace,
+				)
 				return err
 			}
 
@@ -269,6 +308,14 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 				r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Name)
 				return err
 			}
+
+			// Generate the redirect traffic confic used by the CNI plugin. The proxy service must be registered before we can get
+			// all of the redirect traffic information
+			err = r.generateRedirectTrafficConfig(pod, proxyServiceRegistration)
+			if err != nil {
+				r.Log.Error(err, "failed to create redirect traffic annotation", "name", proxyServiceRegistration.Name)
+				return err
+			}
 		}
 
 		// Update the service TTL health check for both legacy services and services managed by endpoints
@@ -278,7 +325,15 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 		// registration.
 		reason := getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace)
 		serviceName := getServiceName(pod, serviceEndpoints)
-		r.Log.Info("updating health check status for service", "name", serviceName, "reason", reason, "status", healthStatus)
+		r.Log.Info(
+			"updating health check status for service",
+			"name",
+			serviceName,
+			"reason",
+			reason,
+			"status",
+			healthStatus,
+		)
 		serviceID := getServiceID(pod, serviceEndpoints)
 		healthCheckID := getConsulHealthCheckID(pod, serviceID)
 		err = r.upsertHealthCheck(pod, client, serviceID, healthCheckID, healthStatus)
@@ -300,6 +355,17 @@ func getServiceCheck(client *api.Client, healthCheckID string) (*api.AgentCheck,
 	}
 	// This will be nil (does not exist) or an actual check.
 	return checks[healthCheckID], nil
+}
+
+// getServiceNameChecks will return all of the health checks for a service.
+func getServiceNameChecks(client *api.Client, serviceName string) (map[string]*api.AgentCheck, error) {
+	filter := fmt.Sprintf("ServiceName == %q", serviceName)
+	checks, err := client.Agent().ChecksWithFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	// This will be nil (does not exist) or an actual check.
+	return checks, nil
 }
 
 // registerConsulHealthCheck registers a TTL health check for the service on this Agent local to the Pod. This will add
@@ -333,7 +399,10 @@ func registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceI
 }
 
 // updateConsulHealthCheckStatus updates the consul health check status.
-func (r *EndpointsController) updateConsulHealthCheckStatus(client *api.Client, consulHealthCheckID, status, reason string) error {
+func (r *EndpointsController) updateConsulHealthCheckStatus(
+	client *api.Client,
+	consulHealthCheckID, status, reason string,
+) error {
 	r.Log.Info("updating health check", "id", consulHealthCheckID)
 	err := client.Agent().UpdateTTL(consulHealthCheckID, reason, status)
 	if err != nil {
@@ -344,12 +413,21 @@ func (r *EndpointsController) updateConsulHealthCheckStatus(client *api.Client, 
 
 // upsertHealthCheck checks if the healthcheck exists for the service, and creates it if it doesn't exist, or updates it
 // if it does.
-func (r *EndpointsController) upsertHealthCheck(pod corev1.Pod, client *api.Client, serviceID, healthCheckID, status string) error {
+func (r *EndpointsController) upsertHealthCheck(
+	pod corev1.Pod,
+	client *api.Client,
+	serviceID, healthCheckID, status string,
+) error {
 	reason := getHealthCheckStatusReason(status, pod.Name, pod.Namespace)
 	// Retrieve the health check that would exist if the service had one registered for this pod.
 	serviceCheck, err := getServiceCheck(client, healthCheckID)
 	if err != nil {
-		return fmt.Errorf("unable to get agent health checks: serviceID=%s, checkID=%s, %s", serviceID, healthCheckID, err)
+		return fmt.Errorf(
+			"unable to get agent health checks: serviceID=%s, checkID=%s, %s",
+			serviceID,
+			healthCheckID,
+			err,
+		)
 	}
 	if serviceCheck == nil {
 		// Create a new health check.
@@ -380,7 +458,8 @@ func (r *EndpointsController) upsertHealthCheck(pod corev1.Pod, client *api.Clie
 func getServiceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	serviceName := serviceEndpoints.Name
 	// If the annotation has a comma, it is a multi port Pod. In that case we always use the name of the endpoint.
-	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
+	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" &&
+		!strings.Contains(serviceNameFromAnnotation, ",") {
 		serviceName = serviceNameFromAnnotation
 	}
 	return serviceName
@@ -402,10 +481,14 @@ func getProxyServiceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
+func (r *EndpointsController) createServiceRegistrations(
+	pod corev1.Pod,
+	serviceEndpoints corev1.Endpoints,
+) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
+
 	var consulServicePort int
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
 		if multiPort := strings.Split(raw, ","); len(multiPort) > 1 {
@@ -536,7 +619,11 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	if tproxyEnabled {
 		var k8sService corev1.Service
 
-		err := r.Client.Get(r.Context, types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace}, &k8sService)
+		err := r.Client.Get(
+			r.Context,
+			types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace},
+			&k8sService,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -599,7 +686,10 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 				for _, originalContainer := range originalPod.Spec.Containers {
 					if originalContainer.Name == mutatedContainer.Name {
 						if mutatedContainer.LivenessProbe != nil && mutatedContainer.LivenessProbe.HTTPGet != nil {
-							originalLivenessPort, err := portValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
+							originalLivenessPort, err := portValueFromIntOrString(
+								originalPod,
+								originalContainer.LivenessProbe.HTTPGet.Port,
+							)
 							if err != nil {
 								return nil, nil, err
 							}
@@ -610,7 +700,10 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 							})
 						}
 						if mutatedContainer.ReadinessProbe != nil && mutatedContainer.ReadinessProbe.HTTPGet != nil {
-							originalReadinessPort, err := portValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
+							originalReadinessPort, err := portValueFromIntOrString(
+								originalPod,
+								originalContainer.ReadinessProbe.HTTPGet.Port,
+							)
 							if err != nil {
 								return nil, nil, err
 							}
@@ -621,7 +714,10 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 							})
 						}
 						if mutatedContainer.StartupProbe != nil && mutatedContainer.StartupProbe.HTTPGet != nil {
-							originalStartupPort, err := portValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
+							originalStartupPort, err := portValueFromIntOrString(
+								originalPod,
+								originalContainer.StartupProbe.HTTPGet.Port,
+							)
 							if err != nil {
 								return nil, nil, err
 							}
@@ -635,9 +731,47 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 				}
 			}
 		}
+
+	}
+	return service, proxyService, nil
+}
+
+// redirectTrafficAnnotation creates an annotation that contains iptables configuration.
+func (r *EndpointsController) redirectTrafficAnnotation(pod corev1.Pod, cfg iptables.Config) error {
+	ctx := context.Background()
+	j, err := json.Marshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("could not marshal iptables config: %v", err)
 	}
 
-	return service, proxyService, nil
+	pod.Annotations[annotationCNIProxyConfig] = string(j)
+	err = r.Client.Update(ctx, &pod)
+	if err != nil {
+		return fmt.Errorf("could not update CNI proxy config annotation: %v", err)
+	}
+	return nil
+}
+
+// generateRedirectTrafficConfig creates the redirect traffic config and adds it as an annotation to the pod.
+func (r *EndpointsController) generateRedirectTrafficConfig(pod corev1.Pod, svc *api.AgentServiceRegistration) error {
+	checks, err := getServiceNameChecks(r.ConsulClient, svc.Proxy.DestinationServiceName)
+	if err != nil {
+		return err
+	}
+
+	iptables, err := createRedirectTrafficConfig(svc, checks)
+	if err != nil {
+		return err
+	}
+
+	excludeInboundOutboundFromAnnotations(pod, &iptables)
+
+	err = r.redirectTrafficAnnotation(pod, iptables)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // portValueFromIntOrString returns the integer port value from the port that can be
@@ -682,7 +816,11 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
+func (r *EndpointsController) deregisterServiceOnAllAgents(
+	ctx context.Context,
+	k8sSvcName, k8sSvcNamespace string,
+	endpointsAddressesMap map[string]bool,
+) error {
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	agents := corev1.PodList{}
 	listOptions := client.ListOptions{
@@ -709,7 +847,13 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 		if !ready {
 			// We can ignore this client agent here because once it switches its status from not-ready to ready,
 			// we will reconcile all services as part of that event.
-			r.Log.Info("Consul client agent is not ready, skipping deregistration", "consul-agent", agent.Name, "svc", k8sSvcName)
+			r.Log.Info(
+				"Consul client agent is not ready, skipping deregistration",
+				"consul-agent",
+				agent.Name,
+				"svc",
+				k8sSvcName,
+			)
 			continue
 		}
 		client, err := r.remoteConsulClient(agent.Status.PodIP, r.consulNamespace(k8sSvcNamespace))
@@ -751,7 +895,12 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 
 			if r.AuthMethod != "" && serviceDeregistered {
 				r.Log.Info("reconciling ACL tokens for service", "svc", serviceRegistration.Service)
-				err = r.deleteACLTokensForServiceInstance(client, serviceRegistration.Service, k8sSvcNamespace, serviceRegistration.Meta[MetaKeyPodName])
+				err = r.deleteACLTokensForServiceInstance(
+					client,
+					serviceRegistration.Service,
+					k8sSvcNamespace,
+					serviceRegistration.Meta[MetaKeyPodName],
+				)
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", serviceRegistration.Service)
 					return err
@@ -766,7 +915,10 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
 // has been configured with and will only delete tokens for the provided podName.
-func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Client, serviceName, k8sNS, podName string) error {
+func (r *EndpointsController) deleteACLTokensForServiceInstance(
+	client *api.Client,
+	serviceName, k8sNS, podName string,
+) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
@@ -884,10 +1036,20 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 
 // serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list
 // of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
-func serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNamespace string, client *api.Client) (map[string]*api.AgentService, error) {
+func serviceInstancesForK8SServiceNameAndNamespace(
+	k8sServiceName, k8sServiceNamespace string,
+	client *api.Client,
+) (map[string]*api.AgentService, error) {
 	return client.Agent().ServicesWithFilter(
-		fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
-			MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, managedByValue))
+		fmt.Sprintf(
+			`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
+			MetaKeyKubeServiceName,
+			k8sServiceName,
+			MetaKeyKubeNS,
+			k8sServiceNamespace,
+			MetaKeyManagedBy,
+			managedByValue,
+		))
 }
 
 // processPreparedQueryUpstream processes an upstream in the format:
@@ -901,7 +1063,6 @@ func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstre
 	preparedQuery = strings.TrimSpace(parts[1])
 	var upstream api.Upstream
 	if port > 0 {
-
 		upstream = api.Upstream{
 			DestinationType: api.UpstreamDestTypePreparedQuery,
 			DestinationName: preparedQuery,
@@ -951,7 +1112,10 @@ func (r *EndpointsController) processUnlabeledUpstream(pod corev1.Pod, rawUpstre
 		// routing.
 		entry, _, err := r.ConsulClient.ConfigEntries().Get(api.ProxyDefaults, api.ProxyConfigGlobal, nil)
 		if err != nil && strings.Contains(err.Error(), "Unexpected response code: 404") {
-			return api.Upstream{}, fmt.Errorf("upstream %q is invalid: there is no ProxyDefaults config to set mesh gateway mode", rawUpstream)
+			return api.Upstream{}, fmt.Errorf(
+				"upstream %q is invalid: there is no ProxyDefaults config to set mesh gateway mode",
+				rawUpstream,
+			)
 		} else if err == nil {
 			mode := entry.(*api.ProxyConfigEntry).MeshGateway.Mode
 			if mode != api.MeshGatewayModeLocal && mode != api.MeshGatewayModeRemote {
@@ -974,7 +1138,6 @@ func (r *EndpointsController) processUnlabeledUpstream(pod corev1.Pod, rawUpstre
 		}
 	}
 	return upstream, nil
-
 }
 
 // processLabeledUpstream processes an upstream in the format:
@@ -1023,7 +1186,6 @@ func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream
 		default:
 			return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 		}
-
 	} else {
 		switch len(pieces) {
 		case 4:
@@ -1042,7 +1204,6 @@ func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream
 		default:
 			return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 		}
-
 	}
 
 	if port > 0 {
@@ -1057,7 +1218,6 @@ func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream
 		}
 	}
 	return upstream, nil
-
 }
 
 // remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.
@@ -1124,7 +1284,11 @@ func (r *EndpointsController) filterAgentPods(object client.Object) bool {
 func (r *EndpointsController) requestsForRunningAgentPods(object client.Object) []ctrl.Request {
 	var consulClientPod corev1.Pod
 	r.Log.Info("received update for Consul client pod", "name", object.GetName())
-	err := r.Client.Get(r.Context, types.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()}, &consulClientPod)
+	err := r.Client.Get(
+		r.Context,
+		types.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()},
+		&consulClientPod,
+	)
 	if k8serrors.IsNotFound(err) {
 		// Ignore if consulClientPod is not found.
 		return []ctrl.Request{}
@@ -1167,7 +1331,10 @@ func (r *EndpointsController) requestsForRunningAgentPods(object client.Object) 
 			for _, address := range allAddresses {
 				// Only add requests for the address that is on the same node as the consul client pod.
 				if address.NodeName != nil && *address.NodeName == consulClientPod.Spec.NodeName {
-					requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Name: ep.Name, Namespace: ep.Namespace}})
+					requests = append(
+						requests,
+						reconcile.Request{NamespacedName: types.NamespacedName{Name: ep.Name, Namespace: ep.Namespace}},
+					)
 				}
 			}
 		}
@@ -1178,7 +1345,13 @@ func (r *EndpointsController) requestsForRunningAgentPods(object client.Object) 
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
 func (r *EndpointsController) consulNamespace(namespace string) string {
-	return namespaces.ConsulNamespace(namespace, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
+	return namespaces.ConsulNamespace(
+		namespace,
+		r.EnableConsulNamespaces,
+		r.ConsulDestinationNamespace,
+		r.EnableNSMirroring,
+		r.NSMirroringPrefix,
+	)
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.

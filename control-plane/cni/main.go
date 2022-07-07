@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,16 +26,31 @@ import (
 )
 
 const (
-	keyCNIStatus    = "consul.hashicorp.com/cni-status"
-	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
-	injected        = "injected"
+	// These annotations are duplicated from control-plane/connect-inject/annotations.go in
+	// order to prevent pulling in dependencies.
+
+	// annotationInject is the key of the annotation that controls whether
+	// injection is explicitly enabled or disabled for a pod. This should
+	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationInject = "consul.hashicorp.com/connect-inject"
+	// annotationCNIProxyConfig stores iptables information so that the CNI plugin can use it to apply iptables rules.
+	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
+	// retries is the number of backoff retries to attempt while waiting for an cni-proxy-config annotation to poplulate.
+	retries = 10
+	// dnsServiceHostEnvSuffix is the suffix that is used for the DNS host IP.
+	dnsServiceHostEnvSuffix = "DNS_SERVICE_HOST"
 )
 
 type CNIArgs struct {
+	// types.CommonArgs are args that are passed part of the CNI standard.
 	types.CommonArgs
-	IP                         net.IP
-	K8S_POD_NAME               types.UnmarshallableString
-	K8S_POD_NAMESPACE          types.UnmarshallableString
+	// IP address assigned to the pod from a previous plugin
+	IP net.IP
+	// K8S_POD_NAME is the pod that the plugin is running for
+	K8S_POD_NAME types.UnmarshallableString
+	// K8S_POD_NAMESPACE is the namespace that the plugin is running for
+	K8S_POD_NAMESPACE types.UnmarshallableString
+	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 }
 
@@ -41,10 +60,12 @@ type PluginConf struct {
 	// CNIVersion and PrevResult
 	types.NetConf
 
+	// RuntimeConfig is the config passed from the kubelet to plugin at runtime
 	RuntimeConfig *struct {
 		SampleConfig map[string]interface{} `json:"sample_config"`
 	} `json:"runtime_config"`
 
+	// Name of the plugin
 	Name string `json:"name"`
 	// Type of plugin (consul-cni)
 	Type string `json:"type"`
@@ -52,6 +73,9 @@ type PluginConf struct {
 	CNIBinDir string `json:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir"`
+	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the prefix allows us
+	// to search for it
+	DNSPrefix string `json:"dns_prefix"`
 	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
 	Multus bool `json:"multus"`
 	// Kubeconfig file name. Can be set as a cli flag.
@@ -135,7 +159,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return fmt.Errorf("Error initializing Kubernetes client: %s", err)
+		return fmt.Errorf("error initializing Kubernetes client: %s", err)
 	}
 
 	pod, err := client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
@@ -143,27 +167,40 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	// TODO: Add tests for all of the logic below
-	// TODO: Remove has hasBeenInjected and instead look for consul.hashicorp.com/cni-proxy-config annotation
-	// TODO: Add wait and timeout for annotations to show up
-	if hasBeenInjected(*pod) {
-		// If everything is good, add an annotation to the pod
-		// TODO: Remove this as it is just a stub to prove that we can do kubernetes things with the plugin
-		annotations := map[string]string{
-			keyCNIStatus: "true",
-		}
-		pod.SetAnnotations(annotations)
-		_, err = client.CoreV1().Pods(podNamespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-	} else {
-		logger.Debug("skipping traffic redirect on un-injected pod")
+	// skip injecting pod that has consul.hashicorp.com/connect-inject: false
+	if skipConnectInject(*pod) {
+		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
+		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	// TODO: Get transparent proxy annotations and merge with proxy config
-	// TODO: Redirect traffic :)
+	// check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff
+	exists := waitForAnnotation(*pod, annotationCNIProxyConfig, uint64(retries))
+	if !exists {
+		logger.Error("could not retrieve annotation: %s on pod: %s", annotationCNIProxyConfig, pod.Name)
+		return types.PrintResult(result, cfg.CNIVersion)
+	}
 
+	// parse the cni-proxy-config annotation into an iptables.Config object
+	iptablesCfg, err := parseAnnotation(*pod, annotationCNIProxyConfig)
+	if err != nil {
+		logger.Error("could not parse annotation: %s, error: %v", annotationCNIProxyConfig, err)
+		return types.PrintResult(result, cfg.CNIVersion)
+	}
+
+	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSPrefix)
+	if dnsIP != "" {
+		logger.Error("assigned consul dns ip to %s", dnsIP)
+		iptablesCfg.ConsulDNSIP = dnsIP
+	}
+
+	// apply the iptables rules
+	err = iptables.Setup(iptablesCfg)
+	if err != nil {
+		logger.Error("could not apply iptables setup: %v", err)
+		return types.PrintResult(result, cfg.CNIVersion)
+	}
+
+	logger.Debug("traffic redirect rules applied to pod: %s", pod.Name)
 	// Pass through the result for the next plugin
 	return types.PrintResult(result, cfg.CNIVersion)
 }
@@ -182,9 +219,56 @@ func main() {
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
 }
 
-func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[keyInjectStatus]; ok && anno == injected {
+// skipConnectInject determines if the connect-inject annotation is false.
+func skipConnectInject(pod corev1.Pod) bool {
+	if anno, ok := pod.Annotations[annotationInject]; ok && anno == "false" {
 		return true
 	}
 	return false
+}
+
+// waitForAnnotation waits for an annotation to be available. Returns immediately if the annotation exists.
+func waitForAnnotation(pod corev1.Pod, annotation string, retries uint64) bool {
+	var err error
+	err = backoff.Retry(func() error {
+		var ok bool
+		_, ok = pod.Annotations[annotation]
+		if !ok {
+			return fmt.Errorf("annotation %s does not exist yet", annotation)
+		}
+		return err
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), retries))
+	return err == nil
+}
+
+// parseAnnotation parses the cni-proxy-config annotation into an iptables.Config object.
+func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error) {
+	anno, ok := pod.Annotations[annotation]
+	if !ok {
+		return iptables.Config{}, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
+	}
+	cfg := iptables.Config{}
+	err := json.Unmarshal([]byte(anno), &cfg)
+	if err != nil {
+		return iptables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
+	}
+	return cfg, nil
+}
+
+// searchDNSIPFromEnvironment gets the consul server DNS IP from the pods environment variables. The prefix makes searching easier
+// return an empty string.
+func searchDNSIPFromEnvironment(pod corev1.Pod, prefix string) string {
+	var result string
+	upcaseResourcePrefix := strings.ToUpper(prefix)
+	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
+	dnsName := strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
+
+	// Environment variables are buried in the pod spec
+	vars := pod.Spec.Containers[0].Env
+	for k := range vars {
+		if vars[k].Name == dnsName {
+			result = vars[k].Value
+		}
+	}
+	return result
 }

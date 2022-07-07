@@ -60,6 +60,10 @@ type initContainerCommandData struct {
 	// container to do that.
 	EnableTransparentProxy bool
 
+	// EnableCNI configures this init container to skip the redirect-traffic command as traffic
+	// redirection is handled by the CNI plugin on pod creation
+	EnableCNI bool
+
 	// TProxyExcludeInboundPorts is a list of inbound ports to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
 	TProxyExcludeInboundPorts []string
@@ -160,6 +164,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
 		ConsulCACert:               w.ConsulCACert,
 		EnableTransparentProxy:     tproxyEnabled,
+		EnableCNI:                  w.EnableCNI,
 		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
@@ -471,6 +476,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 
 {{- if .EnableTransparentProxy }}
+{{- if not .EnableCNI }}
 {{- /* The newline below is intentional to allow extra space
        in the rendered template between this and the previous commands. */}}
 
@@ -502,5 +508,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid={{ .EnvoyUID }}
+{{- end }}
 {{- end }}
 `
