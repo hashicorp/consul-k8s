@@ -138,7 +138,7 @@ spec:
                 {{- if .Values.connectInject.cni.enabled }}
                 -enable-cni=true \
                 {{- else }}
-                --enable-cni=false \
+                -enable-cni=false \
                 {{- end }}
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
