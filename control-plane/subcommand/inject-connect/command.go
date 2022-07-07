@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-discover"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
@@ -51,6 +52,10 @@ type Command struct {
 	flagEnableWebhookCAUpdate bool
 	flagLogLevel              string
 	flagLogJSON               bool
+
+	flagServerAddresses []string
+	flagServerPort      uint
+	flagUseHTTPS        bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -119,6 +124,8 @@ type Command struct {
 
 	once sync.Once
 	help string
+
+	providers map[string]discover.Provider
 }
 
 var (
@@ -156,6 +163,12 @@ func (c *Command) init() {
 		"The default protocol to use in central config registrations.")
 	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"[Deprecated] Please use '-ca-file' flag instead. Path to CA certificate to use if communicating with Consul clients over HTTPS.")
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
+			"At least one value is required.")
+	c.flagSet.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
+	c.flagSet.BoolVar(&c.flagUseHTTPS, "use-https", false,
+		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -326,19 +339,13 @@ func (c *Command) Run(args []string) int {
 
 	// Create Consul API config object.
 	cfg := api.DefaultConfig()
+	cfg.Scheme = "http"
+	if c.flagUseHTTPS {
+		cfg.Scheme = "https"
+	}
 	c.http.MergeOntoConfig(cfg)
 	if cfg.TLSConfig.CAFile == "" && c.flagConsulCACert != "" {
 		cfg.TLSConfig.CAFile = c.flagConsulCACert
-	}
-	consulURLRaw := cfg.Address
-	// cfg.Address may or may not be prefixed with scheme.
-	if !strings.Contains(cfg.Address, "://") {
-		consulURLRaw = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
-	}
-	consulURL, err := url.Parse(consulURLRaw)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", consulURLRaw, err))
-		return 1
 	}
 
 	// Load CA file contents.
@@ -350,6 +357,35 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
 			return 1
 		}
+	}
+
+	if len(c.flagServerAddresses) > 0 {
+		// TODO (ishustava): eventually we will use go-netaddr library which doesn't use hclog,
+		// and so this additional logger will go away and we'll be able to use zap logger.
+		hclogger, err := common.Logger(c.flagLogLevel, c.flagLogJSON)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to create logger: %s", err))
+			return 1
+		}
+		serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, hclogger)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+			return 1
+		}
+
+		serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
+		cfg.Address = serverAddr
+	}
+
+	consulURLRaw := cfg.Address
+	// cfg.Address may or may not be prefixed with scheme.
+	if !strings.Contains(cfg.Address, "://") {
+		consulURLRaw = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
+	}
+	consulURL, err := url.Parse(consulURLRaw)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", consulURLRaw, err))
+		return 1
 	}
 
 	// Set up Consul client.

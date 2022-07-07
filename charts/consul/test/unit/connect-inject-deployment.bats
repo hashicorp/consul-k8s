@@ -2392,3 +2392,136 @@ reservedNameTest() {
 		[ "$status" -eq 1 ]
 		[[ "$output" =~ "The name $name set for key connectInject.consulNamespaces.consulDestinationNamespace is reserved by Consul for future use" ]]
 }
+
+#--------------------------------------------------------------------
+# externalServers
+
+@test "connectInject/Deployment: fails if externalServers.hosts is not provided when externalServers.enabled is true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+       .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
+}
+
+@test "connectInject/Deployment: configures the sidecar-injector and acl-init containers to use external servers" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-server-address=\"consul\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-server-address=\"consul\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].env[] | select(.name == "CONSUL_HTTP_ADDR")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "connectInject/Deployment: can provide a different port for the sidecar-injector and acl-init containers when external servers are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.httpsPort=443' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-server-port=443"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-server-port=443"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector and acl-init containers when external servers are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.tlsServerName=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sets -use-https flag for the sidecar-injector and acl-init containers when external servers with TLS are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: does not configure CA cert for the sidecar-injector and acl-init containers when external servers with useSystemRoots are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].env[] | select(.name == "CONSUL_CACERT")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}

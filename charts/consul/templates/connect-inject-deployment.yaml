@@ -102,13 +102,15 @@ spec:
                   name: {{ .Values.connectInject.aclInjectToken.secretName }}
                   key: {{ .Values.connectInject.aclInjectToken.secretKey }}
             {{- end }}
+            {{- if not .Values.externalServers.enabled }}
             - name: CONSUL_HTTP_ADDR
               {{- if .Values.global.tls.enabled }}
               value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
               {{- else }}
               value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
             {{- end }}
-            {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
+            {{- end }}
+            {{- if (and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))) }}
             - name: CONSUL_CACERT
               {{- if .Values.global.secretsBackend.vault.enabled }}
               value: "/vault/secrets/serverca.crt"
@@ -132,6 +134,19 @@ spec:
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
+                {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+                {{- if .Values.externalServers.enabled }}
+                {{- if .Values.global.tls.enabled }}
+                -use-https \
+                {{- end }}
+                {{- range .Values.externalServers.hosts }}
+                -server-address={{ quote . }} \
+                {{- end }}
+                -server-port={{ .Values.externalServers.httpsPort }} \
+                {{- if .Values.externalServers.tlsServerName }}
+                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                {{- end }}
+                {{- end }}
                 {{- if .Values.connectInject.transparentProxy.defaultEnabled }}
                 -default-enable-transparent-proxy=true \
                 {{- else }}
@@ -311,7 +326,7 @@ spec:
           - mountPath: /consul/login
             name: consul-data
             readOnly: true
-          {{- if .Values.global.tls.enabled }}
+          {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
           - name: consul-ca-cert
             mountPath: /consul/tls/ca
             readOnly: true
@@ -348,13 +363,15 @@ spec:
       initContainers:
       - name: connect-injector-acl-init
         env:
+        {{- if not .Values.externalServers.enabled }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.global.tls.enabled }}
           value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
           {{- else }}
           value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
           {{- end }}
-        {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
+        {{- end }}
+        {{- if (and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))) }}
         - name: CONSUL_CACERT
           {{- if .Values.global.secretsBackend.vault.enabled }}
           value: "/vault/secrets/serverca.crt"
@@ -367,7 +384,7 @@ spec:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
-        {{- if .Values.global.tls.enabled }}
+        {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
           readOnly: true
@@ -386,6 +403,18 @@ spec:
               {{- end }}
               {{- if .Values.global.adminPartitions.enabled }}
               -partition={{ .Values.global.adminPartitions.name }} \
+              {{- end }}
+              {{- if .Values.externalServers.enabled }}
+              {{- if .Values.global.tls.enabled }}
+              -use-https \
+              {{- end }}
+              {{- range .Values.externalServers.hosts }}
+              -server-address={{ quote . }} \
+              {{- end }}
+              -server-port={{ .Values.externalServers.httpsPort }} \
+              {{- if .Values.externalServers.tlsServerName }}
+              -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+              {{- end }}
               {{- end }}
               -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
