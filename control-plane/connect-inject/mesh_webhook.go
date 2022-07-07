@@ -29,7 +29,7 @@ import (
 // "system" level namespaces and are always skipped (never injected).
 var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
 
-// Webhook is the HTTP meshWebhook for admission webhooks.
+// MeshWebhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
 	ConsulClient *api.Client
 	Clientset    kubernetes.Interface
@@ -62,6 +62,8 @@ type MeshWebhook struct {
 	// If not set, will use HTTP.
 	ConsulCACert string
 
+	// ConsulAddress is the address of the Consul server. This should be only the
+	// host (i.e. not including port or protocol).
 	ConsulAddress string
 
 	// ConsulPartition is the name of the Admin Partition that the controller
