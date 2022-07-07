@@ -16,6 +16,7 @@ import (
 	cmdCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-discover"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,8 +53,14 @@ type Command struct {
 	flagNSMirroringPrefix          string
 	flagCrossNSACLPolicy           string
 
+	flagServerAddresses []string
+	flagServerPort      uint
+	flagUseHTTPS        bool
+
 	once sync.Once
 	help string
+
+	providers map[string]discover.Provider
 }
 
 var (
@@ -99,6 +106,12 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
+			"At least one value is required.")
+	c.flagSet.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
+	c.flagSet.BoolVar(&c.flagUseHTTPS, "use-https", false,
+		"Toggle for using HTTPS for all API calls to Consul.")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -138,6 +151,26 @@ func (c *Command) Run(args []string) int {
 	}
 
 	cfg := api.DefaultConfig()
+	if c.flagUseHTTPS {
+		cfg.Scheme = "https"
+	}
+	if len(c.flagServerAddresses) > 0 {
+		// TODO (ishustava): eventually we will use go-netaddr library which doesn't use hclog,
+		// and so this additional logger will go away and we'll be able to use zap logger.
+		hclogger, err := cmdCommon.Logger(c.flagLogLevel, c.flagLogJSON)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to create logger: %s", err))
+			return 1
+		}
+		serverAddresses, err := cmdCommon.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, hclogger)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+			return 1
+		}
+
+		serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
+		cfg.Address = serverAddr
+	}
 	c.httpFlags.MergeOntoConfig(cfg)
 	consulClient, err := consul.NewClient(cfg, c.httpFlags.ConsulAPITimeout())
 	if err != nil {

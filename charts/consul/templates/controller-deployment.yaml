@@ -65,39 +65,33 @@ spec:
         {{- end }}
         {{- end }}
     spec:
-      {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
-      initContainers:
-      {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
-      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
-      {{- end }}
       {{- if .Values.global.acls.manageSystemACLs }}
+      initContainers:
       - name: controller-acl-init
         env:
-          - name: HOST_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.hostIP
-          {{- if .Values.global.tls.enabled }}
-          - name: CONSUL_CACERT
-            value: /consul/tls/ca/tls.crt
-          {{- end }}
+          {{- if not .Values.externalServers.enabled }}
           - name: CONSUL_HTTP_ADDR
             {{- if .Values.global.tls.enabled }}
-            value: https://$(HOST_IP):8501
+            value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
             {{- else }}
-            value: http://$(HOST_IP):8500
+            value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
             {{- end }}
+          {{- end }}
+          {{- if (and .Values.global.tls.enabled (not .Values.externalServers.useSystemRoots)) }}
+          - name: CONSUL_CACERT
+            {{- if .Values.global.secretsBackend.vault.enabled }}
+            value: "/vault/secrets/serverca.crt"
+            {{- else }}
+            value: "/consul/tls/ca/tls.crt"
+            {{- end }}
+          {{- end }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
-        {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-        {{- else }}
+       {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
         - name: consul-ca-cert
-        {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
         {{- end }}
@@ -116,6 +110,18 @@ spec:
               {{- if .Values.global.adminPartitions.enabled }}
               -partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}
+              {{- if .Values.externalServers.enabled }}
+              {{- if .Values.global.tls.enabled }}
+              -use-https \
+              {{- end }}
+              {{- range .Values.externalServers.hosts }}
+              -server-address={{ quote . }} \
+              {{- end }}
+              -server-port={{ .Values.externalServers.httpsPort }} \
+              {{- if .Values.externalServers.tlsServerName }}
+              -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+              {{- end }}
+              {{- end }}
               -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
               -log-json={{ .Values.global.logJSON }}
@@ -127,7 +133,6 @@ spec:
             memory: "25Mi"
             cpu: "50m"
       {{- end }}
-      {{- end }}
       containers:
       - command:
         - "/bin/sh"
@@ -138,6 +143,19 @@ spec:
             -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -resource-prefix={{ template "consul.fullname" . }} \
+            {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+            {{- if .Values.externalServers.enabled }}
+            {{- if .Values.global.tls.enabled }}
+            -use-https \
+            {{- end }}
+            {{- range .Values.externalServers.hosts }}
+            -server-address={{ quote . }} \
+            {{- end }}
+            -server-port={{ .Values.externalServers.httpsPort }} \
+            {{- if .Values.externalServers.tlsServerName }}
+            -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+            {{- end }}
+            {{- end }}
             {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}
             -enable-webhook-ca-update \
             -webhook-tls-cert-dir=/vault/secrets/controller-webhook/certs \
@@ -179,10 +197,6 @@ spec:
         - name: CONSUL_HTTP_TOKEN_FILE
           value: "/consul/login/acl-token"
         {{- end }}
-        - name: HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
         {{- if (and .Values.controller.aclToken.secretName .Values.controller.aclToken.secretKey) }}
         - name: CONSUL_HTTP_TOKEN
           valueFrom:
@@ -190,16 +204,22 @@ spec:
               name: {{ .Values.controller.aclToken.secretName }}
               key: {{ .Values.controller.aclToken.secretKey }}
         {{- end }}
-        {{- if .Values.global.tls.enabled }}
-        - name: CONSUL_CACERT
-          value: /consul/tls/ca/tls.crt
-        {{- end }}
+        {{- if not .Values.externalServers.enabled }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.global.tls.enabled }}
-          value: https://$(HOST_IP):8501
+          value: https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501
           {{- else }}
-          value: http://$(HOST_IP):8500
+          value: http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500
           {{- end }}
+        {{- end }}
+        {{- if (and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))) }}
+        - name: CONSUL_CACERT
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          value: "/vault/secrets/serverca.crt"
+          {{- else }}
+          value: "/consul/tls/ca/tls.crt"
+          {{- end }}
+        {{- end }}
         image: {{ .Values.global.imageK8S }}
         name: controller
         ports:
@@ -219,12 +239,8 @@ spec:
           name: cert
           readOnly: true
         {{- end }}
-        {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-        {{- else }}
+        {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
         - name: consul-ca-cert
-        {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
         {{- end }}
@@ -248,11 +264,6 @@ spec:
           items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
-      {{- end }}
-      {{- if .Values.global.tls.enableAutoEncrypt }}
-      - name: consul-auto-encrypt-ca-cert
-        emptyDir:
-          medium: "Memory"
       {{- end }}
       {{- end }}
       - name: consul-data
