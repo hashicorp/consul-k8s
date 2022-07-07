@@ -166,11 +166,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
+      yq '[.env[0].value] | any(contains("http://release-name-consul-server.default.svc:8500"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 
@@ -198,11 +198,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      yq '[.env[0].value] | any(contains("https://release-name-consul-server.default.svc:8501"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 
@@ -245,12 +245,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[0].value] | any(contains("https://release-name-consul-server.default.svc:8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -260,59 +259,6 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/controller-deployment.yaml \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "controller-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "controller/Deployment: auto-encrypt init container is created and is the first init-container when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/controller-deployment.yaml \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "get-auto-encrypt-client-ca" ]
 }
 
 @test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command when federation enabled in non-primary datacenter" {
@@ -401,73 +347,6 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-webhook-tls-cert-dir=/tmp/controller-webhook/certs"))' | tee /dev/stderr)
   [ "${actual}" != "" ]
-}
-
-#--------------------------------------------------------------------
-# global.tls.enableAutoEncrypt
-
-@test "controller/Deployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "controller/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "controller/Deployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "controller/Deployment: adds both init containers when TLS with auto-encrypt and ACLs are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers | length == 2' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "controller/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo.com' \
-      --set 'externalServers.useSystemRoots=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
 }
 
 #--------------------------------------------------------------------
@@ -840,36 +719,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# get-auto-encrypt-client-ca
-
-@test "controller/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
-  [ "${actual}" = "true" ]
-
-  # check server port
-  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
-
-  # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # Vault
 
 @test "controller/Deployment: vault CA is not configured by default" {
@@ -1231,6 +1080,139 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# externalServers
+
+@test "controller/Deployment: fails if externalServers.hosts is not provided when externalServers.enabled is true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+       .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
+}
+
+@test "controller/Deployment: configures the controller and acl-init containers to use external servers" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-server-address=\"consul\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-server-address=\"consul\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].env[] | select(.name == "CONSUL_HTTP_ADDR")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "controller/Deployment: can provide a different port for the controller and acl-init containers when external servers are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.httpsPort=443' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-server-port=443"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-server-port=443"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: can provide a TLS server name for the controller and acl-init containers when external servers are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.tlsServerName=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: sets -use-https flag for the controller and acl-init containers when external servers with TLS are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].command | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].command | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: does not configure CA cert for the controller and acl-init containers when external servers with useSystemRoots are enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | yq '.containers[0].env[] | select(.name == "CONSUL_CACERT")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.initContainers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" | yq '.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
 }
 
 
