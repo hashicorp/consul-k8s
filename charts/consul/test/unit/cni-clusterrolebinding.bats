@@ -2,43 +2,31 @@
 
 load _helpers
 
-@test "cni/clusterrolebinding: disabled by default" {
+@test "cni/daemonset: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/cni-clusterrolebinding.yaml  \
+      -s templates/cni-daemonset.yaml  \
       .
 }
 
-@test "cni/clusterrolebinding: enabled with connectInject.cni.enabled=true and connectInject.transparentProxy.defaultEnabled=true" {
+@test "cni/daemonset: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/cni-clusterrolebinding.yaml  \
+      -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [[ "${actual}" == *"true"* ]]
 }
 
-@test "cni/clusterrolebinding: disabled with connectInject.cni.enabled=false and connectInject.transparentProxy.defaultEnabled=true" {
+@test "cni/daemonset: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=false' \
+      --set 'connectInject.enabled=true' \
+      -s templates/cni-daemonset.yaml  \
       .
-}
-
-@test "cni/clusterrolebinding: throws error when connectInject.cni.enabled=true and connectInject.transparentProxy.defaultEnabled=false" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/cni-clusterrolebinding.yaml  \
-      --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=false' \
-      -s templates/cni-clusterrolebinding.yaml  \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled is true" ]]
 }
 
 #--------------------------------------------------------------------
@@ -49,7 +37,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.roleRef.name' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-cni" ]
@@ -63,7 +51,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.subjects[0].name' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-cni" ]
@@ -74,7 +62,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.namespace=foo' \
       . | tee /dev/stderr |
       yq -r '.subjects[0].namespace' | tee /dev/stderr)

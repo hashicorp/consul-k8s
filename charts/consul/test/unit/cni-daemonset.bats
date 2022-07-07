@@ -9,35 +9,37 @@ load _helpers
       .
 }
 
-@test "cni/daemonset: enabled with connectInject.cni.enabled=true and connectInject.transparentProxy.defaultEnabled=true" {
+@test "cni/daemonset: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [[ "${actual}" == *"true"* ]]
 }
 
-@test "cni/daemonset: disabled with connectInject.enabled=false and connectInject.transparentProxy.defaultEnabled=true" {
+@test "cni/daemonset: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \
+      --set 'connectInject.cni.enabled=false' \
+      --set 'connectInject.enabled=true' \
       -s templates/cni-daemonset.yaml  \
       .
 }
 
-@test "cni/daemonset: throws error when connectInject.enabled=true and connectInject.transparentProxy.defaultEnabled=false" {
+@test "cni/daemonset: throws error when connectInject.enabled=true and connectInject.enabled=false" {
   cd `chart_dir`
   run helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.transparentProxy.defaultEnabled=false' \
+      --set 'connectInject.enabled=false' \
       -s templates/cni-daemonset.yaml  \
       .
 
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "connectInject.transparentProxy.defaultEnabled must be true if connectInject.cni.enabled is true" ]]
+  [[ "$output" =~ "connectInject.enabled must be true if connectInject.cni.enabled is true" ]]
 }
 
 @test "cni/DaemonSet: image defaults to global.imageK8S" {
@@ -45,6 +47,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'global.imageK8S=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
@@ -56,6 +59,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.namespace=foo' \
       . | tee /dev/stderr |
       yq -r '.metadata.namespace' | tee /dev/stderr)
@@ -67,6 +71,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.updateStrategy' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -80,6 +85,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
   [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
@@ -90,6 +96,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.resources.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
@@ -104,6 +111,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
@@ -115,6 +123,7 @@ load _helpers
   local security_context=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
 
@@ -133,6 +142,7 @@ load _helpers
   local security_context=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.securityContext.runAsNonRoot=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
@@ -146,6 +156,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].securityContext.privileged' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -156,6 +167,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.privileged=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].securityContext.privileged' | tee /dev/stderr)
@@ -170,6 +182,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.volumes[] | select(.name == "cni-bin-dir")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"cni-bin-dir","hostPath":{"path":"/opt/cni/bin"}}' ]
@@ -180,6 +193,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.volumes[] | select(.name == "cni-net-dir")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"cni-net-dir","hostPath":{"path":"/etc/cni/net.d"}}' ]
@@ -190,6 +204,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.cniBinDir=foo' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.volumes[] | select(.name == "cni-bin-dir")' | tee /dev/stderr)
@@ -201,6 +216,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.cniNetDir=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.volumes[] | select(.name == "cni-net-dir")' | tee /dev/stderr)
@@ -215,6 +231,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-bin-dir")' | tee /dev/stderr)
       [ "${actual}" = '{"mountPath":"/host/opt/cni/bin","name":"cni-bin-dir"}' ]
@@ -225,16 +242,18 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-net-dir")' | tee /dev/stderr)
       [ "${actual}" = '{"mountPath":"/host/etc/cni/net.d","name":"cni-net-dir"}' ]
 }
 
-@test "cni/DaemonSet: cano overwrite host cni-bin-dir volumeMount" {
+@test "cni/DaemonSet: can overwrite host cni-bin-dir volumeMount" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.cniBinDir=foo' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-bin-dir")' | tee /dev/stderr)
@@ -246,6 +265,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'connectInject.cni.cniNetDir=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-net-dir")' | tee /dev/stderr)
