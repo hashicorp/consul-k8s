@@ -1860,7 +1860,6 @@ connectInject:
     defaultOverwriteProbes: true
 
   # Configures consul-cni plugin for Consul Service mesh services
-  # Using this feature requires Consul 1.13.0-beta+
   cni:
     # If true, then all traffic redirection setup with use the consul-cni plugin
     # @type: boolean
@@ -1870,9 +1869,10 @@ connectInject:
     # @type: string
     namespace: kube-system
  
-    # If multus plugin is enabled or not. If true, the cni installer will generate a consul cni configuration
+    # If multus plugin is enabled or not. If true, the CNI installer will generate a consul CNI configuration
     # in a location for the multus program to use. Also, the helm chart will create a custom resource for
-    # NetworkAttachmentDefintion that multis. cniBinDir and cniNetDir must be changed to work with multus.
+    # NetworkAttachmentDefintion that multis will consume. The values for cniBinDir and cniNetDir must also be 
+    # changed for multus to work.
     # Please refer to your cloud platform for more informaton on using multus.
     # @type: boolean
     multus: false
@@ -1894,7 +1894,7 @@ connectInject:
     # @type: boolean
     privileged: true
   
-    # The resource settings for cni daemonset.
+    # The resource settings for CNI installer daemonset.
     # @recurse: false
     # @type: map
     resources:
@@ -1909,7 +1909,7 @@ connectInject:
     resourceQuota:
       pods: 5000
 
-    # The security context for the cni installer daemonset. This should be a YAML map corresponding to a
+    # The security context for the CNI installer daemonset. This should be a YAML map corresponding to a
     # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
     # By default, servers will run as root, with user ID `0` and group ID `0`.
     # Note: if running on OpenShift, this setting is ignored because the user and group are set automatically
@@ -1921,7 +1921,7 @@ connectInject:
       runAsGroup: 0
       runAsUser: 0
 
-    # updateStrategy for the cni DaemonSet.
+    # updateStrategy for the CNI installer DaemonSet.
     # See https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
     # This should be a multi-line string mapping directly to the updateStrategy
     #
