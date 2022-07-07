@@ -30,18 +30,13 @@ func TestController(t *testing.T) {
 	cfg := suite.Config()
 
 	cases := []struct {
-		secure      bool
-		autoEncrypt bool
-		useVault    bool
+		secure   bool
+		useVault bool
 	}{
-		{false, false, false},
-		{true, false, false},
-		{true, true, false},
-		{true, true, true},
-		{false, false, true},
-		// Vault with TLS requires autoEncrypt set to true as well, so the below
-		// is not valid
-		// {true, false, true},
+		{false, false},
+		{true, false},
+		{false, true},
+		{true, true},
 	}
 
 	// The name of a service intention in consul is
@@ -50,7 +45,7 @@ func TestController(t *testing.T) {
 	const IntentionName = "svc1"
 
 	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+		name := fmt.Sprintf("secure: %t, vault: %t", c.secure, c.useVault)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
@@ -58,7 +53,6 @@ func TestController(t *testing.T) {
 				"controller.enabled":           "true",
 				"connectInject.enabled":        "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 			}
 
