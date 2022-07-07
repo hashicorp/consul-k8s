@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ template "consul.fullname" . }}-cni
-  namespace: {{ .Values.connectInject.cni.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -56,7 +56,7 @@ spec:
         - name: install-cni
           image: {{ .Values.global.imageK8S }}
           securityContext:
-            privileged: {{ .Values.connectInject.cni.privileged }}
+            privileged: true
           command:
           - "/bin/sh"
           - "-ec"

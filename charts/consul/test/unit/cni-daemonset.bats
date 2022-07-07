@@ -54,18 +54,6 @@ load _helpers
   [ "${actual}" = "foo" ]
 }
 
-@test "cni/DaemonSet: can set cni.namespace" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/cni-daemonset.yaml  \
-      --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.cni.namespace=foo' \
-      . | tee /dev/stderr |
-      yq -r '.metadata.namespace' | tee /dev/stderr)
-  [ "${actual}" = "foo" ]
-}
-
 @test "cni/DaemonSet: no updateStrategy when not updating" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -160,18 +148,6 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].securityContext.privileged' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "cni/DaemonSet: can overwrite privileged security context settings" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/cni-daemonset.yaml  \
-      --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.cni.privileged=false' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].securityContext.privileged' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 }
 
 #--------------------------------------------------------------------

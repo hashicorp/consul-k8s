@@ -63,7 +63,7 @@ load _helpers
       -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.cni.namespace=foo' \
+      --namespace foo \
       . | tee /dev/stderr |
       yq -r '.subjects[0].namespace' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
