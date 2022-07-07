@@ -8,29 +8,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestWriteKubeConfig tests the generated kubeconfig file.
-func TestWriteKubeConfig(t *testing.T) {
+// TestKubeConfigYaml generates a kubeconfig yaml file and compares it against a golden file
+// Note: This test can fail if the version of client-go/kubernetes changes. The kubectl Config struct sometimes
+// inserts a `as-user-extra: null` into the yaml it generates depending on the version. When this happen, the golden
+// file needs to be updated. v0.22.2 does not have as-user-extra, while v0.24.2 does.
+func TestKubeConfigYaml(t *testing.T) {
 	cases := []struct {
-		name                 string
-		server               string
-		token                string
-		certificateAuthority string
-		goldenFile           string // golden file that our output should look like
+		name                     string
+		server                   string
+		token                    string
+		certificateAuthorityData []byte
+		goldenFile               string // Golden file that our output should look like.
 	}{
 		{
-			name:                 "valid kubeconfig file",
-			server:               "https://[172.30.0.1]:443",
-			token:                "eyJhbGciOiJSUzI1NiIsImtp",
-			certificateAuthority: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0",
-			goldenFile:           "ZZZ-consul-cni-kubeconfig.golden",
+			name:                     "valid kubeconfig file",
+			server:                   "https://[172.30.0.1]:443",
+			token:                    "eyJhbGciOiJSUzI1NiIsImtp",
+			certificateAuthorityData: []byte("LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0"),
+			goldenFile:               "ZZZ-consul-cni-kubeconfig.golden",
 		},
 	}
 
-	// TODO: set context so that the command will timeout
-
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, err := kubeConfigYaml(c.server, c.token, c.certificateAuthority)
+			actual, err := kubeConfigYaml(c.server, c.token, c.certificateAuthorityData)
 			if err != nil {
 				t.Fatal(err)
 			}

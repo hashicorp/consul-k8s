@@ -1,0 +1,51 @@
+{
+  "cniVersion": "0.3.1",
+  "name": "k8s-pod-network",
+  "plugins": [
+    {
+      "container_settings": {
+        "allow_ip_forwarding": false
+      },
+      "datastore_type": "kubernetes",
+      "ipam": {
+        "assign_ipv4": "true",
+        "assign_ipv6": "false",
+        "type": "calico-ipam"
+      },
+      "kubernetes": {
+        "k8s_api_root": "https://10.96.0.1:443",
+        "kubeconfig": "/etc/cni/net.d/calico-kubeconfig"
+      },
+      "log_file_path": "/var/log/calico/cni/cni.log",
+      "log_level": "Info",
+      "mtu": 0,
+      "nodename_file_optional": false,
+      "policy": {
+        "type": "k8s"
+      },
+      "type": "calico"
+    },
+    {
+      "capabilities": {
+        "bandwidth": true
+      },
+      "type": "bandwidth"
+    },
+    {
+      "capabilities": {
+        "portMappings": true
+      },
+      "snat": true,
+      "type": "portmap"
+    },
+    {
+      "cni_bin_dir": "/opt/cni/bin",
+      "cni_net_dir": "/etc/cni/net.d",
+      "kubeconfig": "ZZZ-consul-cni-kubeconfig",
+      "log_level": "info",
+      "multus": false,
+      "name": "consul-cni",
+      "type": "consul-cni"
+    }
+  ]
+}

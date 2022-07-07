@@ -25,11 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-var (
-	// kubeSystemNamespaces is a set of namespaces that are considered
-	// "system" level namespaces and are always skipped (never injected).
-	kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
-)
+// kubeSystemNamespaces is a set of namespaces that are considered
+// "system" level namespaces and are always skipped (never injected).
+var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
 
 // Webhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
@@ -135,6 +133,11 @@ type MeshWebhook struct {
 	// This means that the injected init container will apply traffic redirection rules
 	// so that all traffic will go through the Envoy proxy.
 	EnableTransparentProxy bool
+
+	// EnableCNI enables the CNI plugin and prevents the connect-inject init container
+	// from running the consul redirect-traffic command as the CNI plugin handles traffic
+	// redirection
+	EnableCNI bool
 
 	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
 	// to point them to the Envoy proxy.
@@ -361,6 +364,18 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[keyInjectStatus] = injected
+
+	tproxyEnabled, err := transparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
+	if err != nil {
+		w.Log.Error(err, "error determining if transparent proxy is enabled", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if transparent proxy is enabled: %s", err))
+	}
+
+	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
+	// to determine if it should traffic redirect or not
+	if tproxyEnabled {
+		pod.Annotations[keyTransparentProxyStatus] = enabled
+	}
 
 	// Add annotations for metrics.
 	if err = w.prometheusAnnotations(&pod); err != nil {
