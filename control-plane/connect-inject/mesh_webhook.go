@@ -365,6 +365,18 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[keyInjectStatus] = injected
 
+	tproxyEnabled, err := transparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
+	if err != nil {
+		w.Log.Error(err, "error determining if transparent proxy is enabled", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if transparent proxy is enabled: %s", err))
+	}
+
+	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
+	// to determine if it should traffic redirect or not
+	if tproxyEnabled {
+		pod.Annotations[keyTransparentProxyStatus] = enabled
+	}
+
 	// Add annotations for metrics.
 	if err = w.prometheusAnnotations(&pod); err != nil {
 		w.Log.Error(err, "error configuring prometheus annotations", "request name", req.Name)

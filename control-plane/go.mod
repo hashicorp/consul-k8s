@@ -13,8 +13,8 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220803144027-ad547faeffa5
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v0.16.1
-	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/serf v0.9.7
+	github.com/hashicorp/go-multierror v1.1.0
+	github.com/hashicorp/serf v0.9.6
 	github.com/kr/text v0.2.0
 	github.com/miekg/dns v1.1.41
 	github.com/mitchellh/cli v1.1.0

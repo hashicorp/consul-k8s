@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
@@ -155,6 +157,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	result := prevResult
 	logger.Debug("consul-cni previous result", "result", result)
 
+	// Connect to kubernetes.
 	ctx := context.Background()
 	if c.client == nil {
 
@@ -226,6 +229,20 @@ func skipTrafficRedirection(pod corev1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// waitForAnnotation waits for an annotation to be available. Returns immediately if the annotation exists.
+func waitForAnnotation(pod corev1.Pod, annotation string, retries uint64) bool {
+	var err error
+	err = backoff.Retry(func() error {
+		var ok bool
+		_, ok = pod.Annotations[annotation]
+		if !ok {
+			return fmt.Errorf("annotation %s does not exist yet", annotation)
+		}
+		return err
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), retries))
+	return err == nil
 }
 
 // parseAnnotation parses the cni-proxy-config annotation into an iptables.Config object.
