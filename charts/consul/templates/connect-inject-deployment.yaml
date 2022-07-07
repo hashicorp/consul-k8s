@@ -137,7 +137,6 @@ spec:
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
-                -tls-server-name="server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}" \
                 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
                 {{- if .Values.externalServers.enabled }}
                 {{- if .Values.global.tls.enabled }}
