@@ -1860,6 +1860,22 @@ connectInject:
     # Note: This value has no effect if transparent proxy is disabled on the pod.
     defaultOverwriteProbes: true
 
+  # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+  # for the service mesh sidecar injector.
+  disruptionBudget: 
+    # This will enable/disable registering a PodDisruptionBudget for the 
+    # service mesh sidecar injector. If this is enabled, it will only register the budget so long as
+    # the service mesh is enabled.
+    enabled: true
+
+    # The maximum number of unavailable pods. By default, this will be
+    # automatically computed based on the `connectInject.replicas` value to be `(n/2)-1`.
+    # If you need to set this to `0`, you will need to add a
+    # --set 'connectInject.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
+    # command because of a limitation in the Helm templating language.
+    # @type: integer
+    maxUnavailable: null
+
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:
