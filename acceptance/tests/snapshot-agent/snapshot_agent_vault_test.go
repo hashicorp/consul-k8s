@@ -3,6 +3,7 @@ package snapshotagent
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,12 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
 	ns := kubectlOptions.Namespace
+
+	ver, err := version.NewVersion("1.12.0")
+	require.NoError(t, err)
+	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+		t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
+	}
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
