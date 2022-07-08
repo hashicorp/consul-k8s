@@ -2,9 +2,10 @@ package peering
 
 import (
 	"context"
-	"github.com/hashicorp/go-version"
 	"strconv"
 	"testing"
+
+	"github.com/hashicorp/go-version"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -79,7 +80,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "hashicorp/consul-enterprise:1.13.0-alpha2-ent",
+				"global.image": "thisisnotashwin/consul@sha256:bdbef8a2dbb149e4c0558c3fb994250c7ff0b49b70c1efcf207500c947e3148a",
 
 				"global.tls.enabled":           "false",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),

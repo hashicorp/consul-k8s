@@ -982,6 +982,7 @@ workflows:
      # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
      # be moved
+      - cleanup-azure-resources
       - build-distro:
           OS: "darwin freebsd linux solaris windows"
           ARCH: "amd64"
@@ -999,6 +1000,11 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
+      - acceptance-aks-1-21:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+            - cleanup-azure-resources
   nightly-acceptance-tests:
     triggers:
       - schedule:
