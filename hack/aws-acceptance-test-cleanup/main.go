@@ -66,37 +66,46 @@ func realMain(ctx context.Context) error {
 	ec2Client := ec2.New(clientSession, awsCfg)
 	elbClient := elb.New(clientSession, awsCfg)
 
-	// Find clusters to delete.
-	clusters, err := eksClient.ListClustersWithContext(ctx, &eks.ListClustersInput{})
-	if err != nil {
-		return err
-	}
-	var toDeleteClusters []eks.Cluster
-	for _, cluster := range clusters.Clusters {
-		if strings.HasPrefix(*cluster, "consul-k8s-") {
-			// Check the tags of the cluster to ensure they're acceptance test clusters.
-			clusterData, err := eksClient.DescribeClusterWithContext(ctx, &eks.DescribeClusterInput{
-				Name: cluster,
-			})
-			if err != nil {
-				return err
-			}
-			if _, ok := clusterData.Cluster.Tags[buildURLTag]; ok {
-				toDeleteClusters = append(toDeleteClusters, *clusterData.Cluster)
-			}
-
+	// Find VPCs to delete. Most resources we create belong to a VPC, except
+	// for IAM resources, and so if there are no VPCs, that means all leftover resources have been deleted.
+	var nextToken *string
+	var toDeleteVPCs []*ec2.Vpc
+	for {
+		vpcsOutput, err := ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{
+			NextToken: nextToken,
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("tag-key"),
+					Values: []*string{aws.String(buildURLTag)},
+				},
+				{
+					Name:   aws.String("tag:Name"),
+					Values: []*string{aws.String("consul-k8s-*")},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		toDeleteVPCs = append(vpcsOutput.Vpcs)
+		nextToken = vpcsOutput.NextToken
+		if nextToken == nil {
+			break
 		}
 	}
 
-	var clusterPrint string
-	for _, c := range toDeleteClusters {
-		clusterPrint += fmt.Sprintf("- %s (%s)\n", *c.Name, *c.Tags[buildURLTag])
-	}
-	if len(toDeleteClusters) == 0 {
-		fmt.Println("No EKS clusters to clean up")
+	if len(toDeleteVPCs) == 0 {
+		fmt.Println("Found no VPCs or associated resources to clean up")
 		return nil
 	}
-	fmt.Printf("Found EKS clusters:\n%s", clusterPrint)
+
+	var vpcPrint string
+	for _, vpc := range toDeleteVPCs {
+		vpcName, buildURL := vpcNameAndBuildURL(vpc)
+		vpcPrint += fmt.Sprintf("- %s (%s)\n", vpcName, buildURL)
+	}
+
+	fmt.Printf("Found VPCs:\n%s", vpcPrint)
 
 	// Check for approval.
 	if !flagAutoApprove {
@@ -110,7 +119,7 @@ func realMain(ctx context.Context) error {
 		// (see select{} below).
 		go func() {
 			reader := bufio.NewReader(os.Stdin)
-			fmt.Println("\nDo you want to delete these clusters and associated resources including VPCs (y/n)?")
+			fmt.Println("\nDo you want to delete these VPCs and associated resources including EKS clusters (y/n)?")
 			inputStr, err := reader.ReadString('\n')
 			if err != nil {
 				inputCh <- input{err: err}
@@ -133,36 +142,86 @@ func realMain(ctx context.Context) error {
 		}
 	}
 
-	// Delete clusters and associated resources.
-	for _, cluster := range toDeleteClusters {
-
-		// Delete node groups.
-		nodeGroups, err := eksClient.ListNodegroupsWithContext(ctx, &eks.ListNodegroupsInput{
-			ClusterName: cluster.Name,
-		})
-		if err != nil {
-			return err
-		}
-		for _, groupID := range nodeGroups.Nodegroups {
-			fmt.Printf("Node group: Destroying... [id=%s]\n", *groupID)
-			_, err = eksClient.DeleteNodegroupWithContext(ctx, &eks.DeleteNodegroupInput{
-				ClusterName:   cluster.Name,
-				NodegroupName: groupID,
+	// Find EKS clusters to delete.
+	clusters, err := eksClient.ListClustersWithContext(ctx, &eks.ListClustersInput{})
+	if err != nil {
+		return err
+	}
+	toDeleteClusters := make(map[string]eks.Cluster)
+	for _, cluster := range clusters.Clusters {
+		if strings.HasPrefix(*cluster, "consul-k8s-") {
+			// Check the tags of the cluster to ensure they're acceptance test clusters.
+			clusterData, err := eksClient.DescribeClusterWithContext(ctx, &eks.DescribeClusterInput{
+				Name: cluster,
 			})
 			if err != nil {
 				return err
 			}
+			if _, ok := clusterData.Cluster.Tags[buildURLTag]; ok {
+				toDeleteClusters[*cluster] = *clusterData.Cluster
+			}
 
-			// Wait for node group to be deleted.
-			if err := destroyBackoff(ctx, "Node group", *groupID, func() error {
-				currNodeGroups, err := eksClient.ListNodegroupsWithContext(ctx, &eks.ListNodegroupsInput{
-					ClusterName: cluster.Name,
+		}
+	}
+
+	// Delete VPCs and associated resources.
+	for _, vpc := range toDeleteVPCs {
+		fmt.Printf("Deleting VPC and associated resources: %s\n", *vpc.VpcId)
+		vpcName, _ := vpcNameAndBuildURL(vpc)
+		cluster, ok := toDeleteClusters[vpcName]
+		if !ok {
+			fmt.Printf("Found no associated EKS cluster for VPC: %s\n", vpcName)
+		} else {
+			// Delete node groups.
+			nodeGroups, err := eksClient.ListNodegroupsWithContext(ctx, &eks.ListNodegroupsInput{
+				ClusterName: cluster.Name,
+			})
+			if err != nil {
+				return err
+			}
+			for _, groupID := range nodeGroups.Nodegroups {
+				fmt.Printf("Node group: Destroying... [id=%s]\n", *groupID)
+				_, err = eksClient.DeleteNodegroupWithContext(ctx, &eks.DeleteNodegroupInput{
+					ClusterName:   cluster.Name,
+					NodegroupName: groupID,
 				})
 				if err != nil {
 					return err
 				}
-				for _, currGroup := range currNodeGroups.Nodegroups {
-					if *currGroup == *groupID {
+
+				// Wait for node group to be deleted.
+				if err := destroyBackoff(ctx, "Node group", *groupID, func() error {
+					currNodeGroups, err := eksClient.ListNodegroupsWithContext(ctx, &eks.ListNodegroupsInput{
+						ClusterName: cluster.Name,
+					})
+					if err != nil {
+						return err
+					}
+					for _, currGroup := range currNodeGroups.Nodegroups {
+						if *currGroup == *groupID {
+							return errNotDestroyed
+						}
+					}
+					return nil
+				}); err != nil {
+					return err
+				}
+				fmt.Printf("Node group: Destroyed [id=%s]\n", *groupID)
+			}
+
+			// Delete cluster.
+			fmt.Printf("EKS cluster: Destroying... [id=%s]\n", *cluster.Name)
+			_, err = eksClient.DeleteClusterWithContext(ctx, &eks.DeleteClusterInput{Name: cluster.Name})
+			if err != nil {
+				return err
+			}
+			if err := destroyBackoff(ctx, "EKS cluster", *cluster.Name, func() error {
+				currClusters, err := eksClient.ListClustersWithContext(ctx, &eks.ListClustersInput{})
+				if err != nil {
+					return err
+				}
+				for _, currCluster := range currClusters.Clusters {
+					if *currCluster == *cluster.Name {
 						return errNotDestroyed
 					}
 				}
@@ -170,40 +229,18 @@ func realMain(ctx context.Context) error {
 			}); err != nil {
 				return err
 			}
-			fmt.Printf("Node group: Destroyed [id=%s]\n", *groupID)
+			fmt.Printf("EKS cluster: Destroyed [id=%s]\n", *cluster.Name)
 		}
 
-		// Delete cluster.
-		fmt.Printf("EKS cluster: Destroying... [id=%s]\n", *cluster.Name)
-		_, err = eksClient.DeleteClusterWithContext(ctx, &eks.DeleteClusterInput{Name: cluster.Name})
-		if err != nil {
-			return err
-		}
-		if err := destroyBackoff(ctx, "EKS cluster", *cluster.Name, func() error {
-			currClusters, err := eksClient.ListClustersWithContext(ctx, &eks.ListClustersInput{})
-			if err != nil {
-				return err
-			}
-			for _, currCluster := range currClusters.Clusters {
-				if *currCluster == *cluster.Name {
-					return errNotDestroyed
-				}
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-		fmt.Printf("EKS cluster: Destroyed [id=%s]\n", *cluster.Name)
-
-		vpcID := cluster.ResourcesVpcConfig.VpcId
+		vpcID := vpc.VpcId
 
 		// Once we have the VPC ID, collect VPC peering connections to delete.
-		filternameAccepter := "accepter-vpc-info.vpc-id"
-		filternameRequester := "requester-vpc-info.vpc-id"
-		vpcPeeringConnectionsWithAccepter, err := ec2Client.DescribeVpcPeeringConnections(&ec2.DescribeVpcPeeringConnectionsInput{
+		filterNameAcceptor := "accepter-vpc-info.vpc-id"
+		filterNameRequester := "requester-vpc-info.vpc-id"
+		vpcPeeringConnectionsWithAcceptor, err := ec2Client.DescribeVpcPeeringConnections(&ec2.DescribeVpcPeeringConnectionsInput{
 			Filters: []*ec2.Filter{
 				{
-					Name:   &filternameAccepter,
+					Name:   &filterNameAcceptor,
 					Values: []*string{vpcID},
 				},
 			},
@@ -215,12 +252,12 @@ func realMain(ctx context.Context) error {
 		vpcPeeringConnectionsWithRequester, err := ec2Client.DescribeVpcPeeringConnections(&ec2.DescribeVpcPeeringConnectionsInput{
 			Filters: []*ec2.Filter{
 				{
-					Name:   &filternameRequester,
+					Name:   &filterNameRequester,
 					Values: []*string{vpcID},
 				},
 			},
 		})
-		vpcPeeringConnectionsToDelete := append(vpcPeeringConnectionsWithAccepter.VpcPeeringConnections, vpcPeeringConnectionsWithRequester.VpcPeeringConnections...)
+		vpcPeeringConnectionsToDelete := append(vpcPeeringConnectionsWithAcceptor.VpcPeeringConnections, vpcPeeringConnectionsWithRequester.VpcPeeringConnections...)
 
 		// Delete NAT gateways.
 		natGateways, err := ec2Client.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{
@@ -282,7 +319,7 @@ func realMain(ctx context.Context) error {
 				if address.AllocationId != nil {
 					fmt.Printf("NAT gateway: Releasing Elastic IP... [id=%s]\n", *address.AllocationId)
 					_, err := ec2Client.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{AllocationId: address.AllocationId})
-					if err != nil {
+					if err != nil && !strings.Contains(err.Error(), "InvalidAllocationID.NotFound") {
 						return err
 					}
 					fmt.Printf("NAT gateway: Elastic IP released [id=%s]\n", *address.AllocationId)
@@ -296,7 +333,7 @@ func realMain(ctx context.Context) error {
 			return err
 		}
 		for _, elbDescrip := range elbs.LoadBalancerDescriptions {
-			if elbDescrip.VPCId != vpcID {
+			if *elbDescrip.VPCId != *vpcID {
 				continue
 			}
 
@@ -313,16 +350,21 @@ func realMain(ctx context.Context) error {
 				currELBs, err := elbClient.DescribeLoadBalancersWithContext(ctx, &elb.DescribeLoadBalancersInput{
 					LoadBalancerNames: []*string{elbDescrip.LoadBalancerName},
 				})
-				if err != nil {
+				if strings.Contains(err.Error(), elb.ErrCodeAccessPointNotFoundException) {
+					return nil
+				} else if err != nil {
 					return err
 				}
 				if len(currELBs.LoadBalancerDescriptions) > 0 {
 					return errNotDestroyed
 				}
+
 				return nil
 			}); err != nil {
 				return err
 			}
+			// Allow time for ELB deletion to propagate so that we can detach the internet gateway.
+			time.Sleep(1 * time.Second)
 			fmt.Printf("ELB: Destroyed [id=%s]\n", *elbDescrip.LoadBalancerName)
 		}
 
@@ -419,14 +461,16 @@ func realMain(ctx context.Context) error {
 			},
 		})
 		for _, sg := range sgs.SecurityGroups {
-			revokeSGInput := &ec2.RevokeSecurityGroupIngressInput{GroupId: sg.GroupId}
-			revokeSGInput.SetIpPermissions(sg.IpPermissions)
-			fmt.Printf("Security group: Removing security group rules... [id=%s]\n", *sg.GroupId)
-			_, err := ec2Client.RevokeSecurityGroupIngressWithContext(ctx, revokeSGInput)
-			if err != nil {
-				return err
+			if len(sg.IpPermissions) > 0 {
+				revokeSGInput := &ec2.RevokeSecurityGroupIngressInput{GroupId: sg.GroupId}
+				revokeSGInput.SetIpPermissions(sg.IpPermissions)
+				fmt.Printf("Security group: Removing security group rules... [id=%s]\n", *sg.GroupId)
+				_, err := ec2Client.RevokeSecurityGroupIngressWithContext(ctx, revokeSGInput)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Security group: Removed security group rules [id=%s]\n", *sg.GroupId)
 			}
-			fmt.Printf("Security group: Removed security group rules [id=%s]\n", *sg.GroupId)
 		}
 
 		for _, sg := range sgs.SecurityGroups {
@@ -477,6 +521,20 @@ func realMain(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func vpcNameAndBuildURL(vpc *ec2.Vpc) (string, string) {
+	var vpcName string
+	var buildURL string
+	for _, tag := range vpc.Tags {
+		switch *tag.Key {
+		case "Name":
+			vpcName = *tag.Value
+		case buildURLTag:
+			buildURL = *tag.Value
+		}
+	}
+	return vpcName, buildURL
 }
 
 // destroyBackoff runs destroyF in a backoff loop. It logs each loop.
