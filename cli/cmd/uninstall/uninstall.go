@@ -197,7 +197,7 @@ func (c *Command) Run(args []string) int {
 		if !c.flagAutoApprove {
 			confirmation, err := c.UI.Input(&terminal.Input{
 				Prompt: "Proceed with uninstall? (y/N)",
-				Style:  terminal.InfoStyle,
+				Style:  terminal.Info,
 				Secret: false,
 			})
 			if err != nil {
@@ -262,7 +262,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagAutoApprove {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: fmt.Sprintf("WARNING: Proceed with deleting PVCs, Secrets, Service Accounts, Roles, Role Bindings, Jobs, Cluster Roles, and Cluster Role Bindings for the following installation? \n\n   Name: %s \n   Namespace: %s \n\n   Only approve if all data from this installation can be deleted. (y/N)", foundReleaseName, foundReleaseNamespace),
-			Style:  terminal.WarningStyle,
+			Style:  terminal.Warning,
 			Secret: false,
 		})
 		if err != nil {

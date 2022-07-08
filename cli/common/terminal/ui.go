@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/fatih/color"
 )
 
 // ErrNonInteractive is returned when Input is called on a non-Interactive UI.
@@ -33,12 +31,12 @@ type UI interface {
 	// If this is false, Input will always error.
 	Interactive() bool
 
-	// Output outputs a message directly to the terminal. The remaining
+	// Output prints a message directly to the terminal. The remaining
 	// arguments should be interpolations for the format string. After the
 	// interpolations you may add Options.
 	Output(string, ...interface{})
 
-	// Output data as a table of data. Each entry is a row which will be output
+	// NamedValues output data as a table of data. Each entry is a row which will be output
 	// with the columns lined up nicely.
 	NamedValues([]NamedValue, ...Option)
 
@@ -60,14 +58,15 @@ type Input struct {
 
 	// Style is the style to apply to the input. If this is blank,
 	// the output won't be colorized in any way.
-	Style string
+	Style Style
 
 	// True if this input is a secret. The input will be masked.
 	Secret bool
 }
 
-// Interpret decomposes the msg and arguments into the message, style, and writer.
-func Interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
+// Interpret decomposes the msg and arguments into a formatted message with
+// its corresponding style.
+func Interpret(msg string, raw ...interface{}) (string, string) {
 	// Build our args and options
 	var args []interface{}
 	var opts []Option
@@ -83,10 +82,10 @@ func Interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
 	msg = fmt.Sprintf(msg, args...)
 
 	// Build our config and set our options
-	cfg := &config{Writer: color.Output}
+	style := Default
 	for _, opt := range opts {
-		opt(cfg)
+		opt(*style)
 	}
 
-	return msg, cfg.Style, cfg.Writer
+	return msg, style
 }

@@ -258,7 +258,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "Proceed with upgrade? (y/N)",
-			Style:  terminal.InfoStyle,
+			Style:  terminal.Info,
 			Secret: false,
 		})
 

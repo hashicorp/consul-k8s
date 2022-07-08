@@ -234,3 +234,51 @@ func TestFetchPods(t *testing.T) {
 		})
 	}
 }
+
+func TestCommand(t *testing.T) {
+	// Regular expressions which must appear in the output
+	expected := []string{}
+
+	pods := []v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "default",
+				Labels: map[string]string{
+					"consul.hashicorp.com/connect-inject-status": "injected",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mesh-gateway",
+				Namespace: "default",
+				Labels: map[string]string{
+					"component": "mesh-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "api-gateway",
+				Namespace: "default",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+				},
+			},
+		},
+	}
+
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: pods})
+	out := c.Run([]string{})
+	require.Equal(t, 0, out)
+
+	// TODO set this from UI
+	actual := ""
+
+	for _, expression := range expected {
+		require.Regexp(t, expression, actual)
+	}
+}

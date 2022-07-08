@@ -324,7 +324,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagAutoApprove {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "Proceed with installation? (y/N)",
-			Style:  terminal.InfoStyle,
+			Style:  terminal.Info,
 			Secret: false,
 		})
 
