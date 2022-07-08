@@ -477,7 +477,7 @@ jobs:
 
   acceptance-1-11:
     environment:
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.11-dev"
+      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
       - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.45.0"
       - TEST_RESULTS: /tmp/test-results
@@ -512,7 +512,7 @@ jobs:
 
   acceptance-1-12:
     environment:
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.12-dev"
+      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
       - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.45.0"
       - TEST_RESULTS: /tmp/test-results
@@ -548,7 +548,7 @@ jobs:
   acceptance-1-13:
     environment:
       - TEST_RESULTS: /tmp/test-results
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.13-dev"
+      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
       - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.45.0"
     machine:
