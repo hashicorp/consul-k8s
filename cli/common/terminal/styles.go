@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"io"
+	"strings"
 
 	"github.com/fatih/color"
 )
@@ -42,6 +43,46 @@ type config struct {
 
 	// The style the output should take on
 	Style string
+}
+
+// FormatStyle takes a message and the desired style and
+// modifies the message to properly match the desired style.
+// If no matching style is found, the original message is
+// returned.
+func FormatStyle(msg, style string) string {
+	switch style {
+	case HeaderStyle:
+		return colorHeader.Sprintf("\n==> %s", msg)
+	case ErrorStyle:
+		return colorError.Sprintf(" ! %s", msg)
+	case ErrorBoldStyle:
+		return colorErrorBold.Sprintf(" ! %s", msg)
+	case WarningStyle:
+		return colorWarning.Sprintf(" * %s", msg)
+	case WarningBoldStyle:
+		return colorWarningBold.Sprintf(" * %s", msg)
+	case SuccessStyle:
+		return colorSuccess.Sprintf(" ✓ %s", msg)
+	case SuccessBoldStyle:
+		return colorSuccessBold.Sprintf(" ✓ %s", msg)
+	case LibraryStyle:
+		return colorLibrary.Sprintf(" --> %s", msg)
+	case DiffUnchangedStyle:
+		return colorDiffUnchanged.Sprintf("  %s", msg)
+	case DiffAddedStyle:
+		return colorDiffAdded.Sprintf("  %s", msg)
+	case DiffRemovedStyle:
+		return colorDiffRemoved.Sprintf("  %s", msg)
+	case InfoStyle:
+		lines := strings.Split(msg, "\n")
+		for i, line := range lines {
+			lines[i] = colorInfo.Sprintf("    %s", line)
+		}
+
+		return strings.Join(lines, "\n")
+	default:
+		return msg
+	}
 }
 
 // Option controls output styling.

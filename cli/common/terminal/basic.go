@@ -75,40 +75,7 @@ func (ui *basicUI) Interactive() bool {
 // Output implements UI.
 func (ui *basicUI) Output(msg string, raw ...interface{}) {
 	msg, style, w := Interpret(msg, raw...)
-
-	switch style {
-	case HeaderStyle:
-		msg = colorHeader.Sprintf("\n==> %s", msg)
-	case ErrorStyle:
-		msg = colorError.Sprintf(" ! %s", msg)
-	case ErrorBoldStyle:
-		msg = colorErrorBold.Sprintf(" ! %s", msg)
-	case WarningStyle:
-		msg = colorWarning.Sprintf(" * %s", msg)
-	case WarningBoldStyle:
-		msg = colorWarningBold.Sprintf(" * %s", msg)
-	case SuccessStyle:
-		msg = colorSuccess.Sprintf(" ✓ %s", msg)
-	case SuccessBoldStyle:
-		msg = colorSuccessBold.Sprintf(" ✓ %s", msg)
-	case LibraryStyle:
-		msg = colorLibrary.Sprintf(" --> %s", msg)
-	case DiffUnchangedStyle:
-		msg = colorDiffUnchanged.Sprintf("  %s", msg)
-	case DiffAddedStyle:
-		msg = colorDiffAdded.Sprintf("  %s", msg)
-	case DiffRemovedStyle:
-		msg = colorDiffRemoved.Sprintf("  %s", msg)
-	case InfoStyle:
-		lines := strings.Split(msg, "\n")
-		for i, line := range lines {
-			lines[i] = colorInfo.Sprintf("    %s", line)
-		}
-
-		msg = strings.Join(lines, "\n")
-	}
-
-	// Write it
+	msg = FormatStyle(msg, style)
 	fmt.Fprintln(w, msg)
 }
 
