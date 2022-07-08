@@ -480,7 +480,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     machine:
       image: ubuntu-2004:202010-01
-    resource_class: xlarge
+    resource_class: 2xlarge
     parallelism: 6
     steps:
       - checkout
@@ -512,7 +512,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     machine:
       image: ubuntu-2004:202010-01
-    resource_class: xlarge
+    resource_class: 2xlarge
     parallelism: 6
     steps:
       - checkout
@@ -838,7 +838,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     machine:
       image: ubuntu-2004:202010-01
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - checkout
       - install-prereqs
