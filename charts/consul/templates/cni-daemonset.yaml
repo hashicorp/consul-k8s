@@ -72,9 +72,9 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
-            - mountPath: /host{{ .Values.connectInject.cni.cniBinDir }}
+            - mountPath: {{ .Values.connectInject.cni.cniBinDir }}
               name: cni-bin-dir
-            - mountPath: /host{{ .Values.connectInject.cni.cniNetDir }}
+            - mountPath: {{ .Values.connectInject.cni.cniNetDir }}
               name: cni-net-dir
       volumes:
         # Used to install CNI.
