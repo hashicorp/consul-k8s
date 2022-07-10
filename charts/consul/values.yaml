@@ -1182,7 +1182,7 @@ client:
     #  GRPC bind port
     grpc:  8502
     #  Serflan 
-    erflan: 8301
+    serflan: 8301
 
 
   # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
