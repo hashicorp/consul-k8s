@@ -391,16 +391,16 @@ spec:
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - containerPort: 8500
-              hostPort: 8500
+              hostPort: {{ .Values.client.daemonsetPorts.http }}
               name: http
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - containerPort: 8501
-              hostPort: 8501
+              hostPort: {{ .Values.client.daemonsetPorts.https }}
               name: https
             {{- end }}
             - containerPort: 8502
-              hostPort: 8502
+              hostPort: {{ .Values.client.daemonsetPorts.grpc }}
               name: grpc
             - containerPort: 8301
               {{- if .Values.client.exposeGossipPorts }}

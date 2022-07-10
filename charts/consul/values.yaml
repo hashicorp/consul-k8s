@@ -1173,6 +1173,16 @@ client:
     # @recurse: false
     tlsInit: null
 
+  #  Set daemonset port
+  daemonsetPorts:
+    #  HTTP bind port
+    http:  8500
+    #  HTTPS bind port
+    https:  8501
+    #  GRPC bind port
+    grpc:  8502
+
+
   # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
