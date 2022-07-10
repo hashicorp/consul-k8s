@@ -391,26 +391,26 @@ spec:
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - containerPort: 8500
-              hostPort: {{ .Values.client.daemonsetPorts.http }}
+              hostPort: {{ .Values.client.agentPorts.http }}
               name: http
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - containerPort: 8501
-              hostPort: {{ .Values.client.daemonsetPorts.https }}
+              hostPort: {{ .Values.client.agentPorts.https }}
               name: https
             {{- end }}
             - containerPort: 8502
-              hostPort: {{ .Values.client.daemonsetPorts.grpc }}
+              hostPort: {{ .Values.client.agentPorts.grpc }}
               name: grpc
             - containerPort: 8301
               {{- if .Values.client.exposeGossipPorts }}
-              hostPort: 8301
+              hostPort: {{ .Values.client.agentPorts.serflan }}
               {{- end }}
               protocol: "TCP"
               name: serflan-tcp
             - containerPort: 8301
               {{- if .Values.client.exposeGossipPorts }}
-              hostPort: 8301
+              hostPort: {{ .Values.client.agentPorts.serflan }}
               {{- end }}
               protocol: "UDP"
               name: serflan-udp

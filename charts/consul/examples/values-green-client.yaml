@@ -7,7 +7,7 @@ dns:
   enabled: true
 client:
   enabled: true
-  daemonsetPorts:
+  agentPorts:
     http: 9500
     grpc: 9502
   join: [consul-green-server.consul-green.svc.cluster.local]
