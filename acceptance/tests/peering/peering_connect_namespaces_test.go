@@ -2,7 +2,7 @@ package peering
 
 import (
 	"context"
-	"github.com/hashicorp/go-version"
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,8 +88,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
-				"connectInject.enabled":                         "true",
-				"connectInject.transparentProxy.defaultEnabled": "false",
+				"connectInject.enabled": "true",
+
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
@@ -205,10 +206,14 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Log(t, "creating static-client deployments in client peer")
-			if c.destinationNamespace == defaultNamespace {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
+			if cfg.EnableTransparentProxy {
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+				if c.destinationNamespace == defaultNamespace {
+					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
+				} else {
+					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+				}
 			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
@@ -255,7 +260,11 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			}
 
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", staticServerNamespace, staticServerPeer))
+			} else {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			}
 
 			denyAllIntention := &api.ServiceIntentionsConfigEntry{
 				Name:      "*",
@@ -274,7 +283,11 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "checking that the connection is not successful because there's no allow intention")
-			k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", staticServerNamespace, staticServerPeer))
+			} else {
+				k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			}
 
 			intention := &api.ServiceIntentionsConfigEntry{
 				Name:      staticServerName,
@@ -302,7 +315,11 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", staticServerNamespace, staticServerPeer))
+			} else {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			}
 		})
 	}
 }

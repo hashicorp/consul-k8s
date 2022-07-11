@@ -2,6 +2,7 @@ package peering
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -60,8 +61,7 @@ func TestPeering_Connect(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
-				"connectInject.enabled":                         "true",
-				"connectInject.transparentProxy.defaultEnabled": "false",
+				"connectInject.enabled": "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -170,7 +170,11 @@ func TestPeering_Connect(t *testing.T) {
 			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Log(t, "creating static-client deployments in client peer")
-			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default")
+			if cfg.EnableTransparentProxy {
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			} else {
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default")
+			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "app=static-server",
@@ -203,7 +207,11 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
 			})
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
+			} else {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			}
 
 			denyAllIntention := &api.ServiceIntentionsConfigEntry{
 				Name: "*",
@@ -220,7 +228,11 @@ func TestPeering_Connect(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "checking that the connection is not successful because there's no allow intention")
-			k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
+			} else {
+				k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			}
 
 			intention := &api.ServiceIntentionsConfigEntry{
 				Name: staticServerName,
@@ -239,7 +251,11 @@ func TestPeering_Connect(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
+			} else {
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			}
 		})
 	}
 }
