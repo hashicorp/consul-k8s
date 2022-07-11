@@ -210,7 +210,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-bin-dir")' | tee /dev/stderr)
-      [ "${actual}" = '{"mountPath":"/host/opt/cni/bin","name":"cni-bin-dir"}' ]
+      [ "${actual}" = '{"mountPath":"/opt/cni/bin","name":"cni-bin-dir"}' ]
 }
 
 @test "cni/DaemonSet: sets default host cni-net-dir volumeMount" {
@@ -221,7 +221,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-net-dir")' | tee /dev/stderr)
-      [ "${actual}" = '{"mountPath":"/host/etc/cni/net.d","name":"cni-net-dir"}' ]
+      [ "${actual}" = '{"mountPath":"/etc/cni/net.d","name":"cni-net-dir"}' ]
 }
 
 @test "cni/DaemonSet: can overwrite host cni-bin-dir volumeMount" {
@@ -233,7 +233,7 @@ load _helpers
       --set 'connectInject.cni.cniBinDir=foo' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-bin-dir")' | tee /dev/stderr)
-      [ "${actual}" = '{"mountPath":"/hostfoo","name":"cni-bin-dir"}' ]
+      [ "${actual}" = '{"mountPath":"foo","name":"cni-bin-dir"}' ]
 }
 
 @test "cni/DaemonSet: can overwrite host cni-net-dir volumeMount" {
@@ -245,6 +245,6 @@ load _helpers
       --set 'connectInject.cni.cniNetDir=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "cni-net-dir")' | tee /dev/stderr)
-      [ "${actual}" = '{"mountPath":"/hostbar","name":"cni-net-dir"}' ]
+      [ "${actual}" = '{"mountPath":"bar","name":"cni-net-dir"}' ]
 }
 
