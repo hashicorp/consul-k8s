@@ -32,10 +32,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping this test because Transparent Proxy is enabled")
-	}
-
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
@@ -80,7 +76,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "hashicorp/consul-enterprise:1.13.0-alpha2-ent",
+				"global.image": "thisisnotashwin/consul@sha256:446aad6e02f66e3027756dfc0d34e8e6e2b11ac6ec5637b134b34644ca7cda64",
 
 				"global.tls.enabled":           "false",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -98,6 +94,9 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"meshGateway.replicas": "1",
 
 				"controller.enabled": "true",
+
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
 			staticServerPeerHelmValues := map[string]string{
@@ -261,7 +260,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", staticServerNamespace, staticServerPeer))
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
@@ -284,7 +283,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", staticServerNamespace, staticServerPeer))
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
 			} else {
 				k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
@@ -316,7 +315,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", staticServerNamespace, staticServerPeer))
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}

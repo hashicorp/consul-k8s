@@ -39,7 +39,7 @@ load _helpers
       --set 'server.exposeGossipAndRPCPorts=true' \
       . | tee /dev/stderr |
       yq -c '.spec.hostPorts' | tee /dev/stderr)
-  [ "${actual}" = '[{"min":8300,"max":8300},{"min":8301,"max":8301},{"min":8302,"max":8302}]' ]
+  [ "${actual}" = '[{"min":8300,"max":8300},{"min":8301,"max":8301},{"min":8302,"max":8302},{"min":8503,"max":8503}]' ]
 }
 
 @test "server/PodSecurityPolicy: hostPort 8300, server.ports.serflan.port and 8302 allowed when exposeGossipAndRPCPorts=true" {
@@ -51,5 +51,5 @@ load _helpers
       --set 'server.ports.serflan.port=8333' \
       . | tee /dev/stderr |
       yq -c '.spec.hostPorts' | tee /dev/stderr)
-  [ "${actual}" = '[{"min":8300,"max":8300},{"min":8333,"max":8333},{"min":8302,"max":8302}]' ]
+  [ "${actual}" = '[{"min":8300,"max":8300},{"min":8333,"max":8333},{"min":8302,"max":8302},{"min":8503,"max":8503}]' ]
 }

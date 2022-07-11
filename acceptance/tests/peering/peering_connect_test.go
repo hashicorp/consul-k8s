@@ -23,10 +23,6 @@ func TestPeering_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping this test because Transparent Proxy is enabled")
-	}
-
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
@@ -53,7 +49,7 @@ func TestPeering_Connect(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
-				"global.image": "hashicorp/consul:1.13.0-alpha2",
+				"global.image": "thisisnotashwin/consul@sha256:446aad6e02f66e3027756dfc0d34e8e6e2b11ac6ec5637b134b34644ca7cda64",
 
 				"global.tls.enabled":           "false",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -67,6 +63,9 @@ func TestPeering_Connect(t *testing.T) {
 				"meshGateway.replicas": "1",
 
 				"controller.enabled": "true",
+
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
 			staticServerPeerHelmValues := map[string]string{
