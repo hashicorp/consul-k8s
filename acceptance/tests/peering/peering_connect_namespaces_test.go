@@ -77,7 +77,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "thisisnotashwin/consul@sha256:446aad6e02f66e3027756dfc0d34e8e6e2b11ac6ec5637b134b34644ca7cda64",
+				"global.image":    "thisisnotashwin/consul@sha256:0733380a1a177d269c53fff62464e3a4840ea0c3ca24c6164282f8a822ec8825",
+				"global.imageK8S": "thisisnotashwin/consul-k8s@sha256:6fe1ec532876073813c824f27b2c972c03a41376e0729a502f6f3302dc352379",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
