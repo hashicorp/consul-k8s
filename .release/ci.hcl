@@ -8,7 +8,7 @@ project "consul-k8s" {
   github {
     organization = "hashicorp"
     repository = "consul-k8s"
-    release_branches = ["main"]
+    release_branches = ["main", "releases/0.44.0-alpha2"]
   }
 }
 
