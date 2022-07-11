@@ -41,24 +41,6 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		expectDeletedK8sSecret *types.NamespacedName
 		peeringExists          bool
 	}{
-		"Errors when Secret is not set on the spec": {
-			k8sObjects: func() []runtime.Object {
-				dialer := &v1alpha1.PeeringDialer{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "peering",
-						Namespace: "default",
-					},
-					Spec: v1alpha1.PeeringDialerSpec{
-						Peer: &v1alpha1.Peer{
-							Secret: nil,
-						},
-					},
-				}
-				return []runtime.Object{dialer}
-			},
-			expErr:        "PeeringDialer spec.peer.secret was not set",
-			peeringSecret: func(_ string) *corev1.Secret { return nil },
-		},
 		"Errors when Secret set on the spec does not exist in the cluster": {
 			k8sObjects: func() []runtime.Object {
 				dialer := &v1alpha1.PeeringDialer{
@@ -845,9 +827,11 @@ func TestDialerUpdateStatus(t *testing.T) {
 					},
 					ResourceVersion: "1234",
 				},
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(false),
-					Message: pointerToString(""),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:   v1alpha1.ConditionSynced,
+						Status: corev1.ConditionTrue,
+					},
 				},
 			},
 		},
@@ -888,9 +872,11 @@ func TestDialerUpdateStatus(t *testing.T) {
 					},
 					ResourceVersion: "1234",
 				},
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(false),
-					Message: pointerToString(""),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:   v1alpha1.ConditionSynced,
+						Status: corev1.ConditionTrue,
+					},
 				},
 			},
 		},
@@ -928,7 +914,7 @@ func TestDialerUpdateStatus(t *testing.T) {
 			require.Equal(t, tt.expStatus.SecretRef.Key, dialer.SecretRef().Key)
 			require.Equal(t, tt.expStatus.SecretRef.Backend, dialer.SecretRef().Backend)
 			require.Equal(t, tt.expStatus.SecretRef.ResourceVersion, dialer.SecretRef().ResourceVersion)
-			require.Equal(t, *tt.expStatus.ReconcileError.Error, *dialer.Status.ReconcileError.Error)
+			require.Equal(t, tt.expStatus.Conditions[0].Message, dialer.Status.Conditions[0].Message)
 		})
 	}
 }
@@ -959,9 +945,13 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			},
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringDialerStatus{
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(true),
-					Message: pointerToString("this is an error"),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:    v1alpha1.ConditionSynced,
+						Status:  corev1.ConditionFalse,
+						Reason:  InternalError,
+						Message: "this is an error",
+					},
 				},
 			},
 		},
@@ -982,17 +972,23 @@ func TestDialerUpdateStatusError(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringDialerStatus{
-					ReconcileError: &v1alpha1.ReconcileErrorStatus{
-						Error:   pointerToBool(false),
-						Message: pointerToString(""),
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionTrue,
+						},
 					},
 				},
 			},
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringDialerStatus{
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(true),
-					Message: pointerToString("this is an error"),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:    v1alpha1.ConditionSynced,
+						Status:  corev1.ConditionFalse,
+						Reason:  InternalError,
+						Message: "this is an error",
+					},
 				},
 			},
 		},
@@ -1016,7 +1012,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 				Scheme: s,
 			}
 
-			controller.updateStatusError(context.Background(), tt.dialer, tt.reconcileErr)
+			controller.updateStatusError(context.Background(), tt.dialer, InternalError, tt.reconcileErr)
 
 			dialer := &v1alpha1.PeeringDialer{}
 			dialerName := types.NamespacedName{
@@ -1025,7 +1021,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			}
 			err := fakeClient.Get(context.Background(), dialerName, dialer)
 			require.NoError(t, err)
-			require.Equal(t, *tt.expStatus.ReconcileError.Error, *dialer.Status.ReconcileError.Error)
+			require.Equal(t, tt.expStatus.Conditions[0].Message, dialer.Status.Conditions[0].Message)
 
 		})
 	}
