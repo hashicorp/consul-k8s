@@ -23,5 +23,5 @@ func (c *ProxyCommand) Help() string {
 }
 
 func (c *ProxyCommand) Synopsis() string {
-	return "Debug Envoy proxies managed by Consul."
+	return "Inspect Envoy proxies managed by Consul."
 }
