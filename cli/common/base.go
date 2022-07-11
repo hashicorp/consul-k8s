@@ -41,5 +41,4 @@ func (c *BaseCommand) Close() error {
 func (c *BaseCommand) Init() {
 	// TODO: with the new UI setup, this is a no-op and should be removed in a
 	// later cleanup.
-	c.UI = c.UI
 }
