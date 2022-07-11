@@ -192,7 +192,7 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 func (c *ListCommand) output(pods []v1.Pod) {
 	if c.flagAllNamespaces {
 		c.UI.Output("Namespace: All Namespaces\n")
-	} else {
+	} else if c.namespace != "" {
 		c.UI.Output("Namespace: %s\n", c.namespace)
 	}
 
