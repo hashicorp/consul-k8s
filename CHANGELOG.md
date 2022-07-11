@@ -7,6 +7,9 @@ IMPROVEMENTS:
 
 
 FEATURES:
+* CLI:
+  * Add `consul-k8s proxy list` command for displaying Pods running Envoy managed by Consul. [[GH-1271](https://github.com/hashicorp/consul-k8s/pull/1271)
+  * Add `consul-k8s proxy read podname` command for displaying Envoy configuration for a given Pod. [[GH-1271](https://github.com/hashicorp/consul-k8s/pull/1271)
 * [Experimental] Cluster Peering:
   * Add support for secret watchers on the Peering Acceptor and Peering Dialer controllers. [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
   * Add support for version annotation on the Peering Acceptor and Peering Dialer controllers. [[GH-1302](https://github.com/hashicorp/consul-k8s/pull/1302)]
