@@ -39,6 +39,7 @@ func (c *BaseCommand) Close() error {
 
 // Init should be called FIRST within the Run function implementation.
 func (c *BaseCommand) Init() {
-	ui := terminal.NewBasicUI(c.Ctx)
-	c.UI = ui
+	// TODO: with the new UI setup, this is a no-op and should be removed in a
+	// later cleanup.
+	c.UI = c.UI
 }

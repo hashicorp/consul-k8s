@@ -1,7 +1,6 @@
 package terminal
 
 import (
-	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -54,7 +53,7 @@ func (t *Table) AddRow(cols []string, colors []string) {
 // Table implements UI.
 func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	// Build our config and set our options
-	cfg := &config{Writer: color.Output}
+	cfg := &config{Writer: u.bufOut}
 	for _, opt := range opts {
 		opt(cfg)
 	}

@@ -27,9 +27,9 @@ func NewBasicUI(ctx context.Context) *basicUI {
 	return &basicUI{ctx: ctx, bufOut: color.Output}
 }
 
-// NewTestUI creates a new instance of the basicUI struct that outputs to
+// NewUI creates a new instance of the basicUI struct that outputs to
 // the bufOut buffer.
-func NewTestUI(ctx context.Context, bufOut io.Writer) *basicUI {
+func NewUI(ctx context.Context, bufOut io.Writer) *basicUI {
 	return &basicUI{ctx: ctx, bufOut: bufOut}
 }
 
