@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -356,6 +357,7 @@ func getInitializedCommand(t *testing.T) *Command {
 
 	baseCommand := &common.BaseCommand{
 		Log: log,
+		UI:  terminal.NewBasicUI(context.TODO()),
 	}
 
 	c := &Command{
