@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+TEST
+
 IMPROVEMENTS:
 * Helm
   * Enable the configuring of snapshot intervals in the client snapshot agent via `client.snapshotAgent.interval`. [[GH-1235](https://github.com/hashicorp/consul-k8s/pull/1235)]
