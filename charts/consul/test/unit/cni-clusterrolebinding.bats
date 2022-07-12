@@ -2,51 +2,37 @@
 
 load _helpers
 
-@test "cni/daemonset: disabled by default" {
+@test "cni/ClusterRoleBinding: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/cni-daemonset.yaml  \
+      -s templates/cni-clusterrolebinding.yaml  \
       .
 }
 
-@test "cni/daemonset: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/cni-daemonset.yaml  \
-      --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [[ "${actual}" == *"true"* ]]
-}
-
-@test "cni/daemonset: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
-  cd `chart_dir`
-  assert_empty helm template \
-      --set 'connectInject.cni.enabled=false' \
-      --set 'connectInject.enabled=true' \
-      -s templates/cni-daemonset.yaml  \
-      .
-}
-
-#--------------------------------------------------------------------
-# roleRef
-
-@test "cni/clusterrolebinding: roleref name is correct" {
+@test "cni/ClusterRoleBinding: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-clusterrolebinding.yaml  \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.roleRef.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-cni" ]
+      yq 'length > 0' | tee /dev/stderr)
+  [[ "${actual}" == "true" ]]
+}
+
+@test "cni/ClusterRoleBinding: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      --set 'connectInject.cni.enabled=false' \
+      --set 'connectInject.enabled=true' \
+      -s templates/cni-clusterrolebinding.yaml  \
+      .
 }
 
 #--------------------------------------------------------------------
 # subjects
 
-@test "cni/clusterrolebinding: subject name is correct" {
+@test "cni/ClusterRoleBinding: subject name is correct" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-clusterrolebinding.yaml  \
@@ -57,7 +43,7 @@ load _helpers
   [ "${actual}" = "release-name-consul-cni" ]
 }
 
-@test "cni/clusterrolebinding: subject namespace is correct" {
+@test "cni/ClusterRoleBinding: subject namespace is correct" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-clusterrolebinding.yaml  \

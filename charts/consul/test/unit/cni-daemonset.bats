@@ -2,14 +2,14 @@
 
 load _helpers
 
-@test "cni/daemonset: disabled by default" {
+@test "cni/DaemonSet: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/cni-daemonset.yaml  \
       .
 }
 
-@test "cni/daemonset: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
+@test "cni/DaemonSet: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
@@ -17,10 +17,10 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
-  [[ "${actual}" == *"true"* ]]
+  [[ "${actual}" == "true" ]]
 }
 
-@test "cni/daemonset: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
+@test "cni/DaemonSet: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \
       --set 'connectInject.cni.enabled=false' \
@@ -29,7 +29,7 @@ load _helpers
       .
 }
 
-@test "cni/daemonset: throws error when connectInject.enabled=true and connectInject.enabled=false" {
+@test "cni/DaemonSet: throws error when connectInject.enabled=true and connectInject.enabled=false" {
   cd `chart_dir`
   run helm template \
       -s templates/cni-daemonset.yaml  \
@@ -54,7 +54,53 @@ load _helpers
   [ "${actual}" = "foo" ]
 }
 
-@test "cni/DaemonSet: no updateStrategy when not updating" {
+@test "cni/Daemonset: all command arguments" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/cni-daemonset.yaml \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cni.multus=foo' \
+      --set 'connectInject.cni.logLevel=bar' \
+      --set 'connectInject.cni.cniBinDir=baz' \
+      --set 'connectInject.cni.cniNetDir=foo' \
+      bar \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("consul-k8s-control-plane"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("install-cni"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("multus=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("log-level=bar"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("cni-bin-dir=baz"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("cni-net-dir=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("dns-prefix=bar-consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# updateStrategy
+
+@test "cni/DaemonSet: no updateStrategy by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/cni-daemonset.yaml  \
@@ -64,6 +110,23 @@ load _helpers
       yq -r '.spec.updateStrategy' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
+
+@test "cni/DaemonSet: updateStrategy can be set" {
+  cd `chart_dir`
+  local updateStrategy="type: RollingUpdate
+rollingUpdate:
+  maxUnavailable: 5
+"
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set "connectInject.cni.updateStrategy=${updateStrategy}" \
+      . | tee /dev/stderr | \
+      yq -c '.spec.updateStrategy == {"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":5}}' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 
 #--------------------------------------------------------------------
 # resources
@@ -136,17 +199,6 @@ load _helpers
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
 
   local actual=$(echo $security_context | jq -r .runAsNonRoot)
-  [ "${actual}" = "true" ]
-}
-
-@test "cni/DaemonSet: sets default privileged security context settings" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/cni-daemonset.yaml  \
-      --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].securityContext.privileged' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

@@ -1,5 +1,5 @@
 {{- if (and (.Values.connectInject.cni.enabled) (not .Values.connectInject.enabled)) }}{{ fail "connectInject.enabled must be true if connectInject.cni.enabled is true" }}{{ end -}}
-{{- if (and .Values.connectInject.cni.enabled .Values.connectInject.enabled) }}
+{{- if .Values.connectInject.cni.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -50,7 +50,7 @@ spec:
       {{- end }}
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
-      terminationGracePeriodSeconds: 5
+      terminationGracePeriodSeconds: 10
       containers:
         # This container installs the consul CNI binaries and CNI network config file on each node
         - name: install-cni

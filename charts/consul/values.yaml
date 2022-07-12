@@ -1861,14 +1861,15 @@ connectInject:
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
-    # If true, then all traffic redirection setup with use the consul-cni plugin
+    # If true, then all traffic redirection setup will use the consul-cni plugin. 
+    # Requires connectInject.enabled to also be true.
     # @type: boolean
     enabled: false
  
     # If multus plugin is enabled or not. If true, the CNI installer will generate a consul CNI configuration
     # in a location for the multus program to use. Also, the helm chart will create a custom resource for
-    # NetworkAttachmentDefintion that multis will consume. The values for cniBinDir and cniNetDir must also be 
-    # changed for multus to work.
+    # NetworkAttachmentDefintion that multus will consume. The values for cniBinDir and cniNetDir must also be 
+    # changed for multus to work. There is a GKE example for cniBinDir below. 
     # Please refer to your cloud platform for more informaton on using multus.
     # @type: boolean
     multus: false
@@ -1878,6 +1879,12 @@ connectInject:
     logLevel: null 
     
     # Location on the kubernetes node where the CNI plugin is installed. Shoud be the absolute path and start with a '/'
+    # Example on GKE:
+    #
+    # ```yaml
+    # cniBinDir: "/home/kubernetes/bin"
+    # ```
+
     # @type: string
     cniBinDir: "/opt/cni/bin"
 

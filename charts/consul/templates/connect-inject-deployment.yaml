@@ -135,11 +135,7 @@ spec:
                 {{- else }}
                 -default-enable-transparent-proxy=false \
                 {{- end }}
-                {{- if .Values.connectInject.cni.enabled }}
-                -enable-cni=true \
-                {{- else }}
-                -enable-cni=false \
-                {{- end }}
+                -enable-cni={{ .Values.connectInject.cni.enabled }} \
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
                 {{- end }}

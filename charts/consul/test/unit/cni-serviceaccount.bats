@@ -2,37 +2,37 @@
 
 load _helpers
 
-@test "cni/daemonset: disabled by default" {
+@test "cni/ServiceAccount: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/cni-daemonset.yaml  \
+      -s templates/cni-serviceaccount.yaml  \
       .
 }
 
-@test "cni/daemonset: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
+@test "cni/ServiceAccount: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/cni-daemonset.yaml  \
+      -s templates/cni-serviceaccount.yaml  \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
-  [[ "${actual}" == *"true"* ]]
+  [[ "${actual}" == "true" ]]
 }
 
-@test "cni/daemonset: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
+@test "cni/ServiceAccount: disabled with connectInject.cni.enabled=false and connectInject.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \
       --set 'connectInject.cni.enabled=false' \
       --set 'connectInject.enabled=true' \
-      -s templates/cni-daemonset.yaml  \
+      -s templates/cni-serviceaccount.yaml  \
       .
 }
 
 #--------------------------------------------------------------------
 # global.imagePullSecrets
 
-@test "cni/serviceaccount: can set image pull secrets" {
+@test "cni/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/cni-serviceaccount.yaml  \
