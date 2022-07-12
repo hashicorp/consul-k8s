@@ -126,7 +126,7 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 				AclEnabled:   tt.aclEnabled,
 			}
 			namespacedName := types.NamespacedName{
-				Name:      "terminating gateway service-created",
+				Name:      "Terminating gateway service-created",
 				Namespace: "default",
 			}
 
@@ -279,6 +279,7 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 				c.ACL.DefaultPolicy = "deny"
 				c.ACL.Tokens.InitialManagement = masterToken
 			}
+
 		})
 		require.NoError(t, err)
 		defer consul.Stop()
