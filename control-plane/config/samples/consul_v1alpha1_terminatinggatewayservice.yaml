@@ -3,7 +3,8 @@ kind: TerminatingGatewayService
 metadata:
   name: terminatinggatewayservice-sample
 spec:
-  service:
-    iD: counting1
-    service: counting
-    port: 9003
+  Service:
+    Node: "legacy_node"
+    Address: "10.20.10.22"
+    ServiceName: "TerminatingGatewayServiceController-created service: test-service"
+    ServicePort: 9003
