@@ -28,7 +28,7 @@ type ReadCommand struct {
 	// Command Flags
 	flagNamespace string
 	flagPodName   string
-	flagJSON      bool
+	flagRawConfig bool
 
 	// Output Filtering Opts
 	flagClusters  bool
@@ -63,8 +63,8 @@ func (c *ReadCommand) init() {
 		Aliases: []string{"n"},
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:    "json",
-		Target:  &c.flagJSON,
+		Name:    "raw-config",
+		Target:  &c.flagRawConfig,
 		Default: false,
 		Usage:   "Output the whole Envoy Config as JSON.",
 	})
@@ -159,7 +159,7 @@ func (c *ReadCommand) Help() string {
 }
 
 func (c *ReadCommand) Synopsis() string {
-	return "Print the Envoy configuration for a given Pod."
+	return "Inspect the Envoy configuration for a given Pod."
 }
 
 func (c *ReadCommand) parseFlags(args []string) error {
@@ -189,7 +189,17 @@ func (c *ReadCommand) validateFlags() error {
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
+	if c.flagRawConfig && c.filtersPassed() {
+		return fmt.Errorf("-raw-config cannot be combined with filtering flags: %s.",
+			strings.Join(c.set.GetSetFlags("Output Filtering Options"), ", "))
+	}
 	return nil
+}
+
+// filtersPassed returns true if the user has passed a flag which filters the
+// output.
+func (c *ReadCommand) filtersPassed() bool {
+	return c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
 }
 
 func (c *ReadCommand) initKubernetes() (err error) {
@@ -223,7 +233,7 @@ func (c *ReadCommand) initKubernetes() (err error) {
 }
 
 func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
-	if c.flagJSON {
+	if c.flagRawConfig {
 		c.UI.Output(string(config.rawCfg))
 		return
 	}
@@ -232,7 +242,7 @@ func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
 
 	// Track if any filters are passed in. If not, print everything; if so, only
 	// print the filters that are passed in.
-	filtersPassed := c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
+	filtersPassed := c.filtersPassed()
 
 	if !filtersPassed || c.flagClusters {
 		c.UI.Output(fmt.Sprintf("Clusters (%d)", len(config.Clusters)), terminal.WithHeaderStyle())
