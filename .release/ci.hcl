@@ -8,7 +8,7 @@ project "consul-k8s" {
   github {
     organization = "hashicorp"
     repository = "consul-k8s"
-    release_branches = ["cb/crt-testing"]
+    release_branches = ["main"]
   }
 }
 
@@ -195,22 +195,8 @@ event "promote-staging" {
   }
 }
 
-event "promote-staging-new-hc-releases" {
-  depends = ["promote-staging"]
-  action "promote-staging-new-hc-releases" {
-    organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-staging-new-hc-releases"
-	config = "release-metadata.hcl"
-  }
-
-  notification {
-    on = "fail"
-  }
-}
-
 event "promote-staging-docker" {
-  depends = ["promote-staging-new-hc-releases"]
+  depends = ["promote-staging"]
   action "promote-staging-docker" {
     organization = "hashicorp"
     repository = "crt-workflows-common"
