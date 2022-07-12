@@ -26,44 +26,56 @@ type TerminatingGatewayService struct {
 
 //+kubebuilder:object:root=true
 
-// TerminatingGatewayServiceList contains a list of TerminatingGatewayService
+// TerminatingGatewayServiceList contains a list of TerminatingGatewayService.
 type TerminatingGatewayServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []TerminatingGatewayService `json:"items"`
 }
 
-// TerminatingGatewayServiceSpec defines the desired state of TerminatingGatewayService
+// TerminatingGatewayServiceSpec defines the desired state of TerminatingGatewayService.
 type TerminatingGatewayServiceSpec struct {
-	Service *ServiceConfig `json:"serviceConfig,omitempty"`
-	//Service *ServiceConfig `json:"service,omitempty"`
-}
-type ServiceConfig struct {
-	//ID      string `json:"id,omitempty"`
-	ID      string `json:"iD,omitempty"`
-	Service string `json:"service,omitempty"`
-	//Name string `json:"name,omitempty"`
-	Port int `json:"port,omitempty"`
+	Service *CatalogService `json:"service,omitempty"`
 }
 
-// TerminatingGatewayServiceStatus defines the observed state of TerminatingGatewayService
+type CatalogService struct {
+	Node                     string
+	Address                  string
+	Datacenter               string
+	TaggedAddresses          map[string]string
+	NodeMeta                 map[string]string
+	ServiceID                string
+	ServiceName              string
+	ServiceAddress           string
+	ServiceTags              []string
+	ServiceMeta              map[string]string
+	ServicePort              int
+	ServiceEnableTagOverride bool
+}
+
+// TerminatingGatewayServiceStatus defines the observed state of TerminatingGatewayService.
 type TerminatingGatewayServiceStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
-
+	// LatestPeeringVersion is the latest version of the resource that was reconciled.
+	LatestPeeringVersion *uint64 `json:"latestPeeringVersion,omitempty"`
 	// LastReconcileTime is the last time the resource was reconciled.
 	// +optional
 	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
 	// ReconcileError shows any errors during the last reconciliation of this resource.
 	// +optional
 	ReconcileError *ReconcileErrorStatus `json:"reconcileError,omitempty"`
-	// ServiceInfoRefStatus shows information about the service
-	ServiceInfoRef *ServiceInfoRefStatus `json:"serviceConfig,omitempty"`
+	// ServiceInfoRefStatus shows information about the service.
+	ServiceInfoRef *ServiceInfoRefStatus `json:"serviceInfoRef,omitempty"`
 }
 
 type ServiceInfoRefStatus struct {
-	ServiceConfig `json:",inline"`
+	ServiceName string `json:"serviceInfo,inline"`
+	PolicyName  string `json:"service"`
 }
 
+func (tas *TerminatingGatewayService) ServiceInfo() *CatalogService {
+	return tas.Spec.Service
+}
 func (tas *TerminatingGatewayService) ServiceInfoRef() *ServiceInfoRefStatus {
 	return tas.Status.ServiceInfoRef
 }

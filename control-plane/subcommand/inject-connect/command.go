@@ -480,6 +480,7 @@ func (c *Command) Run(args []string) int {
 		Log:          ctrl.Log.WithName("controller").WithName("terminating-gateway-service"),
 		Scheme:       mgr.GetScheme(),
 		Context:      ctx,
+		AclEnabled:   c.flagACLAuthMethod == "",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "terminating-gateway-service")
 		return 1
