@@ -10,7 +10,6 @@ import (
 // ProxyCommand  provides a synopsis for the proxy subcommands (e.g. read).
 type ProxyCommand struct {
 	*common.BaseCommand
-	help string
 }
 
 // Run prints out information about the subcommands.
