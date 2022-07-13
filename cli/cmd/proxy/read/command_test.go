@@ -31,8 +31,8 @@ func TestArgumentParsing(t *testing.T) {
 			args: []string{"podName", "-namespace", "YOLO"},
 			out:  1,
 		},
-		"User tried to filter raw config": {
-			args: []string{"podName", "-raw-config", "-clusters"},
+		"User passed incorrect output": {
+			args: []string{"podName", "-output", "image"},
 			out:  1,
 		},
 	}
