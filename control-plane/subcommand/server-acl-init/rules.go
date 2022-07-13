@@ -8,6 +8,7 @@ import (
 
 type rulesData struct {
 	EnablePartitions        bool
+	EnablePeering           bool
 	PartitionName           string
 	EnableNamespaces        bool
 	SyncConsulDestNS        string
@@ -316,6 +317,9 @@ partition "{{ .PartitionName }}" {
   operator = "write"
 {{- end }}
 {{- end }}
+{{- if .EnablePeering }}
+  peering = "write"
+{{- end }}
   node_prefix "" {
     policy = "write"
   }
@@ -416,6 +420,7 @@ partition "{{ .PartitionName }}" {
 func (c *Command) rulesData() rulesData {
 	return rulesData{
 		EnablePartitions:        c.flagEnablePartitions,
+		EnablePeering:           c.flagEnablePeering,
 		PartitionName:           c.flagPartitionName,
 		EnableNamespaces:        c.flagEnableNamespaces,
 		SyncConsulDestNS:        c.flagConsulSyncDestinationNamespace,
