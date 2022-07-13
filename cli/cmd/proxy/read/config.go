@@ -154,7 +154,7 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 }
 
 func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
-	var clusters []Cluster
+	clusters := make([]Cluster, 0, 0)
 
 	raw, err := json.Marshal(rawCfg)
 	if err != nil {
@@ -168,7 +168,7 @@ func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 
 	for _, cluster := range append(clustersCD.StaticClusters, clustersCD.DynamicActiveClusters...) {
 		// Join nested endpoint data into a slice of strings.
-		var endpoints []string
+		endpoints := make([]string, 0, 0)
 		for _, endpoint := range cluster.Cluster.LoadAssignment.Endpoints {
 			for _, lbEndpoint := range endpoint.LBEndpoints {
 				endpoints = append(endpoints, fmt.Sprintf("%s:%d", lbEndpoint.Endpoint.Address.SocketAddress.Address,
@@ -189,7 +189,7 @@ func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 }
 
 func parseEndpoints(rawCfg map[string]interface{}) ([]Endpoint, error) {
-	var endpoints []Endpoint
+	endpoints := make([]Endpoint, 0, 0)
 
 	raw, err := json.Marshal(rawCfg)
 	if err != nil {
@@ -219,7 +219,7 @@ func parseEndpoints(rawCfg map[string]interface{}) ([]Endpoint, error) {
 }
 
 func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
-	var listeners []Listener
+	listeners := make([]Listener, 0, 0)
 
 	raw, err := json.Marshal(rawCfg)
 	if err != nil {
@@ -275,7 +275,7 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 }
 
 func parseRoutes(rawCfg map[string]interface{}) ([]Route, error) {
-	var routes []Route
+	routes := make([]Route, 0, 0)
 
 	raw, err := json.Marshal(rawCfg)
 	if err != nil {
@@ -307,7 +307,7 @@ func parseRoutes(rawCfg map[string]interface{}) ([]Route, error) {
 }
 
 func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
-	var secrets []Secret
+	secrets := make([]Secret, 0, 0)
 
 	raw, err := json.Marshal(rawCfg)
 	if err != nil {
