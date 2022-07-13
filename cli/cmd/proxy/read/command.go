@@ -37,8 +37,6 @@ type ReadCommand struct {
 	flagNamespace string
 	flagPodName   string
 	flagOutput    string
-	flagRawConfig bool
-	flagJSON      bool
 
 	// Output Filtering Opts
 	flagClusters  bool
@@ -78,18 +76,6 @@ func (c *ReadCommand) init() {
 		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
 		Default: Table,
 		Aliases: []string{"o"},
-	})
-	f.BoolVar(&flag.BoolVar{
-		Name:    "raw-config",
-		Target:  &c.flagRawConfig,
-		Default: false,
-		Usage:   "Output the raw Envoy config dump.",
-	})
-	f.BoolVar(&flag.BoolVar{
-		Name:    "json",
-		Target:  &c.flagJSON,
-		Default: false,
-		Usage:   "Output the configuration as JSON.",
 	})
 
 	f = c.set.NewSet("Output Filtering Options")
@@ -216,10 +202,6 @@ func (c *ReadCommand) validateFlags() error {
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
-	if c.flagRawConfig && c.filtersPassed() {
-		return fmt.Errorf("-raw-config cannot be combined with filtering flags: %s.",
-			strings.Join(c.set.GetSetFlags("Output Filtering Options"), ", "))
-	}
 	if outputs := []string{Table, JSON, Raw}; !slices.Contains(outputs, c.flagOutput) {
 		return fmt.Errorf("-output must be one of %s.", strings.Join(outputs, ", "))
 	}
@@ -263,16 +245,15 @@ func (c *ReadCommand) initKubernetes() (err error) {
 }
 
 func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
-	if c.flagOutput == "raw" {
-		c.UI.Output(string(config.rawCfg))
-		return nil
-	}
-
-	if c.flagOutput == "json" {
+	switch c.flagOutput {
+	case Table:
+		c.outputAsTables(config)
+	case JSON:
 		return c.outputAsJSON(config)
+	case Raw:
+		c.UI.Output(string(config.rawCfg))
 	}
 
-	c.outputAsTables(config)
 	return nil
 }
 
