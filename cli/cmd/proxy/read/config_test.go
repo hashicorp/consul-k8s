@@ -93,12 +93,14 @@ var testEnvoyConfig = &EnvoyConfig{
 		{
 			Name:                     "client",
 			FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+			Endpoints:                []string{},
 			Type:                     "EDS",
 			LastUpdated:              "2022-06-09T00:39:12.948Z",
 		},
 		{
 			Name:                     "frontend",
 			FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+			Endpoints:                []string{},
 			Type:                     "EDS",
 			LastUpdated:              "2022-06-09T00:39:12.855Z",
 		},
@@ -112,12 +114,14 @@ var testEnvoyConfig = &EnvoyConfig{
 		{
 			Name:                     "original-destination",
 			FullyQualifiedDomainName: "original-destination",
+			Endpoints:                []string{},
 			Type:                     "ORIGINAL_DST",
 			LastUpdated:              "2022-05-13T04:22:39.743Z",
 		},
 		{
 			Name:                     "server",
 			FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+			Endpoints:                []string{},
 			Type:                     "EDS",
 			LastUpdated:              "2022-06-09T00:39:12.754Z",
 		},

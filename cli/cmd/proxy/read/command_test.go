@@ -31,6 +31,10 @@ func TestArgumentParsing(t *testing.T) {
 			args: []string{"podName", "-namespace", "YOLO"},
 			out:  1,
 		},
+		"User tried to filter raw config": {
+			args: []string{"podName", "-raw-config", "-clusters"},
+			out:  1,
+		},
 	}
 
 	for name, tc := range cases {
