@@ -6,7 +6,7 @@ env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   CONSUL_VERSION: 1.13.0-alpha1 # Consul's OSS version to use in tests
   CONSUL_ENT_VERSION: 1.13.0-alpha1+ent # Consul's enterprise version to use in tests
-  GOTESTSUM_VERSION: 1.6.4 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
+  GOTESTSUM_VERSION: 1.8.1 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 jobs:
   get-go-version:
@@ -97,7 +97,7 @@ jobs:
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
 
-      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+      - run: go install github.com/hashicorp/lint-consul-retry@master && lint-consul-retry
 
       - name: Run lint
         working-directory: control-plane
