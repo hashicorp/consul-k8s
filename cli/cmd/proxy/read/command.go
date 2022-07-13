@@ -14,10 +14,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/strings/slices"
 )
 
 // adminPort is the port where the Envoy admin API is exposed.
 const adminPort int = 19000
+
+const (
+	Table = "table"
+	JSON  = "json"
+	Raw   = "raw"
+)
 
 type ReadCommand struct {
 	*common.BaseCommand
@@ -29,6 +36,7 @@ type ReadCommand struct {
 	// Command Flags
 	flagNamespace string
 	flagPodName   string
+	flagOutput    string
 	flagRawConfig bool
 	flagJSON      bool
 
@@ -63,6 +71,13 @@ func (c *ReadCommand) init() {
 		Target:  &c.flagNamespace,
 		Usage:   "The namespace where the target Pod can be found.",
 		Aliases: []string{"n"},
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    "output",
+		Target:  &c.flagOutput,
+		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
+		Default: Table,
+		Aliases: []string{"o"},
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    "raw-config",
@@ -205,6 +220,9 @@ func (c *ReadCommand) validateFlags() error {
 		return fmt.Errorf("-raw-config cannot be combined with filtering flags: %s.",
 			strings.Join(c.set.GetSetFlags("Output Filtering Options"), ", "))
 	}
+	if outputs := []string{Table, JSON, Raw}; !slices.Contains(outputs, c.flagOutput) {
+		return fmt.Errorf("-output must be one of %s.", strings.Join(outputs, ", "))
+	}
 	return nil
 }
 
@@ -245,12 +263,12 @@ func (c *ReadCommand) initKubernetes() (err error) {
 }
 
 func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
-	if c.flagRawConfig {
+	if c.flagOutput == "raw" {
 		c.UI.Output(string(config.rawCfg))
 		return nil
 	}
 
-	if c.flagJSON {
+	if c.flagOutput == "json" {
 		return c.outputAsJSON(config)
 	}
 
