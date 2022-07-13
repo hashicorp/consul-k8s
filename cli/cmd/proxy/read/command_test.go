@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestArgumentParsing(t *testing.T) {
+func TestFlagParsing(t *testing.T) {
 	cases := map[string]struct {
 		args []string
 		out  int
