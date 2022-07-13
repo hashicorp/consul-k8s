@@ -27,8 +27,8 @@ jobs:
           go-version: ${{ inputs.go-version }}
      
       - name: golangci-lint-${{inputs.directory}}
-        uses: golangci/golangci-lint-action@v3.1.0
+        uses: golangci/golangci-lint-action@v3.2.0
         with:
-          version: v1.45.2
+          version: v1.46.2
           working-directory: ${{inputs.directory}}
           args: ${{inputs.args}}
