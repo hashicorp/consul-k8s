@@ -259,11 +259,14 @@ func (r *TerminatingGatewayServiceController) serviceFound(serviceName string) (
 	serviceExists := false
 
 	services, _, err := r.ConsulClient.Catalog().Service(serviceName, "", &api.QueryOptions{})
+	len := len(services)
 	if err != nil {
 		return result, serviceExists, err
 	}
-	if len(services) > 1 {
+	if len > 1 {
 		r.Log.Error(err, "Multiple services found with the same serviceName")
+	} else if len == 0 {
+		r.Log.Error(err, "No service found")
 	} else {
 		result = services[0]
 		serviceExists = true
