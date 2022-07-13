@@ -240,21 +240,21 @@ func (c *ReadCommand) initKubernetes() (err error) {
 	return nil
 }
 
-func (c *ReadCommand) outputConfig(config *EnvoyConfig) {
+func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
 	if c.flagRawConfig {
 		c.UI.Output(string(config.rawCfg))
-		return
+		return nil
 	}
 
 	if c.flagJSON {
-		c.outputAsJSON(config)
-		return
+		return c.outputAsJSON(config)
 	}
 
 	c.outputAsTables(config)
+	return nil
 }
 
-func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) {
+func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) error {
 	cfg := make(map[string]interface{})
 	if !c.filtersPassed() || c.flagClusters {
 		cfg["clusters"] = config.Clusters
@@ -271,11 +271,14 @@ func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) {
 	if !c.filtersPassed() || c.flagSecrets {
 		cfg["secrets"] = config.Secrets
 	}
+
 	out, err := json.MarshalIndent(cfg, "", "\t")
 	if err != nil {
-		panic(err)
+		return err
 	}
+
 	c.UI.Output(string(out))
+	return nil
 }
 
 func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
