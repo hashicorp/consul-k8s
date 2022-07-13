@@ -45,6 +45,7 @@ type ReadCommand struct {
 	flagRoutes    bool
 	flagEndpoints bool
 	flagSecrets   bool
+	flagFQDN      string
 
 	// Global Flags
 	flagKubeConfig  string
@@ -104,6 +105,11 @@ func (c *ReadCommand) init() {
 		Name:   "secrets",
 		Target: &c.flagSecrets,
 		Usage:  "Filter output to only show secrets.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:   "fqdn",
+		Target: &c.flagFQDN,
+		Usage:  "Filter cluster output to only clusters with a fully qualified domain name which contains the given value.",
 	})
 
 	f = c.set.NewSet("GlobalOptions")
@@ -207,9 +213,9 @@ func (c *ReadCommand) validateFlags() error {
 	return nil
 }
 
-// filtersPassed returns true if the user has passed a flag which filters the
-// output.
-func (c *ReadCommand) filtersPassed() bool {
+// tableFiltersPassed returns true if a flag which filters the
+// set of tables output is passed.
+func (c *ReadCommand) tableFiltersPassed() bool {
 	return c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
 }
 
@@ -306,7 +312,7 @@ func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 	for name, config := range configs {
 		c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", name, c.flagNamespace))
 
-		c.outputClustersTable(config.Clusters)
+		c.outputClustersTable(FilterFQDN(config.Clusters, c.flagFQDN))
 		c.outputEndpointsTable(config.Endpoints)
 		c.outputListenersTable(config.Listeners)
 		c.outputRoutesTable(config.Routes)
@@ -321,19 +327,19 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 	cfgs := make(map[string]interface{})
 	for name, config := range configs {
 		cfg := make(map[string]interface{})
-		if !c.filtersPassed() || c.flagClusters {
-			cfg["clusters"] = config.Clusters
+		if !c.tableFiltersPassed() || c.flagClusters {
+			cfg["clusters"] = FilterFQDN(config.Clusters, c.flagFQDN)
 		}
-		if !c.filtersPassed() || c.flagEndpoints {
+		if !c.tableFiltersPassed() || c.flagEndpoints {
 			cfg["endpoints"] = config.Endpoints
 		}
-		if !c.filtersPassed() || c.flagListeners {
+		if !c.tableFiltersPassed() || c.flagListeners {
 			cfg["listeners"] = config.Listeners
 		}
-		if !c.filtersPassed() || c.flagRoutes {
+		if !c.tableFiltersPassed() || c.flagRoutes {
 			cfg["routes"] = config.Routes
 		}
-		if !c.filtersPassed() || c.flagSecrets {
+		if !c.tableFiltersPassed() || c.flagSecrets {
 			cfg["secrets"] = config.Secrets
 		}
 
@@ -372,16 +378,27 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 }
 
 func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
-	if c.filtersPassed() && !c.flagClusters {
+	if c.tableFiltersPassed() && !c.flagClusters {
 		return
 	}
 
-	c.UI.Output(fmt.Sprintf("Clusters (%d)", len(clusters)), terminal.WithHeaderStyle())
-	c.UI.Table(formatClusters(clusters))
+	fqdnFilterText := ""
+	if c.flagFQDN != "" {
+		fqdnFilterText = fmt.Sprintf("filtering by FQDNs which contain '%s'", c.flagFQDN)
+	}
+
+	c.UI.Output(fmt.Sprintf("Clusters (%d) %s", len(clusters), fqdnFilterText), terminal.WithHeaderStyle())
+	table := terminal.NewTable("Name", "FQDN", "Endpoints", "Type", "Last Updated")
+	for _, cluster := range clusters {
+		table.AddRow([]string{cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
+			cluster.Type, cluster.LastUpdated}, []string{})
+	}
+	c.UI.Table(table)
+	c.UI.Output("")
 }
 
 func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
-	if c.filtersPassed() && !c.flagEndpoints {
+	if c.tableFiltersPassed() && !c.flagEndpoints {
 		return
 	}
 
@@ -390,7 +407,7 @@ func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
 }
 
 func (c *ReadCommand) outputListenersTable(listeners []Listener) {
-	if c.filtersPassed() && !c.flagListeners {
+	if c.tableFiltersPassed() && !c.flagListeners {
 		return
 	}
 
@@ -399,7 +416,7 @@ func (c *ReadCommand) outputListenersTable(listeners []Listener) {
 }
 
 func (c *ReadCommand) outputRoutesTable(routes []Route) {
-	if c.filtersPassed() && !c.flagRoutes {
+	if c.tableFiltersPassed() && !c.flagRoutes {
 		return
 	}
 
@@ -408,7 +425,7 @@ func (c *ReadCommand) outputRoutesTable(routes []Route) {
 }
 
 func (c *ReadCommand) outputSecretsTable(secrets []Secret) {
-	if c.filtersPassed() && !c.flagSecrets {
+	if c.tableFiltersPassed() && !c.flagSecrets {
 		return
 	}
 
