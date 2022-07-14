@@ -27,7 +27,7 @@ func getInitializedCommand(t *testing.T) (*ListCommand, *bytes.Buffer) {
 	buffer := new(bytes.Buffer)
 	baseCommand := &common.BaseCommand{
 		Log: log,
-		UI:  terminal.NewUI(context.TODO(), buffer),
+		UI:  terminal.NewUI(context.Background(), buffer),
 	}
 
 	c := &ListCommand{
