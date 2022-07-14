@@ -46,6 +46,7 @@ type ReadCommand struct {
 	flagEndpoints bool
 	flagSecrets   bool
 	flagFQDN      string
+	flagPort      int
 
 	// Global Flags
 	flagKubeConfig  string
@@ -110,6 +111,12 @@ func (c *ReadCommand) init() {
 		Name:   "fqdn",
 		Target: &c.flagFQDN,
 		Usage:  "Filter cluster output to only clusters with a fully qualified domain name which contains the given value.",
+	})
+	f.IntVar(&flag.IntVar{
+		Name:    "port",
+		Target:  &c.flagPort,
+		Usage:   "Filter endpoints output to only endpoints with the given port number.",
+		Default: -1,
 	})
 
 	f = c.set.NewSet("GlobalOptions")
@@ -308,6 +315,7 @@ func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 	for name, config := range configs {
 		c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", name, c.flagNamespace))
@@ -318,6 +326,24 @@ func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 		c.outputRoutesTable(config.Routes)
 		c.outputSecretsTable(config.Secrets)
 		c.UI.Output("\n")
+=======
+func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) error {
+	cfg := make(map[string]interface{})
+	if !c.tableFiltersPassed() || c.flagClusters {
+		cfg["clusters"] = FilterPort(FilterFQDN(config.Clusters, c.flagFQDN), c.flagPort)
+	}
+	if !c.tableFiltersPassed() || c.flagEndpoints {
+		cfg["endpoints"] = config.Endpoints
+	}
+	if !c.tableFiltersPassed() || c.flagListeners {
+		cfg["listeners"] = config.Listeners
+	}
+	if !c.tableFiltersPassed() || c.flagRoutes {
+		cfg["routes"] = config.Routes
+	}
+	if !c.tableFiltersPassed() || c.flagSecrets {
+		cfg["secrets"] = config.Secrets
+>>>>>>> f11c95d0 (Add port filtering)
 	}
 
 	return nil
@@ -356,6 +382,7 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	cfgs := make(map[string]interface{}, 0)
 	for name, config := range configs {
@@ -375,6 +402,15 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	c.UI.Output(string(out))
 
 	return nil
+=======
+func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
+	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in Namespace %s:", c.flagPodName, c.flagNamespace))
+	c.outputClustersTable(FilterPort(FilterFQDN(config.Clusters, c.flagFQDN), c.flagPort))
+	c.outputEndpointsTable(config.Endpoints)
+	c.outputListenersTable(config.Listeners)
+	c.outputRoutesTable(config.Routes)
+	c.outputSecretsTable(config.Secrets)
+>>>>>>> f11c95d0 (Add port filtering)
 }
 
 func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
@@ -382,12 +418,16 @@ func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
 		return
 	}
 
-	fqdnFilterText := ""
+	// Format header text if filters are passed.
+	filterHeaderText := ""
 	if c.flagFQDN != "" {
-		fqdnFilterText = fmt.Sprintf("filtering by FQDNs which contain '%s'", c.flagFQDN)
+		filterHeaderText += fmt.Sprintf("Filtering by FQDNs which contain '%s'. ", c.flagFQDN)
+	}
+	if c.flagPort != -1 {
+		filterHeaderText += fmt.Sprintf("Filtering to Endpoints with the port '%d'.", c.flagPort)
 	}
 
-	c.UI.Output(fmt.Sprintf("Clusters (%d) %s", len(clusters), fqdnFilterText), terminal.WithHeaderStyle())
+	c.UI.Output(fmt.Sprintf("Clusters (%d) %s", len(clusters), filterHeaderText), terminal.WithHeaderStyle())
 	table := terminal.NewTable("Name", "FQDN", "Endpoints", "Type", "Last Updated")
 	for _, cluster := range clusters {
 		table.AddRow([]string{cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
