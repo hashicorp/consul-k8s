@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilterFQDN(t *testing.T) {
+func TestFilterClustersByFQDN(t *testing.T) {
 	given := []Cluster{
 		{
 			Name:                     "local_agent",
@@ -133,13 +133,13 @@ func TestFilterFQDN(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			actual := FilterFQDN(given, tc.substring)
+			actual := FilterClustersByFQDN(given, tc.substring)
 			require.Equal(t, tc.expected, actual)
 		})
 	}
 }
 
-func TestFilterPort(t *testing.T) {
+func TestFilterClustersByPort(t *testing.T) {
 	given := []Cluster{
 		{
 			Name:                     "local_agent",
@@ -256,7 +256,7 @@ func TestFilterPort(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			actual := FilterPort(given, tc.port)
+			actual := FilterClustersByPort(given, tc.port)
 			require.Equal(t, tc.expected, actual)
 		})
 	}
