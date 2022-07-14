@@ -126,7 +126,7 @@ func getInitializedCommand(t *testing.T) (*ReadCommand, *bytes.Buffer) {
 	buffer := new(bytes.Buffer)
 	baseCommand := &common.BaseCommand{
 		Log: log,
-		UI:  terminal.NewUI(context.TODO(), buffer),
+		UI:  terminal.NewUI(context.Background(), buffer),
 	}
 
 	c := &ReadCommand{
