@@ -44,3 +44,33 @@ func FilterClustersByPort(clusters []Cluster, port int) []Cluster {
 
 	return filtered
 }
+
+func FilterEndpointsByPort(endpoints []Endpoint, port int) []Endpoint {
+	if port == -1 {
+		return endpoints
+	}
+
+	filtered := make([]Endpoint, 0)
+
+	return filtered
+}
+
+func FilterListenersByPort(listeners []Listener, port int) []Listener {
+	if port == -1 {
+		return listeners
+	}
+
+	filtered := make([]Listener, 0)
+
+	return filtered
+}
+
+func FilterListenersByAddress(listeners []Listener, substring string) []Listener {
+	if substring == "" {
+		return listeners
+	}
+
+	filtered := make([]Listener, 0)
+
+	return filtered
+}
