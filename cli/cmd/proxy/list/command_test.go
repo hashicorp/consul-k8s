@@ -15,28 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) (*ListCommand, *bytes.Buffer) {
-	t.Helper()
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "test",
-		Level:  hclog.Debug,
-		Output: os.Stdout,
-	})
-
-	buffer := new(bytes.Buffer)
-	baseCommand := &common.BaseCommand{
-		Log: log,
-		UI:  terminal.NewUI(context.Background(), buffer),
-	}
-
-	c := &ListCommand{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	return c, buffer
-}
-
 func TestArgumentParsing(t *testing.T) {
 	cases := map[string]struct {
 		args []string
@@ -321,4 +299,26 @@ func TestEndToEnd(t *testing.T) {
 	for _, expression := range expected {
 		require.Regexp(t, expression, actual)
 	}
+}
+
+// getInitializedCommand sets up a command struct for tests.
+func getInitializedCommand(t *testing.T) (*ListCommand, *bytes.Buffer) {
+	t.Helper()
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "test",
+		Level:  hclog.Debug,
+		Output: os.Stdout,
+	})
+
+	buffer := new(bytes.Buffer)
+	baseCommand := &common.BaseCommand{
+		Log: log,
+		UI:  terminal.NewUI(context.Background(), buffer),
+	}
+
+	c := &ListCommand{
+		BaseCommand: baseCommand,
+	}
+	c.init()
+	return c, buffer
 }
