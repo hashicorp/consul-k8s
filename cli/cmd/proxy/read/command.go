@@ -330,7 +330,7 @@ func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) error {
 	cfg := make(map[string]interface{})
 	if !c.tableFiltersPassed() || c.flagClusters {
-		cfg["clusters"] = FilterPort(FilterFQDN(config.Clusters, c.flagFQDN), c.flagPort)
+		cfg["clusters"] = FilterClustersByPort(FilterClustersByFQDN(config.Clusters, c.flagFQDN), c.flagPort)
 	}
 	if !c.tableFiltersPassed() || c.flagEndpoints {
 		cfg["endpoints"] = config.Endpoints
@@ -405,7 +405,7 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 =======
 func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
 	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in Namespace %s:", c.flagPodName, c.flagNamespace))
-	c.outputClustersTable(FilterPort(FilterFQDN(config.Clusters, c.flagFQDN), c.flagPort))
+	c.outputClustersTable(FilterClustersByPort(FilterClustersByFQDN(config.Clusters, c.flagFQDN), c.flagPort))
 	c.outputEndpointsTable(config.Endpoints)
 	c.outputListenersTable(config.Listeners)
 	c.outputRoutesTable(config.Routes)
