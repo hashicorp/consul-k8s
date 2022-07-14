@@ -21,6 +21,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -755,7 +757,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 	for _, name := range gatewayParams.GatewayNames {
 		if name == "" {
 			errMessage := fmt.Sprintf("%s gateway name cannot be empty",
-				strings.Title(strings.ToLower(gatewayParams.GatewayType)))
+				cases.Title(language.English).String(gatewayParams.GatewayType))
 			c.log.Error(errMessage)
 			return errors.New(errMessage)
 		}
