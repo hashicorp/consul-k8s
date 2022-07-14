@@ -53,7 +53,7 @@ func TestFlagParsing(t *testing.T) {
 func TestEndToEnd(t *testing.T) {
 	// These regular expressions must be present in the output.
 	expected := []string{
-		"Envoy configuration for fakePodName in Namespace default:",
+		"Envoy configuration for podName in Namespace default:",
 
 		"==> Clusters \\(6\\)",
 		"Name.*FQDN.*Endpoints.*Type.*Last Updated",
@@ -96,15 +96,15 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// A fetchConfig function that just returns the test Envoy config.
-	mockFetchConfig := func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
+	fakeFetchConfig := func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
 		return testEnvoyConfig, nil
 	}
 
 	c, buf := getInitializedCommand(t)
 	c.kubernetes = fake.NewSimpleClientset()
-	c.fetchConfig = mockFetchConfig
+	c.fetchConfig = fakeFetchConfig
 
-	out := c.Run([]string{"fakePodName"})
+	out := c.Run([]string{"podName"})
 	require.Equal(t, 0, out)
 
 	actual := buf.String()
