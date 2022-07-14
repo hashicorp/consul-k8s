@@ -18,7 +18,7 @@ spec:
   - hostPath
   - secret
   - emptyDir
-  hostNetwork: true
+  hostNetwork: false
   readOnlyRootFilesystem: false
   runAsUser:
     rule: 'RunAsAny'

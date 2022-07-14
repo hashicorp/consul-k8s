@@ -1885,7 +1885,7 @@ connectInject:
     # If multus plugin is enabled or not. If true, the CNI installer will generate a consul CNI configuration
     # in a location for the multus program to use. Also, the helm chart will create a custom resource for
     # NetworkAttachmentDefintion that multus will consume. The values for cniBinDir and cniNetDir must also be 
-    # changed for multus to work. There is a GKE example for cniBinDir below. 
+    # changed for multus to work. 
     # Please refer to your cloud platform for more informaton on using multus.
     # @type: boolean
     multus: false
@@ -1900,7 +1900,6 @@ connectInject:
     # ```yaml
     # cniBinDir: "/home/kubernetes/bin"
     # ```
-
     # @type: string
     cniBinDir: "/opt/cni/bin"
 
