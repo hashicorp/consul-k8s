@@ -81,7 +81,7 @@ func (ui *basicUI) Interactive() bool {
 
 // Output implements UI.
 func (ui *basicUI) Output(msg string, raw ...interface{}) {
-	msg, style, w := ui.interpret(msg, raw...)
+	msg, style, w := ui.parse(msg, raw...)
 
 	switch style {
 	case HeaderStyle:
@@ -158,8 +158,8 @@ func (ui *basicUI) OutputWriters() (io.Writer, io.Writer, error) {
 	return os.Stdout, os.Stderr, nil
 }
 
-// interpret decomposes the msg and arguments into the message, style, and writer.
-func (ui *basicUI) interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
+// parse decomposes the msg and arguments into the message, style, and writer.
+func (ui *basicUI) parse(msg string, raw ...interface{}) (string, string, io.Writer) {
 	// Build our args and options
 	var args []interface{}
 	var opts []Option
