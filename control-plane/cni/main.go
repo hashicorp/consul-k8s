@@ -215,7 +215,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
-// cmdCheck is called for CHECK requests
+// cmdCheck is called for CHECK requests.
 func cmdCheck(args *skel.CmdArgs) error {
 	// Nothing to do but this function will still be called as part of the CNI specification.
 	return nil
