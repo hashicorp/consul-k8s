@@ -52,9 +52,6 @@ func (c *Command) init() {
 	})
 
 	c.help = c.set.Help()
-
-	// c.Init() calls the embedded BaseCommand's initialization function.
-	c.Init()
 }
 
 // Run checks the status of a Consul installation on Kubernetes.

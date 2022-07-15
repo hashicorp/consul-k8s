@@ -119,7 +119,6 @@ func (c *ReadCommand) init() {
 	})
 
 	c.help = c.set.Help()
-	c.Init()
 }
 
 func (c *ReadCommand) Run(args []string) int {
