@@ -218,7 +218,7 @@ func TestFetchPods(t *testing.T) {
 	}
 }
 
-func TestEndToEnd(t *testing.T) {
+func TestListCommandOutput(t *testing.T) {
 	// These regular expressions must be present in the output.
 	expected := []string{
 		"Namespace.*Name.*Type",

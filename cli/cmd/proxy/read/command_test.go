@@ -52,7 +52,7 @@ func TestFlagParsing(t *testing.T) {
 	}
 }
 
-func TestEndToEnd(t *testing.T) {
+func TestReadCommandOutput(t *testing.T) {
 	// These regular expressions must be present in the output.
 	expected := []string{
 		"Envoy configuration for podName in Namespace default:",
