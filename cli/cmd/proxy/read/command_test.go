@@ -3,6 +3,7 @@ package read
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"testing"
 
@@ -42,8 +43,9 @@ func TestFlagParsing(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			c, _ := getInitializedCommand(t)
+			c := setupCommand(new(bytes.Buffer))
 			c.kubernetes = fake.NewSimpleClientset()
+
 			out := c.Run(tc.args)
 			require.Equal(t, tc.out, out)
 		})
@@ -95,14 +97,14 @@ func TestEndToEnd(t *testing.T) {
 		"ROOTCA.*Dynamic Warming.*2022-03-15T05:14:22.868Z",
 	}
 
+	buf := new(bytes.Buffer)
+	c := setupCommand(buf)
+	c.kubernetes = fake.NewSimpleClientset()
+
 	// A fetchConfig function that just returns the test Envoy config.
-	fakeFetchConfig := func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
+	c.fetchConfig = func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
 		return testEnvoyConfig, nil
 	}
-
-	c, buf := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.fetchConfig = fakeFetchConfig
 
 	out := c.Run([]string{"podName"})
 	require.Equal(t, 0, out)
@@ -114,24 +116,22 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
-// getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) (*ReadCommand, *bytes.Buffer) {
-	t.Helper()
+func setupCommand(buf io.Writer) *ReadCommand {
+	// Log at a test level to standard out.
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "test",
 		Level:  hclog.Debug,
 		Output: os.Stdout,
 	})
 
-	buffer := new(bytes.Buffer)
-	baseCommand := &common.BaseCommand{
-		Log: log,
-		UI:  terminal.NewUI(context.Background(), buffer),
+	// Setup and initialize the command struct
+	command := &ReadCommand{
+		BaseCommand: &common.BaseCommand{
+			Log: log,
+			UI:  terminal.NewUI(context.Background(), buf),
+		},
 	}
+	command.init()
 
-	c := &ReadCommand{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	return c, buffer
+	return command
 }

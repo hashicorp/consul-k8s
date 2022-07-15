@@ -3,6 +3,7 @@ package list
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestFlagParsing(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			c, _ := getInitializedCommand(t)
+			c := setupCommand(new(bytes.Buffer))
 			c.kubernetes = fake.NewSimpleClientset()
 			out := c.Run(tc.args)
 			require.Equal(t, tc.out, out)
@@ -205,11 +206,10 @@ func TestFetchPods(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
-
-			c, _ := getInitializedCommand(t)
-			c.kubernetes = client
+			c := setupCommand(new(bytes.Buffer))
+			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
 			c.flagNamespace = tc.namespace
+
 			pods, err := c.fetchPods()
 
 			require.NoError(t, err)
@@ -288,7 +288,8 @@ func TestEndToEnd(t *testing.T) {
 	}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: pods})
 
-	c, buf := getInitializedCommand(t)
+	buf := new(bytes.Buffer)
+	c := setupCommand(buf)
 	c.kubernetes = client
 
 	out := c.Run([]string{"-A"})
@@ -301,24 +302,22 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
-// getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) (*ListCommand, *bytes.Buffer) {
-	t.Helper()
+func setupCommand(buf io.Writer) *ListCommand {
+	// Log at a test level to standard out.
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "test",
 		Level:  hclog.Debug,
 		Output: os.Stdout,
 	})
 
-	buffer := new(bytes.Buffer)
-	baseCommand := &common.BaseCommand{
-		Log: log,
-		UI:  terminal.NewUI(context.Background(), buffer),
+	// Setup and initialize the command struct
+	command := &ListCommand{
+		BaseCommand: &common.BaseCommand{
+			Log: log,
+			UI:  terminal.NewUI(context.Background(), buf),
+		},
 	}
+	command.init()
 
-	c := &ListCommand{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	return c, buffer
+	return command
 }
