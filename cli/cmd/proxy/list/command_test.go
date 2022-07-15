@@ -228,6 +228,9 @@ func TestListCommandOutput(t *testing.T) {
 		"consul.*api-gateway.*Sidecar",
 		"default.*pod1.*Sidecar",
 	}
+	notExpected := []string{
+		"default.*dont-fetch.*Sidecar",
+	}
 
 	pods := []v1.Pod{
 		{
@@ -299,6 +302,9 @@ func TestListCommandOutput(t *testing.T) {
 
 	for _, expression := range expected {
 		require.Regexp(t, expression, actual)
+	}
+	for _, expression := range notExpected {
+		require.NotRegexp(t, expression, actual)
 	}
 }
 
