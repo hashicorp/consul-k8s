@@ -71,7 +71,7 @@ type PluginConf struct {
 	Name string `json:"name"`
 	// Type of plugin (consul-cni).
 	Type string `json:"type"`
-	// CNIBinDir is the location of the cni config files on the node. Can bet as a cli flag.
+	// CNIBinDir is the location of the cni config files on the node. Can be set as a cli flag.
 	CNIBinDir string `json:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir"`
