@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilterClustersByFQDN(t *testing.T) {
+func TestFilterClusters(t *testing.T) {
 	given := []Cluster{
 		{
 			Name:                     "local_agent",
@@ -37,6 +37,13 @@ func TestFilterClustersByFQDN(t *testing.T) {
 			LastUpdated:              "2022-05-13T04:22:39.655Z",
 		},
 		{
+			Name:                     "local_admin",
+			FullyQualifiedDomainName: "local_admin",
+			Endpoints:                []string{"127.0.0.1:5000"},
+			Type:                     "STATIC",
+			LastUpdated:              "2022-05-13T04:22:39.655Z",
+		},
+		{
 			Name:                     "original-destination",
 			FullyQualifiedDomainName: "original-destination",
 			Endpoints:                []string{},
@@ -53,11 +60,15 @@ func TestFilterClustersByFQDN(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		substring string
-		expected  []Cluster
+		fqdn     string
+		address  string
+		port     int
+		expected []Cluster
 	}{
 		"No filter": {
-			substring: "",
+			fqdn:    "",
+			address: "",
+			port:    -1,
 			expected: []Cluster{
 				{
 					Name:                     "local_agent",
@@ -88,6 +99,13 @@ func TestFilterClustersByFQDN(t *testing.T) {
 					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 				{
+					Name:                     "local_admin",
+					FullyQualifiedDomainName: "local_admin",
+					Endpoints:                []string{"127.0.0.1:5000"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+				{
 					Name:                     "original-destination",
 					FullyQualifiedDomainName: "original-destination",
 					Endpoints:                []string{},
@@ -103,8 +121,10 @@ func TestFilterClustersByFQDN(t *testing.T) {
 				},
 			},
 		},
-		"Filter default": {
-			substring: "default",
+		"Filter FQDN default": {
+			fqdn:    "default",
+			address: "",
+			port:    -1,
 			expected: []Cluster{
 				{
 					Name:                     "client",
@@ -129,134 +149,299 @@ func TestFilterClustersByFQDN(t *testing.T) {
 				},
 			},
 		},
+		"Filter address 127.0.": {
+			fqdn:    "",
+			address: "127.0.",
+			port:    -1,
+			expected: []Cluster{
+				{
+					Name:                     "local_app",
+					FullyQualifiedDomainName: "local_app",
+					Endpoints:                []string{"127.0.0.1:8080"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+				{
+					Name:                     "local_admin",
+					FullyQualifiedDomainName: "local_admin",
+					Endpoints:                []string{"127.0.0.1:5000"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+			},
+		},
+		"Filter port 8080": {
+			fqdn:    "",
+			address: "",
+			port:    8080,
+			expected: []Cluster{
+				{
+					Name:                     "local_app",
+					FullyQualifiedDomainName: "local_app",
+					Endpoints:                []string{"127.0.0.1:8080"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+			},
+		},
+		"Filter combo": {
+			fqdn:    "local",
+			address: "127.0.0.1",
+			port:    -1,
+			expected: []Cluster{
+				{
+					Name:                     "local_app",
+					FullyQualifiedDomainName: "local_app",
+					Endpoints:                []string{"127.0.0.1:8080"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+				{
+					Name:                     "local_admin",
+					FullyQualifiedDomainName: "local_admin",
+					Endpoints:                []string{"127.0.0.1:5000"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			actual := FilterClustersByFQDN(given, tc.substring)
+			actual := FilterClusters(given, tc.fqdn, tc.address, tc.port)
 			require.Equal(t, tc.expected, actual)
 		})
 	}
 }
 
-func TestFilterClustersByPort(t *testing.T) {
-	given := []Cluster{
+func TestFilterEndpoints(t *testing.T) {
+	given := []Endpoint{
 		{
-			Name:                     "local_agent",
-			FullyQualifiedDomainName: "local_agent",
-			Endpoints:                []string{"192.168.79.187:8502"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.553Z",
+			Address: "192.168.79.187:8502",
+			Cluster: "local_agent",
+			Weight:  1,
+			Status:  "HEALTHY",
 		},
 		{
-			Name:                     "client",
-			FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.948Z",
+			Address: "127.0.0.1:8080",
+			Cluster: "local_app",
+			Weight:  1,
+			Status:  "HEALTHY",
 		},
 		{
-			Name:                     "frontend",
-			FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.855Z",
+			Address: "192.168.31.201:20000",
+			Weight:  1,
+			Status:  "HEALTHY",
 		},
 		{
-			Name:                     "local_app",
-			FullyQualifiedDomainName: "local_app",
-			Endpoints:                []string{"127.0.0.1:8080"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.655Z",
+			Address: "192.168.47.235:20000",
+			Weight:  1,
+			Status:  "HEALTHY",
 		},
 		{
-			Name:                     "original-destination",
-			FullyQualifiedDomainName: "original-destination",
-			Endpoints:                []string{},
-			Type:                     "ORIGINAL_DST",
-			LastUpdated:              "2022-05-13T04:22:39.743Z",
-		},
-		{
-			Name:                     "server",
-			FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.754Z",
+			Address: "192.168.71.254:20000",
+			Weight:  1,
+			Status:  "HEALTHY",
 		},
 	}
 
 	cases := map[string]struct {
+		address  string
 		port     int
-		expected []Cluster
+		expected []Endpoint
 	}{
-		"No filtering": {
-			port: -1,
-			expected: []Cluster{
+		"No filters": {
+			address: "",
+			port:    -1,
+			expected: []Endpoint{
 				{
-					Name:                     "local_agent",
-					FullyQualifiedDomainName: "local_agent",
-					Endpoints:                []string{"192.168.79.187:8502"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.553Z",
+					Address: "192.168.79.187:8502",
+					Cluster: "local_agent",
+					Weight:  1,
+					Status:  "HEALTHY",
 				},
 				{
-					Name:                     "client",
-					FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.948Z",
+					Address: "127.0.0.1:8080",
+					Cluster: "local_app",
+					Weight:  1,
+					Status:  "HEALTHY",
 				},
 				{
-					Name:                     "frontend",
-					FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.855Z",
+					Address: "192.168.31.201:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
 				},
 				{
-					Name:                     "local_app",
-					FullyQualifiedDomainName: "local_app",
-					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
+					Address: "192.168.47.235:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
 				},
 				{
-					Name:                     "original-destination",
-					FullyQualifiedDomainName: "original-destination",
-					Endpoints:                []string{},
-					Type:                     "ORIGINAL_DST",
-					LastUpdated:              "2022-05-13T04:22:39.743Z",
-				},
-				{
-					Name:                     "server",
-					FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.754Z",
+					Address: "192.168.71.254:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
 				},
 			},
 		},
-		"Port that exists": {
-			port: 8502,
-			expected: []Cluster{
+		"Filter address 127.0.0.1": {
+			address: "127.0.0.1",
+			port:    -1,
+			expected: []Endpoint{
 				{
-					Name:                     "local_agent",
-					FullyQualifiedDomainName: "local_agent",
-					Endpoints:                []string{"192.168.79.187:8502"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.553Z",
+					Address: "127.0.0.1:8080",
+					Cluster: "local_app",
+					Weight:  1,
+					Status:  "HEALTHY",
 				},
 			},
 		},
-		"Port that doesn't exist": {
-			port:     14000000,
-			expected: []Cluster{},
+		"Filter port 20000": {
+			address: "",
+			port:    20000,
+			expected: []Endpoint{
+				{
+					Address: "192.168.31.201:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
+				},
+				{
+					Address: "192.168.47.235:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
+				},
+				{
+					Address: "192.168.71.254:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
+				},
+			},
+		},
+		"Filter combo": {
+			address: "235",
+			port:    20000,
+			expected: []Endpoint{
+				{
+					Address: "192.168.47.235:20000",
+					Weight:  1,
+					Status:  "HEALTHY",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			actual := FilterClustersByPort(given, tc.port)
+			actual := FilterEndpoints(given, tc.address, tc.port)
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestFilterListeners(t *testing.T) {
+	given := []Listener{
+		{
+			Name:    "public_listener",
+			Address: "192.168.69.179:20000",
+			FilterChain: []FilterChain{
+				{
+					FilterChainMatch: "Any",
+					Filters:          []string{"* -> local_app/"},
+				},
+			},
+			Direction:   "INBOUND",
+			LastUpdated: "2022-06-09T00:39:27.668Z",
+		},
+		{
+			Name:    "outbound_listener",
+			Address: "127.0.0.1:15001",
+			FilterChain: []FilterChain{
+				{
+					FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
+					Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
+				},
+			},
+			Direction:   "OUTBOUND",
+			LastUpdated: "2022-05-24T17:41:59.079Z",
+		},
+	}
+
+	cases := map[string]struct {
+		address  string
+		port     int
+		expected []Listener
+	}{
+		"No filter": {
+			address: "",
+			port:    -1,
+			expected: []Listener{
+				{
+					Name:    "public_listener",
+					Address: "192.168.69.179:20000",
+					FilterChain: []FilterChain{
+						{
+							FilterChainMatch: "Any",
+							Filters:          []string{"* -> local_app/"},
+						},
+					},
+					Direction:   "INBOUND",
+					LastUpdated: "2022-06-09T00:39:27.668Z",
+				},
+				{
+					Name:    "outbound_listener",
+					Address: "127.0.0.1:15001",
+					FilterChain: []FilterChain{
+						{
+							FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
+							Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
+						},
+					},
+					Direction:   "OUTBOUND",
+					LastUpdated: "2022-05-24T17:41:59.079Z",
+				},
+			},
+		},
+		"Filter address 127.0.0.1": {
+			address: "127.0.0.1",
+			port:    -1,
+			expected: []Listener{
+				{
+					Name:    "outbound_listener",
+					Address: "127.0.0.1:15001",
+					FilterChain: []FilterChain{
+						{
+							FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
+							Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
+						},
+					},
+					Direction:   "OUTBOUND",
+					LastUpdated: "2022-05-24T17:41:59.079Z",
+				},
+			},
+		},
+		"Filter port 20000": {
+			address: "",
+			port:    20000,
+			expected: []Listener{
+				{
+					Name:    "public_listener",
+					Address: "192.168.69.179:20000",
+					FilterChain: []FilterChain{
+						{
+							FilterChainMatch: "Any",
+							Filters:          []string{"* -> local_app/"},
+						},
+					},
+					Direction:   "INBOUND",
+					LastUpdated: "2022-06-09T00:39:27.668Z",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := FilterListeners(given, tc.address, tc.port)
 			require.Equal(t, tc.expected, actual)
 		})
 	}
