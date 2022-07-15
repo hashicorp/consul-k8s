@@ -39,31 +39,26 @@ type TerminatingGatewayServiceSpec struct {
 }
 
 type CatalogService struct {
-	Node                     string
-	Address                  string
-	Datacenter               string
-	TaggedAddresses          map[string]string
-	NodeMeta                 map[string]string
-	ServiceID                string
-	ServiceName              string
-	ServiceAddress           string
-	ServiceTags              []string
-	ServiceMeta              map[string]string
-	ServicePort              int
-	ServiceEnableTagOverride bool
+	Node                     string            `json:"node,omitempty"`
+	Address                  string            `json:"address,omitempty"`
+	Datacenter               string            `json:"datacenter,omitempty"`
+	TaggedAddresses          map[string]string `json:"taggedAddresses,omitempty"`
+	NodeMeta                 map[string]string `json:"nodeMeta,omitempty"`
+	ServiceID                string            `json:"serviceId,omitempty"`
+	ServiceName              string            `json:"serviceName,omitempty"`
+	ServiceAddress           string            `json:"serviceAddress,omitempty"`
+	ServiceTags              []string          `json:"serviceTags,omitempty"`
+	ServiceMeta              map[string]string `json:"serviceMeta,omitempty"`
+	ServicePort              int               `json:"servicePort,omitempty"`
+	ServiceEnableTagOverride bool              `json:"serviceEnableTagOverride,omitempty"`
 }
 
 // TerminatingGatewayServiceStatus defines the observed state of TerminatingGatewayService.
 type TerminatingGatewayServiceStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
-	// LatestPeeringVersion is the latest version of the resource that was reconciled.
-	LatestPeeringVersion *uint64 `json:"latestPeeringVersion,omitempty"`
 	// LastReconcileTime is the last time the resource was reconciled.
 	// +optional
 	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
-	// ReconcileError shows any errors during the last reconciliation of this resource.
-	// +optional
-	ReconcileError *ReconcileErrorStatus `json:"reconcileError,omitempty"`
 	// ServiceInfoRefStatus shows information about the service.
 	ServiceInfoRef *ServiceInfoRefStatus `json:"serviceInfoRef,omitempty"`
 }
