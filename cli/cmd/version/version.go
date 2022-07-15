@@ -16,13 +16,8 @@ type Command struct {
 	once sync.Once
 }
 
-func (c *Command) init() {
-	c.Init()
-}
-
 // Run prints the version of the Consul on Kubernetes CLI.
 func (c *Command) Run(_ []string) int {
-	c.once.Do(c.init)
 	c.UI.Output("consul-k8s %s", c.Version, terminal.WithInfoStyle())
 	return 0
 }
