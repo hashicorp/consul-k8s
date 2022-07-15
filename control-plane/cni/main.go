@@ -30,51 +30,53 @@ const (
 	// order to prevent pulling in dependencies.
 
 	// annotationInject is the key of the annotation that controls whether
-	// injection is explicitly enabled or disabled for a pod. This should
-	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
+	// injection is explicitly enabled or disabled for a pod.
 	annotationInject = "consul.hashicorp.com/connect-inject"
-	// annotationCNIProxyConfig stores iptables information so that the CNI plugin can use it to apply iptables rules.
+	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply iptables rules.
 	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
 	// retries is the number of backoff retries to attempt while waiting for an cni-proxy-config annotation to poplulate.
 	retries = 10
-	// dnsServiceHostEnvSuffix is the suffix that is used for the DNS host IP.
+	// dnsServiceHostEnvSuffix is the suffix that is used to get the DNS host IP. The DNS IP is saved as an environment variable
+	// with prefix + suffix. The prefix is passed in as cli flag to the endpoints controller which is then passed on in the
+	// cni-proxy-config annotation so that the CNI plugin can use it. The DNS environment variable usually looks like:
+	// CONSUL_CONSUL_DNS_SERVICE_HOST but the prefix can change depending on the helm install.
 	dnsServiceHostEnvSuffix = "DNS_SERVICE_HOST"
 )
 
 type CNIArgs struct {
-	// types.CommonArgs are args that are passed part of the CNI standard.
+	// types.CommonArgs are args that are passed as part of the CNI standard.
 	types.CommonArgs
-	// IP address assigned to the pod from a previous plugin
+	// IP address assigned to the pod from a previous plugin.
 	IP net.IP
-	// K8S_POD_NAME is the pod that the plugin is running for
+	// K8S_POD_NAME is the pod that the plugin is running for.
 	K8S_POD_NAME types.UnmarshallableString
-	// K8S_POD_NAMESPACE is the namespace that the plugin is running for
+	// K8S_POD_NAMESPACE is the namespace that the plugin is running for.
 	K8S_POD_NAMESPACE types.UnmarshallableString
-	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under
+	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under.
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 }
 
 // PluginConf is is the configuration used by the plugin.
 type PluginConf struct {
 	// NetConf is the CNI Specification configuration for standard fields like Name, Type,
-	// CNIVersion and PrevResult
+	// CNIVersion and PrevResult.
 	types.NetConf
 
-	// RuntimeConfig is the config passed from the kubelet to plugin at runtime
+	// RuntimeConfig is the config passed from the kubelet to plugin at runtime.
 	RuntimeConfig *struct {
 		SampleConfig map[string]interface{} `json:"sample_config"`
 	} `json:"runtime_config"`
 
-	// Name of the plugin
+	// Name of the plugin (consul-cni).
 	Name string `json:"name"`
-	// Type of plugin (consul-cni)
+	// Type of plugin (consul-cni).
 	Type string `json:"type"`
 	// CNIBinDir is the location of the cni config files on the node. Can bet as a cli flag.
 	CNIBinDir string `json:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir"`
 	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the prefix allows us
-	// to search for it
+	// to search for it. The DNS IP is determined using the prefix and the dnsServiceHostEnvSuffix constant.
 	DNSPrefix string `json:"dns_prefix"`
 	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
 	Multus bool `json:"multus"`
@@ -84,7 +86,7 @@ type PluginConf struct {
 	LogLevel string `json:"log_level"`
 }
 
-// parseConfig parses the supplied configuration (and prevResult) from stdin.
+// parseConfig parses the supplied CNI configuration (and prevResult) from stdin.
 func parseConfig(stdin []byte) (*PluginConf, error) {
 	cfg := PluginConf{}
 
@@ -110,7 +112,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	// Get the values of args passed through CNI_ARGS
+	// Get the values of args passed through CNI_ARGS.
 	cniArgs := CNIArgs{}
 	if err := types.LoadArgs(args.Args, &cniArgs); err != nil {
 		return err
@@ -119,7 +121,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	podNamespace := string(cniArgs.K8S_POD_NAMESPACE)
 	podName := string(cniArgs.K8S_POD_NAME)
 
-	// We only run in a pod
+	// We should never encounter this unless there has been an error in the kubelet. A good safeguard.
 	if podNamespace == "" && podName == "" {
 		return fmt.Errorf("not running in a pod, namespace and pod should have values")
 	}
@@ -130,14 +132,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 		Level: hclog.LevelFromString(cfg.LogLevel),
 	})
 
-	// Check to see if the plugin is a chained plugin
+	// Check to see if the plugin is a chained plugin.
 	if cfg.PrevResult == nil {
 		return fmt.Errorf("must be called as final chained plugin")
 	}
 
 	logger.Debug("consul-cni plugin config", "config", cfg)
 	// Convert the PrevResult to a concrete Result type that can be modified. The CNI standard says
-	// that the previous result needs to be passed onto the next plugin
+	// that the previous result needs to be passed onto the next plugin.
 	prevResult, err := current.GetResult(cfg.PrevResult)
 	if err != nil {
 		return fmt.Errorf("failed to convert prevResult: %v", err)
@@ -151,6 +153,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	result := prevResult
 	logger.Debug("consul-cni previous result", "result", result)
 
+	// Connect to kubernetes.
 	ctx := context.Background()
 	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
 	if err != nil {
@@ -173,27 +176,28 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	// check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff
+	// check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff.
 	exists := waitForAnnotation(*pod, annotationCNIProxyConfig, uint64(retries))
 	if !exists {
 		logger.Error("could not retrieve annotation: %s on pod: %s", annotationCNIProxyConfig, pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	// parse the cni-proxy-config annotation into an iptables.Config object
+	// parse the cni-proxy-config annotation into an iptables.Config object.
 	iptablesCfg, err := parseAnnotation(*pod, annotationCNIProxyConfig)
 	if err != nil {
 		logger.Error("could not parse annotation: %s, error: %v", annotationCNIProxyConfig, err)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
+	// get the DNS IP from the environment.
 	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSPrefix)
 	if dnsIP != "" {
 		logger.Error("assigned consul dns ip to %s", dnsIP)
 		iptablesCfg.ConsulDNSIP = dnsIP
 	}
 
-	// apply the iptables rules
+	// apply the iptables rules.
 	err = iptables.Setup(iptablesCfg)
 	if err != nil {
 		logger.Error("could not apply iptables setup: %v", err)
@@ -201,17 +205,19 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	logger.Debug("traffic redirect rules applied to pod: %s", pod.Name)
-	// Pass through the result for the next plugin
+	// Pass through the result for the next plugin even though we are the final plugin in the chain.
 	return types.PrintResult(result, cfg.CNIVersion)
 }
 
 // cmdDel is called for DELETE requests.
 func cmdDel(args *skel.CmdArgs) error {
-	// Nothing for consul-cni plugin to do as everything is removed once the pod is gone
+	// Nothing to do but this function will still be called as part of the CNI specification.
 	return nil
 }
 
+// cmdCheck is called for CHECK requests
 func cmdCheck(args *skel.CmdArgs) error {
+	// Nothing to do but this function will still be called as part of the CNI specification.
 	return nil
 }
 

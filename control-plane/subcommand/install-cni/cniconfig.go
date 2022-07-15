@@ -13,7 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// defaultCNIConfigFile gets the the correct config file from the cni net dir
+// defaultCNIConfigFile gets the the correct config file from the cni net dir.
 // Adapted from kubelet: https://github.com/kubernetes/kubernetes/blob/954996e231074dc7429f7be1256a579bedd8344c/pkg/kubelet/dockershim/network/cni/cni.go#L134
 func defaultCNIConfigFile(confDir string) (string, error) {
 	files, err := libcni.ConfFiles(confDir, []string{".conf", ".conflist", ".json"})
@@ -66,7 +66,7 @@ func defaultCNIConfigFile(confDir string) (string, error) {
 	return "", fmt.Errorf("no valid networks found in %s", confDir)
 }
 
-//The format of the main cni config file is unstructured json consisting of a header and list of plugins
+// The format of the main cni config file is unstructured json consisting of a header and list of plugins
 //
 // {
 //  "cniVersion": "0.3.1",
@@ -82,19 +82,20 @@ func defaultCNIConfigFile(confDir string) (string, error) {
 // }
 // appendCNIConfig appends the consul-cni configuration to the main configuration file.
 func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
+	// Read the config file and convert it to a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
 		return fmt.Errorf("could not convert config file to map: %v", err)
 	}
 
-	// Get the 'plugins' map embedded inside of the exisingMap
+	// Get the 'plugins' map embedded inside of the exisingMap.
 	plugins, err := pluginsFromMap(cfgMap)
 	if err != nil {
 		return err
 	}
 
 	// Check to see if 'type: consul-cni' already exists and remove it before appending.
-	// This can happen in a CrashLoop and we end up with many entries in the config file
+	// This can happen in a CrashLoop and we prevents many duplicate entries in the config file.
 	for i, p := range plugins {
 		plugin, ok := p.(map[string]interface{})
 		if !ok {
@@ -106,6 +107,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 		}
 	}
 
+	// Take the consul cni config object and convert it to a map so that we can use it with the other maps.
 	consulMap, err := consulMapFromConfig(consulCfg)
 	if err != nil {
 		return fmt.Errorf("error converting consul config into map: %v", err)
@@ -114,7 +116,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 	// Append the consul-cni map to the already existing plugins
 	cfgMap["plugins"] = append(plugins, consulMap)
 
-	// Marshal into a new json file
+	// Marshal into a new json object
 	cfgJSON, err := json.MarshalIndent(cfgMap, "", "  ")
 	if err != nil {
 		return fmt.Errorf("error marshalling existing CNI config: %v", err)
@@ -173,8 +175,9 @@ func consulMapFromConfig(consulCfg *config.CNIConfig) (map[string]interface{}, e
 	return consulMap, nil
 }
 
-// removeCNIConfig removes the consul-cni config from the CNI config file.
+// removeCNIConfig removes the consul-cni config from the CNI config file. Used as part of cleanup.
 func removeCNIConfig(cfgFile string) error {
+	// Read the config file and convert it to a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
 		return fmt.Errorf("could not convert config file to map: %v", err)

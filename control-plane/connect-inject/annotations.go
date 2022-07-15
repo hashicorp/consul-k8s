@@ -148,6 +148,8 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
+	// annotationCNIProxyConfig is a populated iptables.Config object saved as an annotation so that the CNI
+	// plugin can use that information to apply iptables rules.
 	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
 
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul

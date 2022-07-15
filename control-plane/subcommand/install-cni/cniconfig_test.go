@@ -9,12 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: Test scenario where a goes from .conf to .conflist.
-// TODO: Test multus plugin.
 // TODO: Add more tests for different types of CNI plugins we may encounter on GKE/AWS/EKS
 // TODO: Remove kindnet tests and replace with Calico as kindnet does not work with other CNI plugins as it is not a real chained plugin. Kindnet does not
-//       pass through the previous result which causes the consul-cni plugin to fail (It took a while to figure that one out...)
-// TODO: Find a way to make these file based test faster. Maybe Afero?
 
 // TestCreateCNIConfigFile tests the writing of the config file.
 func TestAppendCNIConfig(t *testing.T) {

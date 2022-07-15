@@ -11,7 +11,7 @@ type CNIConfig struct {
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir" mapstructure:"cni_net_dir"`
 	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the prefix allows us
-	// to search for it
+	// to search for it.
 	DNSPrefix string `json:"dns_prefix" mapstructure:"dns_prefix"`
 	// Kubeconfig file name. Can be set as a cli flag.
 	Kubeconfig string `json:"kubeconfig"  mapstructure:"kubeconfig"`
