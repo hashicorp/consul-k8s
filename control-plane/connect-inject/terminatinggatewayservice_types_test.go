@@ -25,7 +25,6 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 	cases := []struct {
 		name           string
 		k8sObjects     func() []runtime.Object
-		expErr         string
 		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
 		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
 		aclEnabled     bool
@@ -42,7 +41,7 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 						Service: &v1alpha1.CatalogService{
 							Node:        "legacy_node",
 							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+							ServiceName: "TerminatingGatewayServiceController-created-service",
 							ServicePort: 9003,
 						},
 					},
@@ -51,8 +50,16 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 			},
 			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
 				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
 					PolicyName:  "",
+				},
+			},
+			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
+				Service: &v1alpha1.CatalogService{
+					Node:        "legacy_node",
+					Address:     "10.20.10.22",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
+					ServicePort: 9003,
 				},
 			},
 			aclEnabled: false,
@@ -69,7 +76,7 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 						Service: &v1alpha1.CatalogService{
 							Node:        "legacy_node",
 							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+							ServiceName: "TerminatingGatewayServiceController-created-service",
 							ServicePort: 9003,
 						},
 					},
@@ -78,8 +85,16 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 			},
 			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
 				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created service: test-service",
-					PolicyName:  "",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
+					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
+				},
+			},
+			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
+				Service: &v1alpha1.CatalogService{
+					Node:        "legacy_node",
+					Address:     "10.20.10.22",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
+					ServicePort: 9003,
 				},
 			},
 			aclEnabled: true,
@@ -96,12 +111,13 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.TerminatingGatewayService{}, &v1alpha1.TerminatingGatewayServiceList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
+			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+
 			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
 				if tt.aclEnabled {
 					// Start Consul server with ACLs enabled and default deny policy.
-					masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
 					c.ACL.Enabled = true
 					c.ACL.DefaultPolicy = "deny"
 					c.ACL.Tokens.InitialManagement = masterToken
@@ -113,9 +129,39 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
+				Token:   masterToken,
 			}
+
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
+
+			if tt.aclEnabled {
+				// Create fake consul client with fake terminating gateway policy.
+
+				fakeTermGtwPolicy := &api.ACLPolicy{
+					Name:        "1b9a40e2-4b80-0b45-4ee4-0a47592fe386-terminating-gateway",
+					Description: "ACL Policy for terminating gateway",
+				}
+
+				termGtwPolicy, _, err := consulClient.ACL().PolicyCreate(fakeTermGtwPolicy, nil)
+				require.NoError(t, err)
+
+				fakeConsulClientPolicies := []*api.ACLRolePolicyLink{
+					{
+						ID:   termGtwPolicy.ID,
+						Name: termGtwPolicy.Name,
+					},
+				}
+
+				fakeConsulClientRole := &api.ACLRole{
+					Description: "ACL Role for consul-client",
+					Policies:    fakeConsulClientPolicies,
+					Name:        "terminating-gateway-acl-role",
+				}
+
+				_, _, err = consulClient.ACL().RoleCreate(fakeConsulClientRole, nil)
+				require.NoError(t, err)
+			}
 
 			// create the terminating gateway service controller.
 			controller := &TerminatingGatewayServiceController{
@@ -133,11 +179,7 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
-			if tt.expErr != "" {
-				require.EqualError(t, err, tt.expErr)
-			} else {
-				require.NoError(t, err)
-			}
+
 			require.False(t, resp.Requeue)
 
 			// Get the reconciled TerminatingGatewayService and make assertions on the spec.
@@ -145,11 +187,15 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 			err = fakeClient.Get(context.Background(), namespacedName, terminatingGatewayService)
 			require.NoError(t, err)
 
-			serviceName := "TerminatingGatewayServiceController-created service: test-service"
-			policyName := serviceName + "-write-policy"
-			service, serviceExists := serviceFound("TerminatingGatewayServiceController-created service: test-service", consulClient)
+			serviceName := "TerminatingGatewayServiceController-created-service"
+			service, serviceExists := serviceFound("TerminatingGatewayServiceController-created-service", consulClient)
 
 			require.True(t, serviceExists)
+
+			policyName := ""
+			if tt.aclEnabled {
+				policyName = serviceName + "-write-policy"
+			}
 
 			require.Equal(t, tt.expectedSpec.Service.ServiceName, service.ServiceName)
 			require.Equal(t, tt.expectedSpec.Service.ServicePort, service.ServicePort)
@@ -172,6 +218,9 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 
 				require.Equal(t, allPolicies[policyIndex].Name, policyFromConsul.Name)
 			}
+
+			require.Equal(t, tt.expectedStatus.ServiceInfoRef.ServiceName, service.ServiceName)
+			require.Equal(t, tt.expectedStatus.ServiceInfoRef.PolicyName, policyName)
 		})
 	}
 }
@@ -200,7 +249,7 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 						Service: &v1alpha1.CatalogService{
 							Node:        "legacy_node",
 							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+							ServiceName: "TerminatingGatewayServiceController-created-service",
 							ServicePort: 9003,
 						},
 					},
@@ -209,8 +258,16 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 			},
 			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
 				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
 					PolicyName:  "",
+				},
+			},
+			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
+				Service: &v1alpha1.CatalogService{
+					Node:        "legacy_node",
+					Address:     "10.20.10.22",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
+					ServicePort: 9003,
 				},
 			},
 			aclEnabled: false,
@@ -227,7 +284,7 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 						Service: &v1alpha1.CatalogService{
 							Node:        "legacy_node",
 							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+							ServiceName: "TerminatingGatewayServiceController-created-service",
 							ServicePort: 9003,
 						},
 					},
@@ -236,8 +293,16 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 			},
 			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
 				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created service: test-service",
-					PolicyName:  "",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
+					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
+				},
+			},
+			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
+				Service: &v1alpha1.CatalogService{
+					Node:        "legacy_node",
+					Address:     "10.20.10.22",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
+					ServicePort: 9003,
 				},
 			},
 			aclEnabled: true,
@@ -257,7 +322,7 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 				Service: &v1alpha1.CatalogService{
 					Node:        "legacy_node",
 					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created service: test-service",
+					ServiceName: "TerminatingGatewayServiceController-created-service",
 					ServicePort: 9003,
 				},
 			},
@@ -269,12 +334,13 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 		s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.TerminatingGatewayService{}, &v1alpha1.TerminatingGatewayServiceList{})
 		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
+		masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+
 		// Create test consul server.
 		consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 			c.NodeName = nodeName
 			if tt.aclEnabled {
 				// Start Consul server with ACLs enabled and default deny policy.
-				masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
 				c.ACL.Enabled = true
 				c.ACL.DefaultPolicy = "deny"
 				c.ACL.Tokens.InitialManagement = masterToken
@@ -287,9 +353,38 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 
 		cfg := &api.Config{
 			Address: consul.HTTPAddr,
+			Token:   masterToken,
 		}
 		consulClient, err := api.NewClient(cfg)
 		require.NoError(t, err)
+
+		if tt.aclEnabled {
+			// Create fake consul client with fake terminating gateway policy.
+
+			fakeTermGtwPolicy := &api.ACLPolicy{
+				Name:        "1b9a40e2-4b80-0b45-4ee4-0a47592fe386-terminating-gateway",
+				Description: "ACL Policy for terminating gateway",
+			}
+
+			termGtwPolicy, _, err := consulClient.ACL().PolicyCreate(fakeTermGtwPolicy, nil)
+			require.NoError(t, err)
+
+			fakeConsulClientPolicies := []*api.ACLRolePolicyLink{
+				{
+					ID:   termGtwPolicy.ID,
+					Name: termGtwPolicy.Name,
+				},
+			}
+
+			fakeConsulClientRole := &api.ACLRole{
+				Description: "ACL Role for consul-client",
+				Policies:    fakeConsulClientPolicies,
+				Name:        "terminating-gateway-acl-role",
+			}
+
+			_, _, err = consulClient.ACL().RoleCreate(fakeConsulClientRole, nil)
+			require.NoError(t, err)
+		}
 
 		// Create the terminating gateway service controller.
 		controller := &TerminatingGatewayServiceController{
@@ -315,9 +410,9 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 		err = fakeClient.Get(context.Background(), namespacedName, terminatingGatewayService)
 		require.EqualError(t, err, `terminatinggatewayservices.consul.hashicorp.com "Terminating gateway service-deleted" not found`)
 
-		serviceName := "TerminatingGatewayServiceController-created service: test-service"
+		serviceName := "TerminatingGatewayServiceController-created-service"
 		policyName := serviceName + "-write-policy"
-		_, serviceExists := serviceFound("TerminatingGatewayServiceController-created service: test-service", consulClient)
+		_, serviceExists := serviceFound("TerminatingGatewayServiceController-created-service", consulClient)
 
 		require.False(t, serviceExists)
 

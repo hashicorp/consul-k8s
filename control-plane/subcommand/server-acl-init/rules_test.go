@@ -859,6 +859,7 @@ func TestInjectRules(t *testing.T) {
     policy = "write"
   }
     acl = "write"
+	service = "write"
     service_prefix "" {
       policy = "write"
     }`,
@@ -873,6 +874,7 @@ func TestInjectRules(t *testing.T) {
   }
   namespace_prefix "" {
     acl = "write"
+	service = "write"
     service_prefix "" {
       policy = "write"
     }
@@ -890,6 +892,7 @@ partition "part-1" {
   namespace_prefix "" {
     policy = "write"
     acl = "write"
+	service = "write"
     service_prefix "" {
       policy = "write"
     }
