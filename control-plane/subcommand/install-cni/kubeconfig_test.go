@@ -10,18 +10,18 @@ import (
 
 func TestKubeConfigYaml(t *testing.T) {
 	cases := []struct {
-		name                 string
-		server               string
-		token                string
+		name                     string
+		server                   string
+		token                    string
 		certificateAuthorityData []byte
-		goldenFile           string // golden file that our output should look like
+		goldenFile               string // golden file that our output should look like
 	}{
 		{
-			name:                 "valid kubeconfig file",
-			server:               "https://[172.30.0.1]:443",
-			token:                "eyJhbGciOiJSUzI1NiIsImtp",
+			name:                     "valid kubeconfig file",
+			server:                   "https://[172.30.0.1]:443",
+			token:                    "eyJhbGciOiJSUzI1NiIsImtp",
 			certificateAuthorityData: []byte("LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0"),
-			goldenFile:           "ZZZ-consul-cni-kubeconfig.golden",
+			goldenFile:               "ZZZ-consul-cni-kubeconfig.golden",
 		},
 	}
 
