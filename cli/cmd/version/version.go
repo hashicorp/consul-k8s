@@ -1,8 +1,6 @@
 package version
 
 import (
-	"sync"
-
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
@@ -12,8 +10,6 @@ type Command struct {
 
 	// Version is the Consul on Kubernetes CLI version.
 	Version string
-
-	once sync.Once
 }
 
 // Run prints the version of the Consul on Kubernetes CLI.
