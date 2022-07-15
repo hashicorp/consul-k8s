@@ -24,7 +24,7 @@ type basicUI struct {
 // NewBasicUI creates a new instance of the basicUI struct for the terminal
 // with color output.
 func NewBasicUI(ctx context.Context) *basicUI {
-	return &basicUI{ctx: ctx, bufOut: color.Output}
+	return NewUI(ctx, color.Output)
 }
 
 // NewUI creates a new instance of the basicUI struct that outputs to
