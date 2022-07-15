@@ -4,8 +4,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 func init() {
 	SchemeBuilder.Register(&TerminatingGatewayService{}, &TerminatingGatewayServiceList{})
 }
@@ -14,7 +12,6 @@ func init() {
 //+kubebuilder:subresource:status
 
 // TerminatingGatewayService is the Schema for the terminatinggatewayservices API
-// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type TerminatingGatewayService struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -47,11 +44,13 @@ type CatalogService struct {
 	ServiceID                string            `json:"serviceId,omitempty"`
 	ServiceName              string            `json:"serviceName,omitempty"`
 	ServiceAddress           string            `json:"serviceAddress,omitempty"`
-	ServiceTags              []string          `json:"serviceTags,omitempty"`
+	ServiceTags              []ServiceTag      `json:"serviceTags,omitempty"`
 	ServiceMeta              map[string]string `json:"serviceMeta,omitempty"`
 	ServicePort              int               `json:"servicePort,omitempty"`
 	ServiceEnableTagOverride bool              `json:"serviceEnableTagOverride,omitempty"`
 }
+
+type ServiceTag string
 
 // TerminatingGatewayServiceStatus defines the observed state of TerminatingGatewayService.
 type TerminatingGatewayServiceStatus struct {
@@ -64,8 +63,8 @@ type TerminatingGatewayServiceStatus struct {
 }
 
 type ServiceInfoRefStatus struct {
-	ServiceName string `json:"serviceInfo,inline"`
-	PolicyName  string `json:"service"`
+	ServiceName string `json:"serviceInfo,omitempty"`
+	PolicyName  string `json:"service,omitempty"`
 }
 
 func (tas *TerminatingGatewayService) ServiceInfo() *CatalogService {

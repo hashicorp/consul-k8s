@@ -92,9 +92,9 @@ spec:
                 properties:
                   service:
                     type: string
-                required:
-                - service
-                type: string
+                  serviceInfo:
+                    type: string
+                type: object
             type: object
         type: object
     served: true
