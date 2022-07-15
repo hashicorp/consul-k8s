@@ -70,7 +70,6 @@ func (c *ListCommand) init() {
 	})
 
 	c.help = c.set.Help()
-	c.Init()
 }
 
 // Run executes the list command.

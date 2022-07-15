@@ -172,9 +172,6 @@ func (c *Command) init() {
 	})
 
 	c.help = c.set.Help()
-
-	// c.Init() calls the embedded BaseCommand's initialization function.
-	c.Init()
 }
 
 // Run installs Consul into a Kubernetes cluster.
