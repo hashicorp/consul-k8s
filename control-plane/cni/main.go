@@ -274,6 +274,7 @@ func searchDNSIPFromEnvironment(pod corev1.Pod, prefix string) string {
 	for k := range vars {
 		if vars[k].Name == dnsName {
 			result = vars[k].Value
+			break
 		}
 	}
 	return result
