@@ -28,6 +28,9 @@ import (
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.UseKind {
+		t.Skipf("Skipping this test because it's currently flaky on kind")
+	}
 	if !cfg.EnableMultiCluster {
 		t.Skipf("skipping this test because -enable-multi-cluster is not set")
 	}
