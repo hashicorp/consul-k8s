@@ -8,4 +8,3 @@ spec:
     Address: "10.20.10.22"
     ServiceName: "TerminatingGatewayServiceController-created-service"
     ServicePort: 9003
-    

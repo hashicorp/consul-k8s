@@ -29,7 +29,7 @@ func (in *CatalogService) DeepCopyInto(out *CatalogService) {
 	}
 	if in.ServiceTags != nil {
 		in, out := &in.ServiceTags, &out.ServiceTags
-		*out = make([]string, len(*in))
+		*out = make([]ServiceTag, len(*in))
 		copy(*out, *in)
 	}
 	if in.ServiceMeta != nil {
