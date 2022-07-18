@@ -207,7 +207,7 @@ func (c *ReadCommand) validateFlags() error {
 	return nil
 }
 
-// filtersPassed returns true if the user has passed a flag which filters the
+// filtersPassed returns true if the user has passed a flag which filters th
 // output.
 func (c *ReadCommand) filtersPassed() bool {
 	return c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
@@ -290,6 +290,18 @@ func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*Envoy
 }
 
 func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
+	for name, config := range configs {
+		fmt.Println(name)
+		err := c.outputConfig(config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
 	switch c.flagOutput {
 	case Table:
 		return c.outputTables(configs)
