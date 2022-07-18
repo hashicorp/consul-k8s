@@ -176,7 +176,7 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 				Namespace: "default",
 			}
 
-			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+			resp, _ := controller.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 
