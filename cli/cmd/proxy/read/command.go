@@ -143,25 +143,24 @@ func (c *ReadCommand) Run(args []string) int {
 		return 1
 	}
 
-	pf := common.PortForward{
-		Namespace:  c.flagNamespace,
-		PodName:    c.flagPodName,
-		RemotePort: adminPort,
-		KubeClient: c.kubernetes,
-		RestConfig: c.restConfig,
-	}
-
-	config, err := c.fetchConfig(c.Ctx, &pf)
+	adminPorts, err := c.fetchAdminPorts()
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	err = c.outputConfig(config)
+	configs, err := c.fetchConfigs(adminPorts)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
+
+	c.outputConfigs(configs)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
 	return 0
 }
 
@@ -207,7 +206,7 @@ func (c *ReadCommand) validateFlags() error {
 	return nil
 }
 
-// filtersPassed returns true if the user has passed a flag which filters the
+// filtersPassed returns true if the user has passed a flag which filters th
 // output.
 func (c *ReadCommand) filtersPassed() bool {
 	return c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
@@ -238,6 +237,31 @@ func (c *ReadCommand) initKubernetes() (err error) {
 
 	if c.flagNamespace == "" {
 		c.flagNamespace = settings.Namespace()
+	}
+
+	return nil
+}
+
+func (c *ReadCommand) fetchAdminPorts() (map[string]int, error) {
+	// Grab the annotations on the Pod.
+	// Check if it's multiport
+	// If it is, return the multiple ports
+	// If it isn't, return default.
+
+	defaultPort := map[string]int{
+		c.flagPodName: 19000,
+	}
+
+	return defaultPort, nil
+}
+
+func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
+	for name, config := range configs {
+		fmt.Println(name)
+		err := c.outputConfig(config)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -302,9 +326,33 @@ func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
 	for _, cluster := range clusters {
 		table.AddRow([]string{cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
 			cluster.Type, cluster.LastUpdated}, []string{})
+
 	}
 	c.UI.Table(table)
 	c.UI.Output("")
+}
+
+func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*EnvoyConfig, error) {
+	configs := make(map[string]*EnvoyConfig, 0)
+
+	for name, adminPort := range adminPorts {
+		pf := common.PortForward{
+			Namespace:  c.flagNamespace,
+			PodName:    c.flagPodName,
+			RemotePort: adminPort,
+			KubeClient: c.kubernetes,
+			RestConfig: c.restConfig,
+		}
+
+		config, err := c.fetchConfig(c.Ctx, &pf)
+		if err != nil {
+			return configs, err
+		}
+
+		configs[name] = config
+	}
+
+	return configs, nil
 }
 
 func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
@@ -326,6 +374,7 @@ func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
 			[]string{endpoint.Address, endpoint.Cluster, fmt.Sprintf("%.2f", endpoint.Weight), endpoint.Status},
 			[]string{"", "", "", statusColor})
 	}
+
 	c.UI.Table(table)
 	c.UI.Output("")
 }
@@ -353,6 +402,7 @@ func (c *ReadCommand) outputListenersTable(listeners []Listener) {
 			}
 		}
 	}
+
 	c.UI.Table(table)
 	c.UI.Output("")
 }
