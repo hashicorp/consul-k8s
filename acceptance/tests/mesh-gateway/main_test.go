@@ -15,6 +15,9 @@ func TestMain(m *testing.M) {
 
 	if suite.Config().EnableMultiCluster {
 		os.Exit(suite.Run())
+	} else if suite.Config().UseKind {
+		fmt.Println("Skipping mesh gateway tests because they are currently flaky on kind")
+		os.Exit(0)
 	} else {
 		fmt.Println("Skipping mesh gateway tests because -enable-multi-cluster is not set")
 		os.Exit(0)
