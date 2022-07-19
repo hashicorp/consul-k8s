@@ -239,7 +239,7 @@ jobs:
       - name: Copy LICENSE.md
         run:
          cp LICENSE.md ./control-plane
-      - uses: hashicorp/actions-docker-build@v1.2.1
+      - uses: hashicorp/actions-docker-build@v1
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
