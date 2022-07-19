@@ -40,6 +40,8 @@ type TestConfig struct {
 
 	EnableTransparentProxy bool
 
+	DisablePeering bool
+
 	ConsulImage    string
 	ConsulK8SImage string
 	ConsulVersion  *version.Version
