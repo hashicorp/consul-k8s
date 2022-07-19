@@ -22,6 +22,7 @@ FROM alpine:3.15 AS dev
 ARG BIN_NAME=consul-k8s-control-plane
 ARG VERSION
 ARG TARGETARCH
+ARG TARGETOS
 
 LABEL name=${BIN_NAME} \
       maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
