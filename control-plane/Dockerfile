@@ -85,7 +85,8 @@ ENV VERSION=${VERSION}
 RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
-ARG TARGETOS TARGETARCH
+ARG TARGETOS
+ARG TARGETARCH
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -126,7 +127,8 @@ ENV NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
-ARG TARGETOS TARGETARCH
+ARG TARGETOS
+ARG TARGETARCH
 
 # Copy license for Red Hat certification.
 COPY LICENSE.md /licenses/mozilla.txt
