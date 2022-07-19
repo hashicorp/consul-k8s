@@ -266,83 +266,6 @@ func (c *ReadCommand) fetchAdminPorts() (map[string]int, error) {
 	return adminPorts, nil
 }
 
-func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
-	for name, config := range configs {
-		fmt.Println(name)
-		err := c.outputConfig(config)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
-	switch c.flagOutput {
-	case Table:
-		c.outputAsTables(config)
-	case JSON:
-		return c.outputAsJSON(config)
-	case Raw:
-		c.UI.Output(string(config.rawCfg))
-	}
-
-	return nil
-}
-
-func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) error {
-	cfg := make(map[string]interface{})
-	if !c.filtersPassed() || c.flagClusters {
-		cfg["clusters"] = config.Clusters
-	}
-	if !c.filtersPassed() || c.flagEndpoints {
-		cfg["endpoints"] = config.Endpoints
-	}
-	if !c.filtersPassed() || c.flagListeners {
-		cfg["listeners"] = config.Listeners
-	}
-	if !c.filtersPassed() || c.flagRoutes {
-		cfg["routes"] = config.Routes
-	}
-	if !c.filtersPassed() || c.flagSecrets {
-		cfg["secrets"] = config.Secrets
-	}
-
-	out, err := json.MarshalIndent(cfg, "", "\t")
-	if err != nil {
-		return err
-	}
-
-	c.UI.Output(string(out))
-	return nil
-}
-
-func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
-	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in Namespace %s:", c.flagPodName, c.flagNamespace))
-	c.outputClustersTable(config.Clusters)
-	c.outputEndpointsTable(config.Endpoints)
-	c.outputListenersTable(config.Listeners)
-	c.outputRoutesTable(config.Routes)
-	c.outputSecretsTable(config.Secrets)
-}
-
-func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
-	if c.filtersPassed() && !c.flagClusters {
-		return
-	}
-
-	c.UI.Output(fmt.Sprintf("Clusters (%d)", len(clusters)), terminal.WithHeaderStyle())
-	table := terminal.NewTable("Name", "FQDN", "Endpoints", "Type", "Last Updated")
-	for _, cluster := range clusters {
-		table.AddRow([]string{cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
-			cluster.Type, cluster.LastUpdated}, []string{})
-
-	}
-	c.UI.Table(table)
-	c.UI.Output("")
-}
-
 func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*EnvoyConfig, error) {
 	configs := make(map[string]*EnvoyConfig, 0)
 
@@ -366,28 +289,104 @@ func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*Envoy
 	return configs, nil
 }
 
+func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
+	switch c.flagOutput {
+	case Table:
+		return c.outputTables(configs)
+	case JSON:
+		return c.outputJSON(configs)
+	case Raw:
+		return c.outputRaw(configs)
+	}
+
+	return nil
+}
+
+func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
+	for name, config := range configs {
+		c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", name, c.flagNamespace))
+
+		c.outputClustersTable(config.Clusters)
+		c.outputEndpointsTable(config.Endpoints)
+		c.outputListenersTable(config.Listeners)
+		c.outputRoutesTable(config.Routes)
+		c.outputSecretsTable(config.Secrets)
+		c.UI.Output("\n")
+	}
+
+	return nil
+}
+
+func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
+	cfgs := make(map[string]interface{})
+	for name, config := range configs {
+		cfg := make(map[string]interface{})
+		if !c.filtersPassed() || c.flagClusters {
+			cfg["clusters"] = config.Clusters
+		}
+		if !c.filtersPassed() || c.flagEndpoints {
+			cfg["endpoints"] = config.Endpoints
+		}
+		if !c.filtersPassed() || c.flagListeners {
+			cfg["listeners"] = config.Listeners
+		}
+		if !c.filtersPassed() || c.flagRoutes {
+			cfg["routes"] = config.Routes
+		}
+		if !c.filtersPassed() || c.flagSecrets {
+			cfg["secrets"] = config.Secrets
+		}
+
+		cfgs[name] = cfg
+	}
+
+	out, err := json.MarshalIndent(cfgs, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	c.UI.Output(string(out))
+
+	return nil
+}
+
+func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
+	cfgs := make(map[string]interface{}, 0)
+	for name, config := range configs {
+		var cfg interface{}
+		if err := json.Unmarshal(config.rawCfg, &cfg); err != nil {
+			return err
+		}
+
+		cfgs[name] = cfg
+	}
+
+	out, err := json.MarshalIndent(cfgs, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	c.UI.Output(string(out))
+
+	return nil
+}
+
+func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
+	if c.filtersPassed() && !c.flagClusters {
+		return
+	}
+
+	c.UI.Output(fmt.Sprintf("Clusters (%d)", len(clusters)), terminal.WithHeaderStyle())
+	c.UI.Table(formatClusters(clusters))
+}
+
 func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
 	if c.filtersPassed() && !c.flagEndpoints {
 		return
 	}
 
 	c.UI.Output(fmt.Sprintf("Endpoints (%d)", len(endpoints)), terminal.WithHeaderStyle())
-	table := terminal.NewTable("Address:Port", "Cluster", "Weight", "Status")
-	for _, endpoint := range endpoints {
-		var statusColor string
-		if endpoint.Status == "HEALTHY" {
-			statusColor = "green"
-		} else {
-			statusColor = "red"
-		}
-
-		table.AddRow(
-			[]string{endpoint.Address, endpoint.Cluster, fmt.Sprintf("%.2f", endpoint.Weight), endpoint.Status},
-			[]string{"", "", "", statusColor})
-	}
-
-	c.UI.Table(table)
-	c.UI.Output("")
+	c.UI.Table(formatEndpoints(endpoints))
 }
 
 func (c *ReadCommand) outputListenersTable(listeners []Listener) {
@@ -396,26 +395,7 @@ func (c *ReadCommand) outputListenersTable(listeners []Listener) {
 	}
 
 	c.UI.Output(fmt.Sprintf("Listeners (%d)", len(listeners)), terminal.WithHeaderStyle())
-	table := terminal.NewTable("Name", "Address:Port", "Direction", "Filter Chain Match", "Filters", "Last Updated")
-	for _, listener := range listeners {
-		for index, filter := range listener.FilterChain {
-			// Print each element of the filter chain in a separate line
-			// without repeating the name, address, etc.
-			filters := strings.Join(filter.Filters, "\n")
-			if index == 0 {
-				table.AddRow(
-					[]string{listener.Name, listener.Address, listener.Direction, filter.FilterChainMatch, filters, listener.LastUpdated},
-					[]string{})
-			} else {
-				table.AddRow(
-					[]string{"", "", "", filter.FilterChainMatch, filters},
-					[]string{})
-			}
-		}
-	}
-
-	c.UI.Table(table)
-	c.UI.Output("")
+	c.UI.Table(formatListeners(listeners))
 }
 
 func (c *ReadCommand) outputRoutesTable(routes []Route) {
@@ -424,12 +404,7 @@ func (c *ReadCommand) outputRoutesTable(routes []Route) {
 	}
 
 	c.UI.Output(fmt.Sprintf("Routes (%d)", len(routes)), terminal.WithHeaderStyle())
-	table := terminal.NewTable("Name", "Destination Cluster", "Last Updated")
-	for _, route := range routes {
-		table.AddRow([]string{route.Name, route.DestinationCluster, route.LastUpdated}, []string{})
-	}
-	c.UI.Table(table)
-	c.UI.Output("")
+	c.UI.Table(formatRoutes(routes))
 }
 
 func (c *ReadCommand) outputSecretsTable(secrets []Secret) {
@@ -438,10 +413,5 @@ func (c *ReadCommand) outputSecretsTable(secrets []Secret) {
 	}
 
 	c.UI.Output(fmt.Sprintf("Secrets (%d)", len(secrets)), terminal.WithHeaderStyle())
-	table := terminal.NewTable("Name", "Type", "Last Updated")
-	for _, secret := range secrets {
-		table.AddRow([]string{secret.Name, secret.Type, secret.LastUpdated}, []string{})
-	}
-	c.UI.Table(table)
-	c.UI.Output("")
+	c.UI.Table(formatSecrets(secrets))
 }
