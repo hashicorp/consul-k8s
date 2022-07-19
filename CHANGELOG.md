@@ -1,4 +1,7 @@
 ## UNRELEASED
+FEATURES:
+* Transparent Proxy Egress
+  * Add support for Destinations on the Service Defaults CRD. [[GH-1352](https://github.com/hashicorp/consul-k8s/pull/1352)]
 
 ## 0.46.0 (July 20, 2022)
 IMPROVEMENTS:
@@ -6,7 +9,6 @@ IMPROVEMENTS:
   * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
 * CLI
   * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
-
 
 FEATURES:
 * [Experimental] Cluster Peering:

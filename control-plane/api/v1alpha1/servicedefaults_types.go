@@ -1,15 +1,19 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"net"
+	"strings"
 )
 
 const (
@@ -75,6 +79,11 @@ type ServiceDefaultsSpec struct {
 	// and per-upstream configuration overrides. Note that per-upstream configuration applies
 	// across all federated datacenters to the pairing of source and upstream destination services.
 	UpstreamConfig *Upstreams `json:"upstreamConfig,omitempty"`
+	// Destination is an address(es)/port combination that represents an endpoint
+	// outside the mesh. This is only valid when the mesh is configured in "transparent"
+	// mode. Destinations live outside of Consul's catalog, and because of this, they
+	// do not require an artificial node to be created.
+	Destination *ServiceDefaultsDestination `json:"destination,omitempty"`
 }
 
 type Upstreams struct {
@@ -148,6 +157,15 @@ type PassiveHealthCheck struct {
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
 	MaxFailures uint32 `json:"maxFailures,omitempty"`
+}
+
+type ServiceDefaultsDestination struct {
+	// Addresses is a list of IPs and/or hostnames that can be dialed
+	// and routed through a terminating gateway.
+	Addresses []string `json:"addresses,omitempty"`
+	// Port is the port that can be dialed on any of the addresses in this
+	// Destination.
+	Port uint32 `json:"port,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {
@@ -235,6 +253,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		ExternalSNI:      in.Spec.ExternalSNI,
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
 		UpstreamConfig:   in.Spec.UpstreamConfig.toConsul(),
+		Destination:      in.Spec.Destination.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -257,6 +276,9 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	}
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.Destination.validate(path.Child("destination")); err != nil {
+		allErrs = append(allErrs, err...)
 	}
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
@@ -358,6 +380,64 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 	return &capi.PassiveHealthCheck{
 		Interval:    in.Interval.Duration,
 		MaxFailures: in.MaxFailures,
+	}
+}
+
+func (in *ServiceDefaultsDestination) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	if len(in.Addresses) == 0 {
+		errs = append(errs, field.Required(path.Child("addresses"), "at least one address must be define per destination"))
+	}
+
+	seen := make(map[string]bool, len(in.Addresses))
+	for idx, address := range in.Addresses {
+		if _, ok := seen[address]; ok {
+			errs = append(errs, field.Duplicate(path.Child("addresses").Index(idx), address))
+			continue
+		}
+		seen[address] = true
+
+		if !validEndpointAddress(address) {
+			errs = append(errs, field.Invalid(path.Child("addresses").Index(idx), address, fmt.Sprintf("address %s is not a valid IP or hostname", address)))
+		}
+	}
+
+	if in.Port < 1 || in.Port > 65535 {
+		errs = append(errs, field.Invalid(path.Child("port"), in.Port, "invalid port number"))
+	}
+
+	return errs
+}
+
+func validEndpointAddress(address string) bool {
+	var valid bool
+
+	if address == "" {
+		return false
+	}
+
+	ip := net.ParseIP(address)
+	valid = ip != nil
+
+	hasWildcard := strings.Contains(address, "*")
+	_, ok := dns.IsDomainName(address)
+	valid = valid || (ok && !hasWildcard)
+
+	return valid
+}
+
+func (in *ServiceDefaultsDestination) toConsul() *capi.DestinationConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.DestinationConfig{
+		Addresses: in.Addresses,
+		Port:      int(in.Port),
 	}
 }
 
