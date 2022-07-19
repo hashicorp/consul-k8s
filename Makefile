@@ -99,6 +99,15 @@ ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after faile
 version:
 	@echo $(VERSION)
 
+# ===========> Release Targets
+
+prepare-release: ## Sets the versions, updates changelog to prepare this repository to release
+ifndef RELEASE_VERSION
+	$(error RELEASE_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; set_release_mode $(CURDIR) $(RELEASE_VERSION) "$(shell date +"%B %d, %Y")" $(PRERELEASE_VERSION)
+
+
 # ===========> Makefile config
 
 .DEFAULT_GOAL := help
