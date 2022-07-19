@@ -12,13 +12,14 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/strings/slices"
 )
 
-// adminPort is the port where the Envoy admin API is exposed.
-const adminPort int = 19000
+// defaultAdminPort is the port where the Envoy admin API is exposed.
+const defaultAdminPort int = 19000
 
 const (
 	Table = "table"
@@ -243,16 +244,26 @@ func (c *ReadCommand) initKubernetes() (err error) {
 }
 
 func (c *ReadCommand) fetchAdminPorts() (map[string]int, error) {
-	// Grab the annotations on the Pod.
-	// Check if it's multiport
-	// If it is, return the multiple ports
-	// If it isn't, return default.
+	adminPorts := make(map[string]int, 0)
 
-	defaultPort := map[string]int{
-		c.flagPodName: 19000,
+	pod, err := c.kubernetes.CoreV1().Pods(c.flagNamespace).Get(c.Ctx, c.flagPodName, metav1.GetOptions{})
+	if err != nil {
+		return adminPorts, err
 	}
 
-	return defaultPort, nil
+	connectService, isMultiport := pod.Annotations["consul.hashicorp.com/connect-service"]
+
+	if !isMultiport {
+		// Return the default port configuration.
+		adminPorts[c.flagPodName] = defaultAdminPort
+		return adminPorts, nil
+	}
+
+	for index, service := range strings.Split(connectService, ",") {
+		adminPorts[service] = defaultAdminPort + index
+	}
+
+	return adminPorts, nil
 }
 
 func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
