@@ -8,3 +8,4 @@ values.dev.yaml
 bin/
 pkg/
 .idea/
+.vscode
