@@ -326,7 +326,6 @@ partition "{{ .PartitionName }}" {
     policy = "write"
 {{- end }}
     acl = "write"
-	service = "write"
     service_prefix "" {
       policy = "write"
     }
