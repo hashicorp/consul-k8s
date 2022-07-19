@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/upgrade"
 	cmdversion "github.com/hashicorp/consul-k8s/cli/cmd/version"
 	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/version"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -22,6 +23,7 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 	baseCommand := &common.BaseCommand{
 		Ctx: ctx,
 		Log: log,
+		UI:  terminal.NewBasicUI(ctx),
 	}
 
 	commands := map[string]cli.CommandFactory{
