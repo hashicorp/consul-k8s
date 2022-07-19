@@ -10,7 +10,7 @@ on:
       - "release/**"
 
 env:
-  PKG_NAME: "consul-k8s-control-plane"
+  PKG_NAME: "consul-k8s"
 
 jobs:
   get-go-version:
@@ -189,7 +189,7 @@ jobs:
           name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
 
-  build-docker-default:
+  build-docker:
     name: Docker ${{ matrix.arch }} default release build
     needs: [get-product-version, build]
     runs-on: ubuntu-latest
@@ -221,44 +221,40 @@ jobs:
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
             986891699432.dkr.ecr.us-east-1.amazonaws.com/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-dev
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
 
-# Disabling UBI build for now so that we do not inadvertently push a ubi image that we have not tested.
-  # build-docker-alternate:
-  #   name: Docker ${{ matrix.arch }} alternate release build
-  #   needs: [get-product-version, build]
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       arch: ["amd64"]
-  #   env:
-  #     repo: ${{ github.event.repository.name }}
-  #     version: ${{ needs.get-product-version.outputs.product-version }}
-  #
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Copy LICENSE.md 
-  #       run: 
-  #         cp LICENSE.md ./control-plane
-  #     - uses: hashicorp/actions-docker-build@v1.2.1
-  #       with:
-  #         smoke_test: |
-  #           TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-  #           if [ "${TEST_VERSION}" != "${version}" ]; then
-  #             echo "Test FAILED"
-  #             exit 1
-  #           fi
-  #           echo "Test PASSED"
-  #         version: ${{ env.version }}
-  #         target: ubi 
-  #         arch: ${{ matrix.arch }}
-  #         pkg_name: consul-k8s-control-plane_${{ env.version }}
-  #         bin_name: consul-k8s-control-plane 
-  #         workdir: control-plane
-  #         tags: |
-  #           registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:${{env.version}}-ubi
-  #         dev_tags: |
-  #           hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-dev
-  #           docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
-  #
+  build-docker-ubi:
+    name: Docker ${{ matrix.arch }} alternate release build
+    needs: [get-product-version, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: ["amd64"]
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Copy LICENSE.md
+        run:
+         cp LICENSE.md ./control-plane
+      - uses: hashicorp/actions-docker-build@v1.2.1
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: ubi
+          arch: ${{ matrix.arch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane
+          workdir: control-plane
+          redhat_tag: scan.connect.redhat.com/ospid-611ca2f89a9b407267837100/consul-k8s-control-plane:${{env.version}}-ubi
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
