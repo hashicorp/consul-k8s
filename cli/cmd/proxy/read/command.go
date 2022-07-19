@@ -207,7 +207,7 @@ func (c *ReadCommand) validateFlags() error {
 	return nil
 }
 
-// filtersPassed returns true if the user has passed a flag which filters th
+// filtersPassed returns true if the user has passed a flag which filters the
 // output.
 func (c *ReadCommand) filtersPassed() bool {
 	return c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
