@@ -40,6 +40,8 @@ type TestFlags struct {
 
 	flagUseKind bool
 
+	flagDisablePeering bool
+
 	once sync.Once
 }
 
@@ -96,6 +98,8 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagUseKind, "use-kind", false,
 		"If true, the tests will assume they are running against a local kind cluster(s).")
+	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
+		"If true, the peering tests will not run.")
 
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
@@ -139,6 +143,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
+
+		DisablePeering: t.flagDisablePeering,
 
 		ConsulImage:    t.flagConsulImage,
 		ConsulK8SImage: t.flagConsulK8sImage,
