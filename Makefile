@@ -19,12 +19,28 @@ control-plane-dev: ## Build consul-k8s-control-plane binary.
 
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
-	docker build -t '$(DEV_IMAGE)' \
+	@docker build -t '$(DEV_IMAGE)' \
        --target=dev \
-       --build-arg 'ARCH=$(GOARCH)' \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+
+check-remote-dev-image-env:
+ifndef REMOTE_DEV_IMAGE
+	$(error REMOTE_DEV_IMAGE is undefined: set this image to <your_docker_repo>/<your_docker_image>:<image_tag>, e.g. hashicorp/consul-k8s-dev:latest)
+endif
+
+control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-k8s-control-plane dev multi-arch Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a "arm64 amd64"
+	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
+       --platform linux/amd64,linux/arm64 \
+       --target=dev \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
 control-plane-test: ## Run go test for the control plane.
@@ -67,7 +83,7 @@ acceptance-lint: ## Run linter in the control-plane directory.
 # ===========> Shared Targets
 
 help: ## Show targets and their descriptions.
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-38s\033[0m %s\n", $$1, $$2}'
 
 lint: ## Run linter in the control-plane, cli, and acceptance directories.
 	for p in control-plane cli acceptance; do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done

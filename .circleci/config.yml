@@ -277,13 +277,18 @@ jobs:
 
   # upload dev docker image
   dev-upload-docker:
-    executor: go
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
       # get consul-k8s binary
       - attach_workspace:
           at: .
-      - setup_remote_docker
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y qemu-user-static
+      - run: docker buildx create --use
       - run:
           name: make ci.dev-docker
           working_directory: *control-plane-path
@@ -983,13 +988,13 @@ workflows:
      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
      # be moved
       - build-distro:
-          OS: "darwin freebsd linux solaris windows"
-          ARCH: "amd64"
-          name: build-distros-amd64
+          OS: "linux"
+          ARCH: "amd64 arm64"
+          name: build-distros-linux
       - dev-upload-docker:
           context: consul-ci
           requires:
-            - build-distros-amd64
+            - build-distros-linux
       # Run acceptance tests using the docker image built for the control plane
       - acceptance:
           context: consul-ci
@@ -1010,11 +1015,11 @@ workflows:
     jobs:
       - build-distro:
           OS: "linux"
-          ARCH: "amd64"
-          name: build-distros-amd64
+          ARCH: "amd64 arm64"
+          name: build-distros-linux
       - dev-upload-docker:
           requires:
-            - build-distros-amd64
+            - build-distros-linux
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources
