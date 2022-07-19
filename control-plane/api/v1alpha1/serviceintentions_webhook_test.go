@@ -34,7 +34,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -57,7 +57,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -80,7 +80,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -98,7 +98,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -121,7 +121,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -139,7 +139,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "baz",
 					},
@@ -162,7 +162,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -180,7 +180,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "baz",
 					},
@@ -203,7 +203,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -220,7 +220,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -293,7 +293,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -316,7 +316,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -338,7 +338,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -361,7 +361,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo-bar",
 						Namespace: "bar",
 					},
@@ -384,7 +384,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -407,7 +407,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar-foo",
 					},
@@ -488,7 +488,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -511,7 +511,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -539,7 +539,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -566,7 +566,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},

@@ -50,14 +50,14 @@ type ServiceIntentionsList struct {
 // ServiceIntentionsSpec defines the desired state of ServiceIntentions.
 type ServiceIntentionsSpec struct {
 	// Destination is the intention destination that will have the authorization granted to.
-	Destination Destination `json:"destination,omitempty"`
+	Destination IntentionDestination `json:"destination,omitempty"`
 	// Sources is the list of all intention sources and the authorization granted to those sources.
 	// The order of this list does not matter, but out of convenience Consul will always store this
 	// reverse sorted by intention precedence, as that is the order that they will be evaluated at enforcement time.
 	Sources SourceIntentions `json:"sources,omitempty"`
 }
 
-type Destination struct {
+type IntentionDestination struct {
 	// Name is the destination of all intentions defined in this config entry.
 	// This may be set to the wildcard character (*) to match
 	// all services that don't otherwise have intentions defined.
