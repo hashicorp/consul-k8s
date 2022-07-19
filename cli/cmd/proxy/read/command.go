@@ -156,7 +156,7 @@ func (c *ReadCommand) Run(args []string) int {
 		return 1
 	}
 
-	c.outputConfigs(configs)
+	err = c.outputConfigs(configs)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
