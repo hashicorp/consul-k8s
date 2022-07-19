@@ -638,6 +638,52 @@ function update_version {
    return $?
 }
 
+function update_version_helm {
+   # Arguments:
+   #   $1 - Path to the directory where the root of the Helm chart is
+   #   $2 - Version string
+   #   $3 - PreRelease version (if unset will become an empty string)
+   #
+   # Returns:
+   #   0 - success
+   #   * - error
+
+   if ! test -d "$1"
+   then
+      err "ERROR: '$1' is not a directory. update_version_helm must be called with the path to the Helm chart"
+      return 1
+   fi
+
+   if test -z "$2"
+   then
+      err "ERROR: The version specified was empty"
+      return 1
+   fi
+
+   local vfile="$1/values.yaml"
+   local cfile="$1/Chart.yaml"
+   local version="$2"
+   local prerelease="$3"
+   local full_version="$2"
+   if ! test -z "$3"
+   then
+     full_version="$2-$3"
+   fi
+   local image_k8s="hashicorp\/consul-k8s-control-plane:$full_version"
+
+   sed_i ${SED_EXT} -e "s/(imageK8S:[[:space:]]*)\"[^\"]*\"/\1${image_k8s}/g" "${vfile}"
+   sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
+   sed_i ${SED_EXT} -e "s/(image:[[:space:]]*hashicorp\/consul-k8s-control-plane:)[^\"]*/\1${full_version}/g" "${cfile}"
+
+   if test -z "$3"
+   then
+     sed_i ${SED_EXT} -e "s/(artifacthub.io\/prerelease:[[:space:]]*)[^\"]*/\1false/g" "${cfile}"
+   else
+     sed_i ${SED_EXT} -e "s/(artifacthub.io\/prerelease:[[:space:]]*)[^\"]*/\1true/g" "${cfile}"
+   fi
+   return $?
+}
+
 function set_changelog_version {
    # Arguments:
    #   $1 - Path to top level Consul source
@@ -744,6 +790,8 @@ function set_release_mode {
       return 1
    fi
 
+   echo "release version: " $1 $2 $3 $4
+
    if test -z "$2"
    then
       err "ERROR: The version specified was empty"
@@ -768,8 +816,22 @@ function set_release_mode {
    status_stage "==> Updating CHANGELOG.md with release info: ${changelog_vers} (${rel_date})"
    set_changelog_version "${sdir}" "${changelog_vers}" "${rel_date}" || return 1
 
-   status_stage "==> Updating version/version.go"
-   if ! update_version "${sdir}/version/version.go" "${vers}" "$4"
+   status_stage "==> Updating control-plane version/version.go"
+   if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"
+   then
+      unset_changelog_version "${sdir}"
+      return 1
+   fi
+
+   status_stage "==> Updating cli version/version.go"
+   if ! update_version "${sdir}/cli/version/version.go" "${vers}" "$4"
+   then
+      unset_changelog_version "${sdir}"
+      return 1
+   fi
+
+   status_stage "==> Updating Helm chart versions"
+   if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4"
    then
       unset_changelog_version "${sdir}"
       return 1
