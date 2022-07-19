@@ -35,6 +35,11 @@ You will also need to install the Docker engine:
 - [Docker for Mac](https://docs.docker.com/engine/installation/mac/)
 - [Docker for Windows](https://docs.docker.com/engine/installation/windows/)
 - [Docker for Linux](https://docs.docker.com/engine/installation/linux/ubuntulinux/)
+ 
+Install [gox](https://github.com/mitchellh/gox) (v1.14+). For Mac and Linux:
+  ```bash
+  brew install gox
+  ```
 
 Clone the repository:
 
