@@ -50,6 +50,25 @@ spec:
           spec:
             description: ServiceDefaultsSpec defines the desired state of ServiceDefaults.
             properties:
+              destination:
+                description: Destination is an address(es)/port combination that represents
+                  an endpoint outside the mesh. This is only valid when the mesh is
+                  configured in "transparent" mode. Destinations live outside of Consul's
+                  catalog, and because of this, they do not require an artificial
+                  node to be created.
+                properties:
+                  addresses:
+                    description: Addresses is a list of IPs and/or hostnames that
+                      can be dialed and routed through a terminating gateway.
+                    items:
+                      type: string
+                    type: array
+                  port:
+                    description: Port is the port that can be dialed on any of the
+                      addresses in this Destination.
+                    format: int32
+                    type: integer
+                type: object
               expose:
                 description: Expose controls the default expose path configuration
                   for Envoy.

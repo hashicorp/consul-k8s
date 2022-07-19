@@ -43,7 +43,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "svc-name",
 						Namespace: "test",
 					},
@@ -175,7 +175,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "bar",
 					},
 					Sources: SourceIntentions{
@@ -247,7 +247,7 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "svc-name",
 						Namespace: "dest-ns",
 					},
@@ -455,7 +455,7 @@ func TestServiceIntentions_ConsulName(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "baz",
 			},
@@ -470,7 +470,7 @@ func TestServiceIntentions_KubernetesName(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "baz",
 			},
@@ -485,7 +485,7 @@ func TestServiceIntentions_ConsulNamespace(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "baz",
 			},
@@ -504,7 +504,7 @@ func TestServiceIntentions_ConsulNamespaceWithWildcard(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "*",
 			},
@@ -575,7 +575,7 @@ func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "bar",
 					},
 				},
@@ -586,7 +586,7 @@ func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "bar",
 						Namespace: s.expectedDestination,
 					},
@@ -611,7 +611,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -666,7 +666,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -718,7 +718,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
@@ -766,7 +766,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -784,7 +784,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -808,7 +808,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -839,7 +839,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -871,7 +871,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -903,7 +903,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -935,7 +935,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -966,7 +966,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -1003,7 +1003,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -1064,7 +1064,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -1095,7 +1095,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -1127,7 +1127,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1150,7 +1150,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
@@ -1173,7 +1173,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
@@ -1207,7 +1207,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1243,7 +1243,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1278,7 +1278,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1317,7 +1317,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1349,7 +1349,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},

@@ -1,4 +1,7 @@
 ## UNRELEASED
+FEATURES:
+* Transparent Proxy Egress
+  * Add support for Destinations on the Service Defaults CRD. [[GH-1352](https://github.com/hashicorp/consul-k8s/pull/1352)]
 
 FEATURES:
 * [Experimental] Cluster Peering:

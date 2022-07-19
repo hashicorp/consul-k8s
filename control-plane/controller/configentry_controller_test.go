@@ -268,7 +268,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
@@ -738,7 +738,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
@@ -1169,7 +1169,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
