@@ -3,6 +3,7 @@ package read
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -11,6 +12,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -53,9 +56,11 @@ func TestFlagParsing(t *testing.T) {
 }
 
 func TestReadCommandOutput(t *testing.T) {
+	podName := "fakePod"
+
 	// These regular expressions must be present in the output.
 	expected := []string{
-		"Envoy configuration for podName in Namespace default:",
+		fmt.Sprintf("Envoy configuration for %s in namespace default:", podName),
 
 		"==> Clusters \\(6\\)",
 		"Name.*FQDN.*Endpoints.*Type.*Last Updated",
@@ -97,16 +102,23 @@ func TestReadCommandOutput(t *testing.T) {
 		"ROOTCA.*Dynamic Warming.*2022-03-15T05:14:22.868Z",
 	}
 
+	fakePod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: "default",
+		},
+	}
+
 	buf := new(bytes.Buffer)
 	c := setupCommand(buf)
-	c.kubernetes = fake.NewSimpleClientset()
+	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
 
 	// A fetchConfig function that just returns the test Envoy config.
 	c.fetchConfig = func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
 		return testEnvoyConfig, nil
 	}
 
-	out := c.Run([]string{"podName"})
+	out := c.Run([]string{podName})
 	require.Equal(t, 0, out)
 
 	actual := buf.String()
