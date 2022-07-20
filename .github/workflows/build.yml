@@ -109,7 +109,13 @@ jobs:
         working-directory: ${{ matrix.component }}
         run: |
           mkdir -p dist out
-          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} .
+
+          export GIT_COMMIT=$(git rev-parse --short HEAD)
+          export GIT_DIRTY=$(test -n "$(git status --porcelain)" && echo "+CHANGES")
+          export GIT_IMPORT=github.com/hashicorp/consul-k8s/${{ matrix.component }}/version
+          export GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
+
+          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
           zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
       - name: Upload built binaries 
@@ -150,7 +156,7 @@ jobs:
             cd /work
             rpm -ivh out/${{ env.RPM_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="${{ needs.get-product-version.outputs.product-version }}"
+            VERSION="v${{ needs.get-product-version.outputs.product-version }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
               echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
               exit 1
@@ -175,7 +181,7 @@ jobs:
             cd /work
             apt install ./out/${{ env.DEB_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="${{ needs.get-product-version.outputs.product-version }}"
+            VERSION="v${{ needs.get-product-version.outputs.product-version }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
               echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
               exit 1
@@ -206,7 +212,7 @@ jobs:
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-            if [ "${TEST_VERSION}" != "${version}" ]; then
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
               echo "Test FAILED"
               exit 1
             fi
@@ -243,7 +249,7 @@ jobs:
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-            if [ "${TEST_VERSION}" != "${version}" ]; then
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
               echo "Test FAILED"
               exit 1
             fi
@@ -275,7 +281,7 @@ jobs:
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-            if [ "${TEST_VERSION}" != "${version}" ]; then
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
               echo "Test FAILED"
               exit 1
             fi
