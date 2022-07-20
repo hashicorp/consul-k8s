@@ -121,7 +121,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 			},
 		},
-		"Filter FQDN default": {
+		"Filter FQDN": {
 			fqdn:    "default",
 			address: "",
 			port:    -1,
@@ -149,7 +149,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 			},
 		},
-		"Filter address 127.0.": {
+		"Filter address": {
 			fqdn:    "",
 			address: "127.0.",
 			port:    -1,
@@ -170,7 +170,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 			},
 		},
-		"Filter port 8080": {
+		"Filter port": {
 			fqdn:    "",
 			address: "",
 			port:    8080,
@@ -219,7 +219,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 			},
 		},
-		"Filter port and address": {
+		"Filter address and port": {
 			fqdn:    "",
 			address: "127.0.0.1",
 			port:    8080,
@@ -293,7 +293,7 @@ func TestFilterEndpoints(t *testing.T) {
 		port     int
 		expected []Endpoint
 	}{
-		"No filters": {
+		"No filter": {
 			address: "",
 			port:    -1,
 			expected: []Endpoint{
@@ -326,7 +326,7 @@ func TestFilterEndpoints(t *testing.T) {
 				},
 			},
 		},
-		"Filter address 127.0.0.1": {
+		"Filter address": {
 			address: "127.0.0.1",
 			port:    -1,
 			expected: []Endpoint{
@@ -338,7 +338,7 @@ func TestFilterEndpoints(t *testing.T) {
 				},
 			},
 		},
-		"Filter port 20000": {
+		"Filter port": {
 			address: "",
 			port:    20000,
 			expected: []Endpoint{
@@ -359,7 +359,7 @@ func TestFilterEndpoints(t *testing.T) {
 				},
 			},
 		},
-		"Filter combo": {
+		"Filter address and port": {
 			address: "235",
 			port:    20000,
 			expected: []Endpoint{
@@ -443,7 +443,7 @@ func TestFilterListeners(t *testing.T) {
 				},
 			},
 		},
-		"Filter address 127.0.0.1": {
+		"Filter address": {
 			address: "127.0.0.1",
 			port:    -1,
 			expected: []Listener{
@@ -461,8 +461,26 @@ func TestFilterListeners(t *testing.T) {
 				},
 			},
 		},
-		"Filter port 20000": {
+		"Filter port": {
 			address: "",
+			port:    20000,
+			expected: []Listener{
+				{
+					Name:    "public_listener",
+					Address: "192.168.69.179:20000",
+					FilterChain: []FilterChain{
+						{
+							FilterChainMatch: "Any",
+							Filters:          []string{"* -> local_app/"},
+						},
+					},
+					Direction:   "INBOUND",
+					LastUpdated: "2022-06-09T00:39:27.668Z",
+				},
+			},
+		},
+		"Filter address and port": {
+			address: "192.168.69.179",
 			port:    20000,
 			expected: []Listener{
 				{
