@@ -224,8 +224,8 @@ jobs:
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
 
-  build-docker-ubi:
-    name: Docker ${{ matrix.arch }} alternate release build
+  build-docker-ubi-redhat-registry:
+    name: Docker ${{ matrix.arch }} UBI build for RedHat Registry
     needs: [get-product-version, build]
     runs-on: ubuntu-latest
     strategy:
@@ -255,6 +255,40 @@ jobs:
           bin_name: consul-k8s-control-plane
           workdir: control-plane
           redhat_tag: scan.connect.redhat.com/ospid-611ca2f89a9b407267837100/consul-k8s-control-plane:${{env.version}}-ubi
+
+  build-docker-ubi-dockerhub:
+    name: Docker ${{ matrix.arch }} UBI build for DockerHub
+    needs: [ get-product-version, build ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ "amd64" ]
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Copy LICENSE.md
+        run:
+          cp LICENSE.md ./control-plane
+      - uses: hashicorp/actions-docker-build@v1
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: ubi
+          arch: ${{ matrix.arch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane
+          workdir: control-plane
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
+            986891699432.dkr.ecr.us-east-1.amazonaws.com/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}    
