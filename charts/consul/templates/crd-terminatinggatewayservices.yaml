@@ -23,6 +23,14 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
     - description: The age of the resource
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -31,7 +39,6 @@ spec:
     schema:
       openAPIV3Schema:
         description: TerminatingGatewayService is the Schema for the terminatinggatewayservices
-          API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -89,13 +96,44 @@ spec:
             description: TerminatingGatewayServiceStatus defines the observed state
               of TerminatingGatewayService.
             properties:
-              lastReconcileTime:
-                description: 'Important: Run "make" to regenerate code after modifying
-                  this file LastReconcileTime is the last time the resource was reconciled.'
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
                 format: date-time
                 type: string
               serviceInfoRef:
-                description: ServiceInfoRefStatus shows information about the service.
+                description: 'Important: Run "make" to regenerate code after modifying
+                  this file ServiceInfoRefStatus shows information about the service.'
                 properties:
                   service:
                     type: string

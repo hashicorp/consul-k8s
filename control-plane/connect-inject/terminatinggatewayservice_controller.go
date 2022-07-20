@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strings"
@@ -119,12 +120,13 @@ func (r *TerminatingGatewayServiceController) updateStatus(ctx context.Context, 
 		policyName = terminatingGatewayService.Spec.Service.ServiceName + "-write-policy"
 	}
 
+	terminatingGatewayService.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
+	terminatingGatewayService.SetSyncedCondition(corev1.ConditionTrue, "", "")
+
 	terminatingGatewayService.Status.ServiceInfoRef = &consulv1alpha1.ServiceInfoRefStatus{
 		ServiceName: terminatingGatewayService.Spec.Service.ServiceName,
 		PolicyName:  policyName,
 	}
-
-	terminatingGatewayService.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
 
 	err := r.Status().Update(ctx, terminatingGatewayService)
 	if err != nil {
@@ -135,8 +137,8 @@ func (r *TerminatingGatewayServiceController) updateStatus(ctx context.Context, 
 
 // updateStatusError updates the terminatingGatewayService's ReconcileError in the status.
 func (r *TerminatingGatewayServiceController) updateStatusError(ctx context.Context, terminatingGatewayService *consulv1alpha1.TerminatingGatewayService, reconcileErr error) {
+	terminatingGatewayService.SetSyncedCondition(corev1.ConditionFalse, "Error updating status", reconcileErr.Error())
 
-	terminatingGatewayService.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
 	err := r.Status().Update(ctx, terminatingGatewayService)
 	if err != nil {
 		r.Log.Error(err, "failed to update TerminatingGatewayService status", "name", terminatingGatewayService.Name, terminatingGatewayService.Namespace)

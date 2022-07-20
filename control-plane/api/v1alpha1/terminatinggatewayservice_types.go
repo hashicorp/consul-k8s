@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -11,7 +12,9 @@ func init() {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// TerminatingGatewayService is the Schema for the terminatinggatewayservices API
+// TerminatingGatewayService is the Schema for the terminatinggatewayservices
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type TerminatingGatewayService struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -55,11 +58,16 @@ type ServiceTag string
 // TerminatingGatewayServiceStatus defines the observed state of TerminatingGatewayService.
 type TerminatingGatewayServiceStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
-	// LastReconcileTime is the last time the resource was reconciled.
-	// +optional
-	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty" description:"last time the resource was reconciled"`
 	// ServiceInfoRefStatus shows information about the service.
 	ServiceInfoRef *ServiceInfoRefStatus `json:"serviceInfoRef,omitempty"`
+	// Conditions indicate the latest available observations of a resource's current state.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions Conditions `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// LastSyncedTime is the last time the resource successfully synced with Consul.
+	// +optional
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty" description:"last time the condition transitioned from one status to another"`
 }
 
 type ServiceInfoRefStatus struct {
@@ -72,4 +80,15 @@ func (tas *TerminatingGatewayService) ServiceInfo() *CatalogService {
 }
 func (tas *TerminatingGatewayService) ServiceInfoRef() *ServiceInfoRefStatus {
 	return tas.Status.ServiceInfoRef
+}
+func (tas *TerminatingGatewayService) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
+	tas.Status.Conditions = Conditions{
+		{
+			Type:               ConditionSynced,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+			Reason:             reason,
+			Message:            message,
+		},
+	}
 }
