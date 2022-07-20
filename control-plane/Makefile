@@ -43,8 +43,15 @@ ci.dev-docker:
 	$(CI_DEV_DOCKER_WORKDIR) -f $(CURDIR)/Dockerfile
 	@echo "Pushed dev image to: $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)"
 ifeq ($(CIRCLE_BRANCH), main)
-	@docker tag $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT) $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
-	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
+	@docker buildx build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest' \
+	--platform linux/amd64,linux/arm64 \
+	--target=dev \
+	--push \
+	--label COMMIT_SHA=$(CIRCLE_SHA1) \
+	--label PULL_REQUEST=$(CIRCLE_PULL_REQUEST) \
+	--label CIRCLE_BUILD_URL=$(CIRCLE_BUILD_URL) \
+	$(CI_DEV_DOCKER_WORKDIR) -f $(CURDIR)/Dockerfile
+	@echo "Pushed dev image to: $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest"
 endif
 
 # In Github Actions, the linux binary will be attached from a previous step at pkg/bin/linux_amd64/. This make target
