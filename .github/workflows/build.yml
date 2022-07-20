@@ -157,7 +157,7 @@ jobs:
             cd /work
             rpm -ivh out/${{ env.RPM_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="${{ needs.get-product-version.outputs.product-version }}"
+            VERSION="v${{ needs.get-product-version.outputs.product-version }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
               echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
               exit 1
