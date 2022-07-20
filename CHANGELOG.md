@@ -23,6 +23,9 @@ IMPROVEMENTS:
 BUG FIXES:
 * Helm
   * When using Openshift do not set securityContext in gossip-encryption-autogenerate job. [[GH-1308](https://github.com/hashicorp/consul-k8s/pull/1308)]
+* Control Plane
+  * Fix missing RBAC permissions for the peering controllers to be able to update secrets. [[GH-1359](https://github.com/hashicorp/consul-k8s/pull/1359)]
+  * Fix a bug in the peering controller where we tried to read the secret from the cache right after creating it. [[GH-1359](https://github.com/hashicorp/consul-k8s/pull/1359)]
 
 ## 0.45.0 (June 17, 2022)
 FEATURES:
