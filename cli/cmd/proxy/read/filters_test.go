@@ -184,7 +184,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 			},
 		},
-		"Filter combo": {
+		"Filter fqdn and address": {
 			fqdn:    "local",
 			address: "127.0.0.1",
 			port:    -1,
@@ -202,6 +202,48 @@ func TestFilterClusters(t *testing.T) {
 					Endpoints:                []string{"127.0.0.1:5000"},
 					Type:                     "STATIC",
 					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+			},
+		},
+		"Filter fqdn and port": {
+			fqdn:    "local",
+			address: "",
+			port:    8080,
+			expected: []Cluster{
+				{
+					Name:                     "local_app",
+					FullyQualifiedDomainName: "local_app",
+					Endpoints:                []string{"127.0.0.1:8080"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+			},
+		},
+		"Filter port and address": {
+			fqdn:    "",
+			address: "127.0.0.1",
+			port:    8080,
+			expected: []Cluster{
+				{
+					Name:                     "local_app",
+					FullyQualifiedDomainName: "local_app",
+					Endpoints:                []string{"127.0.0.1:8080"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.655Z",
+				},
+			},
+		},
+		"Filter fqdn, address, and port": {
+			fqdn:    "local",
+			address: "192.168.79.187",
+			port:    8502,
+			expected: []Cluster{
+				{
+					Name:                     "local_agent",
+					FullyQualifiedDomainName: "local_agent",
+					Endpoints:                []string{"192.168.79.187:8502"},
+					Type:                     "STATIC",
+					LastUpdated:              "2022-05-13T04:22:39.553Z",
 				},
 			},
 		},
