@@ -29,6 +29,7 @@ func GetHumanVersion() string {
 	if GitDescribe != "" {
 		version = GitDescribe
 	}
+	version = fmt.Sprintf("v%s", version)
 
 	release := VersionPrerelease
 	if GitDescribe == "" && release == "" {
