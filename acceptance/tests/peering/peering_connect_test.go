@@ -2,7 +2,6 @@ package peering
 
 import (
 	"context"
-	"github.com/hashicorp/go-version"
 	"strconv"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -111,6 +111,9 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
+			acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
+			require.NoError(t, err)
+			require.NotEmpty(t, acceptorSecretResourceVersion)
 
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
