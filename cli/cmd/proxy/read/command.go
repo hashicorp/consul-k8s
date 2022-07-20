@@ -414,13 +414,13 @@ func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
 		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
 
 		if c.flagFQDN != "" {
-			c.UI.Output(fmt.Sprintf("Fully qualified domain names must contain `%s`", c.flagFQDN), terminal.WithInfoStyle())
+			c.UI.Output(fmt.Sprintf("Fully qualified domain names containing: %s", c.flagFQDN), terminal.WithInfoStyle())
 		}
 		if c.flagAddress != "" {
-			c.UI.Output(fmt.Sprintf("Endpoint addresses must contain `%s`", c.flagAddress), terminal.WithInfoStyle())
+			c.UI.Output(fmt.Sprintf("Endpoint addresses containing: %s", c.flagAddress), terminal.WithInfoStyle())
 		}
 		if c.flagPort != -1 {
-			c.UI.Output(fmt.Sprintf("Endpoint addresses must have the port `%d`", c.flagPort), terminal.WithInfoStyle())
+			c.UI.Output(fmt.Sprintf("Endpoint addresses with port number: %d", c.flagPort), terminal.WithInfoStyle())
 		}
 	}
 
