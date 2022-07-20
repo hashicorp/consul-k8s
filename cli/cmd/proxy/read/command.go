@@ -410,7 +410,7 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	return nil
 =======
 func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
-	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in Namespace %s:", c.flagPodName, c.flagNamespace))
+	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", c.flagPodName, c.flagNamespace))
 	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
 		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
 
