@@ -8,7 +8,6 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
-      - ishustava/fix-release-build
 
 env:
   PKG_NAME: "consul-k8s"
