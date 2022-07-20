@@ -52,6 +52,7 @@ rules:
   - "list"
   - "watch"
   - "create"
+  - "update"
   - "delete"
 - apiGroups: ["consul.hashicorp.com"]
   resources: ["peeringacceptors"]
