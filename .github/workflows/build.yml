@@ -117,7 +117,7 @@ jobs:
           export GIT_IMPORT=github.com/hashicorp/consul-k8s/${{ matrix.component }}/version
           export GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${GIT_DESCRIBE}"
 
-          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} .
+          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
           zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
       - name: Upload built binaries 
