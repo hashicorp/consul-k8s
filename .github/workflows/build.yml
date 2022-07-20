@@ -225,7 +225,6 @@ jobs:
           workdir: control-plane
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
-            986891699432.dkr.ecr.us-east-1.amazonaws.com/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
@@ -294,7 +293,6 @@ jobs:
           workdir: control-plane
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            986891699432.dkr.ecr.us-east-1.amazonaws.com/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}    
