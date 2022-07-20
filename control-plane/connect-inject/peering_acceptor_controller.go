@@ -314,13 +314,7 @@ func (r *PeeringAcceptorController) createOrUpdateK8sSecret(ctx context.Context,
 			return "", err
 		}
 	}
-	// The newly created or updated secret should exist at this point, so we can get it and return the resourceVersion.
-	newSecret := &corev1.Secret{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, newSecret); err != nil {
-		return "", err
-	}
-
-	return newSecret.ResourceVersion, nil
+	return secret.ResourceVersion, nil
 }
 
 func (r *PeeringAcceptorController) deleteK8sSecret(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor) error {
