@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.46.0 (July 20, 2022)
 IMPROVEMENTS:
 * Control Plane
   * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
