@@ -19,10 +19,25 @@ spec:
     kind: PeeringDialer
     listKind: PeeringDialerList
     plural: peeringdialers
+    shortNames:
+    - peering-dialer
     singular: peeringdialer
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: PeeringDialer is the Schema for the peeringdialers API.
@@ -67,8 +82,39 @@ spec:
           status:
             description: PeeringDialerStatus defines the observed state of PeeringDialer.
             properties:
-              lastReconcileTime:
-                description: LastReconcileTime is the last time the resource was reconciled.
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
                 format: date-time
                 type: string
               latestPeeringVersion:
@@ -76,19 +122,6 @@ spec:
                   that was reconciled.
                 format: int64
                 type: integer
-              reconcileError:
-                description: ReconcileError shows any errors during the last reconciliation
-                  of this resource.
-                properties:
-                  error:
-                    description: Error is a boolean indicating if there was an error
-                      during the last reconcile of this resource.
-                    type: boolean
-                  message:
-                    description: Message displays the error message from the last
-                      reconcile.
-                    type: string
-                type: object
               secret:
                 description: SecretRef shows the status of the secret.
                 properties:
