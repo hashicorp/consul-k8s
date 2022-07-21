@@ -979,9 +979,11 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 					},
 					ResourceVersion: "1234",
 				},
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(false),
-					Message: pointerToString(""),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:   v1alpha1.ConditionSynced,
+						Status: corev1.ConditionTrue,
+					},
 				},
 			},
 		},
@@ -1022,9 +1024,11 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 					},
 					ResourceVersion: "1234",
 				},
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(false),
-					Message: pointerToString(""),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:   v1alpha1.ConditionSynced,
+						Status: corev1.ConditionTrue,
+					},
 				},
 			},
 		},
@@ -1062,7 +1066,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			require.Equal(t, tt.expStatus.SecretRef.Key, acceptor.SecretRef().Key)
 			require.Equal(t, tt.expStatus.SecretRef.Backend, acceptor.SecretRef().Backend)
 			require.Equal(t, tt.expStatus.SecretRef.ResourceVersion, acceptor.SecretRef().ResourceVersion)
-			require.Equal(t, *tt.expStatus.ReconcileError.Error, *acceptor.Status.ReconcileError.Error)
+			require.Equal(t, tt.expStatus.Conditions[0].Message, acceptor.Status.Conditions[0].Message)
 
 		})
 	}
@@ -1094,9 +1098,13 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			},
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringAcceptorStatus{
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(true),
-					Message: pointerToString("this is an error"),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:    v1alpha1.ConditionSynced,
+						Status:  corev1.ConditionFalse,
+						Reason:  InternalError,
+						Message: "this is an error",
+					},
 				},
 			},
 		},
@@ -1117,17 +1125,23 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.PeeringAcceptorStatus{
-					ReconcileError: &v1alpha1.ReconcileErrorStatus{
-						Error:   pointerToBool(false),
-						Message: pointerToString(""),
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionTrue,
+						},
 					},
 				},
 			},
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringAcceptorStatus{
-				ReconcileError: &v1alpha1.ReconcileErrorStatus{
-					Error:   pointerToBool(true),
-					Message: pointerToString("this is an error"),
+				Conditions: v1alpha1.Conditions{
+					{
+						Type:    v1alpha1.ConditionSynced,
+						Status:  corev1.ConditionFalse,
+						Reason:  InternalError,
+						Message: "this is an error",
+					},
 				},
 			},
 		},
@@ -1151,7 +1165,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 				Scheme: s,
 			}
 
-			controller.updateStatusError(context.Background(), tt.acceptor, tt.reconcileErr)
+			controller.updateStatusError(context.Background(), tt.acceptor, InternalError, tt.reconcileErr)
 
 			acceptor := &v1alpha1.PeeringAcceptor{}
 			acceptorName := types.NamespacedName{
@@ -1160,7 +1174,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			}
 			err := fakeClient.Get(context.Background(), acceptorName, acceptor)
 			require.NoError(t, err)
-			require.Equal(t, *tt.expStatus.ReconcileError.Error, *acceptor.Status.ReconcileError.Error)
+			require.Equal(t, tt.expStatus.Conditions[0].Message, acceptor.Status.Conditions[0].Message)
 
 		})
 	}

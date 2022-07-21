@@ -34,7 +34,12 @@ type PeeringAcceptorController struct {
 	context.Context
 }
 
-const FinalizerName = "finalizers.consul.hashicorp.com"
+const (
+	FinalizerName    = "finalizers.consul.hashicorp.com"
+	ConsulAgentError = "ConsulAgentError"
+	InternalError    = "InternalError"
+	KubernetesError  = "KubernetesError"
+)
 
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors/status,verbs=get;update;patch
@@ -100,7 +105,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	if statusSecretSet {
 		existingStatusSecret, err = r.getExistingSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace)
 		if err != nil {
-			r.updateStatusError(ctx, acceptor, err)
+			r.updateStatusError(ctx, acceptor, KubernetesError, err)
 			return ctrl.Result{}, err
 		}
 	}
@@ -124,7 +129,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 				r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name)
 				err := r.Client.Delete(ctx, existingStatusSecret)
 				if err != nil {
-					r.updateStatusError(ctx, acceptor, err)
+					r.updateStatusError(ctx, acceptor, KubernetesError, err)
 					return ctrl.Result{}, err
 				}
 			}
@@ -132,13 +137,13 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
 		if resp, err = r.generateToken(ctx, acceptor.Name); err != nil {
-			r.updateStatusError(ctx, acceptor, err)
+			r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
 			secretResourceVersion, err = r.createOrUpdateK8sSecret(ctx, acceptor, resp)
 			if err != nil {
-				r.updateStatusError(ctx, acceptor, err)
+				r.updateStatusError(ctx, acceptor, KubernetesError, err)
 				return ctrl.Result{}, err
 			}
 		}
@@ -160,7 +165,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	if statusSecretSet {
 		shouldGenerate, nameChanged, err = shouldGenerateToken(acceptor, existingStatusSecret)
 		if err != nil {
-			r.updateStatusError(ctx, acceptor, err)
+			r.updateStatusError(ctx, acceptor, InternalError, err)
 			return ctrl.Result{}, err
 		}
 	} else {
@@ -184,7 +189,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			if existingStatusSecret != nil {
 				err := r.Client.Delete(ctx, existingStatusSecret)
 				if err != nil {
-					r.updateStatusError(ctx, acceptor, err)
+					r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
 					return ctrl.Result{}, err
 				}
 			}
@@ -243,11 +248,8 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptor *
 		Secret:          *acceptor.Secret(),
 		ResourceVersion: secretResourceVersion,
 	}
-	acceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
-	acceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
-		Error:   pointerToBool(false),
-		Message: pointerToString(""),
-	}
+	acceptor.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
+	acceptor.SetSyncedCondition(corev1.ConditionTrue, "", "")
 	if peeringVersionString, ok := acceptor.Annotations[annotationPeeringVersion]; ok {
 		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
 		if err != nil {
@@ -266,13 +268,8 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptor *
 }
 
 // updateStatusError updates the peeringAcceptor's ReconcileError in the status.
-func (r *PeeringAcceptorController) updateStatusError(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, reconcileErr error) {
-	acceptor.Status.ReconcileError = &consulv1alpha1.ReconcileErrorStatus{
-		Error:   pointerToBool(true),
-		Message: pointerToString(reconcileErr.Error()),
-	}
-
-	acceptor.Status.LastReconcileTime = &metav1.Time{Time: time.Now()}
+func (r *PeeringAcceptorController) updateStatusError(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, reason string, reconcileErr error) {
+	acceptor.SetSyncedCondition(corev1.ConditionFalse, reason, reconcileErr.Error())
 	err := r.Status().Update(ctx, acceptor)
 	if err != nil {
 		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", acceptor.Name, "namespace", acceptor.Namespace)
@@ -419,10 +416,6 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 		},
 	}
 	return secret
-}
-
-func pointerToString(s string) *string {
-	return &s
 }
 
 // containsString returns true if s is in slice.
