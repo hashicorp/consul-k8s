@@ -296,7 +296,6 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -hcl='ports { grpc = 8503 }' \
                 -config-file=/consul/extra-config/extra-from-values.json
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}

@@ -148,8 +148,7 @@ data:
         {{- if .Values.global.tls.httpsOnly }}
         "http": -1,
         {{- end }}
-        "https": 8501,
-        "grpc":8503
+        "https": 8501
       }
       {{- end }}
     }
