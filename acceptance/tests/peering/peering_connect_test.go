@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +52,7 @@ func TestPeering_Connect(t *testing.T) {
 
 				"global.image": "thisisnotashwin/consul@sha256:446aad6e02f66e3027756dfc0d34e8e6e2b11ac6ec5637b134b34644ca7cda64",
 
-				"global.tls.enabled":           "false",
+				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
@@ -110,9 +111,13 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
-			acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
-			require.NoError(t, err)
-			require.NotEmpty(t, acceptorSecretResourceVersion)
+
+			// Ensure the secret is created.
+			retry.Run(t, func(r *retry.R) {
+				acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
+				require.NoError(r, err)
+				require.NotEmpty(r, acceptorSecretResourceVersion)
+			})
 
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
