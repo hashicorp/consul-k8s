@@ -50,38 +50,64 @@ spec:
               TerminatingGatewayService.
             properties:
               service:
+                description: Service contains information about a service, needed
+                  for registration or de-registration.
                 properties:
                   address:
+                    description: Address specifies the address to register.
                     type: string
                   datacenter:
+                    description: Datacenter specifies the datacenter, which defaults
+                      to the agent's datacenter if not provided.
                     type: string
                   node:
+                    description: Node specifies the node ID to register.
                     type: string
                   nodeMeta:
                     additionalProperties:
                       type: string
+                    description: NodeMeta specifies arbitrary KV metadata pairs for
+                      filtering purposes.
                     type: object
                   serviceAddress:
+                    description: ServiceAddress specifies the address of the service.
+                      If not provided, the agent's address is used as the address
+                      for the service during DNS queries.
                     type: string
                   serviceEnableTagOverride:
+                    description: ServiceEnableTagOverride specifies to disable the
+                      anti-entropy feature for this service's tags. If set to true
+                      then external agents can update this service in the catalog
+                      and modify the tags.
                     type: boolean
                   serviceId:
+                    description: ServiceID specifies to register a service. If ID
+                      is not provided, it will be defaulted to the value of the ServiceName
+                      property.
                     type: string
                   serviceMeta:
                     additionalProperties:
                       type: string
+                    description: SericeMeta specifies arbitrary KV metadata linked
+                      to the service instance.
                     type: object
                   serviceName:
+                    description: ServiceName specifies the logical name of the service.
                     type: string
                   servicePort:
+                    description: ServicePort specifies the port of the service.
                     type: integer
                   serviceTags:
+                    description: ServiceTags specifies a list of tags to assign to
+                      the service. These tags can be used for later filtering and
+                      are exposed via the APIs.
                     items:
                       type: string
                     type: array
                   taggedAddresses:
                     additionalProperties:
                       type: string
+                    description: TaggedAddresses specifies the tagged addresses.
                     type: object
                 type: object
             type: object

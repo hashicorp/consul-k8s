@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"errors"
+	"fmt"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,10 +35,6 @@ type TerminatingGatewayServiceController struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the TerminatingGatewayService object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.6.4/pkg/reconcile
@@ -79,7 +76,7 @@ func (r *TerminatingGatewayServiceController) Reconcile(ctx context.Context, req
 	} else {
 		if containsString(terminatingGatewayService.Finalizers, FinalizerName) {
 			r.Log.Info("TerminatingGatewayService was deleted, deleting from consul", "name", req.Name, "ns", req.Namespace)
-			err := r.deleteService(spec.Service.ServiceName)
+			_, err := r.deleteService(spec.Service.ServiceName)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -117,7 +114,7 @@ func (r *TerminatingGatewayServiceController) updateStatus(ctx context.Context, 
 
 	policyName := ""
 	if r.AclEnabled {
-		policyName = terminatingGatewayService.Spec.Service.ServiceName + "-write-policy"
+		policyName = fmt.Sprintf("%s-write-policy", terminatingGatewayService.Spec.Service.ServiceName)
 	}
 
 	terminatingGatewayService.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
@@ -135,7 +132,7 @@ func (r *TerminatingGatewayServiceController) updateStatus(ctx context.Context, 
 	return err
 }
 
-// updateStatusError updates the terminatingGatewayService's ReconcileError in the status.
+// updateStatusError updates the terminatingGatewayService's Condition in the status.
 func (r *TerminatingGatewayServiceController) updateStatusError(ctx context.Context, terminatingGatewayService *consulv1alpha1.TerminatingGatewayService, reconcileErr error) {
 	terminatingGatewayService.SetSyncedCondition(corev1.ConditionFalse, "Error updating status", reconcileErr.Error())
 
@@ -153,6 +150,7 @@ func (r *TerminatingGatewayServiceController) SetupWithManager(mgr ctrl.Manager)
 		Complete(r)
 }
 
+// createOrUpdateService creates or updates a service in Consul.
 func (r *TerminatingGatewayServiceController) createOrUpdateService(terminatingGatewayService *consulv1alpha1.TerminatingGatewayService, ctx context.Context) error {
 	spec := terminatingGatewayService.Spec
 
@@ -164,11 +162,18 @@ func (r *TerminatingGatewayServiceController) createOrUpdateService(terminatingG
 
 	if !serviceExists {
 		// register external service with Consul.
+		serviceID := ""
+		if spec.Service.ServiceID == "" {
+			serviceID = spec.Service.ServiceName
+		} else {
+			serviceID = spec.Service.ServiceID
+		}
+
 		catalogRegistration := &api.CatalogRegistration{
 			Node:    spec.Service.Node,
 			Address: spec.Service.Address,
 			Service: &api.AgentService{
-				ID:      spec.Service.ServiceName,
+				ID:      serviceID,
 				Service: spec.Service.ServiceName,
 				Port:    spec.Service.ServicePort}}
 
@@ -200,15 +205,6 @@ func (r *TerminatingGatewayServiceController) updateTerminatingGatewayTokenWithW
 
 	// create a new policy that includes write permissions.
 	// update existing role to include new policy.
-	aclPolicy := &api.ACLPolicy{
-		Name:  spec.Service.ServiceName + "-write-policy",
-		Rules: "service \"" + spec.Service.ServiceName + "\" {policy = \"write\"}"}
-
-	_, _, err := r.ConsulClient.ACL().PolicyCreate(aclPolicy, nil)
-	if err != nil {
-		r.Log.Error(err, "Unable to create new policy", "name")
-		return err
-	}
 	matchedRole, tokenFound, err := r.fetchTerminatingGatewayToken()
 	if err != nil {
 		r.Log.Error(err, "Error fetching terminating gateway token")
@@ -218,22 +214,39 @@ func (r *TerminatingGatewayServiceController) updateTerminatingGatewayTokenWithW
 		return err
 	}
 
-	aclRolePolicyLink := &api.ACLRolePolicyLink{
-		Name: aclPolicy.Name,
-	}
+	aclPolicy := &api.ACLPolicy{
+		Name:  spec.Service.ServiceName + "-write-policy",
+		Rules: fmt.Sprintf(`service "%s" {policy = "write"}`, spec.Service.ServiceName)}
 
-	termGwRole, _, err := r.ConsulClient.ACL().RoleRead(matchedRole.ID, nil)
+	allConsulPolicies, _, err := r.ConsulClient.ACL().PolicyList(nil)
 	if err != nil {
-		r.Log.Error(err, "Error reading terminating gateway token")
+		r.Log.Error(err, "Unable to list exisiting policies")
 	}
+	_, policyAlreadyExists := findConsulPolicy(aclPolicy.Name, allConsulPolicies)
 
-	termGwRole.Policies = append(termGwRole.Policies, aclRolePolicyLink)
-	_, _, err = r.ConsulClient.ACL().RoleUpdate(termGwRole, nil)
-	if err != nil {
-		r.Log.Error(err, "Error updating terminating Gateway ACL token with new policy")
-		return err
+	if !policyAlreadyExists {
+		_, _, err = r.ConsulClient.ACL().PolicyCreate(aclPolicy, nil)
+		if err != nil {
+			r.Log.Error(err, "Unable to create new policy")
+			return err
+		}
+
+		aclRolePolicyLink := &api.ACLRolePolicyLink{
+			Name: aclPolicy.Name,
+		}
+
+		termGwRole, _, err := r.ConsulClient.ACL().RoleRead(matchedRole.ID, nil)
+		if err != nil {
+			r.Log.Error(err, "Error reading terminating gateway role")
+		}
+
+		termGwRole.Policies = append(termGwRole.Policies, aclRolePolicyLink)
+		_, _, err = r.ConsulClient.ACL().RoleUpdate(termGwRole, nil)
+		if err != nil {
+			r.Log.Error(err, "Error updating terminating Gateway ACL token with new policy")
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -242,13 +255,13 @@ func (r *TerminatingGatewayServiceController) serviceFound(serviceName string) (
 	serviceExists := false
 
 	services, _, err := r.ConsulClient.Catalog().Service(serviceName, "", nil)
-	len := len(services)
+	length := len(services)
 	if err != nil {
 		return result, serviceExists, err
 	}
-	if len > 1 {
+	if length > 1 {
 		r.Log.Error(err, "Multiple services found with the same serviceName")
-	} else if len == 0 {
+	} else if length == 0 {
 		r.Log.Error(err, "No service found")
 	} else {
 		result = services[0]
@@ -261,16 +274,17 @@ func (r *TerminatingGatewayServiceController) updateServiceIfDifferent(service *
 	spec := terminatingGatewayService.Spec
 
 	updatedCatalogRegisteration := &api.CatalogRegistration{
-		ID:      service.ServiceID,
-		Service: &api.AgentService{},
+		Node:    spec.Service.Node,
+		Address: spec.Service.Address,
+
+		Service: &api.AgentService{
+			Service: spec.Service.ServiceName,
+			ID:      spec.Service.ServiceID,
+		},
 	}
 
 	if service.Node != spec.Service.Node {
 		updatedCatalogRegisteration.Node = spec.Service.Node
-	}
-
-	if service.Address != spec.Service.Address {
-		updatedCatalogRegisteration.Address = spec.Service.Address
 	}
 
 	if service.Datacenter != spec.Service.Datacenter {
@@ -289,19 +303,67 @@ func (r *TerminatingGatewayServiceController) updateServiceIfDifferent(service *
 		updatedCatalogRegisteration.Service.EnableTagOverride = spec.Service.ServiceEnableTagOverride
 	}
 
-	_, err := r.ConsulClient.Catalog().Register(updatedCatalogRegisteration, nil)
+	// delete old service
+	_, err := r.onlyDeleteServiceEntry(service.ServiceName)
+	if err != nil {
+		r.Log.Error(err, "Error deleting stale service entry")
+		return err
+	}
 
+	// register updated service
+	_, err = r.ConsulClient.Catalog().Register(updatedCatalogRegisteration, nil)
 	if err != nil {
 		r.Log.Error(err, "Unable to update TerminatingGatewayService status")
+		return err
 	}
+
+	// Check if write policy needs to be created
+	if terminatingGatewayService.Status.ServiceInfoRef.PolicyName == "" && r.AclEnabled {
+		// ACLs have just been enabled. Thus, update TerminatingGatewayToken with write policy.
+		err := r.updateTerminatingGatewayTokenWithWritePolicy(terminatingGatewayService)
+		if err != nil {
+			r.Log.Error(err, "Unable to update the terminating gateway ACL token with new write policy")
+			return err
+		}
+	}
+
+	// Store the state in the status.
+	err = r.updateStatus(ctx, terminatingGatewayService)
 	return err
 }
-func (r *TerminatingGatewayServiceController) deleteService(serviceName string) error {
+func (r *TerminatingGatewayServiceController) deleteService(serviceName string) (bool, error) {
+	serviceDeleted := false
 	// search for service.
 	service, serviceExists, err := r.serviceFound(serviceName)
 	if err != nil {
 		r.Log.Error(err, "Error finding service to delete")
+		return serviceDeleted, err
 	}
+	if serviceExists {
+
+		serviceDeleted, err = r.onlyDeleteServiceEntry(service.ServiceName)
+		if err != nil {
+			r.Log.Error(err, "Error deleting service entry")
+			return serviceDeleted, err
+		} else {
+			serviceDeleted = true
+		}
+
+		if r.AclEnabled {
+			err = r.deleteTerminatingGatewayTokenWritePolicy(serviceName)
+			if err != nil {
+				r.Log.Error(err, "Unable to delete terminating gateway token's write policy")
+				serviceDeleted = false
+				return serviceDeleted, err
+			}
+		}
+	}
+	return serviceDeleted, nil
+}
+func (r *TerminatingGatewayServiceController) onlyDeleteServiceEntry(serviceName string) (bool, error) {
+	serviceDeleted := false
+	service, serviceExists, _ := r.serviceFound(serviceName)
+
 	if serviceExists {
 		catalogDeregistration := &api.CatalogDeregistration{
 			Node:       service.Node,
@@ -312,22 +374,28 @@ func (r *TerminatingGatewayServiceController) deleteService(serviceName string) 
 		_, err := r.ConsulClient.Catalog().Deregister(catalogDeregistration, nil)
 		if err != nil {
 			r.Log.Error(err, "Error deleting service")
-			return err
+			return serviceDeleted, err
+		} else {
+			serviceDeleted = true
 		}
-
 	}
-	if r.AclEnabled {
-		// search for policy.
-		terminatingGatewayToken, _, err := r.fetchTerminatingGatewayToken()
-		if err != nil {
-			r.Log.Error(err, "Unable to fetch terminating gateway token")
-			return err
-		}
 
-		policyName := serviceName + "-write-policy"
-		policies := terminatingGatewayToken.Policies
-		indexToFind, policyFound := findAclPolicy(policyName, policies)
+	return serviceDeleted, nil
+}
 
+func (r *TerminatingGatewayServiceController) deleteTerminatingGatewayTokenWritePolicy(serviceName string) error {
+	// search for policy.
+	terminatingGatewayToken, _, err := r.fetchTerminatingGatewayToken()
+	if err != nil {
+		r.Log.Error(err, "Unable to fetch terminating gateway token")
+		return err
+	}
+
+	policyName := fmt.Sprintf("%s-write-policy", serviceName)
+	policies := terminatingGatewayToken.Policies
+	indexToFind, policyFound := findAclPolicy(policyName, policies)
+
+	if policyFound {
 		// Delete actual policy.
 		_, err = r.ConsulClient.ACL().PolicyDelete(policies[indexToFind].ID, nil)
 		if err != nil {
@@ -336,35 +404,33 @@ func (r *TerminatingGatewayServiceController) deleteService(serviceName string) 
 		}
 
 		// Remove policy from policies.
-		if policyFound {
-			policies[indexToFind] = policies[len(policies)-1]
-			policies[len(policies)-1] = &api.ACLRolePolicyLink{}
-			policies = policies[:len(policies)-1]
+		policies[indexToFind] = policies[len(policies)-1]
+		policies[len(policies)-1] = &api.ACLRolePolicyLink{}
+		policies = policies[:len(policies)-1]
 
-		} else {
-			errMessage := "Error finding write  policy"
-			err = errors.New(errMessage)
+	} else {
+		errMessage := "Error finding write  policy"
+		err = errors.New(errMessage)
 
-			r.Log.Error(err, errMessage)
-			return err
-		}
-
-		updatedRole := &api.ACLRole{
-			ID:       terminatingGatewayToken.ID,
-			Name:     terminatingGatewayToken.Name,
-			Policies: policies,
-		}
-
-		// Delete policy from terminating gateway's policies.
-		_, _, err = r.ConsulClient.ACL().RoleUpdate(updatedRole, nil)
-		if err != nil {
-			r.Log.Error(err, "Error updating terminating Gateway ACL token with deleted policy")
-			return err
-		}
+		r.Log.Error(err, errMessage)
+		return err
 	}
 
+	updatedRole := &api.ACLRole{
+		ID:       terminatingGatewayToken.ID,
+		Name:     terminatingGatewayToken.Name,
+		Policies: policies,
+	}
+
+	// Delete policy from terminating gateway's policies.
+	_, _, err = r.ConsulClient.ACL().RoleUpdate(updatedRole, nil)
+	if err != nil {
+		r.Log.Error(err, "Error updating terminating Gateway ACL token with deleted policy")
+		return err
+	}
 	return nil
 }
+
 func (r *TerminatingGatewayServiceController) fetchTerminatingGatewayToken() (*api.ACLRole, bool, error) {
 	var matchedRole *api.ACLRole
 	terminatingGatewayACLTokenFound := false
@@ -378,6 +444,7 @@ func (r *TerminatingGatewayServiceController) fetchTerminatingGatewayToken() (*a
 	matchedRole, err = terminatingGatewayACLRole(aclRoleList)
 	if err != nil {
 		r.Log.Error(err, "Terminating Gateway ACL Role not found")
+		return matchedRole, terminatingGatewayACLTokenFound, err
 	} else {
 		terminatingGatewayACLTokenFound = true
 	}

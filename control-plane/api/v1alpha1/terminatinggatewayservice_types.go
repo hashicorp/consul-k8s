@@ -35,22 +35,36 @@ type TerminatingGatewayServiceList struct {
 
 // TerminatingGatewayServiceSpec defines the desired state of TerminatingGatewayService.
 type TerminatingGatewayServiceSpec struct {
+	// Service contains information about a service, needed for registration or de-registration.
 	Service *CatalogService `json:"service,omitempty"`
 }
 
 type CatalogService struct {
-	Node                     string            `json:"node,omitempty"`
-	Address                  string            `json:"address,omitempty"`
-	Datacenter               string            `json:"datacenter,omitempty"`
-	TaggedAddresses          map[string]string `json:"taggedAddresses,omitempty"`
-	NodeMeta                 map[string]string `json:"nodeMeta,omitempty"`
-	ServiceID                string            `json:"serviceId,omitempty"`
-	ServiceName              string            `json:"serviceName,omitempty"`
-	ServiceAddress           string            `json:"serviceAddress,omitempty"`
-	ServiceTags              []ServiceTag      `json:"serviceTags,omitempty"`
-	ServiceMeta              map[string]string `json:"serviceMeta,omitempty"`
-	ServicePort              int               `json:"servicePort,omitempty"`
-	ServiceEnableTagOverride bool              `json:"serviceEnableTagOverride,omitempty"`
+	// Node specifies the node ID to register.
+	Node string `json:"node,omitempty"`
+	// Address specifies the address to register.
+	Address string `json:"address,omitempty"`
+	// Datacenter specifies the datacenter, which defaults to the agent's datacenter if not provided.
+	Datacenter string `json:"datacenter,omitempty"`
+	// TaggedAddresses specifies the tagged addresses.
+	TaggedAddresses map[string]string `json:"taggedAddresses,omitempty"`
+	// NodeMeta specifies arbitrary KV metadata pairs for filtering purposes.
+	NodeMeta map[string]string `json:"nodeMeta,omitempty"`
+	// ServiceID specifies to register a service. If ID is not provided, it will be defaulted to the value of the ServiceName property.
+	ServiceID string `json:"serviceId,omitempty"`
+	// ServiceName specifies the logical name of the service.
+	ServiceName string `json:"serviceName,omitempty"`
+	// ServiceAddress specifies the address of the service. If not provided, the agent's address is used as the address for the service during DNS queries.
+	ServiceAddress string `json:"serviceAddress,omitempty"`
+	// ServiceTags specifies a list of tags to assign to the service. These tags can be used for later filtering and are exposed via the APIs.
+	ServiceTags []ServiceTag `json:"serviceTags,omitempty"`
+	// SericeMeta specifies arbitrary KV metadata linked to the service instance.
+	ServiceMeta map[string]string `json:"serviceMeta,omitempty"`
+	// ServicePort specifies the port of the service.
+	ServicePort int `json:"servicePort,omitempty"`
+	// ServiceEnableTagOverride specifies to disable the anti-entropy feature for this service's tags.
+	// If set to true then external agents can update this service in the catalog and modify the tags.
+	ServiceEnableTagOverride bool `json:"serviceEnableTagOverride,omitempty"`
 }
 
 type ServiceTag string
