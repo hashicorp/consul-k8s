@@ -257,3 +257,24 @@ webhooks:
     resources:
     - terminatinggateways
   sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-terminatinggatewayservices
+  failurePolicy: Fail
+  name: mutate-terminatinggatewayservices.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - terminatinggatewayservices
+  sideEffects: None

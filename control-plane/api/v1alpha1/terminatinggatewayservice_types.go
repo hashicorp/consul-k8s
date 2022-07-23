@@ -2,8 +2,13 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+const TerminatingGatewayServiceKubeKind = "terminatinggatewayservices"
 
 func init() {
 	SchemeBuilder.Register(&TerminatingGatewayService{}, &TerminatingGatewayServiceList{})
@@ -51,7 +56,7 @@ type CatalogService struct {
 	// NodeMeta specifies arbitrary KV metadata pairs for filtering purposes.
 	NodeMeta map[string]string `json:"nodeMeta,omitempty"`
 	// ServiceID specifies to register a service. If ID is not provided, it will be defaulted to the value of the ServiceName property.
-	ServiceID string `json:"serviceId,omitempty"`
+	ServiceID string `json:"serviceID,omitempty"`
 	// ServiceName specifies the logical name of the service.
 	ServiceName string `json:"serviceName,omitempty"`
 	// ServiceAddress specifies the address of the service. If not provided, the agent's address is used as the address for the service during DNS queries.
@@ -94,6 +99,40 @@ func (tas *TerminatingGatewayService) ServiceInfo() *CatalogService {
 }
 func (tas *TerminatingGatewayService) ServiceInfoRef() *ServiceInfoRefStatus {
 	return tas.Status.ServiceInfoRef
+}
+func (tas *TerminatingGatewayService) KubeKind() string {
+	return TerminatingGatewayServiceKubeKind
+}
+func (tas *TerminatingGatewayService) KubernetesName() string {
+	return tas.ObjectMeta.Name
+}
+func (tas *TerminatingGatewayService) Validate() error {
+	var errs field.ErrorList
+	// The nil checks must return since you can't do further validations.
+	if tas.Spec.Service == nil {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("service"), tas.Spec.Service, "service must be specified"))
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: TerminatingGatewayServiceKubeKind},
+			tas.KubernetesName(), errs)
+	}
+	if tas.Spec.Service.Node == "" {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("service").Child("node"), tas.Spec.Service.Node, "node must be specified"))
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: TerminatingGatewayServiceKubeKind},
+			tas.KubernetesName(), errs)
+	}
+	if tas.Spec.Service.ServiceName == "" {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("service").Child("serviceName"), tas.Spec.Service.ServiceName, "serviceName must be specified"))
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: TerminatingGatewayServiceKubeKind},
+			tas.KubernetesName(), errs)
+	}
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: TerminatingGatewayServiceKubeKind},
+			tas.KubernetesName(), errs)
+	}
+	return nil
 }
 func (tas *TerminatingGatewayService) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
 	tas.Status.Conditions = Conditions{

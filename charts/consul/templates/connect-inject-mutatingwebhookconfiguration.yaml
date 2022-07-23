@@ -82,4 +82,27 @@ webhooks:
       - "v1beta1"
       - "v1"
 {{- end }}
+{{- if .Values.global.terminatingGateways.enabled }}
+- name: {{ template "consul.fullname" . }}-mutate-terminatinggatewayservices.consul.hashicorp.com
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: "/mutate-v1alpha1-terminatinggatewayservices"
+  rules:
+    - apiGroups:
+        - consul.hashicorp.com
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - terminatinggatewayservices
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
+{{- end }}
 {{- end }}

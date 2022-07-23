@@ -80,7 +80,7 @@ spec:
                       then external agents can update this service in the catalog
                       and modify the tags.
                     type: boolean
-                  serviceId:
+                  serviceID:
                     description: ServiceID specifies to register a service. If ID
                       is not provided, it will be defaulted to the value of the ServiceName
                       property.
