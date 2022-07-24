@@ -422,8 +422,35 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 	}
 	switch serverService.Spec.Type {
 	case corev1.ServiceTypeNodePort:
-		// Todo, get nodes, get their external IPs, and get the spec.nodeport from the service
-		return []string{}, fmt.Errorf("nodeport support to come")
+		nodes := corev1.NodeList{}
+		err := r.Client.List(r.Context, &nodes)
+		if err != nil {
+			return []string{}, err
+		}
+		if len(nodes.Items) == 0 {
+			return []string{}, fmt.Errorf("no nodes were found for scraping server addresses from external-servers service")
+		}
+		var grpcNodePort int32
+		for _, port := range serverService.Spec.Ports {
+			if port.Name == "grpc" {
+				grpcNodePort = port.NodePort
+			}
+		}
+		if grpcNodePort == 0 {
+			return []string{}, fmt.Errorf("no grpc port was found for external-servers service")
+		}
+		for _, node := range nodes.Items {
+			addrs := node.Status.Addresses
+			for _, addr := range addrs {
+				if addr.Type == corev1.NodeExternalIP {
+					serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%d", addr.Address, grpcNodePort))
+				}
+			}
+		}
+		if len(serverExternalAddresses) == 0 {
+			return []string{}, fmt.Errorf("no server addresses were scraped from external-servers service")
+		}
+		return serverExternalAddresses, nil
 	case corev1.ServiceTypeLoadBalancer:
 		lbAddrs := serverService.Status.LoadBalancer.Ingress
 		if len(lbAddrs) < 1 {
@@ -440,7 +467,6 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 		}
 	default:
 		return []string{}, fmt.Errorf("only NodePort and LoadBalancer service types are supported")
-
 	}
 	return serverExternalAddresses, nil
 }
