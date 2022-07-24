@@ -101,6 +101,8 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
+                          -run TestPeering_Connect \
+                          -run TestPeering_ConnectNamespaces \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
@@ -132,6 +134,8 @@ commands:
                       -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -debug-directory="$TEST_RESULTS/debug" \
+                      -run TestPeering_Connect \
+                      -run TestPeering_ConnectNamespaces \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
@@ -1002,6 +1006,15 @@ workflows:
             - dev-upload-docker
       - acceptance-tproxy:
           context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-gke-1-20:
+          requires:
+            - dev-upload-docker
+      - acceptance-eks-1-19:
+          requires:
+            - dev-upload-docker
+      - acceptance-aks-1-21:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
