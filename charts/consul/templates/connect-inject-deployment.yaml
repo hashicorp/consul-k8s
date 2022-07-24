@@ -13,6 +13,7 @@
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
+{{- if not (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") (eq .Values.global.peering.tokenGeneration.serverAddresses.source "consul"))) }}{{ fail "global.peering.tokenGeneration.serverAddresses.source must be one of empty string, 'consul' or 'static'" }}{{ end }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
@@ -150,6 +151,11 @@ spec:
                 -server-address="{{ $h }}:{{ $port }}" \
                 {{- end }}
                 {{- end }}
+                {{- end }}
+                {{- end }}
+                {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") }}
+                {{- range $addr := .Values.global.peering.tokenGeneration.serverAddresses.static }}
+                -server-address="{{ $addr }}" \
                 {{- end }}
                 {{- end }}
                 {{- end }}
