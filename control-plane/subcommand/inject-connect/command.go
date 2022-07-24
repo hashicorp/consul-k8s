@@ -459,6 +459,7 @@ func (c *Command) Run(args []string) int {
 			Client:                    mgr.GetClient(),
 			ConsulClient:              c.consulClient,
 			ServerExternalServiceName: c.flagResourcePrefix + "-external-servers",
+			PollServerExternalService: c.flagPollServerExternalService,
 			ExternalServerHosts:       c.flagExternalServerHosts,
 			ExternalServerPort:        c.flagExternalServerGRPCPort,
 			ReleaseNamespace:          c.flagReleaseNamespace,
