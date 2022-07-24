@@ -19,7 +19,7 @@ rules:
   - get
 {{- end }}
 - apiGroups: [ "" ]
-  resources: [ "pods", "endpoints", "services", "namespaces" ]
+  resources: [ "pods", "endpoints", "services", "namespaces", "nodes" ]
   verbs:
   - "get"
   - "list"
