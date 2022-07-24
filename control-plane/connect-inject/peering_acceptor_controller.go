@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -28,9 +29,13 @@ import (
 type PeeringAcceptorController struct {
 	client.Client
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
-	ConsulClient *api.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
+	ConsulClient              *api.Client
+	ServerExternalServiceName string
+	ExternalServerHosts       []string
+	ExternalServerPort        string
+	ReleaseNamespace          string
+	Log                       logr.Logger
+	Scheme                    *runtime.Scheme
 	context.Context
 }
 
@@ -98,6 +103,17 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	// Scrape the address of the server service
+	var serverExternalAddresses []string
+	if r.ServerExternalServiceName != "" {
+		addrs, err := r.scrapeExternalServerAddresses()
+		if err != nil {
+			r.updateStatusError(ctx, acceptor, KubernetesError, err)
+			return ctrl.Result{}, err
+		}
+		serverExternalAddresses = addrs
+	}
+
 	statusSecretSet := acceptor.SecretRef() != nil
 
 	// existingStatusSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
@@ -136,7 +152,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
-		if resp, err = r.generateToken(ctx, acceptor.Name); err != nil {
+		if resp, err = r.generateToken(ctx, acceptor.Name, serverExternalAddresses); err != nil {
 			r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
 			return ctrl.Result{}, err
 		}
@@ -175,7 +191,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	if shouldGenerate {
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
-		if resp, err = r.generateToken(ctx, acceptor.Name); err != nil {
+		if resp, err = r.generateToken(ctx, acceptor.Name, serverExternalAddresses); err != nil {
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
@@ -342,9 +358,12 @@ func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // generateToken is a helper function that calls the Consul api to generate a token for the peer.
-func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
+func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string, serverExternalAddresses []string) (*api.PeeringGenerateTokenResponse, error) {
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
+	}
+	if len(serverExternalAddresses) > 0 {
+		req.ServerExternalAddresses = serverExternalAddresses
 	}
 	resp, _, err := r.ConsulClient.Peerings().GenerateToken(ctx, req, nil)
 	if err != nil {
@@ -386,6 +405,44 @@ func (r *PeeringAcceptorController) requestsForPeeringTokens(object client.Objec
 		}
 	}
 	return []ctrl.Request{}
+}
+
+func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, error) {
+	r.Log.Info("scraping external IP from server external service", "name", r.ServerExternalServiceName)
+	var serverExternalAddresses []string
+
+	serverService := &corev1.Service{}
+	key := types.NamespacedName{
+		Name:      r.ServerExternalServiceName,
+		Namespace: r.ReleaseNamespace,
+	}
+	err := r.Client.Get(r.Context, key, serverService)
+	if err != nil {
+		return []string{}, err
+	}
+	switch serverService.Spec.Type {
+	case corev1.ServiceTypeNodePort:
+		// Todo, get nodes, get their external IPs, and get the spec.nodeport from the service
+		return []string{}, fmt.Errorf("nodeport support to come")
+	case corev1.ServiceTypeLoadBalancer:
+		lbAddrs := serverService.Status.LoadBalancer.Ingress
+		if len(lbAddrs) < 1 {
+			return []string{}, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ServerExternalServiceName)
+		}
+		for _, lbAddr := range lbAddrs {
+			// When the service is of type load balancer, the grpc port is hardcoded to 8503.
+			if lbAddr.IP != "" {
+				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.IP, "8503"))
+			}
+			if lbAddr.Hostname != "" {
+				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.Hostname, "8503"))
+			}
+		}
+	default:
+		return []string{}, fmt.Errorf("only NodePort and LoadBalancer service types are supported")
+
+	}
+	return serverExternalAddresses, nil
 }
 
 // filterPeeringAcceptors receives meta and object information for Kubernetes resources that are being watched,
