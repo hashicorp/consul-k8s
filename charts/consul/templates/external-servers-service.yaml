@@ -1,0 +1,53 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if and .Values.server.externalService.enabled (not $serverEnabled) }}{{ fail "Servers must be enabled to set server.externalService.enabled to true." }}{{ end }}
+{{- if (and $serverEnabled (or .Values.server.externalService.enabled .Values.global.adminPartitions.enabled)) }}
+
+# Service with an external IP to reach Consul servers.
+# Used for exposing gRPC port for peering and ports for client partitions to discover servers.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "consul.fullname" . }}-external-servers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: server
+  annotations:
+    {{- if .Values.server.externalService.annotations }}
+    {{ tpl .Values.server.externalService.annotations . | nindent 4 | trim }}
+    {{- end }}
+spec:
+  type: "{{ .Values.server.externalService.type }}"
+  ports:
+    - name: https
+      port: 8501
+      targetPort: 8501
+      {{ if (and (eq .Values.server.externalService.type "NodePort") .Values.server.externalService.nodePort.https) }}
+      nodePort: {{ .Values.server.externalService.nodePort.https }}
+      {{- end }}
+    - name: serflan
+      port: 8301
+      targetPort: 8301
+      {{ if (and (eq .Values.server.externalService.type "NodePort") .Values.server.externalService.nodePort.serf) }}
+      nodePort: {{ .Values.server.externalService.nodePort.serf }}
+      {{- end }}
+    - name: rpc
+      port: 8300
+      targetPort: 8300
+      {{ if (and (eq .Values.server.externalService.type "NodePort") .Values.server.externalService.nodePort.rpc) }}
+      nodePort: {{ .Values.server.externalService.nodePort.rpc }}
+      {{- end }}
+    - name: grpc
+      port: 8503
+      targetPort: 8503
+      {{ if (and (eq .Values.server.externalService.type "NodePort") .Values.server.externalService.nodePort.rpc) }}
+      nodePort: {{ .Values.server.externalService.nodePort.grpc }}
+      {{- end }}
+  selector:
+    app: {{ template "consul.name" . }}
+    release: "{{ .Release.Name }}"
+    component: server
+{{- end }}
