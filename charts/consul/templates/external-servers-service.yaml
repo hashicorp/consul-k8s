@@ -22,12 +22,22 @@ metadata:
 spec:
   type: "{{ .Values.server.externalService.type }}"
   ports:
+    {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
+    - name: http
+      port: 8500
+      targetPort: 8500
+      {{ if (and (eq .Values.server.externalService.type "NodePort") .Values.server.externalService.nodePort.https) }}
+      nodePort: {{ .Values.server.externalService.nodePort.http }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.global.tls.enabled }}
     - name: https
       port: 8501
       targetPort: 8501
       {{ if (and (eq .Values.server.externalService.type "NodePort") .Values.server.externalService.nodePort.https) }}
       nodePort: {{ .Values.server.externalService.nodePort.https }}
       {{- end }}
+    {{- end }}
     - name: serflan
       port: 8301
       targetPort: 8301
