@@ -1000,6 +1000,7 @@ server:
     # Type of service, supports LoadBalancer or NodePort.
     type: LoadBalancer
     nodePort:
+      http: null
       https: null
       serf: null
       rpc: null
