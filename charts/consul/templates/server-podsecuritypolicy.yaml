@@ -35,6 +35,8 @@ spec:
     max: {{ .Values.server.ports.serflan.port }}
   - min: 8302
     max: 8302
+  - min: 8503
+    max: 8503
   {{- end }}
   hostIPC: false
   hostPID: false
