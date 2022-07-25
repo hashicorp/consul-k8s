@@ -364,7 +364,7 @@ func realMain(ctx context.Context) error {
 				return err
 			}
 			// Allow time for ELB deletion to propagate so that we can detach the internet gateway.
-			time.Sleep(1 * time.Second)
+			time.Sleep(10 * time.Second)
 			fmt.Printf("ELB: Destroyed [id=%s]\n", *elbDescrip.LoadBalancerName)
 		}
 
