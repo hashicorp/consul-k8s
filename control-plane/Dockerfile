@@ -44,6 +44,7 @@ RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
 COPY pkg/bin/linux_${TARGETARCH}/${BIN_NAME} /bin
+COPY cni/pkg/bin/linux_${TARGETARCH}/${CNI_BIN_NAME} /bin
 
 USER 100
 CMD /bin/${BIN_NAME}
