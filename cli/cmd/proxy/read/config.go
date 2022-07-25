@@ -363,7 +363,7 @@ func formatFilters(filterChain filterChain) (filters []string) {
 }
 
 func formatFilterTCPProxy(config typedConfig) (filter string) {
-	return "-> " + config.Cluster
+	return "to " + config.Cluster
 }
 
 func formatFilterRBAC(cfg typedConfig) (filter string) {
@@ -378,7 +378,7 @@ func formatFilterRBAC(cfg typedConfig) (filter string) {
 func formatFilterHTTPConnectionManager(cfg typedConfig) (filter string) {
 	for _, host := range cfg.RouteConfig.VirtualHosts {
 		filter += strings.Join(host.Domains, ", ")
-		filter += " -> "
+		filter += " to "
 
 		routes := ""
 		for _, route := range host.Routes {
