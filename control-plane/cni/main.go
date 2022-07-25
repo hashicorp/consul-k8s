@@ -14,6 +14,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
+	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
@@ -70,24 +71,8 @@ type PluginConf struct {
 		SampleConfig map[string]interface{} `json:"sample_config"`
 	} `json:"runtime_config"`
 
-	// Name of the plugin (consul-cni).
-	Name string `json:"name"`
-	// Type of plugin (consul-cni).
-	Type string `json:"type"`
-	// CNIBinDir is the location of the cni config files on the node. Can be set as a cli flag.
-	CNIBinDir string `json:"cni_bin_dir"`
-	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
-	CNINetDir string `json:"cni_net_dir"`
-	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the
-	// prefix allows us
-	// to search for it. The DNS IP is determined using the prefix and the dnsServiceHostEnvSuffix constant.
-	DNSPrefix string `json:"dns_prefix"`
-	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
-	Multus bool `json:"multus"`
-	// Kubeconfig file name. Can be set as a cli flag.
-	Kubeconfig string `json:"kubeconfig"`
-	// LogLevl is the logging level. Can be set as a cli flag.
-	LogLevel string `json:"log_level"`
+	// CNIConfig is stuct representing the consul-cni configuration.
+	config.CNIConfig
 }
 
 // parseConfig parses the supplied CNI configuration (and prevResult) from stdin.
@@ -103,8 +88,6 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
 		return nil, fmt.Errorf("could not parse prevResult: %v", err)
 	}
-
-	// TODO: Do validation of the config that is passed in.
 
 	return &cfg, nil
 }

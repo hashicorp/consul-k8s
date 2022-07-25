@@ -106,8 +106,8 @@ func (c *Command) Run(args []string) int {
 
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
-		Name:       pluginName,
-		Type:       pluginType,
+		PluginName: pluginName,
+		PluginType: pluginType,
 		CNIBinDir:  c.flagCNIBinDir,
 		CNINetDir:  c.flagCNINetDir,
 		DNSPrefix:  c.flagDNSPrefix,
@@ -117,8 +117,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.logger.Info("Running CNI install with configuration",
-		"name", cfg.Name,
-		"type", cfg.Type,
+		"name", cfg.PluginName,
+		"type", cfg.PluginType,
 		"cni_bin_dir", cfg.CNIBinDir,
 		"cni_net_dir", cfg.CNINetDir,
 		"multus", cfg.Multus,
