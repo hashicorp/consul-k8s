@@ -194,7 +194,7 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagPollServerExternalService, "poll-server-external-service", true,
+	c.flagSet.BoolVar(&c.flagPollServerExternalService, "poll-server-external-service", false,
 		"Enables polling the Consul servers' external service for its IP(s).")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagExternalServerHosts), "external-server-host",
 		"The IP or DNS name of the Consul server(s). May be specified multiple times.")
