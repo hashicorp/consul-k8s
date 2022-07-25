@@ -301,15 +301,25 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if tproxyEnabled {
 		// Running consul connect redirect-traffic with iptables
 		// requires both being a root user and having NET_ADMIN capability.
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:  pointerToInt64(rootUserAndGroupID),
-			RunAsGroup: pointerToInt64(rootUserAndGroupID),
-			// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-			RunAsNonRoot: pointerToBool(false),
-			Privileged:   pointerToBool(true),
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{netAdminCapability},
-			},
+		if !w.EnableCNI {
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:  pointerToInt64(rootUserAndGroupID),
+				RunAsGroup: pointerToInt64(rootUserAndGroupID),
+				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
+				RunAsNonRoot: pointerToBool(false),
+				Privileged:   pointerToBool(true),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{netAdminCapability},
+				},
+			}
+		} else {
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsNonRoot: pointerToBool(true),
+				Privileged:   pointerToBool(false),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			}
 		}
 	}
 

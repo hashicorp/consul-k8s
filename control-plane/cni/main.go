@@ -32,14 +32,17 @@ const (
 	// annotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod.
 	annotationInject = "consul.hashicorp.com/connect-inject"
-	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply iptables rules.
+	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply
+	// iptables rules.
 	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
-	// retries is the number of backoff retries to attempt while waiting for an cni-proxy-config annotation to poplulate.
+	// retries is the number of backoff retries to attempt while waiting for an cni-proxy-config annotation to
+	// poplulate.
 	retries = 10
-	// dnsServiceHostEnvSuffix is the suffix that is used to get the DNS host IP. The DNS IP is saved as an environment variable
-	// with prefix + suffix. The prefix is passed in as cli flag to the endpoints controller which is then passed on in the
-	// cni-proxy-config annotation so that the CNI plugin can use it. The DNS environment variable usually looks like:
-	// CONSUL_CONSUL_DNS_SERVICE_HOST but the prefix can change depending on the helm install.
+	// dnsServiceHostEnvSuffix is the suffix that is used to get the DNS host IP. The DNS IP is saved as an
+	// environment variable with prefix + suffix. The prefix is passed in as cli flag to the endpoints controller
+	// which is then passed on in the cni-proxy-config annotation so that the CNI plugin can use it. The DNS
+	// environment variable usually looks like: CONSUL_CONSUL_DNS_SERVICE_HOST but the prefix can change
+	// depending on the helm install.
 	dnsServiceHostEnvSuffix = "DNS_SERVICE_HOST"
 )
 
@@ -75,7 +78,8 @@ type PluginConf struct {
 	CNIBinDir string `json:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir"`
-	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the prefix allows us
+	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the
+	// prefix allows us
 	// to search for it. The DNS IP is determined using the prefix and the dnsServiceHostEnvSuffix constant.
 	DNSPrefix string `json:"dns_prefix"`
 	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
@@ -261,8 +265,8 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 	return cfg, nil
 }
 
-// searchDNSIPFromEnvironment gets the consul server DNS IP from the pods environment variables. The prefix makes searching easier
-// return an empty string.
+// searchDNSIPFromEnvironment gets the consul server DNS IP from the pods environment variables. The prefix makes
+// searching easier return an empty string.
 func searchDNSIPFromEnvironment(pod corev1.Pod, prefix string) string {
 	var result string
 	upcaseResourcePrefix := strings.ToUpper(prefix)

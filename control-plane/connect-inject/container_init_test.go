@@ -227,48 +227,24 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	cases := map[string]struct {
 		globalEnabled          bool
+		cniEnabled             bool
 		annotations            map[string]string
 		expectedContainsCmd    string
 		expectedNotContainsCmd string
 		namespaceLabel         map[string]string
 	}{
-		"enabled globally, ns not set, annotation not provided": {
+		"enabled globally, ns not set, annotation not provided, cni disabled": {
 			true,
-			nil,
-			`/consul/connect-inject/consul connect redirect-traffic \
-  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=5995`,
-			"",
-			nil,
-		},
-		"enabled globally, ns not set, annotation is false": {
-			true,
-			map[string]string{keyTransparentProxy: "false"},
-			"",
-			`/consul/connect-inject/consul connect redirect-traffic \
-  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=5995`,
-			nil,
-		},
-		"enabled globally, ns not set, annotation is true": {
-			true,
-			map[string]string{keyTransparentProxy: "true"},
-			`/consul/connect-inject/consul connect redirect-traffic \
-  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=5995`,
-			"",
-			nil,
-		},
-		"disabled globally, ns not set, annotation not provided": {
 			false,
 			nil,
-			"",
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
+			"",
 			nil,
 		},
-		"disabled globally, ns not set, annotation is false": {
+		"enabled globally, ns not set, annotation is false, cni disabled": {
+			true,
 			false,
 			map[string]string{keyTransparentProxy: "false"},
 			"",
@@ -277,7 +253,8 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-uid=5995`,
 			nil,
 		},
-		"disabled globally, ns not set, annotation is true": {
+		"enabled globally, ns not set, annotation is true, cni disabled": {
+			true,
 			false,
 			map[string]string{keyTransparentProxy: "true"},
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -286,8 +263,39 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			"",
 			nil,
 		},
-		"exclude-inbound-ports, ns is not set, annotation is provided": {
+		"disabled globally, ns not set, annotation not provided, cni disabled": {
+			false,
+			false,
+			nil,
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			nil,
+		},
+		"disabled globally, ns not set, annotation is false, cni disabled": {
+			false,
+			false,
+			map[string]string{keyTransparentProxy: "false"},
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			nil,
+		},
+		"disabled globally, ns not set, annotation is true, cni disabled": {
+			false,
+			false,
+			map[string]string{keyTransparentProxy: "true"},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
+			nil,
+		},
+		"exclude-inbound-ports, ns is not set, annotation is provided, cni disabled": {
 			true,
+			false,
 			map[string]string{
 				keyTransparentProxy:                 "true",
 				annotationTProxyExcludeInboundPorts: "9090,9091",
@@ -300,8 +308,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			"",
 			nil,
 		},
-		"exclude-outbound-ports, ns is not set, annotation is provided": {
+		"exclude-outbound-ports, ns is not set, annotation is provided, cni disabled": {
 			true,
+			false,
 			map[string]string{
 				keyTransparentProxy:                  "true",
 				annotationTProxyExcludeOutboundPorts: "9090,9091",
@@ -314,8 +323,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			"",
 			nil,
 		},
-		"exclude-outbound-cidrs annotation is provided": {
+		"exclude-outbound-cidrs annotation is provided, cni disabled": {
 			true,
+			false,
 			map[string]string{
 				keyTransparentProxy:                  "true",
 				annotationTProxyExcludeOutboundCIDRs: "1.1.1.1,2.2.2.2/24",
@@ -328,8 +338,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			"",
 			nil,
 		},
-		"exclude-uids annotation is provided, ns is not set": {
+		"exclude-uids annotation is provided, ns is not set, cni disabled": {
 			true,
+			false,
 			map[string]string{
 				keyTransparentProxy:         "true",
 				annotationTProxyExcludeUIDs: "6000,7000",
@@ -342,7 +353,8 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			"",
 			nil,
 		},
-		"disabled globally, ns enabled, annotation not set": {
+		"disabled globally, ns enabled, annotation not set, cni disabled": {
+			false,
 			false,
 			nil,
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -351,8 +363,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			"",
 			map[string]string{keyTransparentProxy: "true"},
 		},
-		"enabled globally, ns disabled, annotation not set": {
+		"enabled globally, ns disabled, annotation not set, cni disabled": {
 			true,
+			false,
 			nil,
 			"",
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -360,24 +373,53 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-uid=5995`,
 			map[string]string{keyTransparentProxy: "false"},
 		},
+		"disabled globally, ns enabled, annotation not set, cni enabled": {
+			false,
+			true,
+			nil,
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			map[string]string{keyTransparentProxy: "true"},
+		},
+
+		"enabled globally, ns not set, annotation not set, cni enabled": {
+			true,
+			true,
+			nil,
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			nil,
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			w := MeshWebhook{
 				EnableTransparentProxy: c.globalEnabled,
 				ConsulAPITimeout:       5 * time.Second,
+				EnableCNI:              c.cniEnabled,
 			}
 			pod := minimal()
 			pod.Annotations = c.annotations
 
-			expectedSecurityContext := &corev1.SecurityContext{
-				RunAsUser:  pointerToInt64(0),
-				RunAsGroup: pointerToInt64(0),
-				Privileged: pointerToBool(true),
-				Capabilities: &corev1.Capabilities{
+			expectedSecurityContext := &corev1.SecurityContext{}
+			if !c.cniEnabled {
+				expectedSecurityContext.RunAsUser = pointerToInt64(0)
+				expectedSecurityContext.RunAsGroup = pointerToInt64(0)
+				expectedSecurityContext.RunAsNonRoot = pointerToBool(false)
+				expectedSecurityContext.Privileged = pointerToBool(true)
+				expectedSecurityContext.Capabilities = &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
-				},
-				RunAsNonRoot: pointerToBool(false),
+				}
+			} else {
+				expectedSecurityContext.RunAsNonRoot = pointerToBool(true)
+				expectedSecurityContext.Privileged = pointerToBool(false)
+				expectedSecurityContext.Capabilities = &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				}
 			}
 			ns := testNS
 			ns.Labels = c.namespaceLabel
@@ -389,7 +431,11 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				require.Equal(t, expectedSecurityContext, container.SecurityContext)
 				require.Contains(t, actualCmd, c.expectedContainsCmd)
 			} else {
-				require.Nil(t, container.SecurityContext)
+				if !c.cniEnabled {
+					require.Nil(t, container.SecurityContext)
+				} else {
+					require.Equal(t, expectedSecurityContext, container.SecurityContext)
+				}
 				require.NotContains(t, actualCmd, c.expectedNotContainsCmd)
 			}
 		})
@@ -916,7 +962,8 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 					serviceName:  "web-admin",
 				},
 			},
-			[]string{`/bin/sh -ec 
+			[]string{
+				`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -967,7 +1014,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 					serviceName:  "web-admin",
 				},
 			},
-			[]string{`/bin/sh -ec 
+			[]string{
+				`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \

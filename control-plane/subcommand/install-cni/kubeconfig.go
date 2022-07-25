@@ -12,13 +12,16 @@ import (
 )
 
 const (
-	tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	// Default location of the service account token on a kubernetes host.
+	defaultTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 // createKubeConfig creates the kubeconfig file that the consul-cni plugin will use to communicate with the
 // kubernetes API.
-func createKubeConfig(mountedPath, kubeconfigFile string) error {
+func createKubeConfig(cniNetDir, kubeconfigFile string) error {
 	var restCfg *rest.Config
+
+	// TODO: Move clientset out of this method and put it in 'Run'
 
 	// Get kube config information from cluster
 	restCfg, err := rest.InClusterConfig()
@@ -35,7 +38,7 @@ func createKubeConfig(mountedPath, kubeconfigFile string) error {
 		return err
 	}
 
-	token, err := serviceAccountToken()
+	token, err := serviceAccountToken(defaultTokenPath)
 	if err != nil {
 		return err
 	}
@@ -46,7 +49,7 @@ func createKubeConfig(mountedPath, kubeconfigFile string) error {
 	}
 
 	// Write the kubeconfig file to the host
-	destFile := filepath.Join(mountedPath, kubeconfigFile)
+	destFile := filepath.Join(cniNetDir, kubeconfigFile)
 	err = os.WriteFile(destFile, data, os.FileMode(0o644))
 	if err != nil {
 		return fmt.Errorf("error writing kube config file %s: %v", destFile, err)
@@ -112,7 +115,8 @@ func kubernetesServer() (string, error) {
 }
 
 // serviceAccountToken gets the service token from a directory on the host.
-func serviceAccountToken() (string, error) {
+func serviceAccountToken(tokenPath string) (string, error) {
+	fmt.Printf("Tokenpath: %s", tokenPath)
 	token, err := ioutil.ReadFile(tokenPath)
 	if err != nil {
 		return "", fmt.Errorf("could not read service account token: %v", err)

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -15,12 +15,12 @@ import (
 
 // defaultCNIConfigFile gets the the correct config file from the cni net dir.
 // Adapted from kubelet: https://github.com/kubernetes/kubernetes/blob/954996e231074dc7429f7be1256a579bedd8344c/pkg/kubelet/dockershim/network/cni/cni.go#L134
-func defaultCNIConfigFile(confDir string) (string, error) {
-	files, err := libcni.ConfFiles(confDir, []string{".conf", ".conflist", ".json"})
+func defaultCNIConfigFile(dir string) (string, error) {
+	files, err := libcni.ConfFiles(dir, []string{".conf", ".conflist", ".json"})
 	switch {
 	case err != nil:
 		// A real error has been found
-		return "", fmt.Errorf("error while trying to find files in %s: %v", confDir, err)
+		return "", fmt.Errorf("error while trying to find files in %s: %v", dir, err)
 	case len(files) == 0:
 		// No config files have shown up yet and it is ok to run this function again
 		return "", nil
@@ -59,11 +59,10 @@ func defaultCNIConfigFile(confDir string) (string, error) {
 			continue
 		}
 
-		cFile := filepath.Base(confFile)
-		return cFile, nil
+		return confFile, nil
 	}
 	// There were files but none of them were valid
-	return "", fmt.Errorf("no valid networks found in %s", confDir)
+	return "", fmt.Errorf("no valid config files found in %s", dir)
 }
 
 // The format of the main cni config file is unstructured json consisting of a header and list of plugins
@@ -134,22 +133,22 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 }
 
 // configFileToMap takes an unstructure JSON config file and converts it into a map.
-func configFileToMap(path string) (map[string]interface{}, error) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("config file %s does not exist: %v", path, err)
+func configFileToMap(cfgFile string) (map[string]interface{}, error) {
+	if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
+		return nil, fmt.Errorf("config file %s does not exist: %v", cfgFile, err)
 	}
 
 	// Read the main config file
-	cfgFile, err := os.ReadFile(path)
+	cfgBytes, err := os.ReadFile(cfgFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not read file %s: %v", path, err)
+		return nil, fmt.Errorf("could not read file %s: %v", cfgFile, err)
 	}
 
 	// Convert the json config file into a map. The map that is created has 2 parts:
 	// [0] the cni header
 	// [1] the plugins
 	var cfgMap map[string]interface{}
-	err = json.Unmarshal(cfgFile, &cfgMap)
+	err = json.Unmarshal(cfgBytes, &cfgMap)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling existing config file %s: %v", cfgFile, err)
 	}
@@ -214,5 +213,60 @@ func removeCNIConfig(cfgFile string) error {
 	if err != nil {
 		return fmt.Errorf("error writing config file %s: %v", cfgFile, err)
 	}
+	return nil
+}
+
+// validConfig validates that the consul-cni config exists in the config file and it is valid. It should be the
+// last plugin in the plugin chain.
+func validConfig(cfg *config.CNIConfig, cfgFile string) error {
+	// convert the config file into a map
+	cfgMap, err := configFileToMap(cfgFile)
+	if err != nil {
+		return fmt.Errorf("could not convert config file to map: %v", err)
+	}
+
+	// Get the 'plugins' map embedded inside of the exisingMap
+	plugins, err := pluginsFromMap(cfgMap)
+	if err != nil {
+		return err
+	}
+
+	// Create an empty config so that we can populate it if found
+	existingCfg := &config.CNIConfig{}
+	// Find the 'consul-cni' plugin in the list of plugins
+	found := false
+	num_plugins := len(plugins)
+	for i, p := range plugins {
+		plugin, ok := p.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("error reading plugin from plugin list")
+		}
+		if plugin["type"] == "consul-cni" {
+			// Populate existingCfg with the consul-cni plugin info so that we can compare it with what
+			// is expected
+			err := mapstructure.Decode(plugin, &existingCfg)
+			if err != nil {
+				return fmt.Errorf("error decoding consul config into a map: %v", err)
+			}
+			found = true
+			// Check to see that consul-cni plugin is the last plugin
+			if !(num_plugins-1 == i) {
+				return fmt.Errorf("consul-cni config is not the last plugin in plugin chain")
+			}
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("consul-cni config missing from config file")
+	}
+
+	// compare the config that is passed to the installer to what is in the config file. There could be a
+	// difference if the config was corrupted or during a helm update or upgrade
+	equal := reflect.DeepEqual(existingCfg, cfg)
+	if !equal {
+		return fmt.Errorf("consul-cni config has changed")
+	}
+
 	return nil
 }
