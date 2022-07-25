@@ -23,7 +23,7 @@ func createKubeConfig(cniNetDir, kubeconfigFile string) error {
 
 	// TODO: Move clientset out of this method and put it in 'Run'
 
-	// Get kube config information from cluster
+	// Get kube config information from cluster.
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func createKubeConfig(cniNetDir, kubeconfigFile string) error {
 		return err
 	}
 
-	// Write the kubeconfig file to the host
+	// Write the kubeconfig file to the host.
 	destFile := filepath.Join(cniNetDir, kubeconfigFile)
 	err = os.WriteFile(destFile, data, os.FileMode(0o644))
 	if err != nil {
@@ -60,7 +60,7 @@ func createKubeConfig(cniNetDir, kubeconfigFile string) error {
 
 // kubeConfigYaml creates the kubeconfig in yaml format using kubectl packages.
 func kubeConfigYaml(server, token string, certificateAuthorityData []byte) ([]byte, error) {
-	// Use the same struct that kubectl uses to create the kubeconfig file
+	// Use the same struct that kubectl uses to create the kubeconfig file.
 	kubeconfig := clientcmdapi.Config{
 		APIVersion: "v1",
 		Kind:       "Config",
@@ -84,7 +84,7 @@ func kubeConfigYaml(server, token string, certificateAuthorityData []byte) ([]by
 		CurrentContext: "consul-cni-context",
 	}
 
-	// Create yaml from the kubeconfig using kubectls yaml writer
+	// Create yaml from the kubeconfig using the yaml writer from kubectl.
 	data, err := clientcmd.Write(kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kubeconfig yaml: %v", err)

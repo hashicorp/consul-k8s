@@ -99,7 +99,7 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	}
 
 	// The previous result is passed from the previously run plugin to our plugin. We do not
-	// do anything with the result but instead just pass it on when our plugin is finished
+	// do anything with the result but instead just pass it on when our plugin is finished.
 	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
 		return nil, fmt.Errorf("could not parse prevResult: %v", err)
 	}
@@ -126,7 +126,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	podName := string(cniArgs.K8S_POD_NAME)
 
 	// We should never encounter this unless there has been an error in the kubelet. A good safeguard.
-	if podNamespace == "" && podName == "" {
+	if podNamespace == "" || podName == "" {
 		return fmt.Errorf("not running in a pod, namespace and pod should have values")
 	}
 
@@ -153,7 +153,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("got no container IPs")
 	}
 
-	// Pass the prevResult through this plugin to the next one
+	// Pass the prevResult through this plugin to the next one.
 	result := prevResult
 	logger.Debug("consul-cni previous result", "result", result)
 
@@ -174,34 +174,34 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	// skip injecting pod that has consul.hashicorp.com/connect-inject: false
+	// Skip pod that has consul.hashicorp.com/connect-inject: false.
 	if skipConnectInject(*pod) {
 		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	// check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff.
+	// Check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff.
 	exists := waitForAnnotation(*pod, annotationCNIProxyConfig, uint64(retries))
 	if !exists {
 		logger.Error("could not retrieve annotation: %s on pod: %s", annotationCNIProxyConfig, pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	// parse the cni-proxy-config annotation into an iptables.Config object.
+	// Parse the cni-proxy-config annotation into an iptables.Config object.
 	iptablesCfg, err := parseAnnotation(*pod, annotationCNIProxyConfig)
 	if err != nil {
 		logger.Error("could not parse annotation: %s, error: %v", annotationCNIProxyConfig, err)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	// get the DNS IP from the environment.
+	// Get the DNS IP from the environment.
 	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSPrefix)
 	if dnsIP != "" {
 		logger.Error("assigned consul dns ip to %s", dnsIP)
 		iptablesCfg.ConsulDNSIP = dnsIP
 	}
 
-	// apply the iptables rules.
+	// Apply the iptables rules.
 	err = iptables.Setup(iptablesCfg)
 	if err != nil {
 		logger.Error("could not apply iptables setup: %v", err)
@@ -273,7 +273,7 @@ func searchDNSIPFromEnvironment(pod corev1.Pod, prefix string) string {
 	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
 	dnsName := strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
 
-	// Environment variables are buried in the pod spec
+	// Environment variables are buried in the pod spec.
 	vars := pod.Spec.Containers[0].Env
 	for k := range vars {
 		if vars[k].Name == dnsName {

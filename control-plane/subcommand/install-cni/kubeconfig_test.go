@@ -14,7 +14,7 @@ func TestKubeConfigYaml(t *testing.T) {
 		server                   string
 		token                    string
 		certificateAuthorityData []byte
-		goldenFile               string // golden file that our output should look like
+		goldenFile               string // Golden file that our output should look like.
 	}{
 		{
 			name:                     "valid kubeconfig file",
@@ -24,8 +24,6 @@ func TestKubeConfigYaml(t *testing.T) {
 			goldenFile:               "ZZZ-consul-cni-kubeconfig.golden",
 		},
 	}
-
-	// TODO: set context so that the command will timeout
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

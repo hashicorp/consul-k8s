@@ -16,7 +16,7 @@ func copyFile(srcFile, destDir string) error {
 
 	filename := filepath.Base(srcFile)
 	// If the destDir does not exist then the incorrect command line argument was used or
-	// the CNI settings for the kubelet are not correct
+	// the CNI settings for the kubelet are not correct.
 	info, err := os.Stat(destDir)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("destination directory %s does not exist: %v", destDir, err)
@@ -26,7 +26,7 @@ func copyFile(srcFile, destDir string) error {
 		return fmt.Errorf("destination directory %s is not a directory: %v", destDir, err)
 	}
 
-	// Check if the user bit is enabled in file permission
+	// Check if the user bit is enabled in file permission.
 	if info.Mode().Perm()&(1<<(uint(7))) == 0 {
 		return fmt.Errorf("cannot write to destination directory %s: %v", destDir, err)
 	}
@@ -45,7 +45,7 @@ func copyFile(srcFile, destDir string) error {
 
 func removeFile(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		// nothing to delete
+		// Nothing to delete.
 		return nil
 	}
 

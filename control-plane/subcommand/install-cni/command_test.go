@@ -46,11 +46,12 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	goldenFile := "testdata/10-kindnet.conflist.golden"
 	notLastConfigFile := "testdata/10-kindnet.conflist.notlast"
 
-	// Create a Command and context
+	// Create a Command and context.
 	var err error
 	ctx, cancel := context.WithCancel(context.Background())
 	tempDir := t.TempDir()
-	// Setup the Command
+
+	// Setup the Command.
 	ui := cli.NewMockUi()
 	cmd := &Command{
 		UI: ui,
@@ -59,45 +60,45 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	cmd.logger, err = common.Logger("info", false)
 	require.NoError(t, err)
 
-	// Create the file watcher
+	// Create the file watcher.
 	go func() {
 		err := cmd.directoryWatcher(ctx, consulConfig, tempDir, "")
 		require.NoError(t, err)
 	}()
 	time.Sleep(50 * time.Millisecond)
 
-	// Copy a base config file that does not contain the consul entry
+	// Copy a base config file that does not contain the consul entry.
 	err = copyFile(baseConfigFile, tempDir)
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
-	// The golden file contains the consul config
+	// The golden file contains the consul config.
 	expected, err := ioutil.ReadFile(goldenFile)
 	require.NoError(t, err)
-	// Get the name of the config file in the tempDir and read it
+	// Get the name of the config file in the tempDir and read it.
 	tempDestFile := filepath.Join(tempDir, configFile)
 	actual, err := ioutil.ReadFile(tempDestFile)
 	require.NoError(t, err)
-	// Filewatcher should have detected change and appended to config file. Make sure
-	// files match
+	// Filewatcher should have detected a change and appended to the config file. Make sure
+	// files match.
 	require.Equal(t, string(expected), string(actual))
 
-	// Event 2: config file changed where consul is not last in the plugin list
+	// Event 2: config file changed where consul is not last in the plugin list.
 	err = replaceFile(notLastConfigFile, filepath.Join(tempDir, configFile))
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
-	// Re-read the config file
+	// Re-read the config file so we can compare the updated config file.
 	actual, err = ioutil.ReadFile(tempDestFile)
 	require.NoError(t, err)
-	// Filewatcher should have detected change, fixed and appended to config file. Make sure
-	// files match
+	// Filewatcher should have detected change, fixed and appended to the config file. Make sure
+	// files match.
 	require.Equal(t, string(expected), string(actual))
 
-	// Event 3: consul config was removed from file, detect and fix
+	// Event 3: consul config was removed from the config file. Should detect and fix.
 	err = replaceFile(baseConfigFile, filepath.Join(tempDir, configFile))
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
-	// Filewatcher should have detected change, fixed and appended to config file. Make sure
-	// files match
+	// Filewatcher should have detected change, fixed and appended to the config file. Make sure
+	// files match.
 	require.Equal(t, string(expected), string(actual))
 	cancel()
 }
@@ -119,7 +120,7 @@ func replaceFile(srcFile, destFile string) error {
 		return fmt.Errorf("destination directory %s is not a directory: %v", destDir, err)
 	}
 
-	// Check if the user bit is enabled in file permission
+	// Check if the user bit is enabled in file permission.
 	if info.Mode().Perm()&(1<<(uint(7))) == 0 {
 		return fmt.Errorf("cannot write to destination directory %s: %v", destDir, err)
 	}

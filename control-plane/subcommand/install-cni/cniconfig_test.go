@@ -134,12 +134,12 @@ func TestAppendCNIConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			// copy the config file to a temporary location so that we can append to it
+			// Copy the config file to a temporary location so that we can append to it.
 			tempDir := t.TempDir()
 			err := copyFile(c.cfgFile, tempDir)
 			require.NoError(t, err)
 
-			// get the config file name in the tempdir
+			// Get the config file name in the tempdir.
 			filename := filepath.Base(c.cfgFile)
 			tempDestFile := filepath.Join(tempDir, filename)
 

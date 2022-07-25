@@ -35,21 +35,21 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	// flagCNIBinDir is the location on the host of the consul-cni binary
+	// flagCNIBinDir is the location on the host of the consul-cni binary.
 	flagCNIBinDir string
-	// flagCNINetDir is the location on the host of cni configuration
+	// flagCNINetDir is the location on the host of cni configuration.
 	flagCNINetDir string
-	// flagCNIBinSourceDir is the location of consul-cni binary inside the installer container (/bin)
+	// flagCNIBinSourceDir is the location of consul-cni binary inside the installer container (/bin).
 	flagCNIBinSourceDir string
 	// flagDNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and
-	// the prefix allows us to search for it
+	// the prefix allows us to search for it.
 	flagDNSPrefix string
 	// flageKubeconfig is the filename of the generated kubeconfig that the plugin will use to communicate with
-	// the kubernetes api
+	// the kubernetes api.
 	flagKubeconfig string
-	// flagLogLevel is the logging level
+	// flagLogLevel is the logging level.
 	flagLogLevel string
-	// flagLogJson is a boolean flag for json logging  format
+	// flagLogJson is a boolean flag for json logging  format.
 	flagLogJSON bool
 	// flagMultus is a boolean flag for multus support.
 	flagMultus bool
@@ -104,7 +104,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Create the CNI Config from command flags
+	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
 		Name:       pluginName,
 		Type:       pluginType,
@@ -115,8 +115,6 @@ func (c *Command) Run(args []string) int {
 		LogLevel:   c.flagLogLevel,
 		Multus:     c.flagMultus,
 	}
-
-	// TODO: Validate config, especially log level
 
 	c.logger.Info("Running CNI install with configuration",
 		"name", cfg.Name,
@@ -133,14 +131,14 @@ func (c *Command) Run(args []string) int {
 		cancel()
 	}(c.sigCh, cancel)
 
-	// Generate the kubeconfig file that will be used by the plugin to communicate with the kubernetes api
+	// Generate the kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
 	err := createKubeConfig(cfg.CNINetDir, cfg.Kubeconfig)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
 
-	// copy the consul-cni binary from the installer container to the host
+	// Copy the consul-cni binary from the installer container to the host.
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIBinName)
 	err = copyFile(srcFile, cfg.CNIBinDir)
 	if err != nil {
@@ -166,7 +164,7 @@ func (c *Command) Run(args []string) int {
 		// what is passed into helm (it could happen in a helm upgrade).
 		err := validConfig(cfg, cfgFile)
 		if err != nil {
-			// The invalid config is not critical and we can recover from it
+			// The invalid config is not critical and we can recover from it.
 			c.logger.Info("Installing plugin", "reason", err)
 			err = appendCNIConfig(cfg, cfgFile)
 			if err != nil {
@@ -176,7 +174,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// watch for changes in the cniNetDir directory and fix/install the config file if need be
+	// Watch for changes in the cniNetDir directory and fix/install the config file if need be.
 	err = c.directoryWatcher(ctx, cfg, cfg.CNINetDir, cfgFile)
 	if err != nil {
 		c.UI.Error(err.Error())
@@ -219,7 +217,7 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 	}
 	//}
 
-	// Cannot do "_ = defer watcher.Close()"
+	// Cannot do "_ = defer watcher.Close()".
 	defer func() {
 		_ = watcher.Close()
 	}()
@@ -235,7 +233,8 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			// created before other CNI plugins were installed.
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
 				c.logger.Debug("Modified event", "event", event)
-				// Get the config file that is on the host.
+				// Always get the config file that is on the host as we do not know if it was deleted
+				// or not.
 				cfgFile, err = defaultCNIConfigFile(dir)
 				if err != nil {
 					c.logger.Error("Unable get default config file", "error", err)
@@ -246,7 +245,7 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 
 					err = validConfig(cfg, cfgFile)
 					if err != nil {
-						// The invalid config is not critical and we can recover from it
+						// The invalid config is not critical and we can recover from it.
 						c.logger.Info("Installing plugin", "reason", err)
 						err = appendCNIConfig(cfg, cfgFile)
 						if err != nil {
