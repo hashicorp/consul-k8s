@@ -89,11 +89,11 @@ func TestReadCommandOutput(t *testing.T) {
 
 		"==> Listeners \\(2\\)",
 		"Name.*Address:Port.*Direction.*Filter Chain Match.*Filters.*Last Updated",
-		"public_listener.*192\\.168\\.69\\.179:20000.*INBOUND.*Any.*\\* -> local_app/.*2022-06-09T00:39:27\\.668Z",
-		"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul.*2022-05-24T17:41:59\\.079Z",
-		"10\\.100\\.254\\.176/32, 240\\.0\\.0\\.4/32.*\\* -> server\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul/",
-		"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.2/32.*-> frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
-		"Any.*-> original-destination",
+		"public_listener.*192\\.168\\.69\\.179:20000.*INBOUND.*Any.*\\* to local_app/.*2022-06-09T00:39:27\\.668Z",
+		"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul.*2022-05-24T17:41:59\\.079Z",
+		"10\\.100\\.254\\.176/32, 240\\.0\\.0\\.4/32.*\\* to server\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul/",
+		"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.2/32.*to frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
+		"Any.*to original-destination",
 
 		"==> Routes \\(2\\)",
 		"Name.*Destination Cluster.*Last Updated",
