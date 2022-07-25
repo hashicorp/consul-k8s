@@ -14,16 +14,16 @@ import (
 func TestWaitForAnnotation(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		annotation string
-		pod        func(*corev1.Pod) *corev1.Pod
-		retries    uint64
-		exists     bool
+		name         string
+		annotation   string
+		annotatedPod func(*corev1.Pod) *corev1.Pod
+		retries      uint64
+		exists       bool
 	}{
 		{
 			name:       "Pod with annotation already existing",
 			annotation: "fooAnnotation",
-			pod: func(pod *corev1.Pod) *corev1.Pod {
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations["fooAnnotation"] = "foo"
 				return pod
 			},
@@ -33,7 +33,7 @@ func TestWaitForAnnotation(t *testing.T) {
 		{
 			name:       "Pod without annotation",
 			annotation: "",
-			pod: func(pod *corev1.Pod) *corev1.Pod {
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
 			retries: 1,
@@ -42,7 +42,7 @@ func TestWaitForAnnotation(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := waitForAnnotation(*c.pod(minimalPod()), c.annotation, c.retries)
+			actual := waitForAnnotation(*c.annotatedPod(minimalPod()), c.annotation, c.retries)
 			require.Equal(t, c.exists, actual)
 		})
 	}
@@ -51,16 +51,16 @@ func TestWaitForAnnotation(t *testing.T) {
 func TestParseAnnotation(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		annotation string
-		pod        func(*corev1.Pod) *corev1.Pod
-		expected   iptables.Config
-		err        error
+		name         string
+		annotation   string
+		configurePod func(*corev1.Pod) *corev1.Pod
+		expected     iptables.Config
+		err          error
 	}{
 		{
 			name:       "Pod with iptables.Config annotation",
 			annotation: annotationCNIProxyConfig,
-			pod: func(pod *corev1.Pod) *corev1.Pod {
+			configurePod: func(pod *corev1.Pod) *corev1.Pod {
 				// Use iptables.Config so that if the Config struct ever changes that the test is still valid
 				cfg := iptables.Config{ProxyUserID: "1234"}
 				j, err := json.Marshal(&cfg)
@@ -78,7 +78,7 @@ func TestParseAnnotation(t *testing.T) {
 		{
 			name:       "Pod without iptables.Config annotation",
 			annotation: annotationCNIProxyConfig,
-			pod: func(pod *corev1.Pod) *corev1.Pod {
+			configurePod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
 			expected: iptables.Config{},
@@ -87,7 +87,7 @@ func TestParseAnnotation(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, err := parseAnnotation(*c.pod(minimalPod()), c.annotation)
+			actual, err := parseAnnotation(*c.configurePod(minimalPod()), c.annotation)
 			require.Equal(t, c.expected, actual)
 			require.Equal(t, c.err, err)
 		})

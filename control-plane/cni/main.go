@@ -183,29 +183,26 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// Check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff.
 	exists := waitForAnnotation(*pod, annotationCNIProxyConfig, uint64(retries))
 	if !exists {
-		logger.Error("could not retrieve annotation: %s on pod: %s", annotationCNIProxyConfig, pod.Name)
-		return types.PrintResult(result, cfg.CNIVersion)
+		return fmt.Errorf("could not retrieve annotation: %s on pod: %s", annotationCNIProxyConfig, pod.Name)
 	}
 
 	// Parse the cni-proxy-config annotation into an iptables.Config object.
 	iptablesCfg, err := parseAnnotation(*pod, annotationCNIProxyConfig)
 	if err != nil {
-		logger.Error("could not parse annotation: %s, error: %v", annotationCNIProxyConfig, err)
-		return types.PrintResult(result, cfg.CNIVersion)
+		return fmt.Errorf("could not parse annotation: %s, error: %v", annotationCNIProxyConfig, err)
 	}
 
 	// Get the DNS IP from the environment.
 	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSPrefix)
 	if dnsIP != "" {
-		logger.Error("assigned consul dns ip to %s", dnsIP)
+		logger.Info("assigned consul DNS IP to %s", dnsIP)
 		iptablesCfg.ConsulDNSIP = dnsIP
 	}
 
 	// Apply the iptables rules.
 	err = iptables.Setup(iptablesCfg)
 	if err != nil {
-		logger.Error("could not apply iptables setup: %v", err)
-		return types.PrintResult(result, cfg.CNIVersion)
+		return fmt.Errorf("could not apply iptables setup: %v", err)
 	}
 
 	logger.Debug("traffic redirect rules applied to pod: %s", pod.Name)
