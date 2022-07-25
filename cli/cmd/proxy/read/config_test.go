@@ -182,7 +182,7 @@ var testEnvoyConfig = &EnvoyConfig{
 			FilterChain: []FilterChain{
 				{
 					FilterChainMatch: "Any",
-					Filters:          []string{"* -> local_app/"},
+					Filters:          []string{"* to local_app/"},
 				},
 			},
 			Direction:   "INBOUND",
@@ -194,21 +194,21 @@ var testEnvoyConfig = &EnvoyConfig{
 			FilterChain: []FilterChain{
 				{
 					FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
-					Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
+					Filters:          []string{"to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
 				},
 				{
 					FilterChainMatch: "10.100.254.176/32, 240.0.0.4/32",
-					Filters:          []string{"* -> server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul/"},
+					Filters:          []string{"* to server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul/"},
 				},
 				{
 					FilterChainMatch: "10.100.31.2/32, 240.0.0.2/32",
 					Filters: []string{
-						"-> frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+						"to frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					},
 				},
 				{
 					FilterChainMatch: "Any",
-					Filters:          []string{"-> original-destination"},
+					Filters:          []string{"to original-destination"},
 				},
 			},
 			Direction:   "OUTBOUND",
