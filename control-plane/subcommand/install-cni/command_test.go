@@ -21,7 +21,7 @@ func TestRun_FlagDefaults(t *testing.T) {
 
 	require.Equal(t, cmd.flagCNIBinDir, config.DefaultCNIBinDir)
 	require.Equal(t, cmd.flagCNINetDir, config.DefaultCNINetDir)
-	require.Equal(t, cmd.flagCNIBinSourceDir, defaultCNIBinSourceDir)
+	require.Equal(t, cmd.flagCNIBinSourceDir, config.DefaultCNIBinSourceDir)
 	require.Equal(t, cmd.flagDNSPrefix, config.DefaultDNSPrefix)
 	require.Equal(t, cmd.flagKubeconfig, config.DefaultKubeconfig)
 	require.Equal(t, cmd.flagLogLevel, config.DefaultLogLevel)
@@ -31,7 +31,7 @@ func TestRun_FlagDefaults(t *testing.T) {
 
 func TestRun_DirectoryWatcher(t *testing.T) {
 	// Create a default configuration that matches golden file.
-	consulConfig := config.NewCNIConfig()
+        consulConfig := config.NewCNIConfig()
 	configFile := "10-kindnet.conflist"
 	baseConfigFile := "testdata/10-kindnet.conflist"
 	goldenFile := "testdata/10-kindnet.conflist.golden"

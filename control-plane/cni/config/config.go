@@ -15,9 +15,9 @@ const (
 // CNIConfig is the configuration that both the CNI installer and plugin will use.
 type CNIConfig struct {
 	// PluginName of the plugin.
-	PluginName string `json:"-"        mapstructure:"name"`
+	PluginName string `json:"name"        mapstructure:"name"`
 	// // PluginType of plugin (consul-cni).
-	PluginType string `json:"-"        mapstructure:"type"`
+	PluginType string `json:"type"        mapstructure:"type"`
 	// CNIBinDir is the location of the cni config files on the node. Can bet as a cli flag.
 	CNIBinDir string `json:"cni_bin_dir" mapstructure:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
