@@ -1005,10 +1005,15 @@ server:
     # Type of service, supports LoadBalancer or NodePort.
     type: LoadBalancer
     nodePort:
+      # @type: integer
       http: null
+      # @type: integer
       https: null
+      # @type: integer
       serf: null
+      # @type: integer
       rpc: null
+      # @type: integer
       grpc: null
     # This value defines additional annotations for
     # server pods. This should be formatted as a multi-line string.
