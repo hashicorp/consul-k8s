@@ -11,6 +11,8 @@
 {{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
@@ -139,7 +141,7 @@ spec:
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
                 {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") }}
-                {{- if (and .Values.server.enabled .Values.server.exposeService.enabled) }}
+                {{- if (and $serverEnabled $serverExposeServiceEnabled) }}
                 -poll-server-expose-service=true \
                 {{- end }}
                 {{- end }}
