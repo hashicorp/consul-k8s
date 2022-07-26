@@ -129,6 +129,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				staticClientPeerHelmValues["server.exposeService.type"] = "NodePort"
+				staticClientPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
