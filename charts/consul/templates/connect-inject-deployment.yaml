@@ -131,15 +131,6 @@ spec:
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
-                {{- if .Values.server.externalService.enabled }}
-                -poll-server-external-service=true \
-                {{- end }}
-                {{- if .Values.externalServers.enabled }}
-                {{- range .Values.externalServers.hosts }}
-                -external-server-host={{ quote . }} \
-                {{- end }}
-                -external-server-grpc-port={{ .Values.externalServers.grpcPort }} \
-                {{- end }}
                 {{- if .Values.connectInject.transparentProxy.defaultEnabled }}
                 -default-enable-transparent-proxy=true \
                 {{- else }}
@@ -147,6 +138,11 @@ spec:
                 {{- end }}
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
+                {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") }}
+                {{- if (and .Values.server.enabled .Values.server.exposeService.enabled) }}
+                -poll-server-expose-service=true \
+                {{- end }}
+                {{- end }}
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \

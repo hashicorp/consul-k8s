@@ -34,6 +34,11 @@ global:
     # If true, the Helm chart enables Cluster Peering for the cluster. This option enables peering controllers and
     # allows use of the PeeringAcceptor and PeeringDialer CRDs for establishing service mesh peerings.
     enabled: false
+    tokenGeneration:
+      serverAddresses:
+        # Source can be set to "" or "consul".
+        # "" is the default behavior.
+        source: ""
 
   # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.
   # It additionally indicates that you are running Consul Enterprise v1.11+ with a valid Consul Enterprise
@@ -993,10 +998,10 @@ server:
   annotations: null
 
   # Configures a service to expose ports on the Consul servers over a Kubernetes Service.
-  externalService:
+  exposeService:
     # When enabled, deploys a Kubernetes Service to reach the Consul servers.
     # @type: boolean
-    enabled: false
+    enabled: "-"
     # Type of service, supports LoadBalancer or NodePort.
     type: LoadBalancer
     nodePort:
