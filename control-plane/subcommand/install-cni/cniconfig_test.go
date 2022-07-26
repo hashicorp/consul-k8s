@@ -299,10 +299,10 @@ func TestValidConfig(t *testing.T) {
 			expectedErr:  nil,
 		},
 		{
-			name:    "config is corrupted and consul-cni is not last in chain",
-			cfgFile: "testdata/10-kindnet.conflist.notlast",
+			name:         "config is corrupted and consul-cni is not last in chain",
+			cfgFile:      "testdata/10-kindnet.conflist.notlast",
 			consulConfig: config.NewCNIConfig(),
-			expectedErr: fmt.Errorf("consul-cni config is not the last plugin in plugin chain"),
+			expectedErr:  fmt.Errorf("consul-cni config is not the last plugin in plugin chain"),
 		},
 	}
 

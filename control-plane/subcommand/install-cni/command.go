@@ -19,14 +19,6 @@ import (
 )
 
 const (
-	pluginName       = "consul-cni"
-	pluginType       = "consul-cni"
-	defaultCNIBinDir = "/opt/cni/bin"
-	defaultCNINetDir = "/etc/cni/net.d"
-	defaultMultus    = false
-	// defaultKubeconfig is named ZZZ-.. as part of a convention that other CNI plugins use.
-	defaultKubeconfig      = "ZZZ-consul-cni-kubeconfig"
-	defaultLogLevel        = "info"
 	defaultCNIBinSourceDir = "/bin"
 	consulCNIBinName       = "consul-cni"
 )
@@ -64,16 +56,16 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flagSet.StringVar(&c.flagCNIBinDir, "cni-bin-dir", defaultCNIBinDir, "Location of CNI plugin binaries.")
-	c.flagSet.StringVar(&c.flagCNINetDir, "cni-net-dir", defaultCNINetDir, "Location to write the CNI plugin configuration.")
+	c.flagSet.StringVar(&c.flagCNIBinDir, "cni-bin-dir", config.DefaultCNIBinDir, "Location of CNI plugin binaries.")
+	c.flagSet.StringVar(&c.flagCNINetDir, "cni-net-dir", config.DefaultCNINetDir, "Location to write the CNI plugin configuration.")
 	c.flagSet.StringVar(&c.flagCNIBinSourceDir, "bin-source-dir", defaultCNIBinSourceDir, "Host location to copy the binary from")
 	c.flagSet.StringVar(&c.flagDNSPrefix, "dns-prefix", "", "Prefix of the environment variables used to determine the Consul Server DNS IP")
-	c.flagSet.StringVar(&c.flagKubeconfig, "kubeconfig", defaultKubeconfig, "Name of the kubernetes config file")
-	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
+	c.flagSet.StringVar(&c.flagKubeconfig, "kubeconfig", config.DefaultKubeconfig, "Name of the kubernetes config file")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", config.DefaultLogLevel,
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagMultus, "multus", false, "If the plugin is a multus plugin (default = false)")
+	c.flagSet.BoolVar(&c.flagMultus, "multus", config.DefaultMultus, "If the plugin is a multus plugin (default = false)")
 
 	c.help = flags.Usage(help, c.flagSet)
 
@@ -106,8 +98,8 @@ func (c *Command) Run(args []string) int {
 
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
-		PluginName: pluginName,
-		PluginType: pluginType,
+		PluginName: config.DefaultPluginName,
+		PluginType: config.DefaultPluginType,
 		CNIBinDir:  c.flagCNIBinDir,
 		CNINetDir:  c.flagCNINetDir,
 		DNSPrefix:  c.flagDNSPrefix,

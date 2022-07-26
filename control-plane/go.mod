@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/google/go-cmp v0.5.8
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220725233037-5a25da131c48
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220726014914-8e01cba53c21
 	github.com/hashicorp/consul/api v1.10.1-0.20220614213650-6453375ab228
 	github.com/hashicorp/consul/sdk v0.10.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
