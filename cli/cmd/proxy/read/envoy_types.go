@@ -9,6 +9,11 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/admin/v3/config_dump.proto
 */
 
 type root struct {
+	ConfigDump configDump `json:"config_dump"`
+	Clusters   clusters   `json:"clusters"`
+}
+
+type configDump struct {
 	Configs []map[string]interface{} `json:"configs"`
 }
 
@@ -249,3 +254,5 @@ type certificateChain struct {
 type trustedCA struct {
 	InlineBytes string `json:"inline_bytes"`
 }
+
+type clusters struct{}
