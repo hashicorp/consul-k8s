@@ -108,18 +108,25 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5 as ubi
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6 as ubi
 
-# NAME and VERSION are the name of the software in releases.hashicorp.com
-# and the version to download. Example: NAME=consul VERSION=1.2.3.
+ARG PRODUCT_NAME
+ARG PRODUCT_VERSION
+ARG PRODUCT_REVISION
 ARG BIN_NAME
-ARG VERSION
 
-LABEL name=${BIN_NAME} \
+# PRODUCT_NAME and PRODUCT_VERSION are the name of the software on releases.hashicorp.com
+# and the version to download. Example: PRODUCT_NAME=consul PRODUCT_VERSION=1.2.3.
+ENV BIN_NAME=$BIN_NAME
+ENV PRODUCT_VERSION=$PRODUCT_VERSION
+
+ARG PRODUCT_NAME=$BIN_NAME
+
+LABEL name=$PRODUCT_NAME \
       maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
       vendor="HashiCorp" \
-      version=${VERSION} \
-      release=${VERSION} \
+      version=$PRODUCT_VERSION \
+      release=$PRODUCT_VERSION \
       summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
       description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes."
 
