@@ -99,8 +99,8 @@ func (c *Command) Run(args []string) int {
 
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
-		Name:       pluginName,
-		Type:       pluginType,
+		Name:       config.DefaultPluginName,
+		Type:       config.DefaultPluginType,
 		CNIBinDir:  c.flagCNIBinDir,
 		CNINetDir:  c.flagCNINetDir,
 		DNSPrefix:  c.flagDNSPrefix,

@@ -87,46 +87,28 @@ func TestAppendCNIConfig(t *testing.T) {
 		goldenFile string
 	}{
 		{
-			name: "valid kindnet file",
-			consulConfig: &config.CNIConfig{
-				Name:       pluginName,
-				Type:       pluginType,
-				CNIBinDir:  defaultCNIBinDir,
-				CNINetDir:  defaultCNINetDir,
-				DNSPrefix:  "",
-				Kubeconfig: defaultKubeconfig,
-				LogLevel:   defaultLogLevel,
-				Multus:     defaultMultus,
-			},
-			cfgFile:    "testdata/10-kindnet.conflist",
-			goldenFile: "testdata/10-kindnet.conflist.golden",
+			name:         "valid kindnet file",
+			consulConfig: config.NewDefaultCNIConfig(),
+			cfgFile:      "testdata/10-kindnet.conflist",
+			goldenFile:   "testdata/10-kindnet.conflist.golden",
 		},
 		{
-			name: "invalid kindnet file that already has consul-cni config inserted, should remove entry and append",
-			consulConfig: &config.CNIConfig{
-				Name:       pluginName,
-				Type:       pluginType,
-				CNIBinDir:  defaultCNIBinDir,
-				CNINetDir:  defaultCNINetDir,
-				DNSPrefix:  "",
-				Kubeconfig: defaultKubeconfig,
-				LogLevel:   defaultLogLevel,
-				Multus:     defaultMultus,
-			},
-			cfgFile:    "testdata/10-kindnet.conflist.alreadyinserted",
-			goldenFile: "testdata/10-kindnet.conflist.golden",
+			name:         "invalid kindnet file that already has consul-cni config inserted, should remove entry and append",
+			consulConfig: config.NewDefaultCNIConfig(),
+			cfgFile:      "testdata/10-kindnet.conflist.alreadyinserted",
+			goldenFile:   "testdata/10-kindnet.conflist.golden",
 		},
 		{
 			name: "valid calico file",
 			consulConfig: &config.CNIConfig{
-				Name:       pluginName,
-				Type:       pluginType,
-				CNIBinDir:  defaultCNIBinDir,
-				CNINetDir:  defaultCNINetDir,
+				Name:       config.DefaultPluginName,
+				Type:       config.DefaultPluginType,
+				CNIBinDir:  config.DefaultCNIBinDir,
+				CNINetDir:  config.DefaultCNINetDir,
 				DNSPrefix:  "consul",
-				Kubeconfig: defaultKubeconfig,
-				LogLevel:   defaultLogLevel,
-				Multus:     defaultMultus,
+				Kubeconfig: config.DefaultKubeconfig,
+				LogLevel:   config.DefaultLogLevel,
+				Multus:     config.DefaultMultus,
 			},
 			cfgFile:    "testdata/10-calico.conflist",
 			goldenFile: "testdata/10-calico.conflist.golden",
@@ -218,14 +200,14 @@ func TestPluginsFromMap(t *testing.T) {
 
 func TestConsulMapFromConfig(t *testing.T) {
 	consulConfig := &config.CNIConfig{
-		Name:       pluginName,
-		Type:       pluginType,
-		CNIBinDir:  defaultCNIBinDir,
-		CNINetDir:  defaultCNINetDir,
+		Name:       config.DefaultPluginName,
+		Type:       config.DefaultPluginType,
+		CNIBinDir:  config.DefaultCNIBinDir,
+		CNINetDir:  config.DefaultCNINetDir,
 		DNSPrefix:  "consul",
-		Kubeconfig: defaultKubeconfig,
-		LogLevel:   defaultLogLevel,
-		Multus:     defaultMultus,
+		Kubeconfig: config.DefaultKubeconfig,
+		LogLevel:   config.DefaultLogLevel,
+		Multus:     config.DefaultMultus,
 	}
 
 	expectedMap := map[string]interface{}{

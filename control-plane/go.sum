@@ -300,10 +300,8 @@ github.com/grpc-ecosystem/go-grpc-middleware v1.3.0/go.mod h1:z0ButlSOZa5vEBq9m2
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
-github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220622202014-ebf6603ca2ab h1:DInGQF0fNYC6/KpF0nMP0n0qB3MYc23TyB0wKeW1dFE=
-github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220622202014-ebf6603ca2ab/go.mod h1:CXKRHv/8P7v7Y5Uw9Uk+vn72bBKyOLzCBrPrgnULtJI=
-github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220707164020-2288f6426f64 h1:rkAFv5eDTFpf0L193s4ijykurLfIlfZdRs32AbdtbS0=
-github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220707164020-2288f6426f64/go.mod h1:CXKRHv/8P7v7Y5Uw9Uk+vn72bBKyOLzCBrPrgnULtJI=
+ithub.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220726140402-0c28a29570a8 h1:PRlTjpYj+b//FqThEXdYxtZMOQGOJKz83NOtUppZVRc=
+github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220726140402-0c28a29570a8/go.mod h1:pULqyTSV4OdYy0dIoyo+XTcnmIzrwWxTD7FSmJSd/i8=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/api v1.10.1-0.20220614213650-6453375ab228 h1:BqzKe5O+75uYcFfJI0mJz3rhCgdVztvEj3rEs4xpPr0=
 github.com/hashicorp/consul/api v1.10.1-0.20220614213650-6453375ab228/go.mod h1:ZlVrynguJKcYr54zGaDbaL3fOvKC9m72FhPvA8T35KQ=

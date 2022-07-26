@@ -66,7 +66,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/gophercloud/gophercloud v0.1.0 // indirect
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220707164020-2288f6426f64 // indirect
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220726140402-0c28a29570a8 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
