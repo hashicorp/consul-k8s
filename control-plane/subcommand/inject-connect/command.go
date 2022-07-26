@@ -95,9 +95,7 @@ type Command struct {
 	flagInitContainerMemoryRequest string
 
 	// Server address flags.
-	flagPollServerExternalService bool
-	flagExternalServerHosts       []string
-	flagExternalServerGRPCPort    string
+	flagPollServerExposeService bool
 
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
@@ -194,12 +192,8 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagPollServerExternalService, "poll-server-external-service", false,
+	c.flagSet.BoolVar(&c.flagPollServerExposeService, "poll-server-expose-service", false,
 		"Enables polling the Consul servers' external service for its IP(s).")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagExternalServerHosts), "external-server-host",
-		"The IP or DNS name of the Consul server(s). May be specified multiple times.")
-	c.flagSet.StringVar(&c.flagExternalServerGRPCPort, "external-server-grpc-port", "8503",
-		"Sets the grpc port to use for the hosts in -external-server-host.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -303,11 +297,6 @@ func (c *Command) Run(args []string) int {
 	err = common.ValidateUnprivilegedPort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
 	if err != nil {
 		c.UI.Error(err.Error())
-		return 1
-	}
-
-	if c.flagPollServerExternalService && len(c.flagExternalServerHosts) > 0 {
-		c.UI.Error("Both -poll-server-external-service and -external-server-host cannot be set.")
 		return 1
 	}
 
@@ -459,9 +448,7 @@ func (c *Command) Run(args []string) int {
 			Client:                    mgr.GetClient(),
 			ConsulClient:              c.consulClient,
 			ServerExternalServiceName: c.flagResourcePrefix + "-external-servers",
-			PollServerExternalService: c.flagPollServerExternalService,
-			ExternalServerHosts:       c.flagExternalServerHosts,
-			ExternalServerPort:        c.flagExternalServerGRPCPort,
+			PollServerExternalService: c.flagPollServerExposeService,
 			ReleaseNamespace:          c.flagReleaseNamespace,
 			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),
 			Scheme:                    mgr.GetScheme(),
