@@ -15,7 +15,7 @@
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
 
-FROM alpine:3.15 AS dev
+FROM alpine:3.16 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -64,7 +64,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.15 AS release-default
+FROM alpine:3.16 AS release-default
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
