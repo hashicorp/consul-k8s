@@ -32,8 +32,6 @@ type PeeringAcceptorController struct {
 	ConsulClient              *api.Client
 	ServerExternalServiceName string
 	PollServerExternalService bool
-	ExternalServerHosts       []string
-	ExternalServerPort        string
 	ReleaseNamespace          string
 	Log                       logr.Logger
 	Scheme                    *runtime.Scheme
