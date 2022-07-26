@@ -443,7 +443,7 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 		for _, node := range nodes.Items {
 			addrs := node.Status.Addresses
 			for _, addr := range addrs {
-				if addr.Type == corev1.NodeExternalIP {
+				if addr.Type == corev1.NodeInternalIP {
 					serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%d", addr.Address, grpcNodePort))
 				}
 			}
