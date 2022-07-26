@@ -84,6 +84,8 @@ func TestPeering_Connect(t *testing.T) {
 				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
+				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			releaseName := helpers.RandomName()
