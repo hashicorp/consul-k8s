@@ -77,11 +77,12 @@ func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyC
 	}
 	defer portForward.Close()
 
+	// Fetch the config dump
 	response, err := http.Get(fmt.Sprintf("http://%s/config_dump?include_eds", endpoint))
 	if err != nil {
 		return nil, err
 	}
-	raw, err := io.ReadAll(response.Body)
+	configDump, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +90,23 @@ func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyC
 		return nil, err
 	}
 
+	// Fetch the clusters mapping
+	response, err = http.Get(fmt.Sprintf("http://%s/clusters?format=json", endpoint))
+	if err != nil {
+		return nil, err
+	}
+	clusters, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := response.Body.Close(); err != nil {
+		return nil, err
+	}
+
+	config := fmt.Sprintf("{\n\"config_dump\":%s,\n\"clusters\":%s}", string(configDump), string(clusters))
+
 	envoyConfig := &EnvoyConfig{}
-	err = json.Unmarshal(raw, envoyConfig)
+	err = json.Unmarshal([]byte(config), envoyConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +131,7 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	err := json.Unmarshal(b, &root)
 
 	// Dispatch each section to the appropriate parsing function by its type.
-	for _, config := range root.Configs {
+	for _, config := range root.ConfigDump.Configs {
 		switch config["@type"] {
 		case "type.googleapis.com/envoy.admin.v3.ClustersConfigDump":
 			clusters, err := parseClusters(config)
