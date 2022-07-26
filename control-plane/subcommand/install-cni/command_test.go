@@ -26,7 +26,7 @@ func TestRun_FlagDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagKubeconfig, config.DefaultKubeconfig)
 	require.Equal(t, cmd.flagLogLevel, config.DefaultLogLevel)
 	require.Equal(t, cmd.flagLogJSON, defaultLogJSON)
-	require.Equal(t, cmd.flagMultus, config.defaultMultus)
+	require.Equal(t, cmd.flagMultus, config.DefaultMultus)
 }
 
 func TestRun_DirectoryWatcher(t *testing.T) {

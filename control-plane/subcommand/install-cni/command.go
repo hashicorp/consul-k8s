@@ -59,7 +59,7 @@ func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagCNIBinDir, "cni-bin-dir", config.DefaultCNIBinDir, "Location of CNI plugin binaries.")
 	c.flagSet.StringVar(&c.flagCNINetDir, "cni-net-dir", config.DefaultCNINetDir, "Location to write the CNI plugin configuration.")
-	c.flagSet.StringVar(&c.flagCNIBinSourceDir, "bin-source-dir", config.DefaultCNIBinSourceDir, "Host location to copy the binary from")
+	c.flagSet.StringVar(&c.flagCNIBinSourceDir, "bin-source-dir", defaultCNIBinSourceDir, "Host location to copy the binary from")
 	c.flagSet.StringVar(&c.flagDNSPrefix, "dns-prefix", config.DefaultDNSPrefix, "Prefix of the environment variables used to determine the Consul Server DNS IP")
 	c.flagSet.StringVar(&c.flagKubeconfig, "kubeconfig", config.DefaultKubeconfig, "Name of the kubernetes config file")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", config.DefaultLogLevel,
