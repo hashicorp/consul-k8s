@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Control Plane
+  * Update alpine to 3.16 in the Docker image. [[GH-1372](https://github.com/hashicorp/consul-k8s/pull/1372)]
+
 ## 0.46.0 (July 20, 2022)
 IMPROVEMENTS:
 * Control Plane
