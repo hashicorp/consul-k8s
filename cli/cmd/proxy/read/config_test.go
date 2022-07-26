@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,17 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed test_config_dump.json
+//go:embed test_config_dump.json test_clusters.json
 var fs embed.FS
 
-const testConfigDump string = "test_config_dump.json"
+const (
+	testConfigDump = "test_config_dump.json"
+	testClusters   = "test_clusters.json"
+)
 
 func TestUnmarshaling(t *testing.T) {
-	raw, err := fs.ReadFile(testConfigDump)
-	require.NoError(t, err)
-
 	var envoyConfig EnvoyConfig
-	err = json.Unmarshal(raw, &envoyConfig)
+	err := json.Unmarshal(rawEnvoyConfig(t), &envoyConfig)
 	require.NoError(t, err)
 
 	require.Equal(t, testEnvoyConfig.Clusters, envoyConfig.Clusters)
@@ -48,11 +49,19 @@ func TestJSON(t *testing.T) {
 }
 
 func TestFetchConfig(t *testing.T) {
-	configResponse, err := fs.ReadFile(testConfigDump)
+	configDump, err := fs.ReadFile(testConfigDump)
+	require.NoError(t, err)
+
+	clusters, err := fs.ReadFile(testClusters)
 	require.NoError(t, err)
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(configResponse)
+		if r.URL.Path == "/config_dump" {
+			w.Write(configDump)
+		}
+		if r.URL.Path == "/clusters" {
+			w.Write(clusters)
+		}
 	}))
 	defer mockServer.Close()
 
@@ -80,13 +89,23 @@ type mockPortForwarder struct {
 func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
 func (m *mockPortForwarder) Close()                                   {}
 
+func rawEnvoyConfig(t *testing.T) []byte {
+	configDump, err := fs.ReadFile(testConfigDump)
+	require.NoError(t, err)
+
+	clusters, err := fs.ReadFile(testClusters)
+	require.NoError(t, err)
+
+	return []byte(fmt.Sprintf("{\n\"config_dump\":%s,\n\"clusters\":%s}", string(configDump), string(clusters)))
+}
+
 // testEnvoyConfig is what we expect the config at `test_config_dump.json` to be.
 var testEnvoyConfig = &EnvoyConfig{
 	Clusters: []Cluster{
 		{
 			Name:                     "local_agent",
 			FullyQualifiedDomainName: "local_agent",
-			Endpoints:                []string{"192.168.79.187:8502"},
+			Endpoints:                []string{"192.168.79.187:8502", "172.18.0.2:8502"},
 			Type:                     "STATIC",
 			LastUpdated:              "2022-05-13T04:22:39.553Z",
 		},
@@ -107,7 +126,7 @@ var testEnvoyConfig = &EnvoyConfig{
 		{
 			Name:                     "local_app",
 			FullyQualifiedDomainName: "local_app",
-			Endpoints:                []string{"127.0.0.1:8080"},
+			Endpoints:                []string{"127.0.0.1:8080", "127.0.0.1:0"},
 			Type:                     "STATIC",
 			LastUpdated:              "2022-05-13T04:22:39.655Z",
 		},
