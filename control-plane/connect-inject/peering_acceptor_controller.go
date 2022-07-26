@@ -427,7 +427,7 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 			return []string{}, err
 		}
 		if len(nodes.Items) == 0 {
-			return []string{}, fmt.Errorf("no nodes were found for scraping server addresses from external-servers service")
+			return []string{}, fmt.Errorf("no nodes were found for scraping server addresses from expose-servers service")
 		}
 		var grpcNodePort int32
 		for _, port := range serverService.Spec.Ports {
@@ -436,7 +436,7 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 			}
 		}
 		if grpcNodePort == 0 {
-			return []string{}, fmt.Errorf("no grpc port was found for external-servers service")
+			return []string{}, fmt.Errorf("no grpc port was found for expose-servers service")
 		}
 		for _, node := range nodes.Items {
 			addrs := node.Status.Addresses
@@ -447,7 +447,7 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 			}
 		}
 		if len(serverExternalAddresses) == 0 {
-			return []string{}, fmt.Errorf("no server addresses were scraped from external-servers service")
+			return []string{}, fmt.Errorf("no server addresses were scraped from expose-servers service")
 		}
 		return serverExternalAddresses, nil
 	case corev1.ServiceTypeLoadBalancer:
