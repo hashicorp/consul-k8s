@@ -95,7 +95,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "ndhanushkodi/consul-dev@sha256:703f5bbc36b898d0c68972e6620aa1216dcb8e554bf94f3bdfa6412f8c417481",
+				"global.image": "ndhanushkodi/consul-dev@sha256:8da86fa912f87422b5e54b9f437a5ff935e7bf59adcec9c53a0a5e0dd976ae66",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -129,6 +129,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
+				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			releaseName := helpers.RandomName()
