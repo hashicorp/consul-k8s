@@ -8,6 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestKubeConfigYaml generates a kubeconfig yaml file and compares it against a golden file
+// Note: This test can fail if the version of client-go/kubernetes changes. The kubectl Config struct sometimes
+// inserts a `as-user-extra: null` into the yaml it generates depending on the version. When this happen, the golden
+// file needs to be updated. v0.22.2 does not have as-user-extra, while v0.24.2 does.
 func TestKubeConfigYaml(t *testing.T) {
 	cases := []struct {
 		name                     string
