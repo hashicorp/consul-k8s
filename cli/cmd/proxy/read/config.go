@@ -130,17 +130,28 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	var root root
 	err := json.Unmarshal(b, &root)
 
+	clusterMapping, endpointMapping := make(map[string][]string), make(map[string]string)
+	for _, clusterStatus := range root.Clusters.ClusterStatuses {
+		var addresses []string
+		for _, status := range clusterStatus.HostStatuses {
+			address := fmt.Sprintf("%s:%d", status.Address.SocketAddress.Address, int(status.Address.SocketAddress.PortValue))
+			addresses = append(addresses, address)
+			endpointMapping[address] = clusterStatus.Name
+		}
+		clusterMapping[clusterStatus.Name] = addresses
+	}
+
 	// Dispatch each section to the appropriate parsing function by its type.
 	for _, config := range root.ConfigDump.Configs {
 		switch config["@type"] {
 		case "type.googleapis.com/envoy.admin.v3.ClustersConfigDump":
-			clusters, err := parseClusters(config)
+			clusters, err := parseClusters(config, clusterMapping)
 			if err != nil {
 				return err
 			}
 			c.Clusters = clusters
 		case "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump":
-			endpoints, err := parseEndpoints(config)
+			endpoints, err := parseEndpoints(config, endpointMapping)
 			if err != nil {
 				return err
 			}
@@ -169,7 +180,7 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
+func parseClusters(rawCfg map[string]interface{}, clusterMapping map[string][]string) ([]Cluster, error) {
 	clusters := make([]Cluster, 0)
 
 	raw, err := json.Marshal(rawCfg)
@@ -192,6 +203,22 @@ func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 			}
 		}
 
+		// Add addresses discovered by EDS if not already added
+		if addresses, ok := clusterMapping[cluster.Cluster.FQDN]; ok {
+			for _, endpoint := range addresses {
+				alreadyAdded := false
+				for _, existingEndpoint := range endpoints {
+					if existingEndpoint == endpoint {
+						alreadyAdded = true
+						break
+					}
+				}
+				if !alreadyAdded {
+					endpoints = append(endpoints, endpoint)
+				}
+			}
+		}
+
 		clusters = append(clusters, Cluster{
 			Name:                     strings.Split(cluster.Cluster.FQDN, ".")[0],
 			FullyQualifiedDomainName: cluster.Cluster.FQDN,
@@ -204,7 +231,7 @@ func parseClusters(rawCfg map[string]interface{}) ([]Cluster, error) {
 	return clusters, nil
 }
 
-func parseEndpoints(rawCfg map[string]interface{}) ([]Endpoint, error) {
+func parseEndpoints(rawCfg map[string]interface{}, endpointMapping map[string]string) ([]Endpoint, error) {
 	endpoints := make([]Endpoint, 0)
 
 	raw, err := json.Marshal(rawCfg)
@@ -220,10 +247,17 @@ func parseEndpoints(rawCfg map[string]interface{}) ([]Endpoint, error) {
 	for _, endpointConfig := range append(endpointsCD.StaticEndpointConfigs, endpointsCD.DynamicEndpointConfigs...) {
 		for _, endpoint := range endpointConfig.EndpointConfig.Endpoints {
 			for _, lbEndpoint := range endpoint.LBEndpoints {
+				address := fmt.Sprintf("%s:%d", lbEndpoint.Endpoint.Address.SocketAddress.Address, int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue))
+
+				cluster := endpointConfig.EndpointConfig.Name
+				// Fill in cluster from EDS endpoint mapping.
+				if edsCluster, ok := endpointMapping[address]; ok && cluster == "" {
+					cluster = edsCluster
+				}
+
 				endpoints = append(endpoints, Endpoint{
-					Address: fmt.Sprintf("%s:%d", lbEndpoint.Endpoint.Address.SocketAddress.Address,
-						int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)),
-					Cluster: endpointConfig.EndpointConfig.Name,
+					Address: address,
+					Cluster: cluster,
 					Weight:  lbEndpoint.LoadBalancingWeight,
 					Status:  lbEndpoint.HealthStatus,
 				})
