@@ -132,6 +132,8 @@ commands:
                       -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -debug-directory="$TEST_RESULTS/debug" \
+                      -run TestPeering_Connect \
+                      -run TestPeering_ConnectNamespaces \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
