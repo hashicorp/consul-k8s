@@ -1452,3 +1452,150 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 		})
 	}
 }
+
+func TestGetExposeServersServiceAddress(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name             string
+		k8sObjects       func() []runtime.Object
+		releaseNamespace string
+		expAddresses     []string
+		expErr           string
+	}{
+		{
+			name:             "Valid LoadBalancer service",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expAddresses: []string{"1.2.3.4:8503"},
+		},
+		{
+			name:             "Valid LoadBalancer service with Hostname",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "foo.bar.baz",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expAddresses: []string{"foo.bar.baz:8503"},
+		},
+		{
+			name:             "LoadBalancer has no addresses",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expErr: "unable to find load balancer address for test-expose-servers service, retrying",
+		},
+		{
+			name:             "LoadBalancer has empty IP",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expErr: "unable to find load balancer address for test-expose-servers service, retrying",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			nsTest := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), &ns, &nsTest)
+
+			s := scheme.Scheme
+			//s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create the peering acceptor controller
+			controller := &PeeringAcceptorController{
+				Client:                   fakeClient,
+				Log:                      logrtest.TestLogger{T: t},
+				Scheme:                   s,
+				ReleaseNamespace:         tt.releaseNamespace,
+				ExposeServersServiceName: "test-expose-servers",
+			}
+
+			// Get addresses from expose-servers service.
+			addrs, err := controller.getExposeServersServiceAddresses()
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Assert all the expected addresses are there.
+			for _, expAddr := range tt.expAddresses {
+				require.Contains(t, addrs, expAddr)
+			}
+		})
+	}
+}
