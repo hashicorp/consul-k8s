@@ -255,4 +255,15 @@ type trustedCA struct {
 	InlineBytes string `json:"inline_bytes"`
 }
 
-type clusters struct{}
+type clusters struct {
+	ClusterStatuses []clusterStatus `json:"cluster_statuses"`
+}
+
+type clusterStatus struct {
+	Name         string       `json:"name"`
+	HostStatuses []hostStatus `json:"host_statuses"`
+}
+
+type hostStatus struct {
+	Address address `json:"address"`
+}
