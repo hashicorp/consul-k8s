@@ -101,6 +101,8 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
+                          -run TestPeering_Connect \
+                          -run TestPeering_ConnectNamespaces \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
