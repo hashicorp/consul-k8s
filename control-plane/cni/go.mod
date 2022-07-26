@@ -1,7 +1,7 @@
 module github.com/hashicorp/consul-k8s/control-plane/cni
 
 require (
-	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/containernetworking/cni v1.1.1
 	github.com/containernetworking/plugins v1.1.1
 	github.com/hashicorp/consul/sdk v0.9.0
