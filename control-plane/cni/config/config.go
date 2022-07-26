@@ -1,22 +1,11 @@
 package config
 
-const (
-	defaultPluginName = "consul-cni"
-	defaultPluginType = "consul-cni"
-	defaultCNIBinDir  = "/opt/cni/bin"
-	defaultCNINetDir  = "/etc/cni/net.d"
-	defaultMultus     = false
-	// defaultKubeconfig is named ZZZ-.. as part of a convention that other CNI plugins use.
-	defaultKubeconfig = "ZZZ-consul-cni-kubeconfig"
-	defaultLogLevel   = "info"
-)
-
 // CNIConfig is the configuration that both the CNI installer and plugin will use.
 type CNIConfig struct {
-	// PluginName of the plugin.
-	PluginName string `json:"name"        mapstructure:"name"`
-	// // PluginType of plugin (consul-cni).
-	PluginType string `json:"type"        mapstructure:"type"`
+	// Name of the plugin.
+	Name string `json:"name"        mapstructure:"name"`
+	// Type of plugin (consul-cni).
+	Type string `json:"type"        mapstructure:"type"`
 	// CNIBinDir is the location of the cni config files on the node. Can bet as a cli flag.
 	CNIBinDir string `json:"cni_bin_dir" mapstructure:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
@@ -30,17 +19,4 @@ type CNIConfig struct {
 	LogLevel string `json:"log_level"   mapstructure:"log_level"`
 	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
 	Multus bool `json:"multus"      mapstructure:"multus"`
-}
-
-func NewCNIConfig() *CNIConfig {
-	return &CNIConfig{
-		PluginName: defaultPluginName,
-		PluginType: defaultPluginType,
-		CNIBinDir:  defaultCNIBinDir,
-		CNINetDir:  defaultCNINetDir,
-		DNSPrefix:  "",
-		Kubeconfig: defaultKubeconfig,
-		LogLevel:   defaultLogLevel,
-		Multus:     defaultMultus,
-	}
 }
