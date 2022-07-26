@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/google/go-cmp v0.5.8
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220726014914-8e01cba53c21
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220726023005-43c37f78408b
 	github.com/hashicorp/consul/api v1.10.1-0.20220614213650-6453375ab228
 	github.com/hashicorp/consul/sdk v0.10.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
@@ -50,6 +50,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
+	github.com/containernetworking/plugins v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/denverdino/aliyungo v0.0.0-20170926055100-d3308649c661 // indirect
 	github.com/digitalocean/godo v1.10.0 // indirect
