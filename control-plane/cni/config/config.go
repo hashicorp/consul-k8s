@@ -1,15 +1,15 @@
 package config
 
 const (
-        DefaultPluginName       = "consul-cni"
-	DefaultPluginType       = "consul-cni"
-	DefaultCNIBinDir = "/opt/cni/bin"
-	DefaultCNINetDir = "/etc/cni/net.d"
-        DefaultDNSPrefix = ""
-	DefaultMultus    = false
+	DefaultPluginName = "consul-cni"
+	DefaultPluginType = "consul-cni"
+	DefaultCNIBinDir  = "/opt/cni/bin"
+	DefaultCNINetDir  = "/etc/cni/net.d"
+	DefaultDNSPrefix  = ""
+	DefaultMultus     = false
 	// defaultKubeconfig is named ZZZ-.. as part of a convention that other CNI plugins use.
-	DefaultKubeconfig      = "ZZZ-consul-cni-kubeconfig"
-	DefaultLogLevel        = "info"
+	DefaultKubeconfig = "ZZZ-consul-cni-kubeconfig"
+	DefaultLogLevel   = "info"
 )
 
 // CNIConfig is the configuration that both the CNI installer and plugin will use.
@@ -34,14 +34,14 @@ type CNIConfig struct {
 }
 
 func NewDefaultCNIConfig() *CNIConfig {
-        return &CNIConfig{
-                Name: DefaultPluginName,
-                Type: DefaultPluginType,
-                CNIBinDir: DefaultCNIBinDir,
-                CNINetDir: DefaultCNINetDir,
-                DNSPrefix: DefaultDNSPrefix,
-                Kubeconfig: DefaultKubeconfig,
-                LogLevel: DefaultLogLevel,
-                Multus: DefaultMultus,
-        }
+	return &CNIConfig{
+		Name:       DefaultPluginName,
+		Type:       DefaultPluginType,
+		CNIBinDir:  DefaultCNIBinDir,
+		CNINetDir:  DefaultCNINetDir,
+		DNSPrefix:  DefaultDNSPrefix,
+		Kubeconfig: DefaultKubeconfig,
+		LogLevel:   DefaultLogLevel,
+		Multus:     DefaultMultus,
+	}
 }
