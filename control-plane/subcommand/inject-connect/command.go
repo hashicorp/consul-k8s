@@ -101,7 +101,7 @@ type Command struct {
 	// Peering flags.
 	flagEnablePeering bool
 
-	// TerminatingGatewayService flag
+	// TerminatingGatewayService flag.
 	flagEnableTermGtwService bool
 
 	// Consul DNS flags.
