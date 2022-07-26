@@ -447,7 +447,7 @@ func (c *Command) Run(args []string) int {
 		if err = (&connectinject.PeeringAcceptorController{
 			Client:                    mgr.GetClient(),
 			ConsulClient:              c.consulClient,
-			ServerExternalServiceName: c.flagResourcePrefix + "-expose-servers",
+			ExposeServersServiceName:  c.flagResourcePrefix + "-expose-servers",
 			PollServerExternalService: c.flagPollServerExposeService,
 			ReleaseNamespace:          c.flagReleaseNamespace,
 			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),

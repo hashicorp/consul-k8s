@@ -30,7 +30,7 @@ type PeeringAcceptorController struct {
 	client.Client
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
 	ConsulClient              *api.Client
-	ServerExternalServiceName string
+	ExposeServersServiceName  string
 	PollServerExternalService bool
 	ReleaseNamespace          string
 	Log                       logr.Logger
@@ -105,7 +105,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// Scrape the address of the server service
 	var serverExternalAddresses []string
 	if r.PollServerExternalService {
-		addrs, err := r.scrapeExternalServerAddresses()
+		addrs, err := r.getExposeServersServiceAddresses()
 		if err != nil {
 			r.updateStatusError(ctx, acceptor, KubernetesError, err)
 			return ctrl.Result{}, err
@@ -406,13 +406,13 @@ func (r *PeeringAcceptorController) requestsForPeeringTokens(object client.Objec
 	return []ctrl.Request{}
 }
 
-func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, error) {
-	r.Log.Info("scraping external IP from server external service", "name", r.ServerExternalServiceName)
+func (r *PeeringAcceptorController) getExposeServersServiceAddresses() ([]string, error) {
+	r.Log.Info("getting external address from expose-servers service", "name", r.ExposeServersServiceName)
 	var serverExternalAddresses []string
 
 	serverService := &corev1.Service{}
 	key := types.NamespacedName{
-		Name:      r.ServerExternalServiceName,
+		Name:      r.ExposeServersServiceName,
 		Namespace: r.ReleaseNamespace,
 	}
 	err := r.Client.Get(r.Context, key, serverService)
@@ -453,7 +453,7 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 	case corev1.ServiceTypeLoadBalancer:
 		lbAddrs := serverService.Status.LoadBalancer.Ingress
 		if len(lbAddrs) < 1 {
-			return []string{}, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ServerExternalServiceName)
+			return []string{}, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
 		}
 		for _, lbAddr := range lbAddrs {
 			// When the service is of type load balancer, the grpc port is hardcoded to 8503.
@@ -463,6 +463,9 @@ func (r *PeeringAcceptorController) scrapeExternalServerAddresses() ([]string, e
 			if lbAddr.Hostname != "" {
 				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.Hostname, "8503"))
 			}
+		}
+		if len(serverExternalAddresses) == 0 {
+			return []string{}, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
 		}
 	default:
 		return []string{}, fmt.Errorf("only NodePort and LoadBalancer service types are supported")
