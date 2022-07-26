@@ -95,7 +95,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "ndhanushkodi/consul-dev@sha256:9692effdb50c5e38f89337aeedb768cc9ed00d2230988306076d18fb100c06bd",
+				"global.image": "ndhanushkodi/consul-dev@sha256:703f5bbc36b898d0c68972e6620aa1216dcb8e554bf94f3bdfa6412f8c417481",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
