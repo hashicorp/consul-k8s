@@ -87,46 +87,28 @@ func TestAppendCNIConfig(t *testing.T) {
 		goldenFile string
 	}{
 		{
-			name: "valid kindnet file",
-			consulConfig: &config.CNIConfig{
-				Name:       pluginName,
-				Type:       pluginType,
-				CNIBinDir:  defaultCNIBinDir,
-				CNINetDir:  defaultCNINetDir,
-				DNSPrefix:  "",
-				Kubeconfig: defaultKubeconfig,
-				LogLevel:   defaultLogLevel,
-				Multus:     defaultMultus,
-			},
-			cfgFile:    "testdata/10-kindnet.conflist",
-			goldenFile: "testdata/10-kindnet.conflist.golden",
+			name:         "valid kindnet file",
+			consulConfig: config.NewCNIConfig(),
+			cfgFile:      "testdata/10-kindnet.conflist",
+			goldenFile:   "testdata/10-kindnet.conflist.golden",
 		},
 		{
-			name: "invalid kindnet file that already has consul-cni config inserted, should remove entry and append",
-			consulConfig: &config.CNIConfig{
-				Name:       pluginName,
-				Type:       pluginType,
-				CNIBinDir:  defaultCNIBinDir,
-				CNINetDir:  defaultCNINetDir,
-				DNSPrefix:  "",
-				Kubeconfig: defaultKubeconfig,
-				LogLevel:   defaultLogLevel,
-				Multus:     defaultMultus,
-			},
-			cfgFile:    "testdata/10-kindnet.conflist.alreadyinserted",
-			goldenFile: "testdata/10-kindnet.conflist.golden",
+			name:         "invalid kindnet file that already has consul-cni config inserted, should remove entry and append",
+			consulConfig: config.NewCNIConfig(),
+			cfgFile:      "testdata/10-kindnet.conflist.alreadyinserted",
+			goldenFile:   "testdata/10-kindnet.conflist.golden",
 		},
 		{
 			name: "valid calico file",
 			consulConfig: &config.CNIConfig{
-				Name:       pluginName,
-				Type:       pluginType,
-				CNIBinDir:  defaultCNIBinDir,
-				CNINetDir:  defaultCNINetDir,
+				PluginName: config.DefaultPluginName,
+				PluginType: config.DefaultPluginType,
+				CNIBinDir:  config.DefaultCNIBinDir,
+				CNINetDir:  config.DefaultCNINetDir,
 				DNSPrefix:  "consul",
-				Kubeconfig: defaultKubeconfig,
-				LogLevel:   defaultLogLevel,
-				Multus:     defaultMultus,
+				Kubeconfig: config.DefaultKubeconfig,
+				LogLevel:   config.DefaultLogLevel,
+				Multus:     config.DefaultMultus,
 			},
 			cfgFile:    "testdata/10-calico.conflist",
 			goldenFile: "testdata/10-calico.conflist.golden",
@@ -217,16 +199,8 @@ func TestPluginsFromMap(t *testing.T) {
 }
 
 func TestConsulMapFromConfig(t *testing.T) {
-	consulConfig := &config.CNIConfig{
-		Name:       pluginName,
-		Type:       pluginType,
-		CNIBinDir:  defaultCNIBinDir,
-		CNINetDir:  defaultCNINetDir,
-		DNSPrefix:  "consul",
-		Kubeconfig: defaultKubeconfig,
-		LogLevel:   defaultLogLevel,
-		Multus:     defaultMultus,
-	}
+	consulConfig := config.NewCNIConfig()
+	consulConfig.DNSPrefix = "consul"
 
 	expectedMap := map[string]interface{}{
 		"cni_bin_dir": "/opt/cni/bin",
@@ -319,33 +293,15 @@ func TestValidConfig(t *testing.T) {
 			expectedErr: fmt.Errorf("consul-cni config has changed"),
 		},
 		{
-			name:    "config passed matches config in config file",
-			cfgFile: "testdata/10-kindnet.conflist.golden",
-			consulConfig: &config.CNIConfig{
-				CNIBinDir:  "/opt/cni/bin",
-				CNINetDir:  "/etc/cni/net.d",
-				DNSPrefix:  "",
-				Kubeconfig: "ZZZ-consul-cni-kubeconfig",
-				LogLevel:   "info",
-				Multus:     false,
-				Name:       "consul-cni",
-				Type:       "consul-cni",
-			},
-			expectedErr: nil,
+			name:         "config passed matches config in config file",
+			cfgFile:      "testdata/10-kindnet.conflist.golden",
+			consulConfig: config.NewCNIConfig(),
+			expectedErr:  nil,
 		},
 		{
 			name:    "config is corrupted and consul-cni is not last in chain",
 			cfgFile: "testdata/10-kindnet.conflist.notlast",
-			consulConfig: &config.CNIConfig{
-				CNIBinDir:  "/opt/cni/bin",
-				CNINetDir:  "/etc/cni/net.d",
-				DNSPrefix:  "",
-				Kubeconfig: "ZZZ-consul-cni-kubeconfig",
-				LogLevel:   "info",
-				Multus:     false,
-				Name:       "consul-cni",
-				Type:       "consul-cni",
-			},
+			consulConfig: config.NewCNIConfig(),
 			expectedErr: fmt.Errorf("consul-cni config is not the last plugin in plugin chain"),
 		},
 	}

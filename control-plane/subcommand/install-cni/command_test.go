@@ -19,28 +19,19 @@ func TestRun_FlagDefaults(t *testing.T) {
 	cmd := Command{}
 	cmd.init()
 
-	require.Equal(t, cmd.flagCNIBinDir, defaultCNIBinDir)
-	require.Equal(t, cmd.flagCNINetDir, defaultCNINetDir)
-	require.Equal(t, cmd.flagCNIBinSourceDir, defaultCNIBinSourceDir)
-	require.Equal(t, cmd.flagDNSPrefix, "")
-	require.Equal(t, cmd.flagKubeconfig, defaultKubeconfig)
-	require.Equal(t, cmd.flagLogLevel, "info")
+	require.Equal(t, cmd.flagCNIBinDir, config.DefaultCNIBinDir)
+	require.Equal(t, cmd.flagCNINetDir, config.DefaultCNINetDir)
+	require.Equal(t, cmd.flagCNIBinSourceDir, config.DefaultCNIBinSourceDir)
+	require.Equal(t, cmd.flagDNSPrefix, config.DefaultDNSPrefix)
+	require.Equal(t, cmd.flagKubeconfig, config.DefaultKubeconfig)
+	require.Equal(t, cmd.flagLogLevel, config.DefaultLogLevel)
 	require.Equal(t, cmd.flagLogJSON, false)
-	require.Equal(t, cmd.flagMultus, false)
+	require.Equal(t, cmd.flagMultus, config.DefaultMultus)
 }
 
 func TestRun_DirectoryWatcher(t *testing.T) {
 	// Create a default configuration that matches golden file.
-	consulConfig := &config.CNIConfig{
-		Name:       pluginName,
-		Type:       pluginType,
-		CNIBinDir:  defaultCNIBinDir,
-		CNINetDir:  defaultCNINetDir,
-		DNSPrefix:  "",
-		Kubeconfig: defaultKubeconfig,
-		LogLevel:   defaultLogLevel,
-		Multus:     defaultMultus,
-	}
+        consulConfig := config.NewCNIConfig()
 	configFile := "10-kindnet.conflist"
 	baseConfigFile := "testdata/10-kindnet.conflist"
 	goldenFile := "testdata/10-kindnet.conflist.golden"
