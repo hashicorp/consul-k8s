@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -123,7 +124,8 @@ func TestPeering_Connect(t *testing.T) {
 			})
 
 			// Ensure the secret is created.
-			retry.Run(t, func(r *retry.R) {
+			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			retry.RunWith(timer, t, func(r *retry.R) {
 				acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
 				require.NoError(r, err)
 				require.NotEmpty(r, acceptorSecretResourceVersion)
