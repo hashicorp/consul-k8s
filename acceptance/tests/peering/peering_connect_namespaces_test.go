@@ -55,18 +55,18 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			false,
 			false,
 		},
-		//{
-		//	"single destination namespace",
-		//	staticServerNamespace,
-		//	false,
-		//	false,
-		//},
-		//{
-		//	"mirror k8s namespaces",
-		//	staticServerNamespace,
-		//	true,
-		//	false,
-		//},
+		{
+			"single destination namespace",
+			staticServerNamespace,
+			false,
+			false,
+		},
+		{
+			"mirror k8s namespaces",
+			staticServerNamespace,
+			true,
+			false,
+		},
 	}
 
 	for _, c := range cases {
