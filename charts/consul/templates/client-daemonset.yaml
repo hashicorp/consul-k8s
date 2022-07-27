@@ -283,6 +283,31 @@ spec:
                 {{- end }}
                 -hcl='leave_on_terminate = true' \
                 {{- if .Values.global.tls.enabled }}
+                {{- if .Values.global.peering.enabled }}
+                {{- if .Values.global.secretsBackend.vault.enabled }}
+                -hcl='tls { defaults { ca_file = "/vault/secrets/serverca.crt" }}' \
+                {{- else }}
+                -hcl='tls { defaults { ca_file = "/consul/tls/ca/tls.crt" }}' \
+                {{- end }}
+                {{- if .Values.global.tls.enableAutoEncrypt }}
+                -hcl='auto_encrypt = {tls = true}' \
+                -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\",\"$POD_IP\"]}" \
+                {{- else }}
+                -hcl='tls { defaults { cert_file = "/consul/tls/client/tls.crt" }}' \
+                -hcl='tls { defaults { key_file = "/consul/tls/client/tls.key" }}' \
+                {{- end }}
+                {{- if .Values.global.tls.verify }}
+                -hcl='tls { defaults { verify_outgoing = true }}' \
+                {{- if not .Values.global.tls.enableAutoEncrypt }}
+                -hcl='tls { internal_rpc { verify_incoming = true }}' \
+                -hcl='tls { internal_rpc { verify_server_hostname = true }}' \
+                {{- end }}
+                {{- end }}
+                -hcl='ports { https = 8501 }' \
+                {{- if .Values.global.tls.httpsOnly }}
+                -hcl='ports { http = -1 }' \
+                {{- end }}
+                {{- else}}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
                 -hcl='ca_file = "/vault/secrets/serverca.crt"' \
                 {{- else }}
@@ -305,6 +330,7 @@ spec:
                 -hcl='ports { https = 8501 }' \
                 {{- if .Values.global.tls.httpsOnly }}
                 -hcl='ports { http = -1 }' \
+                {{- end }}
                 {{- end }}
                 {{- end }}
                 {{- if .Values.client.grpc }}

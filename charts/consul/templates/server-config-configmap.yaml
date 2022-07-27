@@ -87,14 +87,52 @@ data:
   {{- if .Values.global.tls.enabled }}
   tls-config.json: |-
     {
-       {{- if .Values.global.secretsBackend.vault.enabled }}
-       "ca_file": "/vault/secrets/serverca.crt",
-       "cert_file": "/vault/secrets/servercert.crt",
-       "key_file": "/vault/secrets/servercert.key",
+      {{- if .Values.global.peering.enabled }}
+      "tls": {
+        {{- if .Values.global.tls.verify }}
+        "internal_rpc": {
+          "verify_incoming": true,
+          "verify_server_hostname": true
+        },
+        "grpc": {
+          "verify_incoming": false
+        },
+        {{- end }}
+        "defaults": {
+          {{- if .Values.global.tls.verify }}
+          "verify_outgoing": true,
+          {{- end }}
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          "ca_file": "/vault/secrets/serverca.crt",
+          "cert_file": "/vault/secrets/servercert.crt",
+          "key_file": "/vault/secrets/servercert.key"
+          {{- else }}
+          "ca_file": "/consul/tls/ca/tls.crt",
+          "cert_file": "/consul/tls/server/tls.crt",
+          "key_file": "/consul/tls/server/tls.key"
+          {{- end }}
+        }
+      },
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      "auto_encrypt": {
+        "allow_tls": true
+      },
+      {{- end }}
+      "ports": {
+        {{- if .Values.global.tls.httpsOnly }}
+        "http": -1,
+        {{- end }}
+        "https": 8501
+      }
+      {{- else }}
+      {{- if .Values.global.secretsBackend.vault.enabled }}
+      "ca_file": "/vault/secrets/serverca.crt",
+      "cert_file": "/vault/secrets/servercert.crt",
+      "key_file": "/vault/secrets/servercert.key",
        {{- else }}
-       "ca_file": "/consul/tls/ca/tls.crt",
-       "cert_file": "/consul/tls/server/tls.crt",
-       "key_file": "/consul/tls/server/tls.key",
+      "ca_file": "/consul/tls/ca/tls.crt",
+      "cert_file": "/consul/tls/server/tls.crt",
+      "key_file": "/consul/tls/server/tls.key",
        {{- end }}
       {{- if .Values.global.tls.enableAutoEncrypt }}
       "auto_encrypt": {
@@ -112,6 +150,7 @@ data:
         {{- end }}
         "https": 8501
       }
+      {{- end }}
     }
   {{- end }}
   {{- if .Values.ui.enabled }}

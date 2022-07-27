@@ -899,6 +899,48 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "client/DaemonSet: sets verify_* flags to true by default when global.tls.enabled and global.peering.enabled" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $command | jq -r '. | contains("tls { internal_rpc { verify_incoming = true }}")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $command | jq -r '. | contains("tls { defaults { verify_outgoing = true }}")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $command | jq -r '. | contains("tls { internal_rpc { verify_server_hostname = true }}")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: sets updated TLS config when global.tls.enabled and global.peering.enabled" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $command | jq -r '. | contains("tls { defaults { ca_file = \"/consul/tls/ca/tls.crt\" }}")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $command | jq -r '. | contains("tls { defaults { cert_file = \"/consul/tls/client/tls.crt\" }}")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $command | jq -r '. | contains("tls { defaults { key_file = \"/consul/tls/client/tls.key\" }}")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "client/DaemonSet: doesn't set the verify_* flags when global.tls.enabled is true and global.tls.verify is false" {
   cd `chart_dir`
   local command=$(helm template \
