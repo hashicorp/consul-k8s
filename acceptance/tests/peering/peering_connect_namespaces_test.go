@@ -114,8 +114,10 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 				"controller.enabled": "true",
 
-				"dns.enabled":           "true",
-				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+				"dns.enabled":            "true",
+				"dns.enableRedirection":  strconv.FormatBool(cfg.EnableTransparentProxy),
+				"server.replicas":        "3",
+				"server.bootstrapExpect": "3",
 			}
 
 			staticServerPeerHelmValues := map[string]string{
@@ -131,6 +133,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
 				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
+				staticServerPeerHelmValues["server.replicas"] = "1"
+				staticServerPeerHelmValues["server.bootstrapExpect"] = "1"
 			}
 
 			releaseName := helpers.RandomName()
@@ -151,6 +155,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 				staticClientPeerHelmValues["server.exposeService.type"] = "NodePort"
 				staticClientPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
+				staticServerPeerHelmValues["server.replicas"] = "1"
+				staticServerPeerHelmValues["server.bootstrapExpect"] = "1"
 			}
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
