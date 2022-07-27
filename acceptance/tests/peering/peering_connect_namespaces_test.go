@@ -121,7 +121,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			releaseName := helpers.RandomName()
 
-			helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
+			helpers.MergeMaps(commonHelmValues, staticServerPeerHelmValues)
 
 			// Install the first peer where static-server will be deployed in the static-server kubernetes context.
 			staticServerPeerCluster := consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
@@ -141,7 +141,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerHelmValues["server.bootstrapExpect"] = "1"
 			}
 
-			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
+			helpers.MergeMaps(commonHelmValues, staticClientPeerHelmValues)
 
 			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
 			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
