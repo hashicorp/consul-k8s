@@ -98,7 +98,7 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.MergeMaps(commonHelmValues, staticServerPeerHelmValues)
 
 			// Install the first peer where static-server will be deployed in the static-server kubernetes context.
-			staticServerPeerCluster := consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
+			staticServerPeerCluster := consul.NewHelmCluster(t, commonHelmValues, staticServerPeerClusterContext, cfg, releaseName)
 			staticServerPeerCluster.Create(t)
 
 			staticClientPeerHelmValues := map[string]string{
@@ -118,7 +118,7 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.MergeMaps(commonHelmValues, staticClientPeerHelmValues)
 
 			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
-			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
+			staticClientPeerCluster := consul.NewHelmCluster(t, commonHelmValues, staticClientPeerClusterContext, cfg, releaseName)
 			staticClientPeerCluster.Create(t)
 
 			// Create the peering acceptor on the client peer.
