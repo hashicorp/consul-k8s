@@ -79,6 +79,9 @@ type Command struct {
 	flagPartitionName      string // name of the Admin Partition
 	flagPartitionTokenFile string
 
+	// Flags to support peering.
+	flagEnablePeering bool // true if Cluster Peering is enabled
+
 	// Flags to support namespaces.
 	flagEnableNamespaces                 bool   // Use namespacing on all components
 	flagConsulSyncDestinationNamespace   string // Consul namespace to register all catalog sync services into if not mirroring
@@ -180,6 +183,9 @@ func (c *Command) init() {
 		"[Enterprise Only] Name of the Admin Partition")
 	c.flags.StringVar(&c.flagPartitionTokenFile, "partition-token-file", "",
 		"[Enterprise Only] Path to file containing ACL token to be used in non-default partitions.")
+
+	c.flags.BoolVar(&c.flagEnablePeering, "enable-peering", false,
+		"Enables Cluster Peering.")
 
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
