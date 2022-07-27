@@ -3,6 +3,9 @@
 IMPROVEMENTS:
 * Helm
   * Bump default Envoy version to 1.23.0. [[GH-1377](https://github.com/hashicorp/consul-k8s/pull/1377)]
+FEATURES:
+* [Experimental] Cluster Peering:
+  * Add support for ACLs and TLS. [[GH-1343](https://github.com/hashicorp/consul-k8s/pull/1343)] [[GH-1366](https://github.com/hashicorp/consul-k8s/pull/1366)]
 
 ## 0.46.1 (July 26, 2022)
 
@@ -16,7 +19,6 @@ IMPROVEMENTS:
   * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
 * CLI
   * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
-
 
 FEATURES:
 * [Experimental] Cluster Peering:

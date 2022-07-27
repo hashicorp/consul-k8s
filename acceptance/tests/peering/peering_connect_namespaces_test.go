@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,24 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			true,
 			false,
 		},
+		{
+			"default destination namespace",
+			defaultNamespace,
+			false,
+			true,
+		},
+		{
+			"single destination namespace",
+			staticServerNamespace,
+			false,
+			true,
+		},
+		{
+			"mirror k8s namespaces",
+			staticServerNamespace,
+			true,
+			true,
+		},
 	}
 
 	for _, c := range cases {
@@ -76,9 +95,9 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "thisisnotashwin/consul@sha256:446aad6e02f66e3027756dfc0d34e8e6e2b11ac6ec5637b134b34644ca7cda64",
+				"global.image": "thisisnotashwin/consul@sha256:b1d3f59406adf5fb9a3bee4ded058e619d3a186e83b2e2dc14d6da3f28a7073d",
 
-				"global.tls.enabled":           "false",
+				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
@@ -140,6 +159,13 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
+			})
+
+			// Ensure the secret is created.
+			retry.Run(t, func(r *retry.R) {
+				acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
+				require.NoError(r, err)
+				require.NotEmpty(r, acceptorSecretResourceVersion)
 			})
 
 			// Copy secret from client peer to server peer.
@@ -258,60 +284,39 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				})
 			}
 
-			logger.Log(t, "checking that connection is successful")
-			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
-			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
-			}
+			if c.ACLsAndAutoEncryptEnabled {
+				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
+				if cfg.EnableTransparentProxy {
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", fmt.Sprintf("curl: (7) Failed to connect to static-server.%s port 80: Connection refused", c.destinationNamespace)}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
+				} else {
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+				}
 
-			denyAllIntention := &api.ServiceIntentionsConfigEntry{
-				Name:      "*",
-				Kind:      api.ServiceIntentions,
-				Namespace: "*",
-				Sources: []*api.SourceIntention{
-					{
-						Name:      "*",
-						Namespace: "*",
-						Action:    api.IntentionActionDeny,
-						Peer:      staticClientPeer,
+				intention := &api.ServiceIntentionsConfigEntry{
+					Name:      staticServerName,
+					Kind:      api.ServiceIntentions,
+					Namespace: staticServerNamespace,
+					Sources: []*api.SourceIntention{
+						{
+							Name:      staticClientName,
+							Namespace: staticClientNamespace,
+							Action:    api.IntentionActionAllow,
+							Peer:      staticClientPeer,
+						},
 					},
-				},
-			}
-			_, _, err = staticServerPeerClient.ConfigEntries().Set(denyAllIntention, &api.WriteOptions{})
-			require.NoError(t, err)
+				}
 
-			logger.Log(t, "checking that the connection is not successful because there's no allow intention")
-			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
-			} else {
-				k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
-			}
+				// Set the destination namespace to be the same
+				// unless mirrorK8S is true.
+				if !c.mirrorK8S {
+					intention.Namespace = c.destinationNamespace
+					intention.Sources[0].Namespace = c.destinationNamespace
+				}
 
-			intention := &api.ServiceIntentionsConfigEntry{
-				Name:      staticServerName,
-				Kind:      api.ServiceIntentions,
-				Namespace: staticServerNamespace,
-				Sources: []*api.SourceIntention{
-					{
-						Name:      staticClientName,
-						Namespace: staticClientNamespace,
-						Action:    api.IntentionActionAllow,
-						Peer:      staticClientPeer,
-					},
-				},
+				logger.Log(t, "creating intentions in server peer")
+				_, _, err = staticServerPeerClient.ConfigEntries().Set(intention, &api.WriteOptions{})
+				require.NoError(t, err)
 			}
-
-			// Set the destination namespace to be the same
-			// unless mirrorK8S is true.
-			if !c.mirrorK8S {
-				intention.Namespace = c.destinationNamespace
-				intention.Sources[0].Namespace = c.destinationNamespace
-			}
-
-			logger.Log(t, "creating intentions in server peer")
-			_, _, err = staticServerPeerClient.ConfigEntries().Set(intention, &api.WriteOptions{})
-			require.NoError(t, err)
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {

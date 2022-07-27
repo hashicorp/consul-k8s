@@ -700,6 +700,39 @@ load _helpers
   [ "${actual}" = '{"http":-1,"https":8501}' ]
 }
 
+@test "server/ConfigMap: sets correct default configuration when global.tls.enabled and global.peering.enabled" {
+  cd `chart_dir`
+  local config=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $config | jq -r .tls.defaults.ca_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+
+  actual=$(echo $config | jq -r .tls.defaults.cert_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/server/tls.crt" ]
+
+  actual=$(echo $config | jq -r .tls.defaults.key_file | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/server/tls.key" ]
+
+  actual=$(echo $config | jq -r .tls.internal_rpc.verify_incoming | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -r .tls.defaults.verify_outgoing | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -r .tls.internal_rpc.verify_server_hostname | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $config | jq -c .ports | tee /dev/stderr)
+  [ "${actual}" = '{"http":-1,"https":8501}' ]
+}
+
 @test "server/ConfigMap: doesn't set verify_* configuration to true when global.tls.enabled and global.tls.verify is false" {
   cd `chart_dir`
   local config=$(helm template \
@@ -717,6 +750,25 @@ load _helpers
   [ "${actual}" = "null" ]
 
   actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: doesn't set verify_* configuration to true when global.tls.enabled and global.peering.enabled and global.tls.verify is false" {
+  cd `chart_dir`
+  local config=$(helm template \
+      -s templates/server-config-configmap.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.verify=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $config | jq -r .tls.internal_rpc | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $config | jq -r .tls.defaults.verify_outgoing | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -771,6 +823,34 @@ load _helpers
   [ "${actual}" = "/vault/secrets/servercert.crt" ]
 
   local actual=$(echo $object | jq -r .key_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/servercert.key" ]
+}
+
+@test "server/ConfigMap: sets TLS file paths to point to vault secrets when Vault is enabled and global.peering.enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-config-configmap.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.peering.enabled=true' \
+    --set 'connectInject.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+    yq -r '.data["tls-config.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r .tls.defaults.ca_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
+
+  local actual=$(echo $object | jq -r .tls.defaults.cert_file | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/servercert.crt" ]
+
+  local actual=$(echo $object | jq -r .tls.defaults.key_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/servercert.key" ]
 }
 

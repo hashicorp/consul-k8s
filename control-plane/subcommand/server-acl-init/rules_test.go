@@ -848,12 +848,14 @@ func TestInjectRules(t *testing.T) {
 	cases := []struct {
 		EnableNamespaces bool
 		EnablePartitions bool
+		EnablePeering    bool
 		PartitionName    string
 		Expected         string
 	}{
 		{
 			EnableNamespaces: false,
 			EnablePartitions: false,
+			EnablePeering:    false,
 			Expected: `
   node_prefix "" {
     policy = "write"
@@ -866,6 +868,7 @@ func TestInjectRules(t *testing.T) {
 		{
 			EnableNamespaces: true,
 			EnablePartitions: false,
+			EnablePeering:    false,
 			Expected: `
   operator = "write"
   node_prefix "" {
@@ -880,7 +883,25 @@ func TestInjectRules(t *testing.T) {
 		},
 		{
 			EnableNamespaces: true,
+			EnablePartitions: false,
+			EnablePeering:    true,
+			Expected: `
+  operator = "write"
+  peering = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+  namespace_prefix "" {
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+    }
+  }`,
+		},
+		{
+			EnableNamespaces: true,
 			EnablePartitions: true,
+			EnablePeering:    false,
 			PartitionName:    "part-1",
 			Expected: `
 partition "part-1" {
@@ -896,16 +917,37 @@ partition "part-1" {
   }
 }`,
 		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: true,
+			EnablePeering:    true,
+			PartitionName:    "part-1",
+			Expected: `
+partition "part-1" {
+  peering = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+  namespace_prefix "" {
+    policy = "write"
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+    }
+  }
+}`,
+		},
 	}
 
 	for _, tt := range cases {
-		caseName := fmt.Sprintf("ns=%t, partition=%t", tt.EnableNamespaces, tt.EnablePartitions)
+		caseName := fmt.Sprintf("ns=%t, partition=%t, peering=%t", tt.EnableNamespaces, tt.EnablePartitions, tt.EnablePeering)
 		t.Run(caseName, func(t *testing.T) {
 
 			cmd := Command{
 				flagEnablePartitions: tt.EnablePartitions,
 				flagPartitionName:    tt.PartitionName,
 				flagEnableNamespaces: tt.EnableNamespaces,
+				flagEnablePeering:    tt.EnablePeering,
 			}
 
 			injectorRules, err := cmd.injectRules()
