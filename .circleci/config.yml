@@ -1008,6 +1008,15 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
+      - acceptance-gke-1-20:
+          requires:
+            - dev-upload-docker
+      - acceptance-eks-1-19:
+          requires:
+            - dev-upload-docker
+      - acceptance-aks-1-21:
+          requires:
+            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:
