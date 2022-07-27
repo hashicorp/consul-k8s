@@ -1003,16 +1003,23 @@ server:
     # @type: boolean
     enabled: "-"
     # Type of service, supports LoadBalancer or NodePort.
+    # @type: string
     type: LoadBalancer
+    # If service is of type NodePort, configures the nodePorts.
     nodePort:
+      # Configures the nodePort to expose the Consul server http port.
       # @type: integer
       http: null
+      # Configures the nodePort to expose the Consul server https port.
       # @type: integer
       https: null
+      # Configures the nodePort to expose the Consul server serf port.
       # @type: integer
       serf: null
+      # Configures the nodePort to expose the Consul server rpc port.
       # @type: integer
       rpc: null
+      # Configures the nodePort to expose the Consul server grpc port.
       # @type: integer
       grpc: null
     # This value defines additional annotations for
