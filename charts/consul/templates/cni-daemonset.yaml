@@ -64,7 +64,9 @@ spec:
             - -log-level={{ default .Values.global.logLevel .Values.connectInject.cni.logLevel }}
             - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
             - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
-            - -dns-prefix={{ template "consul.fullname" . }}
+          {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
+            - -dns-service={{ template "consul.fullname" . }}-dns
+          {{- end }}
           {{- with .Values.connectInject.cni.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

@@ -34,9 +34,9 @@ type Command struct {
 	flagCNINetDir string
 	// flagCNIBinSourceDir is the location of consul-cni binary inside the installer container (/bin).
 	flagCNIBinSourceDir string
-	// flagDNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and
-	// the prefix allows us to search for it.
-	flagDNSPrefix string
+	// flagDNSService is used to pass the name of the DNS service, if enabled, onto the CNI plugin. DNS is enabled
+	// in the helm chart and it creates a service that points to the Consul servers.
+	flagDNSService string
 	// flageKubeconfig is the filename of the generated kubeconfig that the plugin will use to communicate with
 	// the kubernetes api.
 	flagKubeconfig string
@@ -60,7 +60,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCNIBinDir, "cni-bin-dir", config.DefaultCNIBinDir, "Location of CNI plugin binaries.")
 	c.flagSet.StringVar(&c.flagCNINetDir, "cni-net-dir", config.DefaultCNINetDir, "Location to write the CNI plugin configuration.")
 	c.flagSet.StringVar(&c.flagCNIBinSourceDir, "bin-source-dir", defaultCNIBinSourceDir, "Host location to copy the binary from")
-	c.flagSet.StringVar(&c.flagDNSPrefix, "dns-prefix", config.DefaultDNSPrefix, "Prefix of the environment variables used to determine the Consul Server DNS IP")
+	c.flagSet.StringVar(&c.flagDNSService, "dns-service", config.DefaultDNSService, "Name of the Consul DNS Service")
 	c.flagSet.StringVar(&c.flagKubeconfig, "kubeconfig", config.DefaultKubeconfig, "Name of the kubernetes config file")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", config.DefaultLogLevel,
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
@@ -103,7 +103,7 @@ func (c *Command) Run(args []string) int {
 		Type:       config.DefaultPluginType,
 		CNIBinDir:  c.flagCNIBinDir,
 		CNINetDir:  c.flagCNINetDir,
-		DNSPrefix:  c.flagDNSPrefix,
+		DNSService: c.flagDNSService,
 		Kubeconfig: c.flagKubeconfig,
 		LogLevel:   c.flagLogLevel,
 		Multus:     c.flagMultus,

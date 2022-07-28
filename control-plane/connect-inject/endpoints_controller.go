@@ -309,9 +309,17 @@ func (r *EndpointsController) registerServicesAndHealthCheck(
 				return err
 			}
 
-			// Generate the redirect traffic confic used by the CNI plugin. The proxy service must be registered before we can get
-			// all of the redirect traffic information
-			err = r.generateRedirectTrafficConfig(pod, proxyServiceRegistration)
+			// After service registration, Consul will consolidate proxy information and thus we need to
+			// ask Consul for the proxy service again.
+			proxyService, _, err := client.Agent().Service(proxyServiceRegistration.Name, nil)
+			if err != nil {
+				r.Log.Error(err, "failed to retrieve proxy service", "name", proxyServiceRegistration.Name)
+				return err
+			}
+
+			// Generate the redirect traffic confic used by the CNI plugin. The proxy service must be
+			// registered before we can get all of the redirect traffic information
+			err = r.generateRedirectTrafficConfig(pod, proxyService)
 			if err != nil {
 				r.Log.Error(err, "failed to create redirect traffic annotation", "name", proxyServiceRegistration.Name)
 				return err
@@ -753,7 +761,7 @@ func (r *EndpointsController) redirectTrafficAnnotation(pod corev1.Pod, cfg ipta
 }
 
 // generateRedirectTrafficConfig creates the redirect traffic config and adds it as an annotation to the pod.
-func (r *EndpointsController) generateRedirectTrafficConfig(pod corev1.Pod, svc *api.AgentServiceRegistration) error {
+func (r *EndpointsController) generateRedirectTrafficConfig(pod corev1.Pod, svc *api.AgentService) error {
 	checks, err := getServiceNameChecks(r.ConsulClient, svc.Proxy.DestinationServiceName)
 	if err != nil {
 		return err

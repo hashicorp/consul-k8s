@@ -76,18 +76,19 @@ type PluginConf struct {
 	Type string `json:"type"`
 	// CNIBinDir is the location of the cni config files on the node. Can be set as a cli flag.
 	CNIBinDir string `json:"cni_bin_dir"`
-	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
+	// CNINetDir is the location of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir"`
-	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the
+	// DNSService is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the
 	// prefix allows us
 	// to search for it. The DNS IP is determined using the prefix and the dnsServiceHostEnvSuffix constant.
-	DNSPrefix string `json:"dns_prefix"`
+	DNSService string `json:"dns_service"`
 	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
 	Multus bool `json:"multus"`
 	// Kubeconfig file name. Can be set as a cli flag.
 	Kubeconfig string `json:"kubeconfig"`
 	// LogLevl is the logging level. Can be set as a cli flag.
 	LogLevel string `json:"log_level"`
+	//
 }
 
 // parseConfig parses the supplied CNI configuration (and prevResult) from stdin.
@@ -193,7 +194,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Get the DNS IP from the environment.
-	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSPrefix)
+	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSService)
 	if dnsIP != "" {
 		logger.Info("assigned consul DNS IP to %s", dnsIP)
 		iptablesCfg.ConsulDNSIP = dnsIP
@@ -266,9 +267,9 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 // searching easier return an empty string.
 func searchDNSIPFromEnvironment(pod corev1.Pod, prefix string) string {
 	var result string
-	upcaseResourcePrefix := strings.ToUpper(prefix)
-	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
-	dnsName := strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
+	upcaseResourceService := strings.ToUpper(prefix)
+	upcaseResourceServiceWithUnderscores := strings.ReplaceAll(upcaseResourceService, "-", "_")
+	dnsName := strings.Join([]string{upcaseResourceServiceWithUnderscores, dnsServiceHostEnvSuffix}, "_")
 
 	// Environment variables are buried in the pod spec.
 	vars := pod.Spec.Containers[0].Env

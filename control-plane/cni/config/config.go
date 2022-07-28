@@ -5,7 +5,7 @@ const (
 	DefaultPluginType = "consul-cni"
 	DefaultCNIBinDir  = "/opt/cni/bin"
 	DefaultCNINetDir  = "/etc/cni/net.d"
-	DefaultDNSPrefix  = ""
+	DefaultDNSService = ""
 	DefaultMultus     = false
 	// defaultKubeconfig is named ZZZ-.. as part of a convention that other CNI plugins use.
 	DefaultKubeconfig = "ZZZ-consul-cni-kubeconfig"
@@ -22,9 +22,9 @@ type CNIConfig struct {
 	CNIBinDir string `json:"cni_bin_dir" mapstructure:"cni_bin_dir"`
 	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir" mapstructure:"cni_net_dir"`
-	// DNSPrefix is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the prefix allows us
+	// DNSService is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the prefix allows us
 	// to search for it.
-	DNSPrefix string `json:"dns_prefix"  mapstructure:"dns_prefix"`
+	DNSService string `json:"dns_service" mapstructure:"dns_service"`
 	// Kubeconfig file name. Can be set as a cli flag.
 	Kubeconfig string `json:"kubeconfig"  mapstructure:"kubeconfig"`
 	// LogLevl is the logging level. Can be set as a cli flag.
@@ -39,7 +39,7 @@ func NewDefaultCNIConfig() *CNIConfig {
 		Type:       DefaultPluginType,
 		CNIBinDir:  DefaultCNIBinDir,
 		CNINetDir:  DefaultCNINetDir,
-		DNSPrefix:  DefaultDNSPrefix,
+		DNSService: DefaultDNSService,
 		Kubeconfig: DefaultKubeconfig,
 		LogLevel:   DefaultLogLevel,
 		Multus:     DefaultMultus,

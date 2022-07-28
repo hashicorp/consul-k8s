@@ -31,7 +31,7 @@ type trafficRedirectProxyConfig struct {
 //   ExcludeOutboundCIDRs: pod annotations
 //   ExcludeUIDs: pod annotations
 //   NetNS: Net Namespace, passed to the CNI plugin as CNI_NETNS
-func createRedirectTrafficConfig(svc *api.AgentServiceRegistration, checks map[string]*api.AgentCheck) (iptables.Config, error) {
+func createRedirectTrafficConfig(svc *api.AgentService, checks map[string]*api.AgentCheck) (iptables.Config, error) {
 	cfg := iptables.Config{
 		ProxyUserID: strconv.Itoa(envoyUserAndGroupID),
 	}
