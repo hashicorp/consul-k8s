@@ -38,6 +38,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: connect-injector
+        {{- if .Values.connectInject.extraLabels }}
+          {{- toYaml .Values.connectInject.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.connectInject.annotations }}
