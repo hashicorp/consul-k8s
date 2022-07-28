@@ -99,13 +99,13 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
-			// so that it can can request Connect certificates for it.
+			// so that it can request Connect certificates for it.
 			if c.secure {
 				updateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
 			// Create the config entry for the terminating gateway.
-			createTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace)
+			createTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace, staticServerName)
 
 			// Deploy the static client.
 			logger.Log(t, "deploying static client")
@@ -116,12 +116,16 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				// With the terminating gateway up, we test that we can make a call to it
 				// via the static-server. It should fail to connect with the
 				// static-server pod because of intentions.
-				assertNoConnectionAndAddIntention(t, consulClient, nsK8SOptions, testNamespace, testNamespace)
+				logger.Log(t, "testing intentions prevent connections through the terminating gateway")
+				k8s.CheckStaticServerConnectionFailing(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
+
+				logger.Log(t, "adding intentions to allow traffic from client ==> server")
+				addIntention(t, consulClient, testNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, StaticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
 		})
 	}
 }
@@ -207,13 +211,13 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
-			// so that it can can request Connect certificates for it.
+			// so that it can request Connect certificates for it.
 			if c.secure {
 				updateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
 			// Create the config entry for the terminating gateway
-			createTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace)
+			createTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace, staticServerName)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
@@ -224,12 +228,16 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				// With the terminating gateway up, we test that we can make a call to it
 				// via the static-server. It should fail to connect with the
 				// static-server pod because of intentions.
-				assertNoConnectionAndAddIntention(t, consulClient, ns2K8SOptions, StaticClientNamespace, testNamespace)
+				logger.Log(t, "testing intentions prevent connections through the terminating gateway")
+				k8s.CheckStaticServerConnectionFailing(t, ns2K8SOptions, staticClientName, staticServerLocalAddress)
+
+				logger.Log(t, "adding intentions to allow traffic from client ==> server")
+				addIntention(t, consulClient, StaticClientNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, ns2K8SOptions, StaticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, ns2K8SOptions, staticClientName, staticServerLocalAddress)
 		})
 	}
 }

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-server
+  template:
+    metadata:
+      labels:
+        app: static-server
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:latest
+          ports:
+            - name: https-port
+              containerPort: 443
+            - name: http-port
+              containerPort: 80
+          volumeMounts:
+            - name: data
+              mountPath: "/data"
+            - name: config
+              mountPath: /etc/caddy/
+              readOnly: true
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: static-server-config
+            items:
+              - key: "config"
+                path: "Caddyfile"
