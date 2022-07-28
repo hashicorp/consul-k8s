@@ -37,7 +37,11 @@ global:
     tokenGeneration:
       serverAddresses:
         # Source can be set to "" or "consul".
-        # "" is the default behavior.
+        #
+        # "" is the default source. If servers are enabled, it will check if server.exposeService is enabled, and read
+        # the addresses from that service to use as the peering token server addresses.
+        #
+        # "consul" will use the Consul advertise addresses in the peering token.
         source: ""
 
   # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.

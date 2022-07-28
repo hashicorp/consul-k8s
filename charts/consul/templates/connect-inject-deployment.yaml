@@ -142,7 +142,7 @@ spec:
                 -enable-peering=true \
                 {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") }}
                 {{- if (and $serverEnabled $serverExposeServiceEnabled) }}
-                -poll-server-expose-service=true \
+                -read-server-expose-service=true \
                 {{- end }}
                 {{- end }}
                 {{- end }}

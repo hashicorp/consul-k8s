@@ -55,18 +55,18 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			false,
 			false,
 		},
-		//{
-		//	"single destination namespace",
-		//	staticServerNamespace,
-		//	false,
-		//	false,
-		//},
-		//{
-		//	"mirror k8s namespaces",
-		//	staticServerNamespace,
-		//	true,
-		//	false,
-		//},
+		{
+			"single destination namespace",
+			staticServerNamespace,
+			false,
+			false,
+		},
+		{
+			"mirror k8s namespaces",
+			staticServerNamespace,
+			true,
+			false,
+		},
 		{
 			"default destination namespace",
 			defaultNamespace,
@@ -115,14 +115,17 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 				"controller.enabled": "true",
 
-				"dns.enabled":            "true",
-				"dns.enableRedirection":  strconv.FormatBool(cfg.EnableTransparentProxy),
-				"server.replicas":        "3",
-				"server.bootstrapExpect": "3",
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
 			staticServerPeerHelmValues := map[string]string{
 				"global.datacenter": staticServerPeer,
+			}
+
+			if !cfg.UseKind {
+				staticServerPeerHelmValues["server.replicas"] = "3"
+				staticServerPeerHelmValues["server.bootstrapExpect"] = "3"
 			}
 
 			// On Kind, there are no load balancers but since all clusters
@@ -140,14 +143,19 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			releaseName := helpers.RandomName()
 
-			helpers.MergeMaps(commonHelmValues, staticServerPeerHelmValues)
+			helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
 			// Install the first peer where static-server will be deployed in the static-server kubernetes context.
-			staticServerPeerCluster := consul.NewHelmCluster(t, commonHelmValues, staticServerPeerClusterContext, cfg, releaseName)
+			staticServerPeerCluster := consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
 			staticServerPeerCluster.Create(t)
 
 			staticClientPeerHelmValues := map[string]string{
 				"global.datacenter": staticClientPeer,
+			}
+
+			if !cfg.UseKind {
+				staticClientPeerHelmValues["server.replicas"] = "3"
+				staticClientPeerHelmValues["server.bootstrapExpect"] = "3"
 			}
 
 			if cfg.UseKind {
@@ -160,10 +168,10 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerHelmValues["server.bootstrapExpect"] = "1"
 			}
 
-			helpers.MergeMaps(commonHelmValues, staticClientPeerHelmValues)
+			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
 
 			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
-			staticClientPeerCluster := consul.NewHelmCluster(t, commonHelmValues, staticClientPeerClusterContext, cfg, releaseName)
+			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
 			staticClientPeerCluster.Create(t)
 
 			// Create the peering acceptor on the client peer.

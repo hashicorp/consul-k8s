@@ -31,7 +31,7 @@ type PeeringAcceptorController struct {
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
 	ConsulClient              *api.Client
 	ExposeServersServiceName  string
-	PollServerExternalService bool
+	ReadServerExternalService bool
 	ReleaseNamespace          string
 	Log                       logr.Logger
 	Scheme                    *runtime.Scheme
@@ -104,7 +104,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Scrape the address of the server service
 	var serverExternalAddresses []string
-	if r.PollServerExternalService {
+	if r.ReadServerExternalService {
 		addrs, err := r.getExposeServersServiceAddresses()
 		if err != nil {
 			r.updateStatusError(ctx, acceptor, KubernetesError, err)
