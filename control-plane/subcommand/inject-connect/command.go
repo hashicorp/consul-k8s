@@ -95,7 +95,7 @@ type Command struct {
 	flagInitContainerMemoryRequest string
 
 	// Server address flags.
-	flagPollServerExposeService bool
+	flagReadServerExposeService bool
 
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
@@ -192,7 +192,7 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagPollServerExposeService, "poll-server-expose-service", false,
+	c.flagSet.BoolVar(&c.flagReadServerExposeService, "read-server-expose-service", false,
 		"Enables polling the Consul servers' external service for its IP(s).")
 
 	// Proxy sidecar resource setting flags.
@@ -448,7 +448,7 @@ func (c *Command) Run(args []string) int {
 			Client:                    mgr.GetClient(),
 			ConsulClient:              c.consulClient,
 			ExposeServersServiceName:  c.flagResourcePrefix + "-expose-servers",
-			PollServerExternalService: c.flagPollServerExposeService,
+			ReadServerExternalService: c.flagReadServerExposeService,
 			ReleaseNamespace:          c.flagReleaseNamespace,
 			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),
 			Scheme:                    mgr.GetScheme(),
