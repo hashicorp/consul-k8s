@@ -1935,6 +1935,19 @@ connectInject:
   # @type: string
   annotations: null
   
+  # Extra labels to attach to the connect injector pods. This should be a YAML map.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraLabels:
+  #   labelKey: label-value
+  #   anotherLabelKey: another-label-value
+  # ```
+  #
+  # @type: map
+  extraLabels: null
+  
   # The Docker image for Consul to use when performing Connect injection.
   # Defaults to global.image.
   # @type: string
@@ -2934,3 +2947,17 @@ prometheus:
 # is only useful when running helm template.
 tests:
   enabled: true
+
+serverACLInit:
+  # Extra labels to attach to the server-acl-init pods. This should be a YAML map.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraLabels:
+  #   labelKey: label-value
+  #   anotherLabelKey: another-label-value
+  # ```
+  #
+  # @type: map
+  extraLabels: null
