@@ -55,7 +55,7 @@ func TestPeering_Connect(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
-				"global.image": "ndhanushkodi/consul-dev@sha256:61b02ac369cc13db6b9af8808b7e3a811bcdc9a09c95ddac0da931f81743091c",
+				"global.image": "ghcr.io/lkysow/consul:july28-2022",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
