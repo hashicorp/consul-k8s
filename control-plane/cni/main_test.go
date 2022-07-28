@@ -24,8 +24,8 @@ func TestSkipTrafficRedirection(t *testing.T) {
 		{
 			name: "Pod with both annotations correctly set",
 			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[keyInjectStatus] = injected
-				pod.Annotations[keyTransparentProxyStatus] = enabled
+				pod.Annotations[keyInjectStatus] = "foo"
+				pod.Annotations[keyTransparentProxyStatus] = "bar"
 				return pod
 			},
 			retries:      1,
@@ -42,7 +42,7 @@ func TestSkipTrafficRedirection(t *testing.T) {
 		{
 			name: "Pod only with connect-inject-status annotation, will timeout waiting for other annotation",
 			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[keyInjectStatus] = injected
+				pod.Annotations[keyInjectStatus] = "foo"
 				return pod
 			},
 			retries:      1,
@@ -51,7 +51,7 @@ func TestSkipTrafficRedirection(t *testing.T) {
 		{
 			name: "Pod with only transparent-proxy-status annotation, will timeout waiting for other annotation",
 			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[keyTransparentProxyStatus] = enabled
+				pod.Annotations[keyTransparentProxyStatus] = "foo"
 				return pod
 			},
 			retries:      1,

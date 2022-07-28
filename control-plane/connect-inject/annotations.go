@@ -178,9 +178,6 @@ const (
 	// enabled is used as the annotation value for keyTransparentProxyStatus.
 	enabled = "enabled"
 
-	// disabled is used as the annotation value for keyTransparentProxyStatus.
-	disabled = "disabled"
-
 	// endpointsController is the value for keyManagedBy.
 	managedByValue = "consul-k8s-endpoints-controller"
 )

@@ -37,15 +37,6 @@ const (
 	// a pod when transparent proxy is done.
 	keyTransparentProxyStatus = "consul.hashicorp.com/transparent-proxy-status"
 
-	// injected is used as the annotation value for keyInjectStatus and annotationInjected.
-	injected = "injected"
-
-	// enabled is used as the annotation value for keyTransparentProxyStatus.
-	enabled = "enabled"
-
-	// disabled is used as the annotation value for keyTransparentProxyStatus.
-	disabled = "disabled"
-
 	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
@@ -240,23 +231,16 @@ func main() {
 }
 
 // skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
+// The absence of the annotations is the equivalent of "disabled" because it means that the connect inject mutating
+// webhook did not run against the pod.
 func skipTrafficRedirection(pod corev1.Pod, retries uint64) bool {
 	skip := false
-	exists := waitForAnnotation(pod, keyInjectStatus, uint64(retries))
-	if !exists {
-		skip = true
-	}
-
-	exists = waitForAnnotation(pod, keyTransparentProxyStatus, uint64(retries))
-	if !exists {
-		skip = true
-	}
 
 	if anno, ok := pod.Annotations[keyInjectStatus]; !ok || anno == "" {
 		skip = true
 	}
 
-	if anno, ok := pod.Annotations[keyTransparentProxyStatus]; !ok || anno == disabled {
+	if anno, ok := pod.Annotations[keyTransparentProxyStatus]; !ok || anno == "" {
 		skip = true
 	}
 
