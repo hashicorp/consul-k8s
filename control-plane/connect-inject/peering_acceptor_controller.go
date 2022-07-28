@@ -32,6 +32,7 @@ type PeeringAcceptorController struct {
 	ConsulClient              *api.Client
 	ExposeServersServiceName  string
 	ReadServerExternalService bool
+	TokenServerAddresses      []string
 	ReleaseNamespace          string
 	Log                       logr.Logger
 	Scheme                    *runtime.Scheme
@@ -111,6 +112,8 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		serverExternalAddresses = addrs
+	} else if len(r.TokenServerAddresses) > 0 {
+		serverExternalAddresses = r.TokenServerAddresses
 	}
 
 	statusSecretSet := acceptor.SecretRef() != nil
