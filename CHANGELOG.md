@@ -3,6 +3,9 @@ FEATURES:
 * Transparent Proxy Egress
   * Add support for Destinations on the Service Defaults CRD. [[GH-1352](https://github.com/hashicorp/consul-k8s/pull/1352)]
 
+IMPROVEMENTS:
+* Helm
+  * Bump default Envoy version to 1.23.0. [[GH-1377](https://github.com/hashicorp/consul-k8s/pull/1377)]
 FEATURES:
 * [Experimental] Cluster Peering:
   * Add support for ACLs and TLS. [[GH-1343](https://github.com/hashicorp/consul-k8s/pull/1343)] [[GH-1366](https://github.com/hashicorp/consul-k8s/pull/1366)]
