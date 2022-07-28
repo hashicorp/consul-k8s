@@ -17,7 +17,7 @@ annotations:
     - name: consul-k8s-control-plane
       image: hashicorp/consul-k8s-control-plane:0.46.1
     - name: envoy
-      image: envoyproxy/envoy:v1.22.2
+      image: envoyproxy/envoy:v1.23.0
   artifacthub.io/license: MPL-2.0
   artifacthub.io/links: |
     - name: Documentation
