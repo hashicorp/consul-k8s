@@ -40,10 +40,10 @@ const (
 	// injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	injected = "injected"
 
-	// enabled is used as the annotation value for keyTransparentProxyStatus
+	// enabled is used as the annotation value for keyTransparentProxyStatus.
 	enabled = "enabled"
 
-	// disabled is used as the annotation value for keyTransparentProxyStatus
+	// disabled is used as the annotation value for keyTransparentProxyStatus.
 	disabled = "disabled"
 
 	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply
@@ -292,7 +292,7 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 }
 
 // clusterIPFromDNSService takes a <service name>.<namespace> string that represents a service and returns the services
-// cluster IP
+// cluster IP.
 func clusterIPFromDNSService(clientset kubernetes.Interface, serviceName string) (string, error) {
 	name := strings.Split(serviceName, ".")[0]
 	namespace := strings.Split(serviceName, ".")[1]

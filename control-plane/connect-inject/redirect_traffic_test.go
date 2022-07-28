@@ -14,17 +14,16 @@ import (
 func TestCreateRedirectTrafficConfig(t *testing.T) {
 	cases := []struct {
 		name          string
-		consulService api.AgentServiceRegistration
+		consulService api.AgentService
 		checks        map[string]*api.AgentCheck
 		expCfg        iptables.Config
 		expError      string
 	}{
 		{
 			name: "proxyID with service port provided",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -39,10 +38,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxyID with bind_port(int) provided",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -60,10 +58,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxyID with bind_port(string) provided",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -81,10 +78,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxyID with bind_port(invalid type) provided",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -98,10 +94,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxyID with proxy outbound listener port",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -119,10 +114,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxy config has envoy_prometheus_bind_addr set",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -141,10 +135,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxy config has an invalid envoy_prometheus_bind_addr set",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -158,10 +151,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxy config has envoy_stats_bind_addr set",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -180,10 +172,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxy config has an invalid envoy_stats_bind_addr set",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -197,10 +188,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxy config has expose paths with listener port set",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{
@@ -225,10 +215,9 @@ func TestCreateRedirectTrafficConfig(t *testing.T) {
 		},
 		{
 			name: "proxy config has expose paths with checks set to true",
-			consulService: api.AgentServiceRegistration{
+			consulService: api.AgentService{
 				Kind:    api.ServiceKindConnectProxy,
 				ID:      "test-proxy-id",
-				Name:    "test-proxy",
 				Port:    20000,
 				Address: "1.1.1.1",
 				Proxy: &api.AgentServiceConnectProxyConfig{

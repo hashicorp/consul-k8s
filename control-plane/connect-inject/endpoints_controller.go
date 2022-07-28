@@ -756,16 +756,15 @@ func (r *EndpointsController) createServiceRegistrations(
 	return service, proxyService, nil
 }
 
-// redirectTrafficAnnotation creates an annotation that contains iptables configuration.
-func (r *EndpointsController) redirectTrafficAnnotation(pod corev1.Pod, cfg iptables.Config) error {
-	ctx := context.Background()
+// addRedirectTrafficAnnotation creates an annotation that contains iptables configuration.
+func (r *EndpointsController) addRedirectTrafficAnnotation(pod corev1.Pod, cfg iptables.Config) error {
 	j, err := json.Marshal(&cfg)
 	if err != nil {
 		return fmt.Errorf("could not marshal iptables config: %v", err)
 	}
 
 	pod.Annotations[annotationCNIProxyConfig] = string(j)
-	err = r.Client.Update(ctx, &pod)
+	err = r.Client.Update(r.Context, &pod)
 	if err != nil {
 		return fmt.Errorf("could not update CNI proxy config annotation: %v", err)
 	}
@@ -786,7 +785,7 @@ func (r *EndpointsController) generateRedirectTrafficConfig(pod corev1.Pod, svc 
 
 	excludeInboundOutboundFromAnnotations(pod, &iptables)
 
-	err = r.redirectTrafficAnnotation(pod, iptables)
+	err = r.addRedirectTrafficAnnotation(pod, iptables)
 	if err != nil {
 		return err
 	}

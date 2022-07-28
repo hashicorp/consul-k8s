@@ -175,12 +175,11 @@ const (
 	// injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	injected = "injected"
 
-	// enabled is used as the annotation value for keyTransparentProxyStatus
+	// enabled is used as the annotation value for keyTransparentProxyStatus.
 	enabled = "enabled"
 
-	// enabled is used as the annotation value for keyTransparentProxyStatus
+	// disabled is used as the annotation value for keyTransparentProxyStatus.
 	disabled = "disabled"
-
 
 	// endpointsController is the value for keyManagedBy.
 	managedByValue = "consul-k8s-endpoints-controller"
