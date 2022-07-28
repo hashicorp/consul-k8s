@@ -741,6 +741,18 @@ func (r *EndpointsController) createServiceRegistrations(
 		}
 
 	}
+
+	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
+	// to determine if it should traffic redirect or not
+	if tproxyEnabled {
+		pod.Annotations[keyTransparentProxyStatus] = enabled
+	} else {
+		pod.Annotations[keyTransparentProxyStatus] = disabled
+	}
+	err = r.Client.Update(context.Background(), &pod)
+	if err != nil {
+		return nil, nil, err
+	}
 	return service, proxyService, nil
 }
 

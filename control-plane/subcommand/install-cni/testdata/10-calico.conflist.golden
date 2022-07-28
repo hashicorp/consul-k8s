@@ -41,7 +41,7 @@
     {
       "cni_bin_dir": "/opt/cni/bin",
       "cni_net_dir": "/etc/cni/net.d",
-      "dns_prefix": "consul",
+      "dns_service": "consul-consul-dns.consul",
       "kubeconfig": "ZZZ-consul-cni-kubeconfig",
       "log_level": "info",
       "multus": false,

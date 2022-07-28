@@ -29,21 +29,30 @@ const (
 	// These annotations are duplicated from control-plane/connect-inject/annotations.go in
 	// order to prevent pulling in dependencies.
 
-	// annotationInject is the key of the annotation that controls whether
-	// injection is explicitly enabled or disabled for a pod.
-	annotationInject = "consul.hashicorp.com/connect-inject"
+	// keyInjectStatus is the key of the annotation that is added to
+	// a pod after an injection is done.
+	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
+
+	// keyTransparentProxyStatus is the key of the annotation that is added to
+	// a pod when transparent proxy is done.
+	keyTransparentProxyStatus = "consul.hashicorp.com/transparent-proxy-status"
+
+	// injected is used as the annotation value for keyInjectStatus and annotationInjected.
+	injected = "injected"
+
+	// enabled is used as the annotation value for keyTransparentProxyStatus
+	enabled = "enabled"
+
+	// disabled is used as the annotation value for keyTransparentProxyStatus
+	disabled = "disabled"
+
 	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
+
 	// retries is the number of backoff retries to attempt while waiting for an cni-proxy-config annotation to
-	// poplulate.
-	retries = 10
-	// dnsServiceHostEnvSuffix is the suffix that is used to get the DNS host IP. The DNS IP is saved as an
-	// environment variable with prefix + suffix. The prefix is passed in as cli flag to the endpoints controller
-	// which is then passed on in the cni-proxy-config annotation so that the CNI plugin can use it. The DNS
-	// environment variable usually looks like: CONSUL_CONSUL_DNS_SERVICE_HOST but the prefix can change
-	// depending on the helm install.
-	dnsServiceHostEnvSuffix = "DNS_SERVICE_HOST"
+	// populate. The backoff is constant and will retry every second before failing.
+	retries = 30
 )
 
 type CNIArgs struct {
@@ -175,8 +184,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	// Skip pod that has consul.hashicorp.com/connect-inject: false.
-	if skipConnectInject(*pod) {
+	// Skip traffic redirection the correct annotations are not on the pod.
+	if skipTrafficRedirection(*pod, retries) {
 		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
@@ -194,7 +203,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Get the DNS IP from the environment.
-	dnsIP := searchDNSIPFromEnvironment(*pod, cfg.DNSService)
+	dnsIP, err := clusterIPFromDNSService(client, cfg.DNSService)
+	if err != nil {
+		return fmt.Errorf("could not retrieve DNS IP from service: %s, error: %v", cfg.DNSService, err)
+	}
 	if dnsIP != "" {
 		logger.Info("assigned consul DNS IP to %s", dnsIP)
 		iptablesCfg.ConsulDNSIP = dnsIP
@@ -227,12 +239,28 @@ func main() {
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
 }
 
-// skipConnectInject determines if the connect-inject annotation is false.
-func skipConnectInject(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[annotationInject]; ok && anno == "false" {
-		return true
+// skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
+func skipTrafficRedirection(pod corev1.Pod, retries uint64) bool {
+	skip := false
+	exists := waitForAnnotation(pod, keyInjectStatus, uint64(retries))
+	if !exists {
+		skip = true
 	}
-	return false
+
+	exists = waitForAnnotation(pod, keyTransparentProxyStatus, uint64(retries))
+	if !exists {
+		skip = true
+	}
+
+	if anno, ok := pod.Annotations[keyInjectStatus]; !ok || anno == "" {
+		skip = true
+	}
+
+	if anno, ok := pod.Annotations[keyTransparentProxyStatus]; !ok || anno == disabled {
+		skip = true
+	}
+
+	return skip
 }
 
 // waitForAnnotation waits for an annotation to be available. Returns immediately if the annotation exists.
@@ -263,21 +291,19 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 	return cfg, nil
 }
 
-// searchDNSIPFromEnvironment gets the consul server DNS IP from the pods environment variables. The prefix makes
-// searching easier return an empty string.
-func searchDNSIPFromEnvironment(pod corev1.Pod, prefix string) string {
-	var result string
-	upcaseResourceService := strings.ToUpper(prefix)
-	upcaseResourceServiceWithUnderscores := strings.ReplaceAll(upcaseResourceService, "-", "_")
-	dnsName := strings.Join([]string{upcaseResourceServiceWithUnderscores, dnsServiceHostEnvSuffix}, "_")
+// clusterIPFromDNSService takes a <service name>.<namespace> string that represents a service and returns the services
+// cluster IP
+func clusterIPFromDNSService(clientset kubernetes.Interface, serviceName string) (string, error) {
+	name := strings.Split(serviceName, ".")[0]
+	namespace := strings.Split(serviceName, ".")[1]
 
-	// Environment variables are buried in the pod spec.
-	vars := pod.Spec.Containers[0].Env
-	for k := range vars {
-		if vars[k].Name == dnsName {
-			result = vars[k].Value
-			break
-		}
+	service, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get service: %v", err)
 	}
-	return result
+
+	if service.Spec.ClusterIP == "" {
+		return "", fmt.Errorf("no cluster ip found on service: %v", name)
+	}
+	return service.Spec.ClusterIP, nil
 }

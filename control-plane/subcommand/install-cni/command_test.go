@@ -22,7 +22,7 @@ func TestRun_FlagDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagCNIBinDir, config.DefaultCNIBinDir)
 	require.Equal(t, cmd.flagCNINetDir, config.DefaultCNINetDir)
 	require.Equal(t, cmd.flagCNIBinSourceDir, defaultCNIBinSourceDir)
-	require.Equal(t, cmd.flagDNSPrefix, config.DefaultDNSPrefix)
+	require.Equal(t, cmd.flagDNSService, config.DefaultDNSService)
 	require.Equal(t, cmd.flagKubeconfig, config.DefaultKubeconfig)
 	require.Equal(t, cmd.flagLogLevel, config.DefaultLogLevel)
 	require.Equal(t, cmd.flagLogJSON, defaultLogJSON)

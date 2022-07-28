@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -9,7 +10,61 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
+
+func TestSkipTrafficRedirection(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name         string
+		annotatedPod func(*corev1.Pod) *corev1.Pod
+		retries      uint64
+		expectedSkip bool
+	}{
+		{
+			name: "Pod with both annotations correctly set",
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[keyInjectStatus] = injected
+				pod.Annotations[keyTransparentProxyStatus] = enabled
+				return pod
+			},
+			retries:      1,
+			expectedSkip: false,
+		},
+		{
+			name: "Pod without annotations, will timeout waiting",
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			retries:      1,
+			expectedSkip: true,
+		},
+		{
+			name: "Pod only with connect-inject-status annotation, will timeout waiting for other annotation",
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[keyInjectStatus] = injected
+				return pod
+			},
+			retries:      1,
+			expectedSkip: true,
+		},
+		{
+			name: "Pod with only transparent-proxy-status annotation, will timeout waiting for other annotation",
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[keyTransparentProxyStatus] = enabled
+				return pod
+			},
+			retries:      1,
+			expectedSkip: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := skipTrafficRedirection(*c.annotatedPod(minimalPod()), c.retries)
+			require.Equal(t, c.expectedSkip, actual)
+		})
+	}
+}
 
 func TestWaitForAnnotation(t *testing.T) {
 	t.Parallel()
@@ -94,33 +149,88 @@ func TestParseAnnotation(t *testing.T) {
 	}
 }
 
-func TestSearchDNSIPFromEnvironment(t *testing.T) {
+func TestClusterIPFromDNSService(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name     string
-		prefix   string
-		expected string
-		pod      func(*corev1.Pod) *corev1.Pod
+		name              string
+		fullName          string
+		serviceName       string
+		serviceNamespace  string
+		configuredService func(string, string, string) *corev1.Service
+		expectedIP        string
+		expectedErr       error
 	}{
 		{
-			name:     "Pod with DNS set",
-			prefix:   "consul",
-			expected: "127.0.0.1",
-			pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Spec.Containers[0].Env = []corev1.EnvVar{
-					{
-						Name:  "CONSUL_DNS_SERVICE_HOST",
-						Value: "127.0.0.1",
+			name:             "Service with cluster IP set",
+			fullName:         "consul-consul-dns.consul",
+			serviceName:      "consul-consul-dns",
+			serviceNamespace: "consul",
+			expectedIP:       "10.0.0.1",
+			configuredService: func(serviceName, serviceNamespace, IP string) *corev1.Service {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      serviceName,
+						Namespace: serviceNamespace,
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: IP,
+						Ports: []corev1.ServicePort{
+							{
+								Port: 8081,
+							},
+						},
 					},
 				}
-				return pod
+				return service
 			},
+			expectedErr: nil,
+		},
+		{
+			name:             "No service found",
+			fullName:         "consul-consul-dns.consul",
+			serviceName:      "consul-consul-dns",
+			serviceNamespace: "consul",
+			expectedIP:       "",
+			configuredService: func(serviceName, serviceNamespace, IP string) *corev1.Service {
+				return &corev1.Service{}
+			},
+			expectedErr: fmt.Errorf("unable to get service: services \"consul-consul-dns\" not found"),
+		},
+		{
+			name:             "Service is missing IP",
+			fullName:         "consul-consul-dns.consul",
+			serviceName:      "consul-consul-dns",
+			serviceNamespace: "consul",
+			expectedIP:       "",
+			configuredService: func(serviceName, serviceNamespace, IP string) *corev1.Service {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      serviceName,
+						Namespace: serviceNamespace,
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Port: 8081,
+							},
+						},
+					},
+				}
+				return service
+			},
+			expectedErr: fmt.Errorf("no cluster ip found on service: consul-consul-dns"),
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := searchDNSIPFromEnvironment(*c.pod(minimalPod()), c.prefix)
-			require.Equal(t, c.expected, actual)
+			client := fake.NewSimpleClientset()
+			service := c.configuredService(c.serviceName, c.serviceNamespace, c.expectedIP)
+			_, err := client.CoreV1().Services(c.serviceNamespace).Create(context.Background(), service, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			actual, err := clusterIPFromDNSService(client, c.fullName)
+			require.Equal(t, c.expectedErr, err)
+			require.Equal(t, c.expectedIP, actual)
 		})
 	}
 }

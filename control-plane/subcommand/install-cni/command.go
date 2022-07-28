@@ -34,8 +34,8 @@ type Command struct {
 	flagCNINetDir string
 	// flagCNIBinSourceDir is the location of consul-cni binary inside the installer container (/bin).
 	flagCNIBinSourceDir string
-	// flagDNSService is used to pass the name of the DNS service, if enabled, onto the CNI plugin. DNS is enabled
-	// in the helm chart and it creates a service that points to the Consul servers.
+	// flagDNSService is used to pass the name and namespace of the DNS service as <service>.<namespace> to CNI
+	// plugin if DNS is enabled in the helm chart.
 	flagDNSService string
 	// flageKubeconfig is the filename of the generated kubeconfig that the plugin will use to communicate with
 	// the kubernetes api.
@@ -114,6 +114,7 @@ func (c *Command) Run(args []string) int {
 		"type", cfg.Type,
 		"cni_bin_dir", cfg.CNIBinDir,
 		"cni_net_dir", cfg.CNINetDir,
+		"dns_service", cfg.DNSService,
 		"multus", cfg.Multus,
 		"kubeconfig", cfg.Kubeconfig,
 		"log_level", cfg.LogLevel)
