@@ -18,14 +18,17 @@ func TestTerminatingGatewayService_Validate(t *testing.T) {
 					Name: "api",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "test-service",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "test-service",
+						},
 					},
 				},
 			},
 		},
-		"no service specified": {
+		"no catalogRegistration specified": {
 			terminatingGatewayService: &TerminatingGatewayService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "api",
@@ -33,7 +36,7 @@ func TestTerminatingGatewayService_Validate(t *testing.T) {
 				Spec: TerminatingGatewayServiceSpec{},
 			},
 			expectedErrMsgs: []string{
-				`spec.service: Invalid value: "null": service must be specified`,
+				`spec.catalogRegistration: Invalid value: "null": catalogRegistration must be specified`,
 			},
 		},
 		"no node specified": {
@@ -42,29 +45,35 @@ func TestTerminatingGatewayService_Validate(t *testing.T) {
 					Name: "api",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						ServiceName: "test-service",
+					CatalogRegistration: &CatalogRegistration{
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo",
+						},
 					},
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.service.node: Invalid value: "": node must be specified`,
+				`spec.catalogRegistration.node: Invalid value: "": node must be specified`,
 			},
 		},
-		"no serviceName specified": {
+		"no service specified": {
 			terminatingGatewayService: &TerminatingGatewayService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "api",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy-node",
-						ServiceName: "",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "",
+						},
 					},
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.service.serviceName: Invalid value: "": serviceName must be specified`,
+				`spec.catalogRegistration.service.service: Invalid value: "": service must be specified`,
 			},
 		},
 	}

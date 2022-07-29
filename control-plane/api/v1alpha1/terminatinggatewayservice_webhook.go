@@ -53,9 +53,9 @@ func (v *TerminatingGatewayServiceWebhook) Handle(ctx context.Context, req admis
 
 		for _, item := range termGtwServiceList.Items {
 			// If any terminating gateway service resource has the same service name as this one, reject it.
-			if item.Namespace == termGtwService.Namespace && item.ServiceInfo().ServiceName == termGtwService.ServiceInfo().ServiceName {
+			if item.Namespace == termGtwService.Namespace && item.ServiceInfo().Service.Service == termGtwService.ServiceInfo().Service.Service {
 				return admission.Errored(http.StatusBadRequest,
-					fmt.Errorf("an existing TerminatingGatewayService resource has the same service name `name: %s, namespace: %s`", item.ServiceInfo().ServiceName, termGtwService.Namespace))
+					fmt.Errorf("an existing TerminatingGatewayService resource has the same service name `name: %s, namespace: %s`", item.ServiceInfo().Service.Service, termGtwService.Namespace))
 			}
 		}
 	}

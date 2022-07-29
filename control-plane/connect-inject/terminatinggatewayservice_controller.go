@@ -2,11 +2,13 @@ package connectinject
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strings"
 	"time"
@@ -70,7 +72,7 @@ func (r *TerminatingGatewayServiceController) Reconcile(ctx context.Context, req
 	} else {
 		if containsString(terminatingGatewayService.Finalizers, FinalizerName) {
 			r.Log.Info("TerminatingGatewayService was deleted, deleting from consul", "name", req.Name, "ns", req.Namespace)
-			_, err := r.deleteService(spec.Service.ServiceName)
+			_, err := r.deleteService(spec.CatalogRegistration.Service.Service)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -119,22 +121,22 @@ func (r *TerminatingGatewayServiceController) updateStatus(ctx context.Context, 
 
 	policyName := ""
 	if r.AclEnabled {
-		policyName = fmt.Sprintf("%s-write-policy", terminatingGatewayService.Spec.Service.ServiceName)
+		policyName = fmt.Sprintf("%s-write-policy", terminatingGatewayService.Spec.CatalogRegistration.Service.Service)
 	}
 
 	terminatingGatewayService.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
 	terminatingGatewayService.SetSyncedCondition(corev1.ConditionTrue, "", "")
 
 	terminatingGatewayService.Status.ServiceInfoRef = &consulv1alpha1.ServiceInfoRefStatus{
-		ServiceName: terminatingGatewayService.Spec.Service.ServiceName,
+		ServiceName: terminatingGatewayService.Spec.CatalogRegistration.Service.Service,
 		PolicyName:  policyName,
 	}
 
 	err := r.Status().Update(ctx, terminatingGatewayService)
 	if err != nil {
-		err = fmt.Errorf("failed to update TerminatingGatewayService status: %v", err)
+		return fmt.Errorf("failed to update TerminatingGatewayService status: %v", err)
 	}
-	return err
+	return nil
 }
 
 // updateStatusError updates the terminatingGatewayService's Condition in the status.
@@ -143,9 +145,9 @@ func (r *TerminatingGatewayServiceController) updateStatusError(ctx context.Cont
 
 	err := r.Status().Update(ctx, terminatingGatewayService)
 	if err != nil {
-		err = fmt.Errorf("failed to update TerminatingGatewayService status: %v", err)
+		return fmt.Errorf("failed to update TerminatingGatewayService status: %v", err)
 	}
-	return err
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -159,29 +161,14 @@ func (r *TerminatingGatewayServiceController) SetupWithManager(mgr ctrl.Manager)
 func (r *TerminatingGatewayServiceController) createOrUpdateService(terminatingGatewayService *consulv1alpha1.TerminatingGatewayService, ctx context.Context) error {
 	spec := terminatingGatewayService.Spec
 
-	service, serviceExists, err := r.serviceFound(spec.Service.ServiceName)
+	service, serviceExists, err := r.serviceFound(spec.CatalogRegistration.Service.Service)
 	if err != nil {
 		return fmt.Errorf("error obtaining existing services: %v", err)
 	}
 
 	if !serviceExists {
 		// register external service with Consul.
-		serviceID := ""
-		if spec.Service.ServiceID == "" {
-			serviceID = spec.Service.ServiceName
-		} else {
-			serviceID = spec.Service.ServiceID
-		}
-
-		catalogRegistration := &api.CatalogRegistration{
-			Node:    spec.Service.Node,
-			Address: spec.Service.Address,
-			Service: &api.AgentService{
-				ID:      serviceID,
-				Service: spec.Service.ServiceName,
-				Port:    spec.Service.ServicePort}}
-
-		_, err = r.ConsulClient.Catalog().Register(catalogRegistration, nil)
+		err = onlyRegisterService(terminatingGatewayService, r.ConsulClient)
 		if err != nil {
 			return fmt.Errorf("unable to register external service with Consul: %v", err)
 		}
@@ -217,8 +204,8 @@ func (r *TerminatingGatewayServiceController) updateTerminatingGatewayTokenWithW
 	}
 
 	aclPolicy := &api.ACLPolicy{
-		Name:  spec.Service.ServiceName + "-write-policy",
-		Rules: fmt.Sprintf(`service "%s" {policy = "write"}`, spec.Service.ServiceName)}
+		Name:  spec.CatalogRegistration.Service.Service + "-write-policy",
+		Rules: fmt.Sprintf(`service "%s" {policy = "write"}`, spec.CatalogRegistration.Service.Service)}
 
 	allConsulPolicies, _, err := r.ConsulClient.ACL().PolicyList(nil)
 	if err != nil {
@@ -262,9 +249,7 @@ func (r *TerminatingGatewayServiceController) serviceFound(serviceName string) (
 	}
 	if length > 1 {
 		err = errors.New("multiple services found with the same serviceName")
-	} else if length == 0 {
-		err = errors.New("no service found")
-	} else {
+	} else if length == 1 {
 		result = services[0]
 		serviceExists = true
 	}
@@ -275,38 +260,128 @@ func (r *TerminatingGatewayServiceController) serviceFound(serviceName string) (
 func (r *TerminatingGatewayServiceController) updateServiceIfDifferent(service *api.CatalogService, terminatingGatewayService *consulv1alpha1.TerminatingGatewayService, ctx context.Context) error {
 	spec := terminatingGatewayService.Spec
 
+	byteRep, err := json.Marshal(spec.CatalogRegistration.Service.TaggedAddresses)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	TaggedAddresses := map[string]api.ServiceAddress{}
+	err = json.Unmarshal(byteRep, &TaggedAddresses)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Service.Tags)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	Tags := []string{}
+	err = json.Unmarshal(byteRep, &Tags)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Service.Weights)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	Weights := api.AgentWeights{}
+	err = json.Unmarshal(byteRep, &Weights)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Service.Proxy)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	var Proxy *api.AgentServiceConnectProxyConfig
+	err = json.Unmarshal(byteRep, &Proxy)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Check)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	var check *api.AgentCheck
+	err = json.Unmarshal(byteRep, &check)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Checks)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	checks := api.HealthChecks{}
+	err = json.Unmarshal(byteRep, &checks)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
 	updatedCatalogRegisteration := &api.CatalogRegistration{
-		Node:    spec.Service.Node,
-		Address: spec.Service.Address,
-
+		Node:            service.Node,
+		Address:         service.Address,
+		TaggedAddresses: service.TaggedAddresses,
+		NodeMeta:        service.NodeMeta,
+		Datacenter:      service.Datacenter,
 		Service: &api.AgentService{
-			Service: spec.Service.ServiceName,
-			ID:      spec.Service.ServiceID,
+			ID:                service.ServiceID,
+			Service:           service.ServiceName,
+			Address:           service.ServiceAddress,
+			TaggedAddresses:   service.ServiceTaggedAddresses,
+			Tags:              service.ServiceTags,
+			Meta:              service.ServiceMeta,
+			Port:              service.ServicePort,
+			Weights:           Weights,
+			EnableTagOverride: service.ServiceEnableTagOverride,
+			Proxy:             service.ServiceProxy,
 		},
+		Check:          check,
+		Checks:         checks,
+		SkipNodeUpdate: spec.CatalogRegistration.SkipNodeUpdate,
+	}
+	if service.Address != spec.CatalogRegistration.Service.Address {
+		updatedCatalogRegisteration.Address = spec.CatalogRegistration.Address
+	}
+	if !reflect.DeepEqual(service.TaggedAddresses, spec.CatalogRegistration.TaggedAddresses) {
+		updatedCatalogRegisteration.TaggedAddresses = spec.CatalogRegistration.TaggedAddresses
+	}
+	if !reflect.DeepEqual(service.NodeMeta, spec.CatalogRegistration.NodeMeta) {
+		updatedCatalogRegisteration.NodeMeta = spec.CatalogRegistration.NodeMeta
+	}
+	if service.Datacenter != spec.CatalogRegistration.Datacenter {
+		updatedCatalogRegisteration.Datacenter = spec.CatalogRegistration.Datacenter
+	}
+	if service.ServiceAddress != spec.CatalogRegistration.Service.Address {
+		updatedCatalogRegisteration.Service.Address = spec.CatalogRegistration.Service.Address
+	}
+	if !reflect.DeepEqual(service.ServiceTaggedAddresses, TaggedAddresses) {
+		updatedCatalogRegisteration.Service.TaggedAddresses = TaggedAddresses
+	}
+	if !reflect.DeepEqual(service.ServiceTags, Tags) {
+		updatedCatalogRegisteration.Service.Tags = Tags
+	}
+	if !reflect.DeepEqual(service.ServiceMeta, spec.CatalogRegistration.Service.Meta) {
+		updatedCatalogRegisteration.Service.Meta = spec.CatalogRegistration.Service.Meta
+	}
+	if !reflect.DeepEqual(service.ServiceWeights, Weights) {
+		updatedCatalogRegisteration.Service.Weights = Weights
+	}
+	if service.ServicePort != spec.CatalogRegistration.Service.Port {
+		updatedCatalogRegisteration.Service.Port = spec.CatalogRegistration.Service.Port
 	}
 
-	if service.Node != spec.Service.Node {
-		updatedCatalogRegisteration.Node = spec.Service.Node
+	if service.ServiceEnableTagOverride != spec.CatalogRegistration.Service.EnableTagOverride {
+		updatedCatalogRegisteration.Service.EnableTagOverride = spec.CatalogRegistration.Service.EnableTagOverride
 	}
-
-	if service.Datacenter != spec.Service.Datacenter {
-		updatedCatalogRegisteration.Datacenter = spec.Service.Datacenter
-	}
-
-	if service.ServiceAddress != spec.Service.ServiceAddress {
-		updatedCatalogRegisteration.Service.Address = spec.Service.ServiceAddress
-	}
-
-	if service.ServicePort != spec.Service.ServicePort {
-		updatedCatalogRegisteration.Service.Port = spec.Service.ServicePort
-	}
-
-	if service.ServiceEnableTagOverride != spec.Service.ServiceEnableTagOverride {
-		updatedCatalogRegisteration.Service.EnableTagOverride = spec.Service.ServiceEnableTagOverride
+	if !reflect.DeepEqual(service.ServiceProxy, Proxy) {
+		updatedCatalogRegisteration.Service.Proxy = Proxy
 	}
 
 	// Delete old service.
-	_, err := r.onlyDeleteServiceEntry(service.ServiceName)
+	_, err = r.onlyDeleteServiceEntry(service.ServiceName)
 	if err != nil {
 		return fmt.Errorf("error deleting stale service entry: %v", err)
 	}
@@ -329,6 +404,105 @@ func (r *TerminatingGatewayServiceController) updateServiceIfDifferent(service *
 	// Store the state in the status.
 	err = r.updateStatus(ctx, terminatingGatewayService)
 	return err
+}
+
+func onlyRegisterService(terminatingGatewayService *consulv1alpha1.TerminatingGatewayService, consulClient *api.Client) error {
+	spec := terminatingGatewayService.Spec
+
+	ID := ""
+	if spec.CatalogRegistration.Service.ID == "" {
+		ID = spec.CatalogRegistration.Service.Service
+	} else {
+		ID = spec.CatalogRegistration.Service.ID
+	}
+
+	byteRep, err := json.Marshal(spec.CatalogRegistration.Service.TaggedAddresses)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	TaggedAddresses := map[string]api.ServiceAddress{}
+	err = json.Unmarshal(byteRep, &TaggedAddresses)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Service.Tags)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	Tags := []string{}
+	err = json.Unmarshal(byteRep, &Tags)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Service.Weights)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	Weights := api.AgentWeights{}
+	err = json.Unmarshal(byteRep, &Weights)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Service.Proxy)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	var Proxy *api.AgentServiceConnectProxyConfig
+	err = json.Unmarshal(byteRep, &Proxy)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Check)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	var check *api.AgentCheck
+	err = json.Unmarshal(byteRep, &check)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	byteRep, err = json.Marshal(spec.CatalogRegistration.Checks)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+	checks := api.HealthChecks{}
+	err = json.Unmarshal(byteRep, &checks)
+	if err != nil {
+		return fmt.Errorf("error formating service field: %v", err)
+	}
+
+	catalogRegistration := &api.CatalogRegistration{
+		Node:            spec.CatalogRegistration.Node,
+		Address:         spec.CatalogRegistration.Address,
+		TaggedAddresses: spec.CatalogRegistration.TaggedAddresses,
+		NodeMeta:        spec.CatalogRegistration.NodeMeta,
+		Datacenter:      spec.CatalogRegistration.Datacenter,
+		Service: &api.AgentService{
+			ID:                ID,
+			Service:           spec.CatalogRegistration.Service.Service,
+			Address:           spec.CatalogRegistration.Service.Address,
+			TaggedAddresses:   TaggedAddresses,
+			Tags:              Tags,
+			Meta:              spec.CatalogRegistration.Service.Meta,
+			Port:              spec.CatalogRegistration.Service.Port,
+			Weights:           Weights,
+			EnableTagOverride: spec.CatalogRegistration.Service.EnableTagOverride,
+			Proxy:             Proxy,
+		},
+		Check:          check,
+		Checks:         checks,
+		SkipNodeUpdate: spec.CatalogRegistration.SkipNodeUpdate,
+	}
+	_, err = consulClient.Catalog().Register(catalogRegistration, nil)
+	if err != nil {
+		return fmt.Errorf("unable to update TerminatingGatewayService status: %v", err)
+	}
+	return nil
 }
 
 // deleteService deletes a service and its associated "write" policy.

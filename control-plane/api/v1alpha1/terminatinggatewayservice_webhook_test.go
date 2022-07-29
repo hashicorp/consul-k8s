@@ -28,9 +28,12 @@ func TestValidateTerminatingGatewayService(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "foo",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo",
+						},
 					},
 				},
 			}},
@@ -40,9 +43,12 @@ func TestValidateTerminatingGatewayService(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "foo2",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo2",
+						},
 					},
 				},
 			},
@@ -55,9 +61,12 @@ func TestValidateTerminatingGatewayService(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "foo",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo",
+						},
 					},
 				},
 			}},
@@ -67,9 +76,12 @@ func TestValidateTerminatingGatewayService(t *testing.T) {
 					Namespace: "other",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "foo",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo",
+						},
 					},
 				},
 			},
@@ -82,9 +94,12 @@ func TestValidateTerminatingGatewayService(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "foo",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo",
+						},
 					},
 				},
 			}},
@@ -94,9 +109,12 @@ func TestValidateTerminatingGatewayService(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: TerminatingGatewayServiceSpec{
-					Service: &CatalogService{
-						Node:        "legacy_node",
-						ServiceName: "foo",
+					CatalogRegistration: &CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: AgentService{
+							Service: "foo",
+						},
 					},
 				},
 			},

@@ -40,11 +40,13 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
@@ -57,11 +59,13 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 				},
 			},
 			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
+				CatalogRegistration: &v1alpha1.CatalogRegistration{
+					Node:    "legacy_node",
+					Address: "10.20.10.22",
+					Service: v1alpha1.AgentService{
+						Service: "TerminatingGatewayServiceController-created-service",
+						Port:    9003,
+					},
 				},
 			},
 			aclEnabled: false,
@@ -75,11 +79,13 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
@@ -92,11 +98,13 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 				},
 			},
 			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
+				CatalogRegistration: &v1alpha1.CatalogRegistration{
+					Node:    "legacy_node",
+					Address: "10.20.10.22",
+					Service: v1alpha1.AgentService{
+						Service: "TerminatingGatewayServiceController-created-service",
+						Port:    9003,
+					},
 				},
 			},
 			aclEnabled: true,
@@ -199,10 +207,10 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 				policyName = fmt.Sprintf("%s-write-policy", serviceName)
 			}
 
-			require.Equal(t, tt.expectedSpec.Service.ServiceName, service.ServiceName)
-			require.Equal(t, tt.expectedSpec.Service.ServicePort, service.ServicePort)
-			require.Equal(t, tt.expectedSpec.Service.Node, service.Node)
-			require.Equal(t, tt.expectedSpec.Service.Address, service.Address)
+			require.Equal(t, tt.expectedSpec.CatalogRegistration.Service.Service, service.ServiceName)
+			require.Equal(t, tt.expectedSpec.CatalogRegistration.Service.Port, service.ServicePort)
+			require.Equal(t, tt.expectedSpec.CatalogRegistration.Node, service.Node)
+			require.Equal(t, tt.expectedSpec.CatalogRegistration.Address, service.Address)
 
 			if tt.aclEnabled {
 				aclToken, aclTokenFound := fetchTerminatingGatewayToken(consulClient)
@@ -232,81 +240,16 @@ func TestReconcileCreateTerminatingGatewayService(t *testing.T) {
 func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expErr         string
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
-			name: "Delete TerminatingGatewayService that registers an external service with Consul",
-			k8sObjects: func() []runtime.Object {
-				terminatingGatewayService := &v1alpha1.TerminatingGatewayService{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "Terminating gateway service-created",
-						Namespace: "default",
-					},
-					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
-						},
-					},
-				}
-				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
-			},
+			name:       "Delete TerminatingGatewayService that registers an external service with Consul",
 			aclEnabled: false,
 		},
 		{
-			name: "Delete TerminatingGatewayService that registers an external service with Consul and updates terminating gateway token with new write policy",
-			k8sObjects: func() []runtime.Object {
-				terminatingGatewayService := &v1alpha1.TerminatingGatewayService{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "Terminating gateway service-created",
-						Namespace: "default",
-					},
-					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
-						},
-					},
-				}
-				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
-			},
+			name:       "Delete TerminatingGatewayService that registers an external service with Consul and updates terminating gateway token with new write policy",
 			aclEnabled: true,
 		},
 	}
@@ -321,11 +264,13 @@ func TestReconcile_DeleteTerminatingGatewayService(t *testing.T) {
 				Finalizers:        []string{FinalizerName},
 			},
 			Spec: v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
+				CatalogRegistration: &v1alpha1.CatalogRegistration{
+					Node:    "legacy_node",
+					Address: "10.20.10.22",
+					Service: v1alpha1.AgentService{
+						Service: "TerminatingGatewayServiceController-created-service",
+						Port:    9003,
+					},
 				},
 			},
 		}
@@ -451,18 +396,20 @@ func TestTerminatingGatewayServiceUpdateStatus(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: v1alpha1.TerminatingGatewayServiceSpec{
-					Service: &v1alpha1.CatalogService{
-						Node:        "legacy_node",
-						Address:     "10.20.10.22",
-						ServiceName: "TerminatingGatewayServiceController-created-service",
-						ServicePort: 9003,
+					CatalogRegistration: &v1alpha1.CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: v1alpha1.AgentService{
+							Service: "TerminatingGatewayServiceController-created-service",
+							Port:    9003,
+						},
 					},
 				},
 			},
 			expStatus: v1alpha1.TerminatingGatewayServiceStatus{
 				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
 					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
+					PolicyName:  "",
 				},
 				Conditions: v1alpha1.Conditions{
 					{
@@ -471,21 +418,23 @@ func TestTerminatingGatewayServiceUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			aclEnabled: true,
+			aclEnabled: false,
 		},
 		{
-			name: "updates status when there is an existing status. ACLs have been enabled",
+			name: "updates status when there is an existing status",
 			terminatingGatewayService: &v1alpha1.TerminatingGatewayService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "Terminating gateway service-created",
 					Namespace: "default",
 				},
 				Spec: v1alpha1.TerminatingGatewayServiceSpec{
-					Service: &v1alpha1.CatalogService{
-						Node:        "legacy_node",
-						Address:     "10.20.10.22",
-						ServiceName: "TerminatingGatewayServiceController-created-service",
-						ServicePort: 9003,
+					CatalogRegistration: &v1alpha1.CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: v1alpha1.AgentService{
+							Service: "TerminatingGatewayServiceController-created-service",
+							Port:    9003,
+						},
 					},
 				},
 				Status: v1alpha1.TerminatingGatewayServiceStatus{
@@ -498,16 +447,18 @@ func TestTerminatingGatewayServiceUpdateStatus(t *testing.T) {
 			expStatus: v1alpha1.TerminatingGatewayServiceStatus{
 				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
 					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
+					PolicyName:  "",
 				},
 				Conditions: v1alpha1.Conditions{
 					{
-						Type:   v1alpha1.ConditionSynced,
-						Status: corev1.ConditionTrue,
+						Type:    v1alpha1.ConditionSynced,
+						Status:  corev1.ConditionTrue,
+						Reason:  "",
+						Message: "",
 					},
 				},
 			},
-			aclEnabled: true,
+			aclEnabled: false,
 		},
 	}
 	for _, tt := range cases {
@@ -523,17 +474,9 @@ func TestTerminatingGatewayServiceUpdateStatus(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.TerminatingGatewayService{}, &v1alpha1.TerminatingGatewayList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
-			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
-
 			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
-				if tt.aclEnabled {
-					// Start Consul server with ACLs enabled and default deny policy.
-					c.ACL.Enabled = true
-					c.ACL.DefaultPolicy = "deny"
-					c.ACL.Tokens.InitialManagement = masterToken
-				}
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
@@ -541,39 +484,10 @@ func TestTerminatingGatewayServiceUpdateStatus(t *testing.T) {
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
-				Token:   masterToken,
 			}
 
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
-
-			if tt.aclEnabled {
-				// Create fake consul client with fake terminating gateway policy.
-
-				fakeTermGtwPolicy := &api.ACLPolicy{
-					Name:        "1b9a40e2-4b80-0b45-4ee4-0a47592fe386-terminating-gateway",
-					Description: "ACL Policy for terminating gateway",
-				}
-
-				termGtwPolicy, _, err := consulClient.ACL().PolicyCreate(fakeTermGtwPolicy, nil)
-				require.NoError(t, err)
-
-				fakeConsulClientPolicies := []*api.ACLRolePolicyLink{
-					{
-						ID:   termGtwPolicy.ID,
-						Name: termGtwPolicy.Name,
-					},
-				}
-
-				fakeConsulClientRole := &api.ACLRole{
-					Description: "ACL Role for consul-client",
-					Policies:    fakeConsulClientPolicies,
-					Name:        "terminating-gateway-acl-role",
-				}
-
-				_, _, err = consulClient.ACL().RoleCreate(fakeConsulClientRole, nil)
-				require.NoError(t, err)
-			}
 
 			// create the terminating gateway service controller.
 			tas := &TerminatingGatewayServiceController{
@@ -598,6 +512,8 @@ func TestTerminatingGatewayServiceUpdateStatus(t *testing.T) {
 			require.Equal(t, tt.expStatus.ServiceInfoRef.ServiceName, terminatingGatewayService.ServiceInfoRef().ServiceName)
 			require.Equal(t, tt.expStatus.ServiceInfoRef.PolicyName, terminatingGatewayService.ServiceInfoRef().PolicyName)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, terminatingGatewayService.Status.Conditions[0].Message)
+			require.Equal(t, tt.expStatus.Conditions[0].Status, terminatingGatewayService.Status.Conditions[0].Status)
+			require.Equal(t, tt.expStatus.Conditions[0].Reason, terminatingGatewayService.Status.Conditions[0].Reason)
 
 		})
 	}
@@ -620,11 +536,13 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: v1alpha1.TerminatingGatewayServiceSpec{
-					Service: &v1alpha1.CatalogService{
-						Node:        "legacy_node",
-						Address:     "10.20.10.22",
-						ServiceName: "TerminatingGatewayServiceController-created-service",
-						ServicePort: 9003,
+					CatalogRegistration: &v1alpha1.CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: v1alpha1.AgentService{
+							Service: "TerminatingGatewayServiceController-created-service",
+							Port:    9003,
+						},
 					},
 				},
 			},
@@ -634,12 +552,12 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 					{
 						Type:    v1alpha1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
-						Reason:  "InternalError",
+						Reason:  "Error updating status",
 						Message: "this is an error",
 					},
 				},
 			},
-			aclEnabled: true,
+			aclEnabled: false,
 		},
 		{
 			name: "updates status when there is an existing status",
@@ -649,11 +567,13 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: v1alpha1.TerminatingGatewayServiceSpec{
-					Service: &v1alpha1.CatalogService{
-						Node:        "legacy_node",
-						Address:     "10.20.10.22",
-						ServiceName: "TerminatingGatewayServiceController-created-service",
-						ServicePort: 9003,
+					CatalogRegistration: &v1alpha1.CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.22",
+						Service: v1alpha1.AgentService{
+							Service: "TerminatingGatewayServiceController-created-service",
+							Port:    9003,
+						},
 					},
 				},
 			},
@@ -663,12 +583,12 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 					{
 						Type:    v1alpha1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
-						Reason:  "InternalError",
+						Reason:  "Error updating status",
 						Message: "this is an error",
 					},
 				},
 			},
-			aclEnabled: true,
+			aclEnabled: false,
 		},
 	}
 	for _, tt := range cases {
@@ -684,17 +604,10 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.TerminatingGatewayService{}, &v1alpha1.TerminatingGatewayList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
-			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
-
 			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
-				if tt.aclEnabled {
-					// Start Consul server with ACLs enabled and default deny policy.
-					c.ACL.Enabled = true
-					c.ACL.DefaultPolicy = "deny"
-					c.ACL.Tokens.InitialManagement = masterToken
-				}
+
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
@@ -702,39 +615,10 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
-				Token:   masterToken,
 			}
 
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
-
-			if tt.aclEnabled {
-				// Create fake consul client with fake terminating gateway policy.
-
-				fakeTermGtwPolicy := &api.ACLPolicy{
-					Name:        "1b9a40e2-4b80-0b45-4ee4-0a47592fe386-terminating-gateway",
-					Description: "ACL Policy for terminating gateway",
-				}
-
-				termGtwPolicy, _, err := consulClient.ACL().PolicyCreate(fakeTermGtwPolicy, nil)
-				require.NoError(t, err)
-
-				fakeConsulClientPolicies := []*api.ACLRolePolicyLink{
-					{
-						ID:   termGtwPolicy.ID,
-						Name: termGtwPolicy.Name,
-					},
-				}
-
-				fakeConsulClientRole := &api.ACLRole{
-					Description: "ACL Role for consul-client",
-					Policies:    fakeConsulClientPolicies,
-					Name:        "terminating-gateway-acl-role",
-				}
-
-				_, _, err = consulClient.ACL().RoleCreate(fakeConsulClientRole, nil)
-				require.NoError(t, err)
-			}
 
 			// create the terminating gateway service controller.
 			tas := &TerminatingGatewayServiceController{
@@ -745,7 +629,8 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 				AclEnabled:   tt.aclEnabled,
 			}
 
-			tas.updateStatusError(context.Background(), tt.terminatingGatewayService, tt.reconcileErr)
+			err = tas.updateStatusError(context.Background(), tt.terminatingGatewayService, tt.reconcileErr)
+			require.NoError(t, err)
 
 			terminatingGatewayService := &v1alpha1.TerminatingGatewayService{}
 			terminatingGatewayServiceName := types.NamespacedName{
@@ -755,6 +640,8 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 			err = fakeClient.Get(context.Background(), terminatingGatewayServiceName, terminatingGatewayService)
 			require.NoError(t, err)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, terminatingGatewayService.Status.Conditions[0].Message)
+			require.Equal(t, tt.expStatus.Conditions[0].Status, terminatingGatewayService.Status.Conditions[0].Status)
+			require.Equal(t, tt.expStatus.Conditions[0].Reason, terminatingGatewayService.Status.Conditions[0].Reason)
 
 		})
 	}
@@ -763,11 +650,9 @@ func TestTerminatingGatewayServiceUpdateStatusError(t *testing.T) {
 func TestServiceFoundFunctions(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul",
@@ -778,29 +663,17 @@ func TestServiceFoundFunctions(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: false,
 		},
@@ -878,11 +751,9 @@ func TestServiceFoundFunctions(t *testing.T) {
 func TestTerminatingGatewayACLRole(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul and updates terminating gateway token with new write policy",
@@ -893,29 +764,17 @@ func TestTerminatingGatewayACLRole(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: true,
 		},
@@ -1023,11 +882,9 @@ func TestTerminatingGatewayACLRole(t *testing.T) {
 func TestCreateOrUpdateService(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul and updates terminating gateway token with new write policy",
@@ -1038,29 +895,17 @@ func TestCreateOrUpdateService(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: false,
 		},
@@ -1076,8 +921,6 @@ func TestCreateOrUpdateService(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.TerminatingGatewayService{}, &v1alpha1.TerminatingGatewayServiceList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
-			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
-
 			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
@@ -1088,7 +931,6 @@ func TestCreateOrUpdateService(t *testing.T) {
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
-				Token:   masterToken,
 			}
 
 			consulClient, err := api.NewClient(cfg)
@@ -1124,12 +966,14 @@ func TestCreateOrUpdateService(t *testing.T) {
 
 			newTermGtwService := &v1alpha1.TerminatingGatewayService{
 				Spec: v1alpha1.TerminatingGatewayServiceSpec{
-					Service: &v1alpha1.CatalogService{
-						Node:        "legacy_node",
-						Address:     "10.22.10.10",
-						ServiceName: nonExistentService,
-						ServiceID:   nonExistentService,
-						ServicePort: 10,
+					CatalogRegistration: &v1alpha1.CatalogRegistration{
+						Node:    "legacy_node",
+						Address: "10.20.10.10",
+						Service: v1alpha1.AgentService{
+							ID:      nonExistentService,
+							Service: nonExistentService,
+							Port:    10,
+						},
 					},
 				},
 			}
@@ -1142,23 +986,21 @@ func TestCreateOrUpdateService(t *testing.T) {
 			require.True(t, serviceExists)
 
 			// Service exists and has been updated.
-			newTermGtwService.Spec.Service.Address = "10.20.10.22"
+			newTermGtwService.Spec.CatalogRegistration.Address = "10.20.10.22"
 			controller.createOrUpdateService(newTermGtwService, ctx)
 
 			service, _ := serviceFound(nonExistentService, consulClient)
-			require.Equal(t, newTermGtwService.Spec.Service.Address, service.Address)
+			require.Equal(t, newTermGtwService.Spec.CatalogRegistration.Address, service.Address)
 		})
 	}
 }
 
-func TestUpdateTerminatingGatewayTokenWithWritePolicy(t *testing.T) {
+func TestOnlyRegisterService(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul",
@@ -1169,29 +1011,180 @@ func TestUpdateTerminatingGatewayTokenWithWritePolicy(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+								TaggedAddresses: map[string]v1alpha1.ServiceAddress{
+									"lan": {
+										Address: "10.20.10.22",
+										Port:    9003,
+									},
+								},
+								Weights: v1alpha1.AgentWeights{
+									Passing: 10,
+									Warning: 1,
+								},
+							},
+							Checks: v1alpha1.HealthChecks{},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
 			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
+			aclEnabled: false,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client.
+			k8sObjects := append(tt.k8sObjects(), &ns)
+
+			s := scheme.Scheme
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.TerminatingGatewayService{}, &v1alpha1.TerminatingGatewayServiceList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consul server.
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: consul.HTTPAddr,
+			}
+
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+
+			// create the terminating gateway service controller.
+			controller := &TerminatingGatewayServiceController{
+				Client:       fakeClient,
+				Log:          logrtest.TestLogger{T: t},
+				ConsulClient: consulClient,
+				Scheme:       s,
+				AclEnabled:   tt.aclEnabled,
+			}
+			namespacedName := types.NamespacedName{
+				Name:      "Terminating gateway service-created",
+				Namespace: "default",
+			}
+
+			resp, _ := controller.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+
+			require.False(t, resp.Requeue)
+
+			// Get the reconciled TerminatingGatewayService and make assertions on the spec.
+			terminatingGatewayService := &v1alpha1.TerminatingGatewayService{}
+			err = fakeClient.Get(context.Background(), namespacedName, terminatingGatewayService)
+			require.NoError(t, err)
+
+			// register a service. What is created should match.
+			catalogRegistration := &api.CatalogRegistration{
+				Node:    "legacy_node",
+				Address: "10.20.10.22",
+				Service: &api.AgentService{
+					Service: "TerminatingGatewayServiceController-created-service1",
+					Port:    9003,
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "10.20.10.22",
+							Port:    9003,
+						},
+					},
+					Weights: api.AgentWeights{
+						Passing: 10,
+						Warning: 1,
+					},
 				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
+				Checks: api.HealthChecks{},
+			}
+			_, err = consulClient.Catalog().Register(catalogRegistration, nil)
+			require.NoError(t, err)
+
+			err = onlyRegisterService(terminatingGatewayService, consulClient)
+			require.NoError(t, err)
+
+			catalogRegService, found := serviceFound("TerminatingGatewayServiceController-created-service1", consulClient)
+			require.True(t, found)
+			funcRegService, found := serviceFound("TerminatingGatewayServiceController-created-service", consulClient)
+			require.True(t, found)
+
+			require.Equal(t, catalogRegService.ServiceTaggedAddresses, funcRegService.ServiceTaggedAddresses)
+			require.Equal(t, catalogRegService.ServiceWeights, funcRegService.ServiceWeights)
+
+			// Create another service such that there is not be a match.
+			catalogRegistration = &api.CatalogRegistration{
+				Node:    "legacy_node",
+				Address: "10.20.10.23",
+				Service: &api.AgentService{
+					Service: "TerminatingGatewayServiceController-created-service2",
+					Port:    9003,
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "10.20.10.23",
+							Port:    9003,
+						},
+					},
+					Weights: api.AgentWeights{
+						Passing: 1,
+						Warning: 1,
+					},
 				},
+				Checks: api.HealthChecks{},
+			}
+
+			_, err = consulClient.Catalog().Register(catalogRegistration, nil)
+			require.NoError(t, err)
+
+			err = onlyRegisterService(terminatingGatewayService, consulClient)
+			require.NoError(t, err)
+
+			catalogRegService, found = serviceFound("TerminatingGatewayServiceController-created-service2", consulClient)
+			require.True(t, found)
+
+			require.NotEqual(t, catalogRegService.ServiceTaggedAddresses, funcRegService.ServiceTaggedAddresses)
+			require.NotEqual(t, catalogRegService.ServiceWeights, funcRegService.ServiceWeights)
+
+		})
+	}
+}
+
+func TestUpdateTerminatingGatewayTokenWithWritePolicy(t *testing.T) {
+	nodeName := "test-node"
+	cases := []struct {
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
+	}{
+		{
+			name: "New TerminatingGatewayService registers an external service with Consul",
+			k8sObjects: func() []runtime.Object {
+				terminatingGatewayService := &v1alpha1.TerminatingGatewayService{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "Terminating gateway service-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.TerminatingGatewayServiceSpec{
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
+						},
+					},
+				}
+				return []runtime.Object{terminatingGatewayService}
 			},
 			aclEnabled: false,
 		},
@@ -1204,29 +1197,17 @@ func TestUpdateTerminatingGatewayTokenWithWritePolicy(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: true,
 		},
@@ -1348,11 +1329,9 @@ func TestUpdateTerminatingGatewayTokenWithWritePolicy(t *testing.T) {
 func TestUpdateServiceIfDifferent(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul",
@@ -1363,29 +1342,17 @@ func TestUpdateServiceIfDifferent(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: false,
 		},
@@ -1398,29 +1365,17 @@ func TestUpdateServiceIfDifferent(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: true,
 		},
@@ -1513,31 +1468,30 @@ func TestUpdateServiceIfDifferent(t *testing.T) {
 			err = fakeClient.Get(ctx, namespacedName, terminatingGatewayService)
 			require.NoError(t, err)
 
-			service, serviceExists := serviceFound(terminatingGatewayService.Spec.Service.ServiceName, consulClient)
+			service, serviceExists := serviceFound(terminatingGatewayService.Spec.CatalogRegistration.Service.Service, consulClient)
 			require.True(t, serviceExists)
 
 			// no changes made to the controller.
 			err = controller.updateServiceIfDifferent(service, terminatingGatewayService, ctx)
 			require.NoError(t, err)
-			require.Equal(t, terminatingGatewayService.Spec.Service.Address, service.Address)
+			require.Equal(t, terminatingGatewayService.Spec.CatalogRegistration.Address, service.Address)
 
 			// changes have been made to the controller.
-			terminatingGatewayService.Spec.Service.ServiceAddress = "10.20.10.11"
-			terminatingGatewayService.Spec.Service.Node = "legacy_node"
-			terminatingGatewayService.Spec.Service.Datacenter = "dc1"
-			terminatingGatewayService.Spec.Service.ServicePort = 10
-			terminatingGatewayService.Spec.Service.ServiceEnableTagOverride = true
+			terminatingGatewayService.Spec.CatalogRegistration.Service.Address = "10.20.10.11"
+			terminatingGatewayService.Spec.CatalogRegistration.Datacenter = "dc1"
+			terminatingGatewayService.Spec.CatalogRegistration.Service.Port = 10
+			terminatingGatewayService.Spec.CatalogRegistration.Service.EnableTagOverride = true
 
 			err = controller.updateServiceIfDifferent(service, terminatingGatewayService, ctx)
 			require.NoError(t, err)
 
-			service, serviceExists = serviceFound(terminatingGatewayService.Spec.Service.ServiceName, consulClient)
+			service, serviceExists = serviceFound(terminatingGatewayService.Spec.CatalogRegistration.Service.Service, consulClient)
 			require.True(t, serviceExists)
 
-			require.Equal(t, terminatingGatewayService.Spec.Service.Node, service.Node)
-			require.Equal(t, terminatingGatewayService.Spec.Service.Datacenter, service.Datacenter)
-			require.Equal(t, terminatingGatewayService.Spec.Service.ServicePort, service.ServicePort)
-			require.Equal(t, terminatingGatewayService.Spec.Service.ServiceEnableTagOverride, service.ServiceEnableTagOverride)
+			require.Equal(t, terminatingGatewayService.Spec.CatalogRegistration.Address, service.Address)
+			require.Equal(t, terminatingGatewayService.Spec.CatalogRegistration.Datacenter, service.Datacenter)
+			require.Equal(t, terminatingGatewayService.Spec.CatalogRegistration.Service.Port, service.ServicePort)
+			require.Equal(t, terminatingGatewayService.Spec.CatalogRegistration.Service.EnableTagOverride, service.ServiceEnableTagOverride)
 
 			// write policy needs to be updated.
 			if tt.aclEnabled {
@@ -1552,11 +1506,9 @@ func TestUpdateServiceIfDifferent(t *testing.T) {
 func TestDeleteService(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul",
@@ -1567,29 +1519,17 @@ func TestDeleteService(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: false,
 		},
@@ -1602,29 +1542,17 @@ func TestDeleteService(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: true,
 		},
@@ -1716,7 +1644,7 @@ func TestDeleteService(t *testing.T) {
 			err = fakeClient.Get(context.Background(), namespacedName, terminatingGatewayService)
 			require.NoError(t, err)
 
-			serviceName := terminatingGatewayService.Spec.Service.ServiceName
+			serviceName := terminatingGatewayService.Spec.CatalogRegistration.Service.Service
 			nonExistentService := "nonexistent-service"
 			// delete nonexistent service
 			serviceDeleted, _ := controller.deleteService(nonExistentService)
@@ -1735,11 +1663,9 @@ func TestDeleteService(t *testing.T) {
 func TestOnlyDeleteServiceEntry(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul",
@@ -1750,29 +1676,17 @@ func TestOnlyDeleteServiceEntry(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: false,
 		},
@@ -1836,7 +1750,7 @@ func TestOnlyDeleteServiceEntry(t *testing.T) {
 			require.False(t, serviceDeleted)
 
 			// Search for existing service
-			serviceName := terminatingGatewayService.Spec.Service.ServiceName
+			serviceName := terminatingGatewayService.Spec.CatalogRegistration.Service.Service
 			serviceDeleted, _ = controller.onlyDeleteServiceEntry(serviceName)
 			require.True(t, serviceDeleted)
 		})
@@ -1846,11 +1760,9 @@ func TestOnlyDeleteServiceEntry(t *testing.T) {
 func TestDeleteTerminatingGatewayTokenWritePolicy(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul",
@@ -1861,29 +1773,17 @@ func TestDeleteTerminatingGatewayTokenWritePolicy(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: false,
 		},
@@ -1896,29 +1796,17 @@ func TestDeleteTerminatingGatewayTokenWritePolicy(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: true,
 		},
@@ -2058,8 +1946,6 @@ func TestFetchTerminatingGatewayToken(t *testing.T) {
 	cases := []struct {
 		name                       string
 		k8sObjects                 func() []runtime.Object
-		expectedStatus             *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec               *v1alpha1.TerminatingGatewayServiceSpec
 		aclEnabled                 bool
 		beforeCreatingTermGtwToken bool
 	}{
@@ -2072,29 +1958,17 @@ func TestFetchTerminatingGatewayToken(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled:                 true,
 			beforeCreatingTermGtwToken: true,
@@ -2108,29 +1982,17 @@ func TestFetchTerminatingGatewayToken(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled:                 true,
 			beforeCreatingTermGtwToken: false,
@@ -2248,11 +2110,9 @@ func TestFetchTerminatingGatewayToken(t *testing.T) {
 func TestFindPolicyFunctions(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name           string
-		k8sObjects     func() []runtime.Object
-		expectedStatus *v1alpha1.TerminatingGatewayServiceStatus
-		expectedSpec   *v1alpha1.TerminatingGatewayServiceSpec
-		aclEnabled     bool
+		name       string
+		k8sObjects func() []runtime.Object
+		aclEnabled bool
 	}{
 		{
 			name: "New TerminatingGatewayService registers an external service with Consul and updates terminating gateway token with new write policy",
@@ -2263,29 +2123,17 @@ func TestFindPolicyFunctions(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: v1alpha1.TerminatingGatewayServiceSpec{
-						Service: &v1alpha1.CatalogService{
-							Node:        "legacy_node",
-							Address:     "10.20.10.22",
-							ServiceName: "TerminatingGatewayServiceController-created-service",
-							ServicePort: 9003,
+						CatalogRegistration: &v1alpha1.CatalogRegistration{
+							Node:    "legacy_node",
+							Address: "10.20.10.22",
+							Service: v1alpha1.AgentService{
+								Service: "TerminatingGatewayServiceController-created-service",
+								Port:    9003,
+							},
 						},
 					},
 				}
 				return []runtime.Object{terminatingGatewayService}
-			},
-			expectedStatus: &v1alpha1.TerminatingGatewayServiceStatus{
-				ServiceInfoRef: &v1alpha1.ServiceInfoRefStatus{
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					PolicyName:  "TerminatingGatewayServiceController-created-service-write-policy",
-				},
-			},
-			expectedSpec: &v1alpha1.TerminatingGatewayServiceSpec{
-				Service: &v1alpha1.CatalogService{
-					Node:        "legacy_node",
-					Address:     "10.20.10.22",
-					ServiceName: "TerminatingGatewayServiceController-created-service",
-					ServicePort: 9003,
-				},
 			},
 			aclEnabled: true,
 		},
