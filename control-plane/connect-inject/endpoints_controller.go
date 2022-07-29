@@ -274,9 +274,9 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 
 			// After service registration, Consul will consolidate proxy information and thus we need to
 			// ask Consul for the proxy service again.
-			proxyService, _, err := client.Agent().Service(proxyServiceRegistration.Name, nil)
+			proxyService, _, err := client.Agent().Service(proxyServiceRegistration.ID, nil)
 			if err != nil {
-				r.Log.Error(err, "failed to retrieve proxy service", "name", proxyServiceRegistration.Name)
+				r.Log.Error(err, "failed to retrieve service", "name", proxyServiceRegistration.Name)
 				return err
 			}
 

@@ -67,7 +67,6 @@ type PluginConf struct {
 
 	// RuntimeConfig is the config passed from the kubelet to plugin at runtime.
 	RuntimeConfig *struct {
-		SampleConfig map[string]interface{} `json:"sample_config"`
 	} `json:"runtime_config"`
 
 	// Name of the plugin (consul-cni).
