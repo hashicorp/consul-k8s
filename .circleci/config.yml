@@ -81,12 +81,6 @@ commands:
                 working_directory: *acceptance-test-path
                 no_output_timeout: 2h
                 command: |
-                  # Enterprise tests can't run on fork PRs because they require
-                  # a secret.
-                  if [ -z "$CIRCLE_PR_NUMBER" ]; then
-                    ENABLE_ENTERPRISE=true
-                  fi
-
                   # We have to run the tests for each package separately so that we can
                   # exit early if any test fails (-failfast only works within a single
                   # package).
@@ -96,7 +90,7 @@ commands:
                   echo $pkgs
                   for pkg in $pkgs
                   do
-                    if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+                    if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -v -timeout 2h -failfast \
                           << parameters.additional-flags >> \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
@@ -121,15 +115,9 @@ commands:
                 working_directory: *acceptance-test-path
                 no_output_timeout: 2h
                 command: |
-                  # Enterprise tests can't run on fork PRs because they require
-                  # a secret.
-                  if [ -z "$CIRCLE_PR_NUMBER" ]; then
-                    ENABLE_ENTERPRISE=true
-                  fi
-
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
                   echo "Running $pkgs"
-                  gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
+                  gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -v -timeout 2h -failfast \
                       << parameters.additional-flags >> \
                       -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
@@ -564,9 +552,6 @@ jobs:
               echo "Deleting $cluster GKE cluster"
               gcloud container clusters delete $cluster --zone us-central1-a --project ${CLOUDSDK_CORE_PROJECT} --quiet
             done
-      - slack/status:
-          fail_only: true
-          failure_message: "GKE cleanup failed"
 
   cleanup-azure-resources:
     docker:
@@ -581,9 +566,6 @@ jobs:
               echo "Deleting $group resource group"
               az group delete -n $group --yes
             done
-      - slack/status:
-          fail_only: true
-          failure_message: "AKS cleanup failed"
 
   cleanup-eks-resources:
     docker:
@@ -600,9 +582,6 @@ jobs:
             export AWS_SESSION_TOKEN="$(jq -r .Credentials.SessionToken assume-role.json)"
 
             make ci.aws-acceptance-test-cleanup
-      - slack/status:
-          fail_only: true
-          failure_message: "EKS cleanup failed"
 
   ########################
   # ACCEPTANCE TESTS
@@ -669,10 +648,6 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
   acceptance-aks-1-21:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -723,10 +698,6 @@ jobs:
           command: |
             terraform destroy -auto-approve
           when: always
-
-      - slack/status:
-          fail_only: true
-          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-1-19:
     environment:
@@ -785,10 +756,6 @@ jobs:
             terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
   acceptance-openshift:
     environment:
       TEST_RESULTS: /tmp/test-results
@@ -838,10 +805,6 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
   acceptance-kind-1-23:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -871,9 +834,6 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      - slack/status:
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-11:
     environment:
@@ -907,9 +867,6 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      - slack/status:
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11.x nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-12:
     environment:
@@ -943,9 +900,6 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      - slack/status:
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-13:
     environment:
@@ -979,9 +933,6 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      - slack/status:
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
 workflows:
   version: 2
