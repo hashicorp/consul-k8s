@@ -1883,17 +1883,62 @@ EOF
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: -read-server-expose-service is not set when global.peering.tokenGeneration.serverAddresses.source is not equal to empty string" {
+@test "connectInject/Deployment: -read-server-expose-service and -server-address is not set when global.peering.tokenGeneration.serverAddresses.source is not equal to empty string" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local command=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'global.peering.tokenGeneration.serverAddresses.source="notempty"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command')
 
+  local actual=$(echo $command | jq -r ' . | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: when servers are not enabled and externalServers.enabled=true, passes in -server-address flags with hosts" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=1.2.3.4' \
+      --set 'externalServers.hosts[1]=2.2.3.4' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"1.2.3.4:8503\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"2.2.3.4:8503\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: externalServers.grpcPort can be customized" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=1.2.3.4' \
+      --set 'externalServers.hosts[1]=2.2.3.4' \
+      --set 'externalServers.grpcPort=1234' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"2.2.3.4:1234\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
