@@ -34,6 +34,15 @@ global:
     # If true, the Helm chart enables Cluster Peering for the cluster. This option enables peering controllers and
     # allows use of the PeeringAcceptor and PeeringDialer CRDs for establishing service mesh peerings.
     enabled: false
+    tokenGeneration:
+      serverAddresses:
+        # Source can be set to "" or "consul".
+        #
+        # "" is the default source. If servers are enabled, it will check if server.exposeService is enabled, and read
+        # the addresses from that service to use as the peering token server addresses.
+        #
+        # "consul" will use the Consul advertise addresses in the peering token.
+        source: ""
 
   # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.
   # It additionally indicates that you are running Consul Enterprise v1.11+ with a valid Consul Enterprise
@@ -992,6 +1001,43 @@ server:
   # @type: string
   annotations: null
 
+  # Configures a service to expose ports on the Consul servers over a Kubernetes Service.
+  exposeService:
+    # When enabled, deploys a Kubernetes Service to reach the Consul servers.
+    # @type: boolean
+    enabled: "-"
+    # Type of service, supports LoadBalancer or NodePort.
+    # @type: string
+    type: LoadBalancer
+    # If service is of type NodePort, configures the nodePorts.
+    nodePort:
+      # Configures the nodePort to expose the Consul server http port.
+      # @type: integer
+      http: null
+      # Configures the nodePort to expose the Consul server https port.
+      # @type: integer
+      https: null
+      # Configures the nodePort to expose the Consul server serf port.
+      # @type: integer
+      serf: null
+      # Configures the nodePort to expose the Consul server rpc port.
+      # @type: integer
+      rpc: null
+      # Configures the nodePort to expose the Consul server grpc port.
+      # @type: integer
+      grpc: null
+    # This value defines additional annotations for
+    # server pods. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # Server service properties.
   service:
     # Annotations to apply to the server service.
@@ -1033,6 +1079,9 @@ externalServers:
 
   # The HTTPS port of the Consul servers.
   httpsPort: 8501
+
+  # The GRPC port of the Consul servers.
+  grpcPort: 8503
 
   # The server name to use as the SNI host header when connecting with HTTPS.
   # @type: string

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -95,7 +96,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "thisisnotashwin/consul@sha256:b1d3f59406adf5fb9a3bee4ded058e619d3a186e83b2e2dc14d6da3f28a7073d",
+				"global.image": "ndhanushkodi/consul-dev:ent-backoff-fix",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -122,6 +123,10 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.datacenter": staticServerPeer,
 			}
 
+			if !cfg.UseKind {
+				staticServerPeerHelmValues["server.replicas"] = "3"
+			}
+
 			// On Kind, there are no load balancers but since all clusters
 			// share the same node network (docker bridge), we can use
 			// a NodePort service so that we can access node(s) in a different Kind cluster.
@@ -129,6 +134,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
+				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			releaseName := helpers.RandomName()
@@ -143,10 +150,16 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.datacenter": staticClientPeer,
 			}
 
+			if !cfg.UseKind {
+				staticClientPeerHelmValues["server.replicas"] = "3"
+			}
+
 			if cfg.UseKind {
 				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				staticClientPeerHelmValues["server.exposeService.type"] = "NodePort"
+				staticClientPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
@@ -162,7 +175,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			})
 
 			// Ensure the secret is created.
-			retry.Run(t, func(r *retry.R) {
+			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			retry.RunWith(timer, t, func(r *retry.R) {
 				acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
 				require.NoError(r, err)
 				require.NotEmpty(r, acceptorSecretResourceVersion)

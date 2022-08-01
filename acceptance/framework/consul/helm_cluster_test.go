@@ -24,7 +24,6 @@ func TestNewHelmCluster(t *testing.T) {
 			helmValues: map[string]string{},
 			want: map[string]string{
 				"global.image":                                  "test-config-image",
-				"server.bootstrapExpect":                        "1",
 				"server.replicas":                               "1",
 				"connectInject.envoyExtraArgs":                  "--log-level debug",
 				"connectInject.logLevel":                        "debug",

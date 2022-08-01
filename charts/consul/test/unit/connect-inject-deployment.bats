@@ -1831,6 +1831,70 @@ EOF
   [[ "$output" =~ "setting global.peering.enabled to true requires connectInject.enabled to be true" ]]
 }
 
+@test "connectInject/Deployment: -read-server-expose-service=true is set when global.peering.enabled is true and global.peering.tokenGeneration.serverAddresses.source is empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -read-server-expose-service=true is set when servers are enabled and peering is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'global.enabled=false' \
+      --set 'server.enabled=true' \
+      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -read-server-expose-service is not set when servers are disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'server.enabled=false' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -read-server-expose-service is not set when peering is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -read-server-expose-service is not set when global.peering.tokenGeneration.serverAddresses.source is not equal to empty string" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'global.peering.tokenGeneration.serverAddresses.source="notempty"' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
 
 #--------------------------------------------------------------------
 # openshift

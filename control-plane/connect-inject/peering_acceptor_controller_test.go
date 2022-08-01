@@ -1452,3 +1452,301 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 		})
 	}
 }
+
+func TestGetExposeServersServiceAddress(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name             string
+		k8sObjects       func() []runtime.Object
+		releaseNamespace string
+		expAddresses     []string
+		expErr           string
+	}{
+		{
+			name:             "Valid LoadBalancer service",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expAddresses: []string{"1.2.3.4:8502"},
+		},
+		{
+			name:             "Valid LoadBalancer service with Hostname",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "foo.bar.baz",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expAddresses: []string{"foo.bar.baz:8502"},
+		},
+		{
+			name:             "LoadBalancer has no addresses",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expErr: "unable to find load balancer address for test-expose-servers service, retrying",
+		},
+		{
+			name:             "LoadBalancer has empty IP",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expErr: "unable to find load balancer address for test-expose-servers service, retrying",
+		},
+		{
+			name:             "Valid NodePort service",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeNodePort,
+						Ports: []corev1.ServicePort{
+							{
+								Name:     "grpc",
+								NodePort: 30100,
+							},
+						},
+					},
+					Status: corev1.ServiceStatus{},
+				}
+				node1 := createNode("fake-gke-node1", "", "10.1.1.1")
+				node2 := createNode("fake-gke-node2", "", "10.2.2.2")
+				node3 := createNode("fake-gke-node3", "", "10.3.3.3")
+				return []runtime.Object{exposeServersService, node1, node2, node3}
+			},
+			expAddresses: []string{"10.1.1.1:30100", "10.2.2.2:30100", "10.3.3.3:30100"},
+		},
+		{
+			name:             "Valid NodePort service ignores node external IPs",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeNodePort,
+						Ports: []corev1.ServicePort{
+							{
+								Name:     "grpc",
+								NodePort: 30100,
+							},
+						},
+					},
+					Status: corev1.ServiceStatus{},
+				}
+				node1 := createNode("fake-gke-node1", "30.1.1.1", "10.1.1.1")
+				node2 := createNode("fake-gke-node2", "30.2.2.2", "10.2.2.2")
+				node3 := createNode("fake-gke-node3", "30.3.3.3", "10.3.3.3")
+				return []runtime.Object{exposeServersService, node1, node2, node3}
+			},
+			expAddresses: []string{"10.1.1.1:30100", "10.2.2.2:30100", "10.3.3.3:30100"},
+		},
+		{
+			name:             "Invalid NodePort service with only external IPs",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeNodePort,
+						Ports: []corev1.ServicePort{
+							{
+								Name:     "grpc",
+								NodePort: 30100,
+							},
+						},
+					},
+					Status: corev1.ServiceStatus{},
+				}
+				node1 := createNode("fake-gke-node1", "30.1.1.1", "")
+				node2 := createNode("fake-gke-node2", "30.2.2.2", "")
+				node3 := createNode("fake-gke-node3", "30.3.3.3", "")
+				return []runtime.Object{exposeServersService, node1, node2, node3}
+			},
+			expErr: "no server addresses were scraped from expose-servers service",
+		},
+		{
+			name:             "Invalid NodePort service because no nodes exist to scrape addresses from",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeNodePort,
+						Ports: []corev1.ServicePort{
+							{
+								Name:     "grpc",
+								NodePort: 30100,
+							},
+						},
+					},
+					Status: corev1.ServiceStatus{},
+				}
+				return []runtime.Object{exposeServersService}
+			},
+			expErr: "no nodes were found for scraping server addresses from expose-servers service",
+		},
+		{
+			name:             "Invalid NodePort service because no grpc port exists",
+			releaseNamespace: "test",
+			k8sObjects: func() []runtime.Object {
+				exposeServersService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "test",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeNodePort,
+						Ports: []corev1.ServicePort{
+							{
+								Name:     "not-grpc",
+								NodePort: 30100,
+							},
+						},
+					},
+					Status: corev1.ServiceStatus{},
+				}
+				node1 := createNode("fake-gke-node1", "30.1.1.1", "10.1.1.1")
+				node2 := createNode("fake-gke-node2", "30.2.2.2", "10.2.2.2")
+				node3 := createNode("fake-gke-node3", "30.3.3.3", "10.3.3.3")
+				return []runtime.Object{exposeServersService, node1, node2, node3}
+			},
+			expErr: "no grpc port was found for expose-servers service",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			nsTest := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), &ns, &nsTest)
+
+			s := scheme.Scheme
+			//s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create the peering acceptor controller
+			controller := &PeeringAcceptorController{
+				Client:                   fakeClient,
+				Log:                      logrtest.TestLogger{T: t},
+				Scheme:                   s,
+				ReleaseNamespace:         tt.releaseNamespace,
+				ExposeServersServiceName: "test-expose-servers",
+			}
+
+			// Get addresses from expose-servers service.
+			addrs, err := controller.getExposeServersServiceAddresses()
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Assert all the expected addresses are there.
+			for _, expAddr := range tt.expAddresses {
+				require.Contains(t, addrs, expAddr)
+			}
+		})
+	}
+}
+
+// createNode is a test helper to create Kubernetes nodes.
+func createNode(name, externalIP, internalIP string) *corev1.Node {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{},
+		},
+	}
+	if externalIP != "" {
+		node.Status.Addresses = append(node.Status.Addresses, corev1.NodeAddress{Type: corev1.NodeExternalIP, Address: externalIP})
+	}
+	if internalIP != "" {
+		node.Status.Addresses = append(node.Status.Addresses, corev1.NodeAddress{Type: corev1.NodeInternalIP, Address: internalIP})
+	}
+	return node
+}
