@@ -80,7 +80,6 @@ func TestPeering_Connect(t *testing.T) {
 
 			if !cfg.UseKind {
 				staticServerPeerHelmValues["server.replicas"] = "3"
-				staticServerPeerHelmValues["server.bootstrapExpect"] = "3"
 			}
 
 			// On Kind, there are no load balancers but since all clusters
@@ -108,7 +107,6 @@ func TestPeering_Connect(t *testing.T) {
 
 			if !cfg.UseKind {
 				staticServerPeerHelmValues["server.replicas"] = "3"
-				staticServerPeerHelmValues["server.bootstrapExpect"] = "3"
 			}
 
 			if cfg.UseKind {
