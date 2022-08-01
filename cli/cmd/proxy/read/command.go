@@ -266,52 +266,6 @@ func (c *ReadCommand) fetchAdminPorts() (map[string]int, error) {
 	return adminPorts, nil
 }
 
-func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
-	for name, config := range configs {
-		fmt.Println(name)
-		err := c.outputConfig(config)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
-	switch c.flagOutput {
-	case Table:
-		c.outputAsTables(config)
-	case JSON:
-		return c.outputAsJSON(config)
-	case Raw:
-		c.UI.Output(string(config.rawCfg))
-	}
-
-	return nil
-}
-
-func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) error {
-	cfg := make(map[string]interface{})
-	if !c.filtersPassed() || c.flagClusters {
-		cfg["clusters"] = config.Clusters
-	}
-	if !c.filtersPassed() || c.flagEndpoints {
-		cfg["endpoints"] = config.Endpoints
-	}
-	if !c.filtersPassed() || c.flagListeners {
-		cfg["listeners"] = config.Listeners
-	}
-	if !c.filtersPassed() || c.flagRoutes {
-		cfg["routes"] = config.Routes
-	}
-	if !c.filtersPassed() || c.flagSecrets {
-		cfg["secrets"] = config.Secrets
-	}
-
-	out, err := json.MarshalIndent(cfg, "", "\t")
-}
-
 func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*EnvoyConfig, error) {
 	configs := make(map[string]*EnvoyConfig, 0)
 
@@ -336,18 +290,6 @@ func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*Envoy
 }
 
 func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
-	for name, config := range configs {
-		fmt.Println(name)
-		err := c.outputConfig(config)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *ReadCommand) outputConfig(config *EnvoyConfig) error {
 	switch c.flagOutput {
 	case Table:
 		return c.outputTables(configs)
