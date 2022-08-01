@@ -999,6 +999,9 @@ workflows:
           context: consul-ci
           requires:
             - build-distros-linux
+      - cleanup-gcp-resources
+      - cleanup-azure-resources
+      - cleanup-eks-resources
       # Run acceptance tests using the docker image built for the control plane
       - acceptance:
           context: consul-ci
@@ -1011,12 +1014,15 @@ workflows:
       - acceptance-gke-1-20:
           requires:
             - dev-upload-docker
+            - cleanup-gcp-resources
       - acceptance-eks-1-19:
           requires:
             - dev-upload-docker
+            - cleanup-eks-resources
       - acceptance-aks-1-21:
           requires:
             - dev-upload-docker
+            - cleanup-azure-resources
   nightly-acceptance-tests:
     triggers:
       - schedule:
