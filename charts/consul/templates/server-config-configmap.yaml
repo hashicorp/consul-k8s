@@ -32,6 +32,11 @@ data:
       },
       "recursors": {{ .Values.global.recursors | toJson }},
       "retry_join": ["{{template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.ports.serflan.port }}"],
+      {{- if .Values.global.peering.enabled }}
+      "peering": {
+        "enabled": true
+      },
+      {{- end }}
       "server": true
     }
   {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}

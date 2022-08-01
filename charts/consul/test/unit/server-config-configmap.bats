@@ -905,3 +905,28 @@ load _helpers
 
   [ "${actual}" = null ]
 }
+
+#--------------------------------------------------------------------
+# peering
+
+@test "server/ConfigMap: peering configuration is unspecified by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .peering | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: peering configuration is set by if global.peering.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.peering.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .peering.enabled | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
