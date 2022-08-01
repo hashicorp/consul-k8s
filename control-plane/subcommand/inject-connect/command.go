@@ -196,7 +196,7 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagReadServerExposeService, "read-server-expose-service", false,
 		"Enables polling the Consul servers' external service for its IP(s).")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"An address the Consul server(s), formatted host:port, where host may be an IP or DNS name. May be specified multiple times for multiple addresses.")
+		"An address of the Consul server(s), formatted host:port, where host may be an IP or DNS name and port must be a gRPC port. May be specified multiple times for multiple addresses.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")

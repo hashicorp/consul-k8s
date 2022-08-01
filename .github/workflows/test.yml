@@ -142,15 +142,6 @@ jobs:
       - run:  mkdir -p ${{env.TEST_RESULTS}}
       - run:  echo "$HOME/bin" >> $GITHUB_PATH
 
-#      - name: Download consul
-#        working-directory: control-plane
-#        run: |
-#          mkdir -p $HOME/bin
-#          wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
-#            unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-#            rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
-#          chmod +x $HOME/bin/consul
-
       - name: Download consul
         working-directory: control-plane
         run: |
