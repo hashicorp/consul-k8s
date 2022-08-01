@@ -86,6 +86,65 @@ load _helpers
       .
 }
 
+@test "expose-servers/Service: http port exists when tls is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/expose-servers-service.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.ports[0]' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("http"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "expose-servers/Service: only https port exists when tls is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/expose-servers-service.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.ports[0]' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "expose-servers/Service: http and https ports exist when tls is enabled and httpsOnly is false" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/expose-servers-service.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      . | tee /dev/stderr |
+      yq '.spec.ports[1]' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local cmd=$(helm template \
+      -s templates/expose-servers-service.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      . | tee /dev/stderr |
+      yq '.spec.ports[0]' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("http"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # annotations
 
@@ -114,6 +173,33 @@ load _helpers
 
 #--------------------------------------------------------------------
 # nodePort
+
+@test "expose-servers/Service: HTTP node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/expose-servers-service.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'server.exposeService.type=NodePort' \
+      --set 'server.exposeService.nodePort.http=4443' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "http") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+}
+
+@test "expose-servers/Service: HTTPS node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/expose-servers-service.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.exposeService.type=NodePort' \
+      --set 'server.exposeService.nodePort.https=4443' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+}
 
 @test "expose-servers/Service: RPC node port can be set" {
   cd `chart_dir`
@@ -153,8 +239,6 @@ load _helpers
       yq -r '.spec.ports[] | select(.name == "grpc") | .nodePort' | tee /dev/stderr)
   [ "${actual}" == "4444" ]
 }
-
-# TODO: HTTP/HTTPS/TLS
 
 @test "expose-servers/Service: RPC, Serf and grpc node ports can be set" {
   cd `chart_dir`
