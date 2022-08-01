@@ -96,7 +96,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.image": "ndhanushkodi/consul-dev@sha256:61b02ac369cc13db6b9af8808b7e3a811bcdc9a09c95ddac0da931f81743091c",
+				"global.image": "ndhanushkodi/consul-dev:ent-backoff-fix",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -125,7 +125,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			if !cfg.UseKind {
 				staticServerPeerHelmValues["server.replicas"] = "3"
-				staticServerPeerHelmValues["server.bootstrapExpect"] = "3"
 			}
 
 			// On Kind, there are no load balancers but since all clusters
@@ -137,8 +136,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
 				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
-				staticServerPeerHelmValues["server.replicas"] = "1"
-				staticServerPeerHelmValues["server.bootstrapExpect"] = "1"
 			}
 
 			releaseName := helpers.RandomName()
@@ -164,8 +161,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 				staticClientPeerHelmValues["server.exposeService.type"] = "NodePort"
 				staticClientPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
-				staticServerPeerHelmValues["server.replicas"] = "1"
-				staticServerPeerHelmValues["server.bootstrapExpect"] = "1"
 			}
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)

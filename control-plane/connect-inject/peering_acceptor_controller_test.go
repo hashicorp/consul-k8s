@@ -1486,7 +1486,7 @@ func TestGetExposeServersServiceAddress(t *testing.T) {
 				}
 				return []runtime.Object{exposeServersService}
 			},
-			expAddresses: []string{"1.2.3.4:8503"},
+			expAddresses: []string{"1.2.3.4:8502"},
 		},
 		{
 			name:             "Valid LoadBalancer service with Hostname",
@@ -1512,7 +1512,7 @@ func TestGetExposeServersServiceAddress(t *testing.T) {
 				}
 				return []runtime.Object{exposeServersService}
 			},
-			expAddresses: []string{"foo.bar.baz:8503"},
+			expAddresses: []string{"foo.bar.baz:8502"},
 		},
 		{
 			name:             "LoadBalancer has no addresses",

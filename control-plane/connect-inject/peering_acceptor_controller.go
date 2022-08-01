@@ -417,17 +417,17 @@ func (r *PeeringAcceptorController) getExposeServersServiceAddresses() ([]string
 	}
 	err := r.Client.Get(r.Context, key, serverService)
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 	switch serverService.Spec.Type {
 	case corev1.ServiceTypeNodePort:
 		nodes := corev1.NodeList{}
 		err := r.Client.List(r.Context, &nodes)
 		if err != nil {
-			return []string{}, err
+			return nil, err
 		}
 		if len(nodes.Items) == 0 {
-			return []string{}, fmt.Errorf("no nodes were found for scraping server addresses from expose-servers service")
+			return nil, fmt.Errorf("no nodes were found for scraping server addresses from expose-servers service")
 		}
 		var grpcNodePort int32
 		for _, port := range serverService.Spec.Ports {
@@ -436,7 +436,7 @@ func (r *PeeringAcceptorController) getExposeServersServiceAddresses() ([]string
 			}
 		}
 		if grpcNodePort == 0 {
-			return []string{}, fmt.Errorf("no grpc port was found for expose-servers service")
+			return nil, fmt.Errorf("no grpc port was found for expose-servers service")
 		}
 		for _, node := range nodes.Items {
 			addrs := node.Status.Addresses
@@ -447,28 +447,28 @@ func (r *PeeringAcceptorController) getExposeServersServiceAddresses() ([]string
 			}
 		}
 		if len(serverExternalAddresses) == 0 {
-			return []string{}, fmt.Errorf("no server addresses were scraped from expose-servers service")
+			return nil, fmt.Errorf("no server addresses were scraped from expose-servers service")
 		}
 		return serverExternalAddresses, nil
 	case corev1.ServiceTypeLoadBalancer:
 		lbAddrs := serverService.Status.LoadBalancer.Ingress
 		if len(lbAddrs) < 1 {
-			return []string{}, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
+			return nil, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
 		}
 		for _, lbAddr := range lbAddrs {
-			// When the service is of type load balancer, the grpc port is hardcoded to 8503.
+			// When the service is of type load balancer, the grpc port is hardcoded to 8502.
 			if lbAddr.IP != "" {
-				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.IP, "8503"))
+				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.IP, "8502"))
 			}
 			if lbAddr.Hostname != "" {
-				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.Hostname, "8503"))
+				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.Hostname, "8502"))
 			}
 		}
 		if len(serverExternalAddresses) == 0 {
-			return []string{}, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
+			return nil, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
 		}
 	default:
-		return []string{}, fmt.Errorf("only NodePort and LoadBalancer service types are supported")
+		return nil, fmt.Errorf("only NodePort and LoadBalancer service types are supported")
 	}
 	return serverExternalAddresses, nil
 }

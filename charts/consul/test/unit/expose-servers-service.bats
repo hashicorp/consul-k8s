@@ -9,7 +9,7 @@ load _helpers
       .
 }
 
-@test "expose-servers/Service: enable with global.enabled false" {
+@test "expose-servers/Service: enabled when servers and peering are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
