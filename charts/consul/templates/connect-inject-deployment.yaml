@@ -11,6 +11,8 @@
 {{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
@@ -129,6 +131,7 @@ spec:
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
+                -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
                 {{- if .Values.connectInject.transparentProxy.defaultEnabled }}
                 -default-enable-transparent-proxy=true \
@@ -137,6 +140,11 @@ spec:
                 {{- end }}
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
+                {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") }}
+                {{- if (and $serverEnabled $serverExposeServiceEnabled) }}
+                -read-server-expose-service=true \
+                {{- end }}
+                {{- end }}
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \
@@ -146,7 +154,6 @@ spec:
                 {{- else }}
                 -transparent-proxy-default-overwrite-probes=false \
                 {{- end }}
-                -resource-prefix={{ template "consul.fullname" . }} \
                 {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
                 -enable-consul-dns=true \
                 {{- end }}

@@ -123,6 +123,7 @@ func TestPartitions_Connect(t *testing.T) {
 				serverHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
 				serverHelmValues["meshGateway.service.type"] = "NodePort"
 				serverHelmValues["meshGateway.service.nodePort"] = "30100"
+				serverHelmValues["server.exposeService.type"] = "NodePort"
 			}
 
 			releaseName := helpers.RandomName()
