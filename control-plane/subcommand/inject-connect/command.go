@@ -96,6 +96,7 @@ type Command struct {
 
 	// Server address flags.
 	flagReadServerExposeService bool
+	flagServerAddresses         []string
 
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
@@ -194,6 +195,8 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagReadServerExposeService, "read-server-expose-service", false,
 		"Enables polling the Consul servers' external service for its IP(s).")
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"An address of the Consul server(s), formatted host:port, where host may be an IP or DNS name and port must be a gRPC port. May be specified multiple times for multiple addresses.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -449,6 +452,7 @@ func (c *Command) Run(args []string) int {
 			ConsulClient:              c.consulClient,
 			ExposeServersServiceName:  c.flagResourcePrefix + "-expose-servers",
 			ReadServerExternalService: c.flagReadServerExposeService,
+			TokenServerAddresses:      c.flagServerAddresses,
 			ReleaseNamespace:          c.flagReleaseNamespace,
 			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),
 			Scheme:                    mgr.GetScheme(),

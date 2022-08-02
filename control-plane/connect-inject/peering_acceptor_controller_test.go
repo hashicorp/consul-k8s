@@ -29,17 +29,136 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
-		name                   string
-		k8sObjects             func() []runtime.Object
-		expectedConsulPeerings []*api.Peering
-		expectedK8sSecrets     func() []*corev1.Secret
-		expErr                 string
-		expectedStatus         *v1alpha1.PeeringAcceptorStatus
-		expectDeletedK8sSecret *types.NamespacedName
-		initialConsulPeerName  string
+		name                    string
+		k8sObjects              func() []runtime.Object
+		expectedConsulPeerings  []*api.Peering
+		expectedK8sSecrets      func() []*corev1.Secret
+		expErr                  string
+		expectedStatus          *v1alpha1.PeeringAcceptorStatus
+		expectDeletedK8sSecret  *types.NamespacedName
+		initialConsulPeerName   string
+		externalAddresses       []string
+		readServerExposeService bool
+		expectedTokenAddresses  []string
 	}{
 		{
 			name: "New PeeringAcceptor creates a peering in Consul and generates a token",
+			k8sObjects: func() []runtime.Object {
+				acceptor := &v1alpha1.PeeringAcceptor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.PeeringAcceptorSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "acceptor-created-secret",
+								Key:     "data",
+								Backend: "kubernetes",
+							},
+						},
+					},
+				}
+				return []runtime.Object{acceptor}
+			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
+					Secret: v1alpha1.Secret{
+						Name:    "acceptor-created-secret",
+						Key:     "data",
+						Backend: "kubernetes",
+					},
+				},
+			},
+			expectedConsulPeerings: []*api.Peering{
+				{
+					Name: "acceptor-created",
+				},
+			},
+			expectedK8sSecrets: func() []*corev1.Secret {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created-secret",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"data": "tokenstub",
+					},
+				}
+				return []*corev1.Secret{secret}
+			},
+		},
+		{
+			name:                    "PeeringAcceptor generates a token with expose server addresses",
+			readServerExposeService: true,
+			expectedTokenAddresses:  []string{"1.1.1.1:8503"},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-expose-servers",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.1.1.1",
+								},
+							},
+						},
+					},
+				}
+				acceptor := &v1alpha1.PeeringAcceptor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.PeeringAcceptorSpec{
+						Peer: &v1alpha1.Peer{
+							Secret: &v1alpha1.Secret{
+								Name:    "acceptor-created-secret",
+								Key:     "data",
+								Backend: "kubernetes",
+							},
+						},
+					},
+				}
+				return []runtime.Object{acceptor, service}
+			},
+			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
+				SecretRef: &v1alpha1.SecretRefStatus{
+					Secret: v1alpha1.Secret{
+						Name:    "acceptor-created-secret",
+						Key:     "data",
+						Backend: "kubernetes",
+					},
+				},
+			},
+			expectedConsulPeerings: []*api.Peering{
+				{
+					Name: "acceptor-created",
+				},
+			},
+			expectedK8sSecrets: func() []*corev1.Secret {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acceptor-created-secret",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"data": "tokenstub",
+					},
+				}
+				return []*corev1.Secret{secret}
+			},
+		},
+		{
+			name:                   "PeeringAcceptor generates a token with external addresses specified",
+			externalAddresses:      []string{"1.1.1.1:8503", "2.2.2.2:8503"},
+			expectedTokenAddresses: []string{"1.1.1.1:8503", "2.2.2.2:8503"},
 			k8sObjects: func() []runtime.Object {
 				acceptor := &v1alpha1.PeeringAcceptor{
 					ObjectMeta: metav1.ObjectMeta{
@@ -424,10 +543,14 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 
 			// Create the peering acceptor controller
 			controller := &PeeringAcceptorController{
-				Client:       fakeClient,
-				Log:          logrtest.TestLogger{T: t},
-				ConsulClient: consulClient,
-				Scheme:       s,
+				Client:                    fakeClient,
+				TokenServerAddresses:      tt.externalAddresses,
+				ReadServerExternalService: tt.readServerExposeService,
+				ExposeServersServiceName:  "test-expose-servers",
+				ReleaseNamespace:          "default",
+				Log:                       logrtest.TestLogger{T: t},
+				ConsulClient:              consulClient,
+				Scheme:                    s,
 			}
 			namespacedName := types.NamespacedName{
 				Name:      "acceptor-created",
@@ -475,6 +598,11 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			require.Contains(t, string(decodedTokenData), "\"CA\":null")
 			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
 			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.consul\"")
+			if len(tt.expectedTokenAddresses) > 0 {
+				for _, addr := range tt.externalAddresses {
+					require.Contains(t, string(decodedTokenData), addr)
+				}
+			}
 
 			// Get the reconciled PeeringAcceptor and make assertions on the status
 			acceptor := &v1alpha1.PeeringAcceptor{}

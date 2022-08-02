@@ -290,8 +290,9 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				require.NoError(t, err)
 				// Get the IP of the Consul server.
 				addr := strings.Split(acceptorPeerServer.HTTPAddr, ":")[0]
+				port := strings.Split(acceptorPeerServer.GRPCAddr, ":")[1]
 				// Generate expected token for Peering Initiate.
-				tokenString := fmt.Sprintf(`{"CA":null,"ServerAddresses":["%s:8300"],"ServerName":"%s","PeerID":"%s"}`, addr, token.ServerName, token.PeerID)
+				tokenString := fmt.Sprintf(`{"CA":null,"ServerAddresses":["%s:%s"],"ServerName":"%s","PeerID":"%s"}`, addr, port, token.ServerName, token.PeerID)
 				// Create peering initiate secret in Kubernetes.
 				encodedPeeringToken = base64.StdEncoding.EncodeToString([]byte(tokenString))
 				secret := tt.peeringSecret(encodedPeeringToken)
