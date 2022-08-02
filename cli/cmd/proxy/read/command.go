@@ -333,6 +333,8 @@ func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 		if c.flagPort != -1 {
 			c.UI.Output(fmt.Sprintf("Endpoint addresses with port number: %d", c.flagPort), terminal.WithInfoStyle())
 		}
+
+		c.UI.Output("")
 	}
 
 	for name, config := range configs {
