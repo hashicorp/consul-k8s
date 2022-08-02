@@ -9,53 +9,32 @@ import (
 func TestFilterClusters(t *testing.T) {
 	given := []Cluster{
 		{
-			Name:                     "local_agent",
 			FullyQualifiedDomainName: "local_agent",
 			Endpoints:                []string{"192.168.79.187:8502"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.553Z",
 		},
 		{
-			Name:                     "client",
 			FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.948Z",
 		},
 		{
-			Name:                     "frontend",
 			FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.855Z",
 		},
 		{
-			Name:                     "local_app",
 			FullyQualifiedDomainName: "local_app",
 			Endpoints:                []string{"127.0.0.1:8080"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.655Z",
 		},
 		{
-			Name:                     "local_admin",
 			FullyQualifiedDomainName: "local_admin",
 			Endpoints:                []string{"127.0.0.1:5000"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.655Z",
 		},
 		{
-			Name:                     "original-destination",
 			FullyQualifiedDomainName: "original-destination",
 			Endpoints:                []string{},
-			Type:                     "ORIGINAL_DST",
-			LastUpdated:              "2022-05-13T04:22:39.743Z",
 		},
 		{
-			Name:                     "server",
 			FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.754Z",
 		},
 	}
 
@@ -71,53 +50,32 @@ func TestFilterClusters(t *testing.T) {
 			port:    -1,
 			expected: []Cluster{
 				{
-					Name:                     "local_agent",
 					FullyQualifiedDomainName: "local_agent",
 					Endpoints:                []string{"192.168.79.187:8502"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.553Z",
 				},
 				{
-					Name:                     "client",
 					FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.948Z",
 				},
 				{
-					Name:                     "frontend",
 					FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.855Z",
 				},
 				{
-					Name:                     "local_app",
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 				{
-					Name:                     "local_admin",
 					FullyQualifiedDomainName: "local_admin",
 					Endpoints:                []string{"127.0.0.1:5000"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 				{
-					Name:                     "original-destination",
 					FullyQualifiedDomainName: "original-destination",
 					Endpoints:                []string{},
-					Type:                     "ORIGINAL_DST",
-					LastUpdated:              "2022-05-13T04:22:39.743Z",
 				},
 				{
-					Name:                     "server",
 					FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.754Z",
 				},
 			},
 		},
@@ -127,25 +85,16 @@ func TestFilterClusters(t *testing.T) {
 			port:    -1,
 			expected: []Cluster{
 				{
-					Name:                     "client",
 					FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.948Z",
 				},
 				{
-					Name:                     "frontend",
 					FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.855Z",
 				},
 				{
-					Name:                     "server",
 					FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
-					Type:                     "EDS",
-					LastUpdated:              "2022-06-09T00:39:12.754Z",
 				},
 			},
 		},
@@ -155,18 +104,12 @@ func TestFilterClusters(t *testing.T) {
 			port:    -1,
 			expected: []Cluster{
 				{
-					Name:                     "local_app",
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 				{
-					Name:                     "local_admin",
 					FullyQualifiedDomainName: "local_admin",
 					Endpoints:                []string{"127.0.0.1:5000"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 			},
 		},
@@ -176,11 +119,8 @@ func TestFilterClusters(t *testing.T) {
 			port:    8080,
 			expected: []Cluster{
 				{
-					Name:                     "local_app",
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 			},
 		},
@@ -190,18 +130,12 @@ func TestFilterClusters(t *testing.T) {
 			port:    -1,
 			expected: []Cluster{
 				{
-					Name:                     "local_app",
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 				{
-					Name:                     "local_admin",
 					FullyQualifiedDomainName: "local_admin",
 					Endpoints:                []string{"127.0.0.1:5000"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 			},
 		},
@@ -211,11 +145,8 @@ func TestFilterClusters(t *testing.T) {
 			port:    8080,
 			expected: []Cluster{
 				{
-					Name:                     "local_app",
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 			},
 		},
@@ -225,11 +156,8 @@ func TestFilterClusters(t *testing.T) {
 			port:    8080,
 			expected: []Cluster{
 				{
-					Name:                     "local_app",
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.655Z",
 				},
 			},
 		},
@@ -239,11 +167,8 @@ func TestFilterClusters(t *testing.T) {
 			port:    8502,
 			expected: []Cluster{
 				{
-					Name:                     "local_agent",
 					FullyQualifiedDomainName: "local_agent",
 					Endpoints:                []string{"192.168.79.187:8502"},
-					Type:                     "STATIC",
-					LastUpdated:              "2022-05-13T04:22:39.553Z",
 				},
 			},
 		},
@@ -261,30 +186,18 @@ func TestFilterEndpoints(t *testing.T) {
 	given := []Endpoint{
 		{
 			Address: "192.168.79.187:8502",
-			Cluster: "local_agent",
-			Weight:  1,
-			Status:  "HEALTHY",
 		},
 		{
 			Address: "127.0.0.1:8080",
-			Cluster: "local_app",
-			Weight:  1,
-			Status:  "HEALTHY",
 		},
 		{
 			Address: "192.168.31.201:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
 		},
 		{
 			Address: "192.168.47.235:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
 		},
 		{
 			Address: "192.168.71.254:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
 		},
 	}
 
@@ -299,30 +212,18 @@ func TestFilterEndpoints(t *testing.T) {
 			expected: []Endpoint{
 				{
 					Address: "192.168.79.187:8502",
-					Cluster: "local_agent",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 				{
 					Address: "127.0.0.1:8080",
-					Cluster: "local_app",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 				{
 					Address: "192.168.31.201:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 				{
 					Address: "192.168.47.235:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 				{
 					Address: "192.168.71.254:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 			},
 		},
@@ -332,9 +233,6 @@ func TestFilterEndpoints(t *testing.T) {
 			expected: []Endpoint{
 				{
 					Address: "127.0.0.1:8080",
-					Cluster: "local_app",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 			},
 		},
@@ -344,18 +242,12 @@ func TestFilterEndpoints(t *testing.T) {
 			expected: []Endpoint{
 				{
 					Address: "192.168.31.201:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 				{
 					Address: "192.168.47.235:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 				{
 					Address: "192.168.71.254:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 			},
 		},
@@ -365,8 +257,6 @@ func TestFilterEndpoints(t *testing.T) {
 			expected: []Endpoint{
 				{
 					Address: "192.168.47.235:20000",
-					Weight:  1,
-					Status:  "HEALTHY",
 				},
 			},
 		},
@@ -383,28 +273,10 @@ func TestFilterEndpoints(t *testing.T) {
 func TestFilterListeners(t *testing.T) {
 	given := []Listener{
 		{
-			Name:    "public_listener",
 			Address: "192.168.69.179:20000",
-			FilterChain: []FilterChain{
-				{
-					FilterChainMatch: "Any",
-					Filters:          []string{"* -> local_app/"},
-				},
-			},
-			Direction:   "INBOUND",
-			LastUpdated: "2022-06-09T00:39:27.668Z",
 		},
 		{
-			Name:    "outbound_listener",
 			Address: "127.0.0.1:15001",
-			FilterChain: []FilterChain{
-				{
-					FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
-					Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
-				},
-			},
-			Direction:   "OUTBOUND",
-			LastUpdated: "2022-05-24T17:41:59.079Z",
 		},
 	}
 
@@ -418,28 +290,10 @@ func TestFilterListeners(t *testing.T) {
 			port:    -1,
 			expected: []Listener{
 				{
-					Name:    "public_listener",
 					Address: "192.168.69.179:20000",
-					FilterChain: []FilterChain{
-						{
-							FilterChainMatch: "Any",
-							Filters:          []string{"* -> local_app/"},
-						},
-					},
-					Direction:   "INBOUND",
-					LastUpdated: "2022-06-09T00:39:27.668Z",
 				},
 				{
-					Name:    "outbound_listener",
 					Address: "127.0.0.1:15001",
-					FilterChain: []FilterChain{
-						{
-							FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
-							Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
-						},
-					},
-					Direction:   "OUTBOUND",
-					LastUpdated: "2022-05-24T17:41:59.079Z",
 				},
 			},
 		},
@@ -448,16 +302,7 @@ func TestFilterListeners(t *testing.T) {
 			port:    -1,
 			expected: []Listener{
 				{
-					Name:    "outbound_listener",
 					Address: "127.0.0.1:15001",
-					FilterChain: []FilterChain{
-						{
-							FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
-							Filters:          []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
-						},
-					},
-					Direction:   "OUTBOUND",
-					LastUpdated: "2022-05-24T17:41:59.079Z",
 				},
 			},
 		},
@@ -466,16 +311,7 @@ func TestFilterListeners(t *testing.T) {
 			port:    20000,
 			expected: []Listener{
 				{
-					Name:    "public_listener",
 					Address: "192.168.69.179:20000",
-					FilterChain: []FilterChain{
-						{
-							FilterChainMatch: "Any",
-							Filters:          []string{"* -> local_app/"},
-						},
-					},
-					Direction:   "INBOUND",
-					LastUpdated: "2022-06-09T00:39:27.668Z",
 				},
 			},
 		},
@@ -484,16 +320,7 @@ func TestFilterListeners(t *testing.T) {
 			port:    20000,
 			expected: []Listener{
 				{
-					Name:    "public_listener",
 					Address: "192.168.69.179:20000",
-					FilterChain: []FilterChain{
-						{
-							FilterChainMatch: "Any",
-							Filters:          []string{"* -> local_app/"},
-						},
-					},
-					Direction:   "INBOUND",
-					LastUpdated: "2022-06-09T00:39:27.668Z",
 				},
 			},
 		},
