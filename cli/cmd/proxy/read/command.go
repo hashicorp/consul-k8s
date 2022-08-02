@@ -121,7 +121,7 @@ func (c *ReadCommand) init() {
 	f.IntVar(&flag.IntVar{
 		Name:    "port",
 		Target:  &c.flagPort,
-		Usage:   "Filter endpoints output to only endpoints with the given port number.",
+		Usage:   "Filter endpoints and listeners output to only addresses with the given port number.",
 		Default: -1,
 	})
 
