@@ -2,6 +2,8 @@ package k8s
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -136,6 +138,14 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 		secret.ResourceVersion = ""
 		require.NoError(r, err)
 	})
+	secretData := secret.Data["data"]
+
+	var token map[string]interface{}
+	// Decode the token to extract the ServerName and PeerID from the token. CA is always NULL.
+	decodeBytes, err := base64.StdEncoding.DecodeString(string(secretData))
+	require.NoError(t, err)
+	err = json.Unmarshal(decodeBytes, &token)
+	logger.Log(t, "peering token", token)
 	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destContext.KubectlOptions(t).Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 	require.NoError(t, err)
 }
