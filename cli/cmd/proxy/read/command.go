@@ -116,7 +116,7 @@ func (c *ReadCommand) init() {
 	f.StringVar(&flag.StringVar{
 		Name:   "address",
 		Target: &c.flagAddress,
-		Usage:  "Filter clusters, endpoints, and listeners output to only those with endpoint addresses which contain the given value.",
+		Usage:  "Filter clusters, endpoints, and listeners output to only those with addresses which contain the given value.",
 	})
 	f.IntVar(&flag.IntVar{
 		Name:    "port",
