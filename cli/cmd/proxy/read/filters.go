@@ -31,7 +31,7 @@ func FilterClusters(clusters []Cluster, fqdn, address string, port int) []Cluste
 			continue
 		}
 
-		endpoints := strings.Join(cluster.Endpoints, "")
+		endpoints := strings.Join(cluster.Endpoints, " ")
 		if !strings.Contains(endpoints, address) || (port != -1 && !strings.Contains(endpoints, portStr)) {
 			continue
 		}
