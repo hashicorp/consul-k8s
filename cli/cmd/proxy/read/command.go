@@ -226,11 +226,6 @@ func (c *ReadCommand) validateFlags() error {
 	return nil
 }
 
-// areTablesFiltered returns true if a table filtering flag was passed in.
-func (c *ReadCommand) areTablesFiltered() bool {
-	return c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets
-}
-
 func (c *ReadCommand) initKubernetes() (err error) {
 	settings := helmCLI.New()
 
@@ -320,6 +315,18 @@ func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
+// shouldPrintTable takes the flag passed in for that table. If the flag is true,
+// the table should always be printed. Otherwise, it should only be printed if
+// no other table filtering flags are passed in.
+func (c *ReadCommand) shouldPrintTable(table bool) bool {
+	if table {
+		return table
+	}
+
+	// True if no other table filtering flags are passed in.
+	return !(c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets)
+}
+
 func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
 		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
@@ -355,19 +362,19 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 	cfgs := make(map[string]interface{})
 	for name, config := range configs {
 		cfg := make(map[string]interface{})
-		if !c.areTablesFiltered() || c.flagClusters {
+		if c.shouldPrintTable(c.flagClusters) {
 			cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
 		}
-		if !c.areTablesFiltered() || c.flagEndpoints {
+		if c.shouldPrintTable(c.flagEndpoints) {
 			cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
 		}
-		if !c.areTablesFiltered() || c.flagListeners {
+		if c.shouldPrintTable(c.flagListeners) {
 			cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
 		}
-		if !c.areTablesFiltered() || c.flagRoutes {
+		if c.shouldPrintTable(c.flagRoutes) {
 			cfg["routes"] = config.Routes
 		}
-		if !c.areTablesFiltered() || c.flagSecrets {
+		if c.shouldPrintTable(c.flagSecrets) {
 			cfg["secrets"] = config.Secrets
 		}
 
@@ -406,7 +413,7 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 }
 
 func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
-	if c.areTablesFiltered() && !c.flagClusters {
+	if !c.shouldPrintTable(c.flagClusters) {
 		return
 	}
 
@@ -421,7 +428,7 @@ func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
 }
 
 func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
-	if c.areTablesFiltered() && !c.flagEndpoints {
+	if !c.shouldPrintTable(c.flagEndpoints) {
 		return
 	}
 
@@ -430,7 +437,7 @@ func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
 }
 
 func (c *ReadCommand) outputListenersTable(listeners []Listener) {
-	if c.areTablesFiltered() && !c.flagListeners {
+	if !c.shouldPrintTable(c.flagListeners) {
 		return
 	}
 
@@ -439,7 +446,7 @@ func (c *ReadCommand) outputListenersTable(listeners []Listener) {
 }
 
 func (c *ReadCommand) outputRoutesTable(routes []Route) {
-	if c.areTablesFiltered() && !c.flagRoutes {
+	if !c.shouldPrintTable(c.flagRoutes) {
 		return
 	}
 
@@ -448,7 +455,7 @@ func (c *ReadCommand) outputRoutesTable(routes []Route) {
 }
 
 func (c *ReadCommand) outputSecretsTable(secrets []Secret) {
-	if c.areTablesFiltered() && !c.flagSecrets {
+	if !c.shouldPrintTable(c.flagSecrets) {
 		return
 	}
 
