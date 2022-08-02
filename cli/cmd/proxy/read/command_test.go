@@ -60,11 +60,7 @@ func TestReadCommandOutput(t *testing.T) {
 
 	// These regular expressions must be present in the output.
 	expected := []string{
-<<<<<<< HEAD
 		fmt.Sprintf("Envoy configuration for %s in namespace default:", podName),
-=======
-		"Envoy configuration for podName in namespace default:",
->>>>>>> 2d37a627 (Fix test output)
 
 		"==> Clusters \\(6\\)",
 		"Name.*FQDN.*Endpoints.*Type.*Last Updated",
