@@ -84,7 +84,7 @@ commands:
                   # Enterprise tests can't run on fork PRs because they require
                   # a secret.
                   if [ -z "$CIRCLE_PR_NUMBER" ]; then
-                    ENABLE_ENTERPRISE=true
+                    ENABLE_ENTERPRISE=false
                   fi
 
                   # We have to run the tests for each package separately so that we can
@@ -101,7 +101,7 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
+                          -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul:1.13-dev \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
