@@ -34,7 +34,7 @@ func TestFilterClusters(t *testing.T) {
 		},
 		{
 			FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
+			Endpoints:                []string{"123.45.67.890:8080", "111.30.2.39:8080"},
 		},
 	}
 
@@ -75,7 +75,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 				{
 					FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-					Endpoints:                []string{},
+					Endpoints:                []string{"123.45.67.890:8080", "111.30.2.39:8080"},
 				},
 			},
 		},
@@ -94,7 +94,7 @@ func TestFilterClusters(t *testing.T) {
 				},
 				{
 					FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-					Endpoints:                []string{},
+					Endpoints:                []string{"123.45.67.890:8080", "111.30.2.39:8080"},
 				},
 			},
 		},
@@ -121,6 +121,10 @@ func TestFilterClusters(t *testing.T) {
 				{
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
+				},
+				{
+					FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+					Endpoints:                []string{"123.45.67.890:8080", "111.30.2.39:8080"},
 				},
 			},
 		},
