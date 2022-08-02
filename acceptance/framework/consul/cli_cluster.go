@@ -272,6 +272,10 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, 
 	return consulClient, config.Address
 }
 
+func (c *CLICluster) CLI() cli.CLI {
+	return c.cli
+}
+
 func createOrUpdateNamespace(t *testing.T, client kubernetes.Interface, namespace string) {
 	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
