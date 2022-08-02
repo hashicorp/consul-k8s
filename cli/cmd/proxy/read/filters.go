@@ -36,7 +36,13 @@ func FilterClusters(clusters []Cluster, fqdn, address string, port int) []Cluste
 			continue
 		}
 
-		filtered = append(filtered, cluster)
+		hasFQDN := strings.Contains(cluster.FullyQualifiedDomainName, fqdn)
+		hasAddress := strings.Contains(endpoints, address)
+		hasPort := port == -1 || strings.Contains(endpoints, portStr)
+
+		if hasFQDN && hasAddress && hasPort {
+			filtered = append(filtered, cluster)
+		}
 	}
 
 	return filtered
