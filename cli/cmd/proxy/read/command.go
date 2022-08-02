@@ -320,35 +320,30 @@ func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
-<<<<<<< HEAD
 func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
+	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
+		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
+
+		if c.flagFQDN != "" {
+			c.UI.Output(fmt.Sprintf("Fully qualified domain names containing: %s", c.flagFQDN), terminal.WithInfoStyle())
+		}
+		if c.flagAddress != "" {
+			c.UI.Output(fmt.Sprintf("Endpoint addresses containing: %s", c.flagAddress), terminal.WithInfoStyle())
+		}
+		if c.flagPort != -1 {
+			c.UI.Output(fmt.Sprintf("Endpoint addresses with port number: %d", c.flagPort), terminal.WithInfoStyle())
+		}
+	}
+
 	for name, config := range configs {
 		c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", name, c.flagNamespace))
 
-		c.outputClustersTable(FilterFQDN(config.Clusters, c.flagFQDN))
-		c.outputEndpointsTable(config.Endpoints)
-		c.outputListenersTable(config.Listeners)
+		c.outputClustersTable(FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort))
+		c.outputEndpointsTable(FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort))
+		c.outputListenersTable(FilterListeners(config.Listeners, c.flagAddress, c.flagPort))
 		c.outputRoutesTable(config.Routes)
 		c.outputSecretsTable(config.Secrets)
 		c.UI.Output("\n")
-=======
-func (c *ReadCommand) outputAsJSON(config *EnvoyConfig) error {
-	cfg := make(map[string]interface{})
-	if !c.areTablesFiltered() || c.flagClusters {
-		cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
-	}
-	if !c.areTablesFiltered() || c.flagEndpoints {
-		cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
-	}
-	if !c.areTablesFiltered() || c.flagListeners {
-		cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
-	}
-	if !c.areTablesFiltered() || c.flagRoutes {
-		cfg["routes"] = config.Routes
-	}
-	if !c.areTablesFiltered() || c.flagSecrets {
-		cfg["secrets"] = config.Secrets
->>>>>>> f11c95d0 (Add port filtering)
 	}
 
 	return nil
@@ -358,19 +353,19 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 	cfgs := make(map[string]interface{})
 	for name, config := range configs {
 		cfg := make(map[string]interface{})
-		if !c.tableFiltersPassed() || c.flagClusters {
-			cfg["clusters"] = FilterFQDN(config.Clusters, c.flagFQDN)
+		if !c.areTablesFiltered() || c.flagClusters {
+			cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
 		}
-		if !c.tableFiltersPassed() || c.flagEndpoints {
-			cfg["endpoints"] = config.Endpoints
+		if !c.areTablesFiltered() || c.flagEndpoints {
+			cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
 		}
-		if !c.tableFiltersPassed() || c.flagListeners {
-			cfg["listeners"] = config.Listeners
+		if !c.areTablesFiltered() || c.flagListeners {
+			cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
 		}
-		if !c.tableFiltersPassed() || c.flagRoutes {
+		if !c.areTablesFiltered() || c.flagRoutes {
 			cfg["routes"] = config.Routes
 		}
-		if !c.tableFiltersPassed() || c.flagSecrets {
+		if !c.areTablesFiltered() || c.flagSecrets {
 			cfg["secrets"] = config.Secrets
 		}
 
@@ -387,7 +382,6 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
-<<<<<<< HEAD
 func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	cfgs := make(map[string]interface{}, 0)
 	for name, config := range configs {
@@ -407,7 +401,8 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	c.UI.Output(string(out))
 
 	return nil
-=======
+}
+
 func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
 	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", c.flagPodName, c.flagNamespace))
 	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
@@ -429,7 +424,6 @@ func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
 	c.outputListenersTable(FilterListeners(config.Listeners, c.flagAddress, c.flagPort))
 	c.outputRoutesTable(config.Routes)
 	c.outputSecretsTable(config.Secrets)
->>>>>>> f11c95d0 (Add port filtering)
 }
 
 func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
