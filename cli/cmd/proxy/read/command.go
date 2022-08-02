@@ -111,17 +111,17 @@ func (c *ReadCommand) init() {
 	f.StringVar(&flag.StringVar{
 		Name:   "fqdn",
 		Target: &c.flagFQDN,
-		Usage:  "Filter cluster output to only clusters with a fully qualified domain name which contains the given value.",
+		Usage:  "Filter cluster output to clusters with a fully qualified domain name which contains the given value. May be combined with -address and -port.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:   "address",
 		Target: &c.flagAddress,
-		Usage:  "Filter clusters, endpoints, and listeners output to only those with addresses which contain the given value.",
+		Usage:  "Filter clusters, endpoints, and listeners output to those with addresses which contain the given value. May be combined with -fqdn and -port",
 	})
 	f.IntVar(&flag.IntVar{
 		Name:    "port",
 		Target:  &c.flagPort,
-		Usage:   "Filter endpoints and listeners output to only addresses with the given port number.",
+		Usage:   "Filter endpoints and listeners output to addresses with the given port number. May be combined with -fqdn and -address.",
 		Default: -1,
 	})
 
