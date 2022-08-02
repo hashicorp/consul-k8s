@@ -403,29 +403,6 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
-func (c *ReadCommand) outputAsTables(config *EnvoyConfig) {
-	c.UI.Output(fmt.Sprintf("Envoy configuration for %s in namespace %s:", c.flagPodName, c.flagNamespace))
-	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
-		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
-
-		if c.flagFQDN != "" {
-			c.UI.Output(fmt.Sprintf("Fully qualified domain names containing: %s", c.flagFQDN), terminal.WithInfoStyle())
-		}
-		if c.flagAddress != "" {
-			c.UI.Output(fmt.Sprintf("Endpoint addresses containing: %s", c.flagAddress), terminal.WithInfoStyle())
-		}
-		if c.flagPort != -1 {
-			c.UI.Output(fmt.Sprintf("Endpoint addresses with port number: %d", c.flagPort), terminal.WithInfoStyle())
-		}
-	}
-
-	c.outputClustersTable(FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort))
-	c.outputEndpointsTable(FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort))
-	c.outputListenersTable(FilterListeners(config.Listeners, c.flagAddress, c.flagPort))
-	c.outputRoutesTable(config.Routes)
-	c.outputSecretsTable(config.Secrets)
-}
-
 func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
 	if c.areTablesFiltered() && !c.flagClusters {
 		return
