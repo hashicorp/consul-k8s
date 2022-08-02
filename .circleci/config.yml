@@ -102,7 +102,7 @@ commands:
                           -enable-multi-cluster \
                           -run TestPeering_ConnectNamespaces/default_destination_namespace \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
+                          -consul-image=ishustava/consul-dev@sha256:d51bc7f150a5930ed7c1a0d8b688767faff8996dd845c74d718c67b464f1ceb9 \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
