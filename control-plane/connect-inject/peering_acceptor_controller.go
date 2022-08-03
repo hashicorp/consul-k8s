@@ -103,9 +103,11 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// existingStatusSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
 	var existingStatusSecret *corev1.Secret
 	if statusSecretSet {
+		r.Log.Info("secret status is set; retrieving secret")
 		existingStatusSecret, err = r.getExistingSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace)
 		if err != nil {
-			r.updateStatusError(ctx, acceptor, KubernetesError, err)
+			r.Log.Error(err, "error retrieving existing secret", "name", acceptor.SecretRef().Name)
+			r.updateStatusError(ctx, acceptor, KubernetesError, err) // todo: why do set update status error here?
 			return ctrl.Result{}, err
 		}
 	}
@@ -157,17 +159,21 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// TODO(peering): Verify that the existing peering in Consul is an acceptor peer. If it is a dialing peer, an error should be thrown.
 
+	r.Log.Info("peering exists in Consul")
 	// If the peering does exist in Consul, figure out whether to generate and store a new token by comparing the secret
 	// in the status to the resource version of the secret. If no secret is specified in the status, shouldGenerate will
 	// be set to true.
 	var shouldGenerate bool
 	var nameChanged bool
 	if statusSecretSet {
-		shouldGenerate, nameChanged, err = shouldGenerateToken(acceptor, existingStatusSecret)
+		r.Log.Info("status secret set; determining if we need to generate token again")
+		shouldGenerate, nameChanged, err = r.shouldGenerateToken(acceptor, existingStatusSecret)
 		if err != nil {
+			r.Log.Error(err, "error determining if we should generate token again")
 			r.updateStatusError(ctx, acceptor, InternalError, err)
 			return ctrl.Result{}, err
 		}
+		r.Log.Info("finished determining if we should generate token", "shouldGenerate", shouldGenerate, "nameChanged", nameChanged)
 	} else {
 		shouldGenerate = true
 	}
@@ -205,15 +211,18 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 
 // shouldGenerateToken returns whether a token should be generated, and whether the name of the secret has changed. It
 // compares the spec secret's name/key/backend and resource version with the name/key/backend and resource version of the status secret's.
-func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingStatusSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
+func (r *PeeringAcceptorController) shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingStatusSecret *corev1.Secret) (shouldGenerate bool, nameChanged bool, err error) {
 	if acceptor.SecretRef() == nil {
+		r.Log.Info("shouldGenerateToken; secretRef is nil")
 		return false, false, errors.New("shouldGenerateToken was called with an empty fields in the existing status")
 	}
 	// Compare the existing name, key, and backend.
 	if acceptor.SecretRef().Name != acceptor.Secret().Name {
+		r.Log.Info("shouldGenerateToken; names don't match", "secret-ref-name", acceptor.SecretRef().Name, "spec name", acceptor.Secret().Name)
 		return true, true, nil
 	}
 	if acceptor.SecretRef().Key != acceptor.Secret().Key {
+		r.Log.Info("shouldGenerateToken; keys don't match", "secret-ref-key", acceptor.SecretRef().Key, "spec key", acceptor.Secret().Key)
 		return true, false, nil
 	}
 	// TODO(peering): remove this when validation webhook exists.
@@ -225,18 +234,22 @@ func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingStatu
 		if err != nil {
 			return false, false, err
 		}
+		r.Log.Info("shouldGenerateToken; checking peering version annotation", "version", peeringVersion)
 		if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < peeringVersion {
+			r.Log.Info("shouldGenerateToken; should regenerate is true because either the latest version is nil or lower than peering version", "latest-version", acceptor.Status.LatestPeeringVersion)
 			return true, false, nil
 		}
 	}
 	// Compare the existing secret resource version.
 	// Get the secret specified by the status, make sure it matches the status' secret.ResourceVersion.
 	if existingStatusSecret != nil {
+		r.Log.Info("shouldGenerateToken; comparing resource versions of exsiting secret with the one in secret ref")
 		if existingStatusSecret.ResourceVersion != acceptor.SecretRef().ResourceVersion {
+			r.Log.Info("shouldGenerateToken; should generate is true because versions don't match", "existing-status-secret", existingStatusSecret.ResourceVersion, "secret-ref-version", acceptor.SecretRef().ResourceVersion)
 			return true, false, nil
 		}
-
 	} else {
+		r.Log.Info("shouldGenerateToken, should generate is true because existing status secret is nil")
 		return true, false, nil
 	}
 	return false, false, nil
