@@ -101,7 +101,7 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -consul-image=ishustava/consul-dev@sha256:6dc2ae18f50218b8948645d47c4cb7a30395a73cdb8137b4df6c0ad8a5a28ad4 \
+                          -consul-image=ishustava/consul-dev@sha256:a26fd1564c6760caf225073baff36e961fb58e3f5235932070d5bf8c5d6830ab \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
