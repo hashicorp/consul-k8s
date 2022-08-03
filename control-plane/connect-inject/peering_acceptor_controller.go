@@ -206,6 +206,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	r.Log.Info("finished reconcile")
 	return ctrl.Result{}, nil
 }
 
