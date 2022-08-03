@@ -14,8 +14,6 @@ IMPROVEMENTS:
 * Helm
   * Bump default Envoy version to 1.23.0. [[GH-1377](https://github.com/hashicorp/consul-k8s/pull/1377)]
 
-FEATURES:
-
 ## 0.46.1 (July 26, 2022)
 
 IMPROVEMENTS:
