@@ -102,7 +102,7 @@ commands:
                           -enable-multi-cluster \
                           -run TestPeering_ConnectNamespaces/default_destination_namespace \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -consul-image=ishustava/consul-dev@sha256:5dcd562830813e78f0b8a8448edc0dc16c3850b7b6b526431dcc61f891c91202 \
+                          -consul-image=ishustava/consul-dev@sha256:4d844c4680803fd664f1b84ef0891692135d260628df842f8eb671fd861fc79b \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
