@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -270,10 +271,10 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptorOb
 	//r.mutex.Lock()
 	//defer r.mutex.Unlock()
 	// Get the latest resource before we update it.
-	var acceptor *consulv1alpha1.PeeringAcceptor
+	acceptor := &consulv1alpha1.PeeringAcceptor{}
 	err := r.Client.Get(ctx, acceptorObjKey, acceptor)
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching acceptor resource before status update: %w", err)
 	}
 	acceptor.Status.SecretRef = &consulv1alpha1.SecretRefStatus{
 		Secret:          *acceptor.Secret(),
