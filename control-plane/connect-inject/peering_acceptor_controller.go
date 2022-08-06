@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,6 +33,8 @@ type PeeringAcceptorController struct {
 	Log          logr.Logger
 	Scheme       *runtime.Scheme
 	context.Context
+
+	mutex sync.RWMutex
 }
 
 const (
@@ -150,7 +153,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			}
 		}
 		// Store the state in the status.
-		err := r.updateStatus(ctx, acceptor, secretResourceVersion)
+		err := r.updateStatus(ctx, req.NamespacedName, secretResourceVersion)
 		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
@@ -202,7 +205,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		// Store the state in the status.
-		err := r.updateStatus(ctx, acceptor, secretResourceVersion)
+		err := r.updateStatus(ctx, req.NamespacedName, secretResourceVersion)
 		return ctrl.Result{}, err
 	}
 
@@ -245,19 +248,33 @@ func (r *PeeringAcceptorController) shouldGenerateToken(acceptor *consulv1alpha1
 	// Get the secret specified by the status, make sure it matches the status' secret.ResourceVersion.
 	if existingStatusSecret != nil {
 		r.Log.Info("shouldGenerateToken; comparing resource versions of exsiting secret with the one in secret ref")
-		if existingStatusSecret.ResourceVersion != acceptor.SecretRef().ResourceVersion {
-			r.Log.Info("shouldGenerateToken; should generate is true because versions don't match", "existing-status-secret", existingStatusSecret.ResourceVersion, "secret-ref-version", acceptor.SecretRef().ResourceVersion)
-			return true, false, nil
-		}
-	} else {
-		r.Log.Info("shouldGenerateToken, should generate is true because existing status secret is nil")
-		return true, false, nil
+		// general question of whether we should regenerate it at all
+		// there should be three cases:
+		// 1. if version(existing secret from status) > the version in CR, should we just update the status in the CR? why do we regenerate the token in this case (which we do at the end)
+		// 2. if version(existing secret from) < the version in CR, that should be impossible?
+		// 3.
+		//if existingStatusSecret.ResourceVersion != acceptor.SecretRef().ResourceVersion {
+		//	r.Log.Info("shouldGenerateToken; should generate is true because versions don't match", "existing-status-secret", existingStatusSecret.ResourceVersion, "secret-ref-version", acceptor.SecretRef().ResourceVersion)
+		//	return true, false, nil
+		//}
+		return false, false, nil
+
 	}
-	return false, false, nil
+
+	r.Log.Info("shouldGenerateToken, should generate is true because existing status secret is nil")
+	return true, false, nil
 }
 
 // updateStatus updates the peeringAcceptor's secret in the status.
-func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptor *consulv1alpha1.PeeringAcceptor, secretResourceVersion string) error {
+func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptorObjKey types.NamespacedName, secretResourceVersion string) error {
+	//r.mutex.Lock()
+	//defer r.mutex.Unlock()
+	// Get the latest resource before we update it.
+	var acceptor *consulv1alpha1.PeeringAcceptor
+	err := r.Client.Get(ctx, acceptorObjKey, acceptor)
+	if err != nil {
+		return err
+	}
 	acceptor.Status.SecretRef = &consulv1alpha1.SecretRefStatus{
 		Secret:          *acceptor.Secret(),
 		ResourceVersion: secretResourceVersion,
@@ -274,7 +291,8 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptor *
 			acceptor.Status.LatestPeeringVersion = pointerToUint64(peeringVersion)
 		}
 	}
-	err := r.Status().Update(ctx, acceptor)
+	// todo: does it need a read-write lock
+	err = r.Status().Update(ctx, acceptor)
 	if err != nil {
 		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", acceptor.Name, "namespace", acceptor.Namespace)
 	}
