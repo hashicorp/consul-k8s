@@ -105,15 +105,32 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// todo: we should check that the secret in the spec exists and just update status rather than regenerating a new token altogether
 	statusSecretSet := acceptor.SecretRef() != nil
 
-	// existingStatusSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
-	var existingStatusSecret *corev1.Secret
+	// existingSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
+	var existingSecret *corev1.Secret
 	if statusSecretSet {
 		r.Log.Info("secret status is set; retrieving secret")
-		existingStatusSecret, err = r.getExistingSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace)
+		existingSecret, err = r.getExistingSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace)
 		if err != nil {
 			r.Log.Error(err, "error retrieving existing secret", "name", acceptor.SecretRef().Name)
 			r.updateStatusError(ctx, acceptor, KubernetesError, err) // todo: why do set update status error here?
 			return ctrl.Result{}, err
+		}
+	} else {
+		// If status is not set, check if the secret from the spec already exists and update the status.
+		existingSecret, err = r.getExistingSecret(ctx, acceptor.Secret().Name, acceptor.Namespace)
+		if err != nil {
+			r.Log.Error(err, "error retrieving existing secret", "name", acceptor.Secret().Name)
+			r.updateStatusError(ctx, acceptor, KubernetesError, err)
+			return ctrl.Result{}, err
+		}
+		if existingSecret != nil {
+			r.Log.Info("secret in the spec exists; updating status from existing secret")
+			err = r.updateStatus(ctx, req.NamespacedName, existingSecret.ResourceVersion)
+			if err != nil {
+				r.Log.Error(err, "error updating status", "name", acceptor.Secret().Name)
+				r.updateStatusError(ctx, acceptor, KubernetesError, err)
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -132,9 +149,9 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		r.Log.Info("peering doesn't exist in Consul; creating new peering", "name", acceptor.Name)
 
 		if statusSecretSet {
-			if existingStatusSecret != nil {
+			if existingSecret != nil {
 				r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name)
-				err := r.Client.Delete(ctx, existingStatusSecret)
+				err := r.Client.Delete(ctx, existingSecret)
 				if err != nil {
 					r.updateStatusError(ctx, acceptor, KubernetesError, err)
 					return ctrl.Result{}, err
@@ -172,7 +189,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	var nameChanged bool
 	if statusSecretSet {
 		r.Log.Info("status secret set; determining if we need to generate token again")
-		shouldGenerate, nameChanged, err = r.shouldGenerateToken(acceptor, existingStatusSecret)
+		shouldGenerate, nameChanged, err = r.shouldGenerateToken(acceptor, existingSecret)
 		if err != nil {
 			r.Log.Error(err, "error determining if we should generate token again")
 			r.updateStatusError(ctx, acceptor, InternalError, err)
@@ -198,8 +215,8 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		// Delete the existing secret if the name changed. This needs to come before updating the status if we do generate a new token.
 		if nameChanged {
-			if existingStatusSecret != nil {
-				err := r.Client.Delete(ctx, existingStatusSecret)
+			if existingSecret != nil {
+				err := r.Client.Delete(ctx, existingSecret)
 				if err != nil {
 					r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
 					return ctrl.Result{}, err
