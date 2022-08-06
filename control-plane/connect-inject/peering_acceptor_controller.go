@@ -123,15 +123,6 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			r.updateStatusError(ctx, acceptor, KubernetesError, err)
 			return ctrl.Result{}, err
 		}
-		if existingSecret != nil {
-			r.Log.Info("secret in the spec exists; updating status from existing secret")
-			err = r.updateStatus(ctx, req.NamespacedName, existingSecret.ResourceVersion)
-			if err != nil {
-				r.Log.Error(err, "error updating status", "name", acceptor.Secret().Name)
-				r.updateStatusError(ctx, acceptor, KubernetesError, err)
-				return ctrl.Result{}, err
-			}
-		}
 	}
 
 	var secretResourceVersion string
@@ -148,14 +139,12 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	if peering == nil {
 		r.Log.Info("peering doesn't exist in Consul; creating new peering", "name", acceptor.Name)
 
-		if statusSecretSet {
-			if existingSecret != nil {
-				r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name)
-				err := r.Client.Delete(ctx, existingSecret)
-				if err != nil {
-					r.updateStatusError(ctx, acceptor, KubernetesError, err)
-					return ctrl.Result{}, err
-				}
+		if existingSecret != nil {
+			r.Log.Info("secret exists without a peering in Consul; deleting stale secret", "name", acceptor.Name)
+			err := r.Client.Delete(ctx, existingSecret)
+			if err != nil {
+				r.updateStatusError(ctx, acceptor, KubernetesError, err)
+				return ctrl.Result{}, err
 			}
 		}
 		// Generate and store the peering token.
