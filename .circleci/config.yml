@@ -100,7 +100,7 @@ commands:
                           << parameters.additional-flags >> \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
-                          -run TestPeering_ConnectNamespaces/default_destination_namespace \
+                          -run TestPeering_* \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-image=ishustava/consul-dev@sha256:c8d4c6e0ba991325166c26083d5d5280eaea7394d9a13dbfe9cf87165252a949 \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
