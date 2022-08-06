@@ -102,6 +102,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	// todo: we should check that the secret in the spec exists and just update status rather than regenerating a new token altogether
 	statusSecretSet := acceptor.SecretRef() != nil
 
 	// existingStatusSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
@@ -179,6 +180,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		r.Log.Info("finished determining if we should generate token", "shouldGenerate", shouldGenerate, "nameChanged", nameChanged)
 	} else {
+		r.Log.Info("status is not set; generating a new token")
 		shouldGenerate = true
 	}
 
