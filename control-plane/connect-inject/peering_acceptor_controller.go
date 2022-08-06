@@ -376,6 +376,7 @@ func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 
 // generateToken is a helper function that calls the Consul api to generate a token for the peer.
 func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string) (*api.PeeringGenerateTokenResponse, error) {
+	r.Log.Info("calling /peering/token to generate token")
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
 	}
