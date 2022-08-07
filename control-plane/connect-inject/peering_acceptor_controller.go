@@ -35,7 +35,7 @@ type PeeringAcceptorController struct {
 	Scheme       *runtime.Scheme
 	context.Context
 
-	mutex sync.RWMutex
+	mutex sync.Mutex
 }
 
 const (
@@ -176,8 +176,8 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	// be set to true.
 	var shouldGenerate bool
 	var nameChanged bool
-	if statusSecretSet {
-		r.Log.Info("status secret set; determining if we need to generate token again")
+	if existingSecret != nil {
+		r.Log.Info("found existing secret; determining if we need to generate token again")
 		shouldGenerate, nameChanged, err = r.shouldGenerateToken(acceptor, existingSecret)
 		if err != nil {
 			r.Log.Error(err, "error determining if we should generate token again")
@@ -186,7 +186,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		r.Log.Info("finished determining if we should generate token", "shouldGenerate", shouldGenerate, "nameChanged", nameChanged)
 	} else {
-		r.Log.Info("status is not set; generating a new token")
+		r.Log.Info("existing secret is nil; generating a new token")
 		shouldGenerate = true
 	}
 
