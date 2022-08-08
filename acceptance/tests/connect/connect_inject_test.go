@@ -107,7 +107,7 @@ func TestConnectInject(t *testing.T) {
 					output := string(out)
 					logger.Log(t, output)
 
-					// Both proxies must see their own local agent and app as clusters
+					// Both proxies must see their own local agent and app as clusters.
 					require.Regexp(r, "local_agent.*STATIC", output)
 					require.Regexp(r, "local_app.*STATIC", output)
 

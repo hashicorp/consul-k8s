@@ -56,7 +56,11 @@ default  	server-7685b4fc97-vphq9                	Sidecar`),
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			actual := TranslateListOutput(tc.raw)
-			require.Equal(t, tc.expected, actual)
+
+			require.Equal(t, len(tc.expected), actual)
+			for podName, proxyType := range actual {
+				require.Equal(t, tc.expected[podName], proxyType)
+			}
 		})
 	}
 }
