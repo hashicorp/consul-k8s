@@ -63,7 +63,7 @@ func TestConnectInject(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			consulK8sCli, err := cli.NewCLI()
+			cli, err := cli.NewCLI()
 			require.NoError(t, err)
 
 			cfg := suite.Config()
@@ -88,10 +88,10 @@ func TestConnectInject(t *testing.T) {
 			}
 
 			// Run proxy list and get the two results.
-			listOut, err := consulK8sCli.Run("proxy", "list")
+			listOut, err := cli.Run("proxy", "list")
 			require.NoError(t, err)
 			logger.Log(t, string(listOut))
-			list := cli.TranslateListOutput(listOut)
+			list := translateListOutput(listOut)
 			require.Equal(t, 2, len(list))
 			for _, proxyType := range list {
 				require.Equal(t, "Sidecar", proxyType)
@@ -101,7 +101,7 @@ func TestConnectInject(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := consulK8sCli.Run("proxy", "read", podName)
+					out, err := cli.Run("proxy", "read", podName)
 					require.NoError(t, err)
 
 					output := string(out)
@@ -467,4 +467,23 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
 		})
 	}
+}
+
+// translateListOutput takes the raw output from the proxy list command and
+// translates the table into a map.
+func translateListOutput(raw []byte) map[string]string {
+	formatted := make(map[string]string)
+	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[2:] {
+		row := strings.Split(strings.TrimSpace(pod), "\t")
+
+		var name string
+		if len(row) == 3 { // Handle the case where namespace is present
+			name = fmt.Sprintf("%s/%s", strings.TrimSpace(row[0]), strings.TrimSpace(row[1]))
+		} else if len(row) == 2 {
+			name = strings.TrimSpace(row[0])
+		}
+		formatted[name] = row[len(row)-1]
+	}
+
+	return formatted
 }
