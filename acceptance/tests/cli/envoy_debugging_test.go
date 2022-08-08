@@ -13,6 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+
 func TestEnvoyDebugging(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
@@ -55,12 +57,26 @@ func TestEnvoyDebugging(t *testing.T) {
 		require.Equal(t, "Sidecar", proxyType)
 	}
 
-	// Run proxy read for each Pod and check the expected output
+	// Run proxy read for each Pod and store the output
+	outputs := make(map[string]string)
 	for podName := range list {
-		// TODO (waiting for other PRs to merge) use -o json and check that the output is correct.
-		readOut, err := cli.Run("proxy", "read", podName)
+		output, err := cli.Run("proxy", "read", podName)
 		require.NoError(t, err)
-		fmt.Println(string(readOut))
+		outputs[podName] = string(output)
+	}
+
+	// Check that the read command returned the correct output.
+	for podName, output := range outputs {
+		logger.Log(t, string(output))
+		// Both proxies must see their own local agent and app as clusters
+		require.Regexp(t, "local_agent.*STATIC", output)
+		require.Regexp(t, "local_app.*STATIC", output)
+
+		// Static Client must have Static Server as a cluster and endpoint.
+		if strings.Contains(podName, "static-client") {
+			require.Regexp(t, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
+			require.Regexp(t, ipv4RegEx+".*static-server.default.dc1.internal", output)
+		}
 	}
 }
 
