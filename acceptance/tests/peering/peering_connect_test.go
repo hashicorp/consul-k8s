@@ -55,8 +55,6 @@ func TestPeering_Connect(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
-				"global.image": "ndhanushkodi/consul-dev:ent-backoff-fix",
-
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -132,9 +130,9 @@ func TestPeering_Connect(t *testing.T) {
 			// Ensure the secret is created.
 			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
+				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
-				require.NotEmpty(r, acceptorSecretResourceVersion)
+				require.NotEmpty(r, acceptorSecretName)
 			})
 
 			// Copy secret from client peer to server peer.

@@ -99,6 +99,7 @@ commands:
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
+                          -run TestPeering* \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
