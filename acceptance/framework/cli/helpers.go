@@ -9,7 +9,7 @@ import (
 // translates the table into a map.
 func TranslateListOutput(raw []byte) map[string]string {
 	formatted := make(map[string]string)
-	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[3:] {
+	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[2:] {
 		row := strings.Split(strings.TrimSpace(pod), "\t")
 
 		var name string

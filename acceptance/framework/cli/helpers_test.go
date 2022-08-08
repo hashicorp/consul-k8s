@@ -57,7 +57,7 @@ default  	server-7685b4fc97-vphq9                	Sidecar`),
 		t.Run(name, func(t *testing.T) {
 			actual := TranslateListOutput(tc.raw)
 
-			require.Equal(t, len(tc.expected), actual)
+			require.Equal(t, len(tc.expected), len(actual))
 			for podName, proxyType := range actual {
 				require.Equal(t, tc.expected[podName], proxyType)
 			}
