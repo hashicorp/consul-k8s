@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -66,18 +68,22 @@ func TestEnvoyDebugging(t *testing.T) {
 	}
 
 	// Check that the read command returned the correct output.
-	for podName, output := range outputs {
-		logger.Log(t, string(output))
-		// Both proxies must see their own local agent and app as clusters
-		require.Regexp(t, "local_agent.*STATIC", output)
-		require.Regexp(t, "local_app.*STATIC", output)
+	// A retry accounts for variations in the connect injection time to succeed.
+	retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		for podName, output := range outputs {
+			logger.Log(t, output)
+			// Both proxies must see their own local agent and app as clusters
+			require.Regexp(r, "local_agent.*STATIC", output)
+			require.Regexp(r, "local_app.*STATIC", output)
 
-		// Static Client must have Static Server as a cluster and endpoint.
-		if strings.Contains(podName, "static-client") {
-			require.Regexp(t, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
-			require.Regexp(t, ipv4RegEx+".*static-server.default.dc1.internal", output)
+			// Static Client must have Static Server as a cluster and endpoint.
+			if strings.Contains(podName, "static-client") {
+				require.Regexp(r, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
+				require.Regexp(r, ipv4RegEx+".*static-server.default.dc1.internal", output)
+			}
 		}
-	}
+	})
 }
 
 func TestTranslateListOutput(t *testing.T) {
