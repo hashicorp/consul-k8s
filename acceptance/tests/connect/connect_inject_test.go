@@ -473,7 +473,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 // translates the table into a map.
 func translateListOutput(raw []byte) map[string]string {
 	formatted := make(map[string]string)
-	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[2:] {
+	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[3:] {
 		row := strings.Split(strings.TrimSpace(pod), "\t")
 
 		var name string
