@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	InjectInitCopyContainerName = "copy-consul-bin"
-	InjectInitContainerName     = "consul-connect-inject-init"
-	rootUserAndGroupID          = 0
-	envoyUserAndGroupID         = 5995
-	copyContainerUserAndGroupID = 5996
-	netAdminCapability          = "NET_ADMIN"
-	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
+	InjectInitCopyContainerName  = "copy-consul-bin"
+	InjectInitContainerName      = "consul-connect-inject-init"
+	rootUserAndGroupID           = 0
+	envoyUserAndGroupID          = 5995
+	initContainersUserAndGroupID = 5996
+	netAdminCapability           = "NET_ADMIN"
+	dnsServiceHostEnvSuffix      = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {
@@ -121,8 +121,8 @@ func (w *MeshWebhook) initCopyContainer() corev1.Container {
 	if !w.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
 			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
-			RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
-			RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
+			RunAsUser:              pointerToInt64(initContainersUserAndGroupID),
+			RunAsGroup:             pointerToInt64(initContainersUserAndGroupID),
 			RunAsNonRoot:           pointerToBool(true),
 			ReadOnlyRootFilesystem: pointerToBool(true),
 		}
@@ -314,6 +314,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			}
 		} else {
 			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    pointerToInt64(initContainersUserAndGroupID),
+				RunAsGroup:   pointerToInt64(initContainersUserAndGroupID),
 				RunAsNonRoot: pointerToBool(true),
 				Privileged:   pointerToBool(false),
 				Capabilities: &corev1.Capabilities{

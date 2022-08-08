@@ -1,26 +1,16 @@
 package connectinject
 
 import (
+	"encoding/json"
 	"fmt"
-	"net"
+	"os"
 	"strconv"
 
-	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/iptables"
-	"github.com/mitchellh/mapstructure"
 	corev1 "k8s.io/api/core/v1"
 )
 
-// trafficRedirectProxyConfig is a snippet of xds/config.go
-// with only the configuration values that we need to parse from Proxy.Config
-// to apply traffic redirection rules.
-type trafficRedirectProxyConfig struct {
-	BindPort           int    `mapstructure:"bind_port"`
-	PrometheusBindAddr string `mapstructure:"envoy_prometheus_bind_addr"`
-	StatsBindAddr      string `mapstructure:"envoy_stats_bind_addr"`
-}
-
-// createRedirectTrafficConfig creates an iptables.Config based on proxy configuration.
+// addRedirectTrafficConfigAnnotation creates an iptables.Config based on proxy configuration.
 // iptables.Config:
 //   ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
 //   ProxyUserID: a constant set in Annotations
@@ -30,90 +20,101 @@ type trafficRedirectProxyConfig struct {
 //   ExcludeOutboundPorts: pod annotations
 //   ExcludeOutboundCIDRs: pod annotations
 //   ExcludeUIDs: pod annotations
-//   NetNS: Net Namespace, passed to the CNI plugin as CNI_NETNS
-func createRedirectTrafficConfig(svc *api.AgentService, checks map[string]*api.AgentCheck) (iptables.Config, error) {
+func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
 	cfg := iptables.Config{
 		ProxyUserID: strconv.Itoa(envoyUserAndGroupID),
 	}
 
-	if svc.Proxy == nil {
-		return iptables.Config{}, fmt.Errorf("service %s is not a proxy service", svc.ID)
-	}
-
-	// Decode proxy's opaque config so that we can use it later to configure
-	// traffic redirection with iptables.
-	var trCfg trafficRedirectProxyConfig
-	if err := mapstructure.WeakDecode(svc.Proxy.Config, &trCfg); err != nil {
-		return iptables.Config{}, fmt.Errorf("failed parsing Proxy.Config: %s", err)
-	}
-
 	// Set the proxy's inbound port.
-	cfg.ProxyInboundPort = svc.Port
-	if trCfg.BindPort != 0 {
-		cfg.ProxyInboundPort = trCfg.BindPort
-	}
+	cfg.ProxyInboundPort = proxyDefaultInboundPort
 
 	// Set the proxy's outbound port.
 	cfg.ProxyOutboundPort = iptables.DefaultTProxyOutboundPort
-	if svc.Proxy.TransparentProxy != nil && svc.Proxy.TransparentProxy.OutboundListenerPort != 0 {
-		cfg.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
-	}
 
-	// Exclude envoy_prometheus_bind_addr port from inbound redirection rules.
-	if trCfg.PrometheusBindAddr != "" {
-		_, port, err := net.SplitHostPort(trCfg.PrometheusBindAddr)
+	// todo: update this
+	// If metrics are enabled, the proxyConfig should set envoy_prometheus_bind_addr to a listener on 0.0.0.0 on
+	// the prometheusScrapePort that points to a metrics backend. The backend for this listener will be determined by
+	// the envoy bootstrapping command (consul connect envoy) configuration in the init container. If there is a merged
+	// metrics server, the backend would be that server. If we are not running the merged metrics server, the backend
+	// should just be the Envoy metrics endpoint.
+	enableMetrics, err := w.MetricsConfig.enableMetrics(*pod)
+	if err != nil {
+		return err
+	}
+	if enableMetrics {
+		prometheusScrapePort, err := w.MetricsConfig.prometheusScrapePort(*pod)
 		if err != nil {
-			return iptables.Config{}, fmt.Errorf(
-				"failed parsing host and port from envoy_prometheus_bind_addr: %s",
-				err,
-			)
+			return err
 		}
-		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, port)
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, prometheusScrapePort)
 	}
 
-	// Exclude envoy_stats_bind_addr port from inbound redirection rules.
-	if trCfg.StatsBindAddr != "" {
-		_, port, err := net.SplitHostPort(trCfg.StatsBindAddr)
-		if err != nil {
-			return iptables.Config{}, fmt.Errorf("failed parsing host and port from envoy_stats_bind_addr: %s", err)
-		}
-		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, port)
+	// Exclude any overwritten liveness/readiness/startup ports from redirection.
+	overwriteProbes, err := shouldOverwriteProbes(*pod, w.TProxyOverwriteProbes)
+	if err != nil {
+		return err
 	}
 
-	// Exclude the ListenerPort from Expose configs from inbound traffic redirection.
-	for _, exposePath := range svc.Proxy.Expose.Paths {
-		if exposePath.ListenerPort != 0 {
-			cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposePath.ListenerPort))
-		}
-	}
-
-	// Exclude any exposed health check ports when Proxy.Expose.Checks is true.
-	if svc.Proxy.Expose.Checks {
-		for _, check := range checks {
-			if check.ExposedPort != 0 {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(check.ExposedPort))
+	if overwriteProbes {
+		for i, container := range pod.Spec.Containers {
+			// skip the "envoy-sidecar" container from having its probes overridden
+			if container.Name == envoySidecarContainer {
+				continue
+			}
+			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsLivenessPortsRangeStart+i))
+			}
+			if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsReadinessPortsRangeStart+i))
+			}
+			if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsStartupPortsRangeStart+i))
 			}
 		}
 	}
-	return cfg, nil
-}
 
-// excludeInboundOutboundFromAnnotations gets the exclude inbound ports, exclude outbound ports, exclude CIDRs, exclude
-// UIDs annotations from a pod and adds them to the iptables.Config.
-func excludeInboundOutboundFromAnnotations(pod corev1.Pod, cfg *iptables.Config) {
 	// Inbound ports
-	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod)
+	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, *pod)
 	cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, excludeInboundPorts...)
 
 	// Outbound ports
-	excludeOutboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod)
+	excludeOutboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, *pod)
 	cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts, excludeOutboundPorts...)
 
 	// Outbound CIDRs
-	excludeOutboundCIDRs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod)
+	excludeOutboundCIDRs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, *pod)
 	cfg.ExcludeOutboundCIDRs = append(cfg.ExcludeOutboundCIDRs, excludeOutboundCIDRs...)
 
 	// UIDs
-	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod)
+	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, *pod)
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, excludeUIDs...)
+
+	// Add init container user ID to exclude from traffic redirection.
+	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
+
+	dnsEnabled, err := consulDNSEnabled(ns, *pod, w.EnableConsulDNS)
+	if err != nil {
+		return err
+	}
+
+	var consulDNSClusterIP string
+	if dnsEnabled {
+		// If Consul DNS is enabled, we find the environment variable that has the value
+		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
+		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
+		consulDNSClusterIP = os.Getenv(w.constructDNSServiceHostName())
+		if consulDNSClusterIP == "" {
+			return fmt.Errorf("environment variable %s is not found", w.constructDNSServiceHostName())
+		}
+		cfg.ConsulDNSIP = w.constructDNSServiceHostName()
+	}
+
+	iptablesConfigJson, err := json.Marshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("could not marshal iptables config: %w", err)
+	}
+
+	pod.Annotations[annotationCNIProxyConfig] = string(iptablesConfigJson)
+
+	return nil
 }

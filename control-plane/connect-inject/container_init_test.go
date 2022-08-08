@@ -1214,8 +1214,8 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 				require.Nil(t, container.SecurityContext)
 			} else {
 				expectedSecurityContext := &corev1.SecurityContext{
-					RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
-					RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
+					RunAsUser:              pointerToInt64(initContainersUserAndGroupID),
+					RunAsGroup:             pointerToInt64(initContainersUserAndGroupID),
 					RunAsNonRoot:           pointerToBool(true),
 					ReadOnlyRootFilesystem: pointerToBool(true),
 				}

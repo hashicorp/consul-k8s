@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -58,6 +57,8 @@ const (
 	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
+
+	proxyDefaultInboundPort = 20000
 )
 
 type EndpointsController struct {
@@ -269,22 +270,6 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 			err = client.Agent().ServiceRegister(proxyServiceRegistration)
 			if err != nil {
 				r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Name)
-				return err
-			}
-
-			// After service registration, Consul will consolidate proxy information and thus we need to
-			// ask Consul for the proxy service again.
-			proxyService, _, err := client.Agent().Service(proxyServiceRegistration.ID, nil)
-			if err != nil {
-				r.Log.Error(err, "failed to retrieve service", "name", proxyServiceRegistration.Name)
-				return err
-			}
-
-			// Generate the redirect traffic confic used by the CNI plugin. The proxy service must be
-			// registered before we can get all of the redirect traffic information
-			err = r.generateRedirectTrafficConfig(pod, proxyService)
-			if err != nil {
-				r.Log.Error(err, "failed to create redirect traffic annotation", "name", proxyServiceRegistration.Name)
 				return err
 			}
 		}
@@ -521,7 +506,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	proxyConfig.Upstreams = upstreams
 
-	proxyPort := 20000
+	proxyPort := proxyDefaultInboundPort
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
@@ -665,43 +650,6 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		}
 	}
 	return service, proxyService, nil
-}
-
-// addRedirectTrafficAnnotation creates an annotation that contains iptables configuration.
-func (r *EndpointsController) addRedirectTrafficAnnotation(pod corev1.Pod, cfg iptables.Config) error {
-	j, err := json.Marshal(&cfg)
-	if err != nil {
-		return fmt.Errorf("could not marshal iptables config: %v", err)
-	}
-
-	pod.Annotations[annotationCNIProxyConfig] = string(j)
-	err = r.Client.Update(r.Context, &pod)
-	if err != nil {
-		return fmt.Errorf("could not update CNI proxy config annotation: %v", err)
-	}
-	return nil
-}
-
-// generateRedirectTrafficConfig creates the redirect traffic config and adds it as an annotation to the pod.
-func (r *EndpointsController) generateRedirectTrafficConfig(pod corev1.Pod, svc *api.AgentService) error {
-	checks, err := getServiceNameChecks(r.ConsulClient, svc.Proxy.DestinationServiceName)
-	if err != nil {
-		return err
-	}
-
-	iptables, err := createRedirectTrafficConfig(svc, checks)
-	if err != nil {
-		return err
-	}
-
-	excludeInboundOutboundFromAnnotations(pod, &iptables)
-
-	err = r.addRedirectTrafficAnnotation(pod, iptables)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // portValueFromIntOrString returns the integer port value from the port that can be

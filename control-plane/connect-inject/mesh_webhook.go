@@ -372,7 +372,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	}
 
 	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
-	// to determine if it should traffic redirect or not
+	// to determine if it should traffic redirect or not.
 	if tproxyEnabled {
 		pod.Annotations[keyTransparentProxyStatus] = enabled
 	}
@@ -402,6 +402,15 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if err != nil {
 		w.Log.Error(err, "error overwriting readiness or liveness probes", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
+	}
+
+	// todo: add comment
+	if w.EnableCNI && tproxyEnabled {
+		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+			// todo: update this error message
+			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
+		}
 	}
 
 	// Marshall the pod into JSON after it has the desired envs, annotations, labels,

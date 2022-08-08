@@ -60,7 +60,7 @@ func TestSkipTrafficRedirection(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := skipTrafficRedirection(*c.annotatedPod(minimalPod()), c.retries)
+			actual := skipTrafficRedirection(*c.annotatedPod(minimalPod()))
 			require.Equal(t, c.expectedSkip, actual)
 		})
 	}

@@ -77,17 +77,12 @@ type PluginConf struct {
 	CNIBinDir string `json:"cni_bin_dir"`
 	// CNINetDir is the location of the cni plugin on the node. Can be set as a cli flag.
 	CNINetDir string `json:"cni_net_dir"`
-	// DNSService is used to determine the Consul Server DNS IP. The IP is set as an environment variable and the
-	// prefix allows us
-	// to search for it. The DNS IP is determined using the prefix and the dnsServiceHostEnvSuffix constant.
-	DNSService string `json:"dns_service"`
 	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
 	Multus bool `json:"multus"`
 	// Kubeconfig file name. Can be set as a cli flag.
 	Kubeconfig string `json:"kubeconfig"`
 	// LogLevl is the logging level. Can be set as a cli flag.
 	LogLevel string `json:"log_level"`
-	//
 }
 
 // parseConfig parses the supplied CNI configuration (and prevResult) from stdin.
@@ -175,15 +170,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Skip traffic redirection the correct annotations are not on the pod.
-	if skipTrafficRedirection(*pod, retries) {
-		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
+	if skipTrafficRedirection(*pod) {
+		logger.Debug("skipping traffic redirection because the pod is either not injected or transparent proxy is disabled: %s", pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
-	}
-
-	// Check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff.
-	exists := waitForAnnotation(*pod, annotationCNIProxyConfig, uint64(retries))
-	if !exists {
-		return fmt.Errorf("could not retrieve annotation: %s on pod: %s", annotationCNIProxyConfig, pod.Name)
 	}
 
 	// Parse the cni-proxy-config annotation into an iptables.Config object.
@@ -192,15 +181,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("could not parse annotation: %s, error: %v", annotationCNIProxyConfig, err)
 	}
 
-	// Get the DNS IP from the environment.
-	dnsIP, err := clusterIPFromDNSService(client, cfg.DNSService)
-	if err != nil {
-		return fmt.Errorf("could not retrieve DNS IP from service: %s, error: %v", cfg.DNSService, err)
-	}
-	if dnsIP != "" {
-		logger.Info("assigned consul DNS IP to %s", dnsIP)
-		iptablesCfg.ConsulDNSIP = dnsIP
-	}
+	// Set NetNS passed through the CNI.
+	iptablesCfg.NetNS = args.Netns
 
 	// Apply the iptables rules.
 	err = iptables.Setup(iptablesCfg)
@@ -214,7 +196,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 // cmdDel is called for DELETE requests.
-func cmdDel(args *skel.CmdArgs) error {
+func cmdDel(_ *skel.CmdArgs) error {
 	// Nothing to do but this function will still be called as part of the CNI specification.
 	return nil
 }
@@ -232,7 +214,7 @@ func main() {
 // skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
 // The absence of the annotations is the equivalent of "disabled" because it means that the connect inject mutating
 // webhook did not run against the pod.
-func skipTrafficRedirection(pod corev1.Pod, retries uint64) bool {
+func skipTrafficRedirection(pod corev1.Pod) bool {
 	skip := false
 
 	if anno, ok := pod.Annotations[keyInjectStatus]; !ok || anno == "" {
