@@ -1000,13 +1000,52 @@ workflows:
             - build-distros-linux
       # Run acceptance tests using the docker image built for the control plane
       - acceptance:
+          name: acceptance1
           context: consul-ci
           requires:
             - dev-upload-docker
       - acceptance-tproxy:
+          name: acceptance2
           context: consul-ci
           requires:
             - dev-upload-docker
+      - acceptance:
+          name: acceptance3
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          name: acceptance4
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance:
+          name: acceptance5
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          name: acceptance6
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance:
+          name: acceptance7
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          name: acceptance8
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance:
+          name: acceptance9
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          name: acceptance10
   nightly-acceptance-tests:
     triggers:
       - schedule:
