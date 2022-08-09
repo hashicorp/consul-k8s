@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	InjectInitCopyContainerName = "copy-consul-bin"
-	InjectInitContainerName     = "consul-connect-inject-init"
-	rootUserAndGroupID          = 0
-	envoyUserAndGroupID         = 5995
-	copyContainerUserAndGroupID = 5996
-	netAdminCapability          = "NET_ADMIN"
-	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
+	InjectInitCopyContainerName  = "copy-consul-bin"
+	InjectInitContainerName      = "consul-connect-inject-init"
+	rootUserAndGroupID           = 0
+	envoyUserAndGroupID          = 5995
+	initContainersUserAndGroupID = 5996
+	netAdminCapability           = "NET_ADMIN"
+	dnsServiceHostEnvSuffix      = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {
@@ -62,7 +62,7 @@ type initContainerCommandData struct {
 	EnableTransparentProxy bool
 
 	// EnableCNI configures this init container to skip the redirect-traffic command as traffic
-	// redirection is handled by the CNI plugin on pod creation
+	// redirection is handled by the CNI plugin on pod creation.
 	EnableCNI bool
 
 	// TProxyExcludeInboundPorts is a list of inbound ports to exclude from traffic redirection via
@@ -122,8 +122,8 @@ func (w *MeshWebhook) initCopyContainer() corev1.Container {
 	if !w.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
 			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
-			RunAsUser:              pointer.Int64(copyContainerUserAndGroupID),
-			RunAsGroup:             pointer.Int64(copyContainerUserAndGroupID),
+			RunAsUser:              pointer.Int64(initContainersUserAndGroupID),
+			RunAsGroup:             pointer.Int64(initContainersUserAndGroupID),
 			RunAsNonRoot:           pointer.Bool(true),
 			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}

@@ -720,6 +720,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(keyTransparentProxyStatus),
+				},
+
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalPod),
 				},
 				{
@@ -1868,7 +1873,6 @@ func TestOverwriteProbes(t *testing.T) {
 					require.Equal(t, c.expStartupPort[i], container.StartupProbe.HTTPGet.Port.IntValue())
 				}
 			}
-
 		})
 	}
 }
@@ -1904,9 +1908,7 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 			require.Error(t, err)
 			require.Equal(t, tt.expErr, err.Error())
 		})
-
 	}
-
 }
 
 // encodeRaw is a helper to encode some data into a RawExtension.

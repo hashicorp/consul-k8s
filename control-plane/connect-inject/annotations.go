@@ -152,6 +152,10 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
+	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
+	// iptables rules.
+	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
+
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/meshWebhook.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"

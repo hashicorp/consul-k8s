@@ -404,6 +404,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
 	}
 
+	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
+	// plugin can apply redirect traffic rules on the pod.
+	if w.EnableCNI && tproxyEnabled {
+		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+			// todo: update this error message
+			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
+		}
+	}
+
 	// Marshall the pod into JSON after it has the desired envs, annotations, labels,
 	// sidecars and initContainers appended to it.
 	updatedPodJson, err := json.Marshal(pod)

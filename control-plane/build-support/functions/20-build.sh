@@ -255,14 +255,14 @@ function build_consul_local {
          return 1
       fi
    else
-      status "Building sequentially with go install"
+      status "Building sequentially with go build"
       for os in ${build_os}
       do
          for arch in ${build_arch}
          do
             outdir="pkg.bin.new/${extra_dir}${os}_${arch}"
             osarch="${os}/${arch}"
-            if test "${osarch}" == "darwin/arm" -o "${osarch}" == "darwin/arm64" -o "${osarch}" == "freebsd/arm64" -o "${osarch}" == "windows/arm" -o "${osarch}" == "windows/arm64"
+            if test "${osarch}" == "darwin/arm" -o "${osarch}" == "freebsd/arm64" -o "${osarch}" == "windows/arm" -o "${osarch}" == "windows/arm64"
             then
                continue
             fi
