@@ -3,7 +3,6 @@ package consul
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/cli"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -44,6 +44,7 @@ type CLICluster struct {
 	noCleanupOnFailure bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
+	cli                cli.CLI
 }
 
 // NewCLICluster creates a new Consul cluster struct which can be used to create
@@ -90,6 +91,9 @@ func NewCLICluster(
 		Logger:         logger,
 	}
 
+	cli, err := cli.NewCLI()
+	require.NoError(t, err)
+
 	return &CLICluster{
 		ctx:                ctx,
 		helmOptions:        hopts,
@@ -103,6 +107,7 @@ func NewCLICluster(
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
+		cli:                *cli,
 	}
 }
 
@@ -129,7 +134,7 @@ func (c *CLICluster) Create(t *testing.T) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.runCLI(args)
+	out, err := c.cli.Run(args...)
 	if err != nil {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
@@ -162,7 +167,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.runCLI(args)
+	out, err := c.cli.Run(args...)
 	if err != nil {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
@@ -186,7 +191,7 @@ func (c *CLICluster) Destroy(t *testing.T) {
 	// Use `go run` so that the CLI is recompiled and therefore uses the local
 	// charts directory rather than the directory from whenever it was last
 	// compiled.
-	out, err := c.runCLI(args)
+	out, err := c.cli.Run(args...)
 	if err != nil {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
@@ -267,6 +272,10 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, 
 	return consulClient, config.Address
 }
 
+func (c *CLICluster) CLI() cli.CLI {
+	return c.cli
+}
+
 func createOrUpdateNamespace(t *testing.T, client kubernetes.Interface, namespace string) {
 	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -295,13 +304,4 @@ func (c *CLICluster) setKube(args []string) []string {
 	}
 
 	return args
-}
-
-// runCLI runs the CLI with the given args.
-// Use `go run` so that the CLI is recompiled and therefore uses the local
-// charts directory rather than the directory from whenever it was last compiled.
-func (c *CLICluster) runCLI(args []string) ([]byte, error) {
-	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
-	cmd.Dir = config.CLIPath
-	return cmd.Output()
 }

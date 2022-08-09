@@ -52,9 +52,6 @@ func (c *Command) init() {
 	})
 
 	c.help = c.set.Help()
-
-	// c.Init() calls the embedded BaseCommand's initialization function.
-	c.Init()
 }
 
 // Run checks the status of a Consul installation on Kubernetes.
@@ -152,33 +149,10 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 
 	timezone, _ := rel.Info.LastDeployed.Zone()
 
-	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "Chart Version", "AppVersion", "Revision", "Last Updated"}...)
-	trow := []terminal.TableEntry{
-		{
-			Value: releaseName,
-		},
-		{
-			Value: namespace,
-		},
-		{
-			Value: string(rel.Info.Status),
-		},
-		{
-			Value: rel.Chart.Metadata.Version,
-		},
-		{
-			Value: rel.Chart.Metadata.AppVersion,
-		},
-		{
-			Value: strconv.Itoa(rel.Version),
-		},
-		{
-			Value: rel.Info.LastDeployed.Format("2006/01/02 15:04:05") + " " + timezone,
-		},
-	}
-	tbl.Rows = [][]terminal.TableEntry{}
-	tbl.Rows = append(tbl.Rows, trow)
-
+	tbl := terminal.NewTable("Name", "Namespace", "Status", "Chart Version", "AppVersion", "Revision", "Last Updated")
+	tbl.AddRow([]string{releaseName, namespace, string(rel.Info.Status), rel.Chart.Metadata.Version,
+		rel.Chart.Metadata.AppVersion, strconv.Itoa(rel.Version),
+		rel.Info.LastDeployed.Format("2006/01/02 15:04:05") + " " + timezone}, []string{})
 	c.UI.Table(tbl)
 
 	valuesYaml, err := yaml.Marshal(rel.Config)

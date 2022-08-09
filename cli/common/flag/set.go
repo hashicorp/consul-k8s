@@ -56,6 +56,22 @@ func (f *Sets) NewSet(name string) *Set {
 	return flagSet
 }
 
+// GetSetFlags returns a slice of flags for a given set.
+// If the requested set does not exist, this will return an empty slice.
+func (f *Sets) GetSetFlags(setName string) []string {
+	var setFlags []string
+	for _, set := range f.flagSets {
+		if set.name == setName {
+			set.flagSet.VisitAll(func(f *flag.Flag) {
+				setFlags = append(setFlags, fmt.Sprintf("-%s", f.Name))
+			})
+			return setFlags
+		}
+	}
+
+	return setFlags
+}
+
 // Completions returns the completions for this flag set.
 func (f *Sets) Completions() complete.Flags {
 	return f.completions
