@@ -673,7 +673,7 @@ jobs:
 #          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-1-21:
-    parallelism: 3
+    parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
