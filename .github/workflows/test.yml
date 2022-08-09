@@ -4,8 +4,8 @@ on:
 
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  CONSUL_VERSION: 1.13.0-alpha2 # Consul's OSS version to use in tests
-  CONSUL_ENT_VERSION: 1.13.0-alpha2+ent # Consul's enterprise version to use in tests
+  CONSUL_VERSION: 1.13.0 # Consul's OSS version to use in tests
+  CONSUL_ENT_VERSION: 1.13.0+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.8.1 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 jobs:
@@ -146,8 +146,9 @@ jobs:
         working-directory: control-plane
         run: |
           mkdir -p $HOME/bin
-          wget https://github.com/ndhanushkodi/binaries/releases/download/v4.1oss/consul -O consulbin && \
-            mv consulbin $HOME/bin/consul &&
+          wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
+            unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
+            rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
           chmod +x $HOME/bin/consul
 
       - name: Run go tests
@@ -194,8 +195,9 @@ jobs:
         working-directory: control-plane
         run: |
           mkdir -p $HOME/bin
-          wget https://github.com/ndhanushkodi/binaries/releases/download/v4.1ent/consul -O consulbin && \
-            mv consulbin $HOME/bin/consul &&
+          wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
+            unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
+            rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
           chmod +x $HOME/bin/consul
 
       - name: Run go tests

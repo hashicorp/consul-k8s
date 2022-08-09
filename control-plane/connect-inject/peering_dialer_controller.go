@@ -152,7 +152,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		// Or, if the peering in Consul does exist, compare it to the spec's secret. If there's any
 		// differences, initiate peering.
 		if r.specStatusSecretsDifferent(dialer, specSecret) {
-			r.Log.Info("the version annotation was incremented; re-establishing peering with spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
+			r.Log.Info("the spec.peer.secret is different from the status secret, re-establishing peering", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
 			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
@@ -164,7 +164,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		if updated, err := r.versionAnnotationUpdated(dialer); err == nil && updated {
-			r.Log.Info("status.secret exists, but the peering doesn't exist in Consul; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
+			r.Log.Info("the version annotation was incremented; re-establishing peering with spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
 			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
