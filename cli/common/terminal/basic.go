@@ -15,15 +15,22 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// basicUI.
+// basicUI is a standard implementation of the UI interface for the terminal.
 type basicUI struct {
-	ctx context.Context
+	ctx    context.Context
+	bufOut io.Writer
 }
 
+// NewBasicUI creates a new instance of the basicUI struct for the terminal
+// with color output.
 func NewBasicUI(ctx context.Context) *basicUI {
-	return &basicUI{
-		ctx: ctx,
-	}
+	return NewUI(ctx, color.Output)
+}
+
+// NewUI creates a new instance of the basicUI struct that outputs to
+// the bufOut buffer.
+func NewUI(ctx context.Context, bufOut io.Writer) *basicUI {
+	return &basicUI{ctx: ctx, bufOut: bufOut}
 }
 
 // Input implements UI.
@@ -32,8 +39,8 @@ func (ui *basicUI) Input(input *Input) (string, error) {
 
 	// Write the prompt, add a space.
 	ui.Output(input.Prompt, WithStyle(input.Style), WithWriter(&buf))
-	fmt.Fprint(color.Output, strings.TrimRight(buf.String(), "\r\n"))
-	fmt.Fprint(color.Output, " ")
+	fmt.Fprint(ui.bufOut, strings.TrimRight(buf.String(), "\r\n"))
+	fmt.Fprint(ui.bufOut, " ")
 
 	// Ask for input in a go-routine so that we can ignore it.
 	errCh := make(chan error, 1)
@@ -62,7 +69,7 @@ func (ui *basicUI) Input(input *Input) (string, error) {
 		return line, nil
 	case <-ui.ctx.Done():
 		// Print newline so that any further output starts properly
-		fmt.Fprintln(color.Output)
+		fmt.Fprintln(ui.bufOut)
 		return "", ui.ctx.Err()
 	}
 }
@@ -74,7 +81,7 @@ func (ui *basicUI) Interactive() bool {
 
 // Output implements UI.
 func (ui *basicUI) Output(msg string, raw ...interface{}) {
-	msg, style, w := Interpret(msg, raw...)
+	msg, style, w := ui.parse(msg, raw...)
 
 	switch style {
 	case HeaderStyle:
@@ -114,7 +121,10 @@ func (ui *basicUI) Output(msg string, raw ...interface{}) {
 
 // NamedValues implements UI.
 func (ui *basicUI) NamedValues(rows []NamedValue, opts ...Option) {
-	cfg := &config{Writer: color.Output}
+	cfg := &config{
+		Writer: ui.bufOut,
+		Style:  "",
+	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -146,4 +156,32 @@ func (ui *basicUI) NamedValues(rows []NamedValue, opts ...Option) {
 // OutputWriters implements UI.
 func (ui *basicUI) OutputWriters() (io.Writer, io.Writer, error) {
 	return os.Stdout, os.Stderr, nil
+}
+
+// parse decomposes the msg and arguments into the message, style, and writer.
+func (ui *basicUI) parse(msg string, raw ...interface{}) (string, string, io.Writer) {
+	// Build our args and options
+	var args []interface{}
+	var opts []Option
+	for _, r := range raw {
+		if opt, ok := r.(Option); ok {
+			opts = append(opts, opt)
+		} else {
+			args = append(args, r)
+		}
+	}
+
+	// Build our message
+	msg = fmt.Sprintf(msg, args...)
+
+	// Build our config and set our options
+	cfg := &config{
+		Writer: ui.bufOut,
+		Style:  "",
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return msg, cfg.Style, cfg.Writer
 }

@@ -2,7 +2,6 @@ package terminal
 
 import (
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/fatih/color"
@@ -64,31 +63,6 @@ type Input struct {
 
 	// True if this input is a secret. The input will be masked.
 	Secret bool
-}
-
-// Interpret decomposes the msg and arguments into the message, style, and writer.
-func Interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
-	// Build our args and options
-	var args []interface{}
-	var opts []Option
-	for _, r := range raw {
-		if opt, ok := r.(Option); ok {
-			opts = append(opts, opt)
-		} else {
-			args = append(args, r)
-		}
-	}
-
-	// Build our message
-	msg = fmt.Sprintf(msg, args...)
-
-	// Build our config and set our options
-	cfg := &config{Writer: color.Output}
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
-	return msg, cfg.Style, cfg.Writer
 }
 
 const (

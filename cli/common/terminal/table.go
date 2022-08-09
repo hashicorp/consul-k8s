@@ -1,14 +1,31 @@
 package terminal
 
 import (
-	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 )
+
+const (
+	Yellow = "yellow"
+	Green  = "green"
+	Red    = "red"
+)
+
+var colorMapping = map[string]int{
+	Green:  tablewriter.FgGreenColor,
+	Yellow: tablewriter.FgYellowColor,
+	Red:    tablewriter.FgRedColor,
+}
 
 // Passed to UI.Table to provide a nicely formatted table.
 type Table struct {
 	Headers []string
-	Rows    [][]TableEntry
+	Rows    [][]Cell
+}
+
+// Cell is a single entry for a table.
+type Cell struct {
+	Value string
+	Color string
 }
 
 // Table creates a new Table structure that can be used with UI.Table.
@@ -18,21 +35,15 @@ func NewTable(headers ...string) *Table {
 	}
 }
 
-// TableEntry is a single entry for a table.
-type TableEntry struct {
-	Value string
-	Color string
-}
-
-// Rich adds a row to the table.
-func (t *Table) Rich(cols []string, colors []string) {
-	var row []TableEntry
+// AddRow adds a row to the table.
+func (t *Table) AddRow(cols []string, colors []string) {
+	var row []Cell
 
 	for i, col := range cols {
 		if i < len(colors) {
-			row = append(row, TableEntry{Value: col, Color: colors[i]})
+			row = append(row, Cell{Value: col, Color: colors[i]})
 		} else {
-			row = append(row, TableEntry{Value: col})
+			row = append(row, Cell{Value: col})
 		}
 	}
 
@@ -42,7 +53,7 @@ func (t *Table) Rich(cols []string, colors []string) {
 // Table implements UI.
 func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	// Build our config and set our options
-	cfg := &config{Writer: color.Output}
+	cfg := &config{Writer: u.bufOut}
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -52,20 +63,15 @@ func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	table.SetHeader(tbl.Headers)
 	table.SetBorder(false)
 	table.SetAutoWrapText(false)
-
-	if cfg.Style == "Simple" {
-		// Format the table without borders, simple output
-
-		table.SetAutoFormatHeaders(true)
-		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.SetCenterSeparator("")
-		table.SetColumnSeparator("")
-		table.SetRowSeparator("")
-		table.SetHeaderLine(false)
-		table.SetTablePadding("\t") // pad with tabs
-		table.SetNoWhiteSpace(true)
-	}
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetCenterSeparator("")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetHeaderLine(false)
+	table.SetTablePadding("\t") // pad with tabs
+	table.SetNoWhiteSpace(true)
 
 	for _, row := range tbl.Rows {
 		colors := make([]tablewriter.Colors, len(row))
@@ -84,16 +90,4 @@ func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	}
 
 	table.Render()
-}
-
-const (
-	Yellow = "yellow"
-	Green  = "green"
-	Red    = "red"
-)
-
-var colorMapping = map[string]int{
-	Green:  tablewriter.FgGreenColor,
-	Yellow: tablewriter.FgYellowColor,
-	Red:    tablewriter.FgRedColor,
 }
