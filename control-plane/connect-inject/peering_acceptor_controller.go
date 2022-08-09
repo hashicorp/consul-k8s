@@ -242,8 +242,7 @@ func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingSecre
 func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptorObjKey types.NamespacedName) error {
 	// Get the latest resource before we update it.
 	acceptor := &consulv1alpha1.PeeringAcceptor{}
-	err := r.Client.Get(ctx, acceptorObjKey, acceptor)
-	if err != nil {
+	if err := r.Client.Get(ctx, acceptorObjKey, acceptor); err != nil {
 		return fmt.Errorf("error fetching acceptor resource before status update: %w", err)
 	}
 	acceptor.Status.SecretRef = &consulv1alpha1.SecretRefStatus{
@@ -261,7 +260,7 @@ func (r *PeeringAcceptorController) updateStatus(ctx context.Context, acceptorOb
 			acceptor.Status.LatestPeeringVersion = pointerToUint64(peeringVersion)
 		}
 	}
-	err = r.Status().Update(ctx, acceptor)
+	err := r.Status().Update(ctx, acceptor)
 	if err != nil {
 		r.Log.Error(err, "failed to update PeeringAcceptor status", "name", acceptor.Name, "namespace", acceptor.Namespace)
 	}
