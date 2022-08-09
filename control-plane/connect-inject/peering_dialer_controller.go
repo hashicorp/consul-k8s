@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -120,7 +121,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 			r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 			return ctrl.Result{}, err
 		} else {
-			err := r.updateStatus(ctx, dialer, specSecret.ResourceVersion)
+			err := r.updateStatus(ctx, req.NamespacedName, specSecret.ResourceVersion)
 			return ctrl.Result{}, err
 		}
 	} else {
@@ -143,7 +144,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 				return ctrl.Result{}, err
 			} else {
-				err := r.updateStatus(ctx, dialer, specSecret.ResourceVersion)
+				err := r.updateStatus(ctx, req.NamespacedName, specSecret.ResourceVersion)
 				return ctrl.Result{}, err
 			}
 		}
@@ -157,7 +158,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 				return ctrl.Result{}, err
 			} else {
-				err := r.updateStatus(ctx, dialer, specSecret.ResourceVersion)
+				err := r.updateStatus(ctx, req.NamespacedName, specSecret.ResourceVersion)
 				return ctrl.Result{}, err
 			}
 		}
@@ -169,7 +170,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 				return ctrl.Result{}, err
 			} else {
-				err := r.updateStatus(ctx, dialer, specSecret.ResourceVersion)
+				err := r.updateStatus(ctx, req.NamespacedName, specSecret.ResourceVersion)
 				return ctrl.Result{}, err
 			}
 		} else if err != nil {
@@ -194,7 +195,11 @@ func (r *PeeringDialerController) specStatusSecretsDifferent(dialer *consulv1alp
 	return dialer.SecretRef().ResourceVersion != existingSpecSecret.ResourceVersion
 }
 
-func (r *PeeringDialerController) updateStatus(ctx context.Context, dialer *consulv1alpha1.PeeringDialer, resourceVersion string) error {
+func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey types.NamespacedName, resourceVersion string) error {
+	dialer := &consulv1alpha1.PeeringDialer{}
+	if err := r.Client.Get(ctx, dialerObjKey, dialer); err != nil {
+		return fmt.Errorf("error fetching dialer resource before status update: %w", err)
+	}
 	dialer.Status.SecretRef = &consulv1alpha1.SecretRefStatus{
 		Secret:          *dialer.Spec.Peer.Secret,
 		ResourceVersion: resourceVersion,

@@ -143,8 +143,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if acceptor.SecretRef() != nil {
 			r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name, "secret-name", acceptor.SecretRef().Name)
-			err = r.deleteK8sSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace)
-			if err != nil {
+			if err := r.deleteK8sSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace); err != nil {
 				r.updateStatusError(ctx, acceptor, KubernetesError, err)
 				return ctrl.Result{}, err
 			}
@@ -156,8 +155,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
-			err = r.createOrUpdateK8sSecret(ctx, acceptor, resp)
-			if err != nil {
+			if err := r.createOrUpdateK8sSecret(ctx, acceptor, resp); err != nil {
 				r.updateStatusError(ctx, acceptor, KubernetesError, err)
 				return ctrl.Result{}, err
 			}
@@ -186,16 +184,14 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
-			err = r.createOrUpdateK8sSecret(ctx, acceptor, resp)
-			if err != nil {
+			if err = r.createOrUpdateK8sSecret(ctx, acceptor, resp); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 		// Delete the existing secret if the name changed. This needs to come before updating the status if we do generate a new token.
 		if nameChanged && acceptor.SecretRef() != nil {
 			r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name, "secret-name", acceptor.SecretRef().Name)
-			err = r.deleteK8sSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace)
-			if err != nil {
+			if err = r.deleteK8sSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace); err != nil {
 				r.updateStatusError(ctx, acceptor, KubernetesError, err)
 				return ctrl.Result{}, err
 			}
