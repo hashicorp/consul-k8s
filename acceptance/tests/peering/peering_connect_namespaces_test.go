@@ -68,19 +68,19 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			false,
 		},
 		{
-			"default destination namespace",
+			"default destination namespace; secure",
 			defaultNamespace,
 			false,
 			true,
 		},
 		{
-			"single destination namespace",
+			"single destination namespace; secure",
 			staticServerNamespace,
 			false,
 			true,
 		},
 		{
-			"mirror k8s namespaces",
+			"mirror k8s namespaces; secure",
 			staticServerNamespace,
 			true,
 			true,
@@ -95,8 +95,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
-
-				"global.image": "ndhanushkodi/consul-dev:ent-backoff-fix",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
@@ -177,9 +175,9 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// Ensure the secret is created.
 			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretResourceVersion, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.resourceVersion}")
+				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
-				require.NotEmpty(r, acceptorSecretResourceVersion)
+				require.NotEmpty(r, acceptorSecretName)
 			})
 
 			// Copy secret from client peer to server peer.
