@@ -413,12 +413,19 @@ func realMain(ctx context.Context) error {
 		})
 		for _, subnet := range subnets.Subnets {
 			fmt.Printf("Subnet: Destroying... [id=%s]\n", *subnet.SubnetId)
-			_, err := ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
-				SubnetId: subnet.SubnetId,
-			})
-			if err != nil {
+			if err := destroyBackoff(ctx, "Subnet", *subnet.SubnetId, func() error {
+				_, err := ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
+					SubnetId: subnet.SubnetId,
+				})
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}); err != nil {
 				return err
 			}
+
 			fmt.Printf("Subnet: Destroyed [id=%s]\n", *subnet.SubnetId)
 		}
 
