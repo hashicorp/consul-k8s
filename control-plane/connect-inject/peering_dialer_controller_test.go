@@ -500,6 +500,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			// Create a new token to be potentially used by Reconcile(). The original token has already been
 			// used once to simulate establishing an existing peering.
 			token, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "peering"}, nil)
+			require.NoError(t, err)
 			secret := createSecret("dialer-token", "default", "token", token.PeeringToken)
 			secret.SetResourceVersion("latest-version")
 			k8sObjects = append(k8sObjects, secret)
