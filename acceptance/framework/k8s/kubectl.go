@@ -94,7 +94,7 @@ func KubectlApplyK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir strin
 // deletes it from the cluster by running 'kubectl delete -f'.
 // If there's an error deleting the file, fail the test.
 func KubectlDelete(t *testing.T, options *k8s.KubectlOptions, configPath string) {
-	_, err := RunKubectlAndGetOutputE(t, options, "delete", "-f", configPath)
+	_, err := RunKubectlAndGetOutputE(t, options, "delete", "--timeout=60s", "-f", configPath)
 	require.NoError(t, err)
 }
 
@@ -102,7 +102,7 @@ func KubectlDelete(t *testing.T, options *k8s.KubectlOptions, configPath string)
 // deletes it from the cluster by running 'kubectl delete -k'.
 // If there's an error deleting the file, fail the test.
 func KubectlDeleteK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir string) {
-	_, err := RunKubectlAndGetOutputE(t, options, "delete", "-k", kustomizeDir)
+	_, err := RunKubectlAndGetOutputE(t, options, "delete", "--timeout=60s", "-k", kustomizeDir)
 	require.NoError(t, err)
 }
 

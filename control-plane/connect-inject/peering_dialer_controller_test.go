@@ -901,7 +901,7 @@ func TestDialerUpdateStatus(t *testing.T) {
 				Scheme: s,
 			}
 
-			err := controller.updateStatus(context.Background(), tt.peeringDialer, tt.resourceVersion)
+			err := controller.updateStatus(context.Background(), types.NamespacedName{Name: tt.peeringDialer.Name, Namespace: tt.peeringDialer.Namespace}, tt.resourceVersion)
 			require.NoError(t, err)
 
 			dialer := &v1alpha1.PeeringDialer{}
