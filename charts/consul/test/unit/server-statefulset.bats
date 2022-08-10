@@ -207,7 +207,7 @@ load _helpers
         . | tee /dev/stderr )
 
     local actual=$(echo "$object" |
-        yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
+        yq -r '.spec.template.spec.volumes[] | select(.name == "consul-server-cert") | .secret.secretName' | tee /dev/stderr)
     [ "${actual}" = "release-name-consul-server-cert" ]
 }
 
@@ -221,7 +221,7 @@ load _helpers
         . | tee /dev/stderr )
 
     local actual=$(echo "$object" |
-        yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
+        yq -r '.spec.template.spec.volumes[] | select(.name == "consul-server-cert") | .secret.secretName' | tee /dev/stderr)
     [ "${actual}" = "server-cert" ]
 }
 
@@ -346,6 +346,27 @@ load _helpers
 
   local command=$(echo "$object" |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+}
+
+#--------------------------------------------------------------------
+# extra-config
+
+@test "server/StatefulSet: has extra-config volume" {
+  cd `chart_dir`
+
+  # check that the extra-config volume is defined
+  local volume_name=$(helm template \
+      -s templates/server-statefulset.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name == "extra-config") | .name' | tee /dev/stderr)
+  [ "${volume_name}" = "extra-config" ]
+
+  # check that the consul container mounts the volume at /consul/extra-config
+  local mount_path=$(helm template \
+      -s templates/server-statefulset.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "extra-config") | .mountPath' | tee /dev/stderr)
+  [ "${mount_path}" = "/consul/extra-config" ]
 }
 
 #--------------------------------------------------------------------
