@@ -123,7 +123,7 @@ commands:
                   # Enterprise tests can't run on fork PRs because they require
                   # a secret.
                   if [ -z "$CIRCLE_PR_NUMBER" ]; then
-                    ENABLE_ENTERPRISE=true
+                    ENABLE_ENTERPRISE=false
                   fi
 
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
@@ -133,7 +133,7 @@ commands:
                       -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -debug-directory="$TEST_RESULTS/debug" \
-                      -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
+                      -consul-image=ishustava/consul-dev:latest \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
