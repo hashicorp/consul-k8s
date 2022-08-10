@@ -219,9 +219,15 @@ func parseClusters(rawCfg map[string]interface{}, clusterMapping map[string][]st
 			}
 		}
 
+		// Don't display "non-domain name" FQDNs (e.g. local_app)
+		fqdn := cluster.Cluster.FQDN
+		if !strings.Contains(fqdn, ".") {
+			fqdn = ""
+		}
+
 		clusters = append(clusters, Cluster{
 			Name:                     strings.Split(cluster.Cluster.FQDN, ".")[0],
-			FullyQualifiedDomainName: cluster.Cluster.FQDN,
+			FullyQualifiedDomainName: fqdn,
 			Endpoints:                endpoints,
 			Type:                     cluster.Cluster.ClusterType,
 			LastUpdated:              cluster.LastUpdated,
@@ -257,7 +263,7 @@ func parseEndpoints(rawCfg map[string]interface{}, endpointMapping map[string]st
 
 				endpoints = append(endpoints, Endpoint{
 					Address: address,
-					Cluster: cluster,
+					Cluster: strings.Split(cluster, ".")[0],
 					Weight:  lbEndpoint.LoadBalancingWeight,
 					Status:  lbEndpoint.HealthStatus,
 				})
