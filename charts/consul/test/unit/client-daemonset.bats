@@ -239,6 +239,27 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# extra-config
+
+@test "client/DaemonSet: has extra-config volume" {
+  cd `chart_dir`
+
+  # check that the extra-config volume is defined
+  local volume_name=$(helm template \
+      -s templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name == "extra-config") | .name' | tee /dev/stderr)
+  [ "${volume_name}" = "extra-config" ]
+
+  # check that the consul container mounts the volume at /consul/extra-config
+  local mount_path=$(helm template \
+      -s templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "extra-config") | .mountPath' | tee /dev/stderr)
+  [ "${mount_path}" = "/consul/extra-config" ]
+}
+
+#--------------------------------------------------------------------
 # extraVolumes
 
 @test "client/DaemonSet: adds extra volume" {
@@ -1100,29 +1121,22 @@ load _helpers
 
 @test "client/DaemonSet: aclconfig volume is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local volume_name=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[3].name == "aclconfig"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.spec.template.spec.volumes[] | select(.name == "aclconfig") | .name' | tee /dev/stderr)
+  [ "${volume_name}" = "aclconfig" ]
 }
 
 @test "client/DaemonSet: aclconfig volumeMount is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
-  local object=$(helm template \
+  local mount_path=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[3]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "aclconfig" ]
-
-  local actual=$(echo $object |
-      yq -r '.mountPath' | tee /dev/stderr)
-  [ "${actual}" = "/consul/aclconfig" ]
+      yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "aclconfig") | .mountPath' | tee /dev/stderr)
+  [ "${mount_path}" = "/consul/aclconfig" ]
 }
 
 @test "client/DaemonSet: command includes aclconfig dir when global.acls.manageSystemACLs=true" {
@@ -1260,37 +1274,34 @@ local actual=$(echo $object |
 
 @test "client/DaemonSet: Adds consul login volume when ACLs are enabled" {
   cd `chart_dir`
-  local object=$(helm template \
+  local volume=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      . | yq '.spec.template.spec.volumes[2]' | tee /dev/stderr)
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "consul-data" ]
+      . | yq '.spec.template.spec.volumes[] | select(.name == "consul-data")' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local volume_name=$(echo $volume |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${volume_name}" = "consul-data" ]
+
+  local volume_emptydir_medium=$(echo $volume |
       yq -r '.emptyDir.medium' | tee /dev/stderr)
-  [ "${actual}" = "Memory" ]
+  [ "${volume_emptydir_medium}" = "Memory" ]
 }
 
 @test "client/DaemonSet: Adds consul login volumeMount to client container when ACLs are enabled" {
   cd `chart_dir`
-  local object=$(helm template \
+  local volume_mount=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      . | yq '.spec.template.spec.containers[0].volumeMounts[2]' | tee /dev/stderr)
+      . | yq '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "consul-data")' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "consul-data" ]
-
-  local actual=$(echo $object |
+  local volume_mount_path=$(echo $volume_mount |
       yq -r '.mountPath' | tee /dev/stderr)
-  [ "${actual}" = "/consul/login" ]
+  [ "${volume_mount_path}" = "/consul/login" ]
 
-  local actual=$(echo $object |
+  local volume_mount_ro=$(echo $volume_mount |
       yq -r '.readOnly' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  [ "${volume_mount_ro}" = "true" ]
 }
 
 @test "client/DaemonSet: Adds consul login volumeMount to acl-init init container when ACLs are enabled" {

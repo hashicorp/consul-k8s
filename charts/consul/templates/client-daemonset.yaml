@@ -125,6 +125,8 @@ spec:
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-client-config
+        - name: extra-config
+          emptyDir: {}
         - name: consul-data
           emptyDir:
             medium: "Memory"
@@ -384,6 +386,8 @@ spec:
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
+            - name: extra-config
+              mountPath: /consul/extra-config
             - mountPath: /consul/login
               name: consul-data
               readOnly: true
