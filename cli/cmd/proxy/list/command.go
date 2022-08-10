@@ -204,6 +204,8 @@ func (c *ListCommand) output(pods []v1.Pod) {
 
 	for _, pod := range pods {
 		var proxyType string
+
+		// Get the type for ingress, mesh, and terminating gateways.
 		switch pod.Labels["component"] {
 		case "ingress-gateway":
 			proxyType = "Ingress Gateway"
@@ -211,9 +213,15 @@ func (c *ListCommand) output(pods []v1.Pod) {
 			proxyType = "Mesh Gateway"
 		case "terminating-gateway":
 			proxyType = "Terminating Gateway"
-		case "api-gateway":
+		}
+
+		// Determine if the pod is an API Gateway.
+		if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
 			proxyType = "API Gateway"
-		default:
+		}
+
+		// Fallback to "Sidecar" as a default
+		if proxyType == "" {
 			proxyType = "Sidecar"
 		}
 

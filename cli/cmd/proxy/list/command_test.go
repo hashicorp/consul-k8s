@@ -225,7 +225,7 @@ func TestListCommandOutput(t *testing.T) {
 		"consul.*mesh-gateway.*Mesh Gateway",
 		"consul.*terminating-gateway.*Terminating Gateway",
 		"default.*ingress-gateway.*Ingress Gateway",
-		"consul.*api-gateway.*Sidecar",
+		"consul.*api-gateway.*API Gateway",
 		"default.*pod1.*Sidecar",
 	}
 	notExpected := []string{
