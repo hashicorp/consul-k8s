@@ -124,7 +124,6 @@ func (c *CLICluster) Create(t *testing.T) {
 
 	// Set the args for running the install command.
 	args := []string{"install"}
-	args = c.setKube(args)
 
 	for k, v := range c.values {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
@@ -134,7 +133,7 @@ func (c *CLICluster) Create(t *testing.T) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.cli.Run(args...)
+	out, err := c.cli.Run(t, c.kubectlOptions, args...)
 	if err != nil {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
@@ -167,7 +166,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.cli.Run(args...)
+	out, err := c.cli.Run(t, c.kubectlOptions, args...)
 	if err != nil {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
@@ -185,13 +184,12 @@ func (c *CLICluster) Destroy(t *testing.T) {
 
 	// Set the args for running the uninstall command.
 	args := []string{"uninstall"}
-	args = c.setKube(args)
 	args = append(args, "-auto-approve", "-wipe-data")
 
 	// Use `go run` so that the CLI is recompiled and therefore uses the local
 	// charts directory rather than the directory from whenever it was last
 	// compiled.
-	out, err := c.cli.Run(args...)
+	out, err := c.cli.Run(t, c.kubectlOptions, args...)
 	if err != nil {
 		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
 		c.logger.Logf(t, "command stdout: %s", string(out))
