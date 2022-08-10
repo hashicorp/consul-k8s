@@ -21,7 +21,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Helm
-  * Fix permissions in client-daemonset and server-statefulset when using extra-config volumes to prevent errors on openshift [[GH-1307](https://github.com/hashicorp/consul-k8s/pull/1307)]
+  * Fix permissions in client-daemonset and server-statefulset when using extra-config volumes to prevent errors on openshift. [[GH-1307](https://github.com/hashicorp/consul-k8s/pull/1307)]
 
 ## 0.46.1 (July 26, 2022)
 
