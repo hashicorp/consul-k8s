@@ -98,7 +98,6 @@ commands:
                   do
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
-                          ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
@@ -123,7 +122,7 @@ commands:
                   # Enterprise tests can't run on fork PRs because they require
                   # a secret.
                   if [ -z "$CIRCLE_PR_NUMBER" ]; then
-                    ENABLE_ENTERPRISE=false
+                    ENABLE_ENTERPRISE=true
                   fi
 
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
@@ -132,7 +131,6 @@ commands:
                       << parameters.additional-flags >> \
                       -enable-multi-cluster \
                       -run TestPeering* \
-                      ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -debug-directory="$TEST_RESULTS/debug" \
                       -consul-image=ishustava/consul-dev:latest \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
