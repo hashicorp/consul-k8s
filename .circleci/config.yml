@@ -607,7 +607,6 @@ jobs:
   ########################
   acceptance-gke-1-20:
     parallelism: 6
-    resource_class: large
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -675,7 +674,6 @@ jobs:
 
   acceptance-aks-1-21:
     parallelism: 6
-    resource_class: large
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -732,7 +730,6 @@ jobs:
 
   acceptance-eks-1-19:
     parallelism: 6
-    resource_class: large
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
