@@ -229,11 +229,11 @@ func (c *ReadCommand) validateFlags() error {
 func (c *ReadCommand) initKubernetes() (err error) {
 	settings := helmCLI.New()
 
-	if c.flagKubeConfig == "" {
+	if c.flagKubeConfig != "" {
 		settings.KubeConfig = c.flagKubeConfig
 	}
 
-	if c.flagKubeContext == "" {
+	if c.flagKubeContext != "" {
 		settings.KubeContext = c.flagKubeContext
 	}
 
