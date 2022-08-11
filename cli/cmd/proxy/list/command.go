@@ -128,7 +128,7 @@ func (c *ListCommand) validateFlags() error {
 	return nil
 }
 
-// initKubernetes initializes the Kubernetes client
+// initKubernetes initializes the Kubernetes client.
 func (c *ListCommand) initKubernetes() error {
 	settings := helmCLI.New()
 
