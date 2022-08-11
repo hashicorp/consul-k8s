@@ -59,6 +59,11 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount...)
 	}
 
+	lifecycle, err := w.envoySidecarLifecycle(pod)
+	if err == nil {
+		container.Lifecycle = lifecycle
+	}
+
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -147,6 +152,29 @@ func (w *MeshWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcNam
 		}
 	}
 	return cmd, nil
+}
+
+func (w *MeshWebhook) envoySidecarLifecycle(pod corev1.Pod) (*corev1.Lifecycle, error) {
+
+	delay, annotationSet := pod.Annotations[annotationSidecarProxyPreStopDelay]
+
+	if !annotationSet {
+		return &corev1.Lifecycle{}, fmt.Errorf("Annotation not set")
+	}
+
+	lifecycle := &corev1.Lifecycle{
+		PreStop: &corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/sh",
+					"-c",
+					"sleep " + delay,
+				},
+			},
+		},
+	}
+
+	return lifecycle, nil
 }
 
 func (w *MeshWebhook) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
