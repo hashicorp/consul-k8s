@@ -134,6 +134,14 @@ func (c *ListCommand) validateFlags() error {
 func (c *ListCommand) initKubernetes() error {
 	settings := helmCLI.New()
 
+	if c.flagKubeConfig != "" {
+		settings.KubeConfig = c.flagKubeConfig
+	}
+
+	if c.flagKubeContext != "" {
+		settings.KubeContext = c.flagKubeContext
+	}
+
 	restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 	if err != nil {
 		return fmt.Errorf("error retrieving Kubernetes authentication %v", err)

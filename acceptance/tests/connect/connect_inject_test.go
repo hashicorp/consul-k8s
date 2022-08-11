@@ -88,7 +88,7 @@ func TestConnectInject(t *testing.T) {
 			}
 
 			// Run proxy list and get the two results.
-			listOut, err := cli.Run("proxy", "list")
+			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list")
 			require.NoError(t, err)
 			logger.Log(t, string(listOut))
 			list := translateListOutput(listOut)
@@ -101,7 +101,7 @@ func TestConnectInject(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run("proxy", "read", podName)
+					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
 					require.NoError(t, err)
 
 					output := string(out)
