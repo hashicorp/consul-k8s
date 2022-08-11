@@ -1,4 +1,4 @@
-## 0.47.0 (August 11, 2022)
+## 0.47.0 (August 12, 2022)
 
 FEATURES:
 * Transparent Proxy Egress
