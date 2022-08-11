@@ -2970,6 +2970,16 @@ apiGateway:
 # Configuration settings for the webhook-cert-manager
 # `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.
 webhookCertManager:
+  # The resource settings for the `webhook-cert-manager` container.
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 100m
+    limits:
+      memory: 50Mi
+      cpu: 100m
 
   # Toleration Settings
   # This should be a multi-line string matching the Toleration array

@@ -47,11 +47,11 @@ spec:
         name: webhook-cert-manager
         resources:
           limits:
-            cpu: 100m
-            memory: 50Mi
+            cpu: {{ .Values.webhookCertManager.resources.limits.cpu }}
+            memory: {{ .Values.webhookCertManager.resources.limits.memory }}
           requests:
-            cpu: 100m
-            memory: 50Mi
+            cpu: {{ .Values.webhookCertManager.resources.requests.cpu }}
+            memory: {{ .Values.webhookCertManager.resources.requests.memory }}
         volumeMounts:
         - name: config
           mountPath: /bootstrap/config
