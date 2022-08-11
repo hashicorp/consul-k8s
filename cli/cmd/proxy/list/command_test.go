@@ -308,6 +308,35 @@ func TestListCommandOutput(t *testing.T) {
 	}
 }
 
+func TestNoPodsFound(t *testing.T) {
+	cases := map[string]struct {
+		args     []string
+		expected string
+	}{
+		"Default namespace": {
+			[]string{"-n", "default"},
+			"No proxies found in default namespace.",
+		},
+		"All namespaces": {
+			[]string{"-A"},
+			"No proxies found across all namespaces.",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := setupCommand(buf)
+			c.kubernetes = fake.NewSimpleClientset()
+
+			out := c.Run(tc.args)
+			require.Equal(t, 0, out)
+
+			require.Regexp(t, tc.expected, buf.String())
+		})
+	}
+}
+
 func setupCommand(buf io.Writer) *ListCommand {
 	// Log at a test level to standard out.
 	log := hclog.New(&hclog.LoggerOptions{
