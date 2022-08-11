@@ -204,6 +204,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
+				"global.imageK8S":              "kyleschochenmaier/consul-k8s-dev",
 				"connectInject.enabled":        "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
@@ -266,6 +267,7 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 
 	helmValues := map[string]string{
+		"global.imageK8S":       "kyleschochenmaier/consul-k8s-dev",
 		"connectInject.enabled": "true",
 	}
 
@@ -329,6 +331,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			helmValues := map[string]string{
+				"global.imageK8S":       "kyleschochenmaier/consul-k8s-dev",
 				"connectInject.enabled": "true",
 
 				"global.tls.enabled":           strconv.FormatBool(c.secure),

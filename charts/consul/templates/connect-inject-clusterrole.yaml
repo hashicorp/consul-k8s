@@ -13,8 +13,7 @@ metadata:
 rules:
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources:
-  - serviceaccounts
+  resources: ["serviceaccounts", "secrets"]
   verbs:
   - get
 {{- end }}
