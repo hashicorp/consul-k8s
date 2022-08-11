@@ -209,6 +209,9 @@ func TestFetchPods(t *testing.T) {
 			c := setupCommand(new(bytes.Buffer))
 			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
 			c.flagNamespace = tc.namespace
+			if tc.namespace == "" {
+				c.flagAllNamespaces = true
+			}
 
 			pods, err := c.fetchPods()
 
