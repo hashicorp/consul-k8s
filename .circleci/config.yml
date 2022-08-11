@@ -98,6 +98,7 @@ commands:
                   do
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
+                          ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
@@ -129,9 +130,10 @@ commands:
                   echo "Running $pkgs"
                   gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
                       << parameters.additional-flags >> \
+                      ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -enable-multi-cluster \
                       -debug-directory="$TEST_RESULTS/debug" \
-                      -consul-image=ishustava/consul-dev:latest \
+                      -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
@@ -671,8 +673,8 @@ jobs:
 #          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-1-21:
-    parallelism: 6
-    resource_class: 2xlarge
+    parallelism: 3
+    resource_class: 2xlarge+
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
