@@ -258,7 +258,6 @@ func TestPeering_Connect(t *testing.T) {
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
-			t.FailNow()
 		})
 	}
 }
