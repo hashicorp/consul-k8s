@@ -4,8 +4,8 @@ FEATURES:
 * Transparent Proxy Egress
   * Add support for Destinations on the Service Defaults CRD. [[GH-1352](https://github.com/hashicorp/consul-k8s/pull/1352)]
 * CLI:
-  * Add `consul-k8s proxy list` command for displaying Pods running Envoy managed by Consul. [[GH-1271](https://github.com/hashicorp/consul-k8s/pull/1271)
-  * Add `consul-k8s proxy read podname` command for displaying Envoy configuration for a given Pod. [[GH-1271](https://github.com/hashicorp/consul-k8s/pull/1271)
+  * Add `consul-k8s proxy list` command for displaying Pods running Envoy managed by Consul. [[GH-1271](https://github.com/hashicorp/consul-k8s/pull/1271)]
+  * Add `consul-k8s proxy read podname` command for displaying Envoy configuration for a given Pod. [[GH-1271](https://github.com/hashicorp/consul-k8s/pull/1271)]
 * [Experimental] Cluster Peering:
   * Add support for ACLs and TLS. [[GH-1343](https://github.com/hashicorp/consul-k8s/pull/1343)] [[GH-1366](https://github.com/hashicorp/consul-k8s/pull/1366)]
   * Add support for Load Balancers or external addresses in front of Consul servers for peering stream.
@@ -21,7 +21,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Helm
-  * Fix permissions in client-daemonset and server-statefulset when using extra-config volumes to prevent errors on openshift. [[GH-1307](https://github.com/hashicorp/consul-k8s/pull/1307)]
+  * Fix permissions in client-daemonset and server-statefulset when using extra-config volumes to prevent errors on OpenShift. [[GH-1307](https://github.com/hashicorp/consul-k8s/pull/1307)]
 
 ## 0.46.1 (July 26, 2022)
 
@@ -30,11 +30,6 @@ IMPROVEMENTS:
   * Update alpine to 3.16 in the Docker image. [[GH-1372](https://github.com/hashicorp/consul-k8s/pull/1372)]
 
 ## 0.46.0 (July 20, 2022)
-IMPROVEMENTS:
-* Control Plane
-  * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
-* CLI
-  * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
 
 FEATURES:
 * [Experimental] Cluster Peering:
@@ -47,9 +42,12 @@ IMPROVEMENTS:
 * Control Plane
   * Added annotations `consul.hashicorp.com/prometheus-ca-file`, `consul.hashicorp.com/prometheus-ca-path`, `consul.hashicorp.com/prometheus-cert-file`, and `consul.hashicorp.com/prometheus-key-file` for configuring TLS scraping on Prometheus metrics endpoints for Envoy sidecars. To enable, set the cert and key file annotations along with one of the ca file/path annotations. [[GH-1303](https://github.com/hashicorp/consul-k8s/pull/1303)]
   * Added annotations `consul.hashicorp.com/consul-sidecar-user-volume` and `consul.hashicorp.com/consul-sidecar-user-volume-mount` for attaching Volumes and VolumeMounts to the Envoy sidecar. Both should be JSON objects. [[GH-1315](https://github.com/hashicorp/consul-k8s/pull/1315)]
+  * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
 * Helm
   * Added `connectInject.annotations` and `syncCatalog.annotations` values for setting annotations on connect inject and sync catalog deployments. [[GH-775](https://github.com/hashicorp/consul-k8s/pull/775)]
   * Added PodDisruptionBudget to the connect injector deployment which can be configured using the `connectInject.disruptionBudget` stanza. [[GH-1316](https://github.com/hashicorp/consul-k8s/pull/1316)]
+* CLI
+  * Update minimum go version for project to 1.18 [[GH-1292](https://github.com/hashicorp/consul-k8s/pull/1292)]
 
 BUG FIXES:
 * Helm
