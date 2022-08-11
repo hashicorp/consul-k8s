@@ -127,7 +127,7 @@ commands:
 
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
                   echo "Running $pkgs"
-                  gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h \
+                  gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
                       << parameters.additional-flags >> \
                       -enable-multi-cluster \
                       -run TestPeering* \
