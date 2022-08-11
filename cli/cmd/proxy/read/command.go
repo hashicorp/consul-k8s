@@ -327,6 +327,34 @@ func (c *ReadCommand) shouldPrintTable(table bool) bool {
 	return !(c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets)
 }
 
+// filterWarnings checks if the user has passed in a combination of field and
+// table filters where the field in question is not present on the table and
+// returns a warning.
+// For example, if the user passes "-fqdn default -endpoints", a warning will
+// be printed saying "The filter `-fqdn default` does not apply to the tables displayed.".
+func (c *ReadCommand) filterWarnings() []string {
+	var warnings []string
+
+	// No table filters passed. Return early.
+	if !(c.flagClusters || c.flagEndpoints || c.flagListeners || c.flagRoutes || c.flagSecrets) {
+		return warnings
+	}
+
+	if c.flagFQDN != "" && !c.flagClusters {
+		warnings = append(warnings, fmt.Sprintf("The filter `-fqdn %s` does not apply to the tables displayed.", c.flagFQDN))
+	}
+
+	if c.flagPort != -1 && !(c.flagClusters || c.flagEndpoints || c.flagListeners) {
+		warnings = append(warnings, fmt.Sprintf("The filter `-port %d` does not apply to the tables displayed.", c.flagPort))
+	}
+
+	if c.flagAddress != "" && !(c.flagClusters || c.flagEndpoints || c.flagListeners) {
+		warnings = append(warnings, fmt.Sprintf("The filter `-address %s` does not apply to the tables displayed.", c.flagAddress))
+	}
+
+	return warnings
+}
+
 func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
 		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
@@ -339,6 +367,10 @@ func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 		}
 		if c.flagPort != -1 {
 			c.UI.Output(fmt.Sprintf("Endpoint addresses with port number: %d", c.flagPort), terminal.WithInfoStyle())
+		}
+
+		for _, warning := range c.filterWarnings() {
+			c.UI.Output(warning, terminal.WithWarningStyle())
 		}
 
 		c.UI.Output("")

@@ -140,6 +140,41 @@ func TestReadCommandOutput(t *testing.T) {
 	}
 }
 
+// TestFilterWarnings ensures that a warning is printed if the user applies a
+// field filter (e.g. -fqdn default) and a table filter (e.g. -secrets) where
+// the former does not affect the output of the latter.
+func TestFilterWarnings(t *testing.T) {
+	podName := "fakePod"
+	cases := map[string][]string{
+		"fully qualified domain name doesn't apply to secrets":                {"-fqdn", "default", "-secrets"},
+		"port doesn't apply to secrets or routes":                             {"-port", "8080", "-secrets", "-routes"},
+		"fully qualified domain name doesn't apply to endpoints or listeners": {"-fqdn", "default", "-endpoints", "-listeners"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			fakePod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: "default",
+				},
+			}
+
+			buf := new(bytes.Buffer)
+			c := setupCommand(buf)
+			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
+			c.fetchConfig = func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
+				return testEnvoyConfig, nil
+			}
+
+			out := c.Run(append([]string{podName}, tc...))
+			require.Equal(t, 0, out) // This shouldn't error out, just warn the user.
+
+			require.Regexp(t, "The filter.*does not apply to the tables displayed.", buf.String())
+		})
+	}
+}
+
 func setupCommand(buf io.Writer) *ReadCommand {
 	// Log at a test level to standard out.
 	log := hclog.New(&hclog.LoggerOptions{
