@@ -203,6 +203,7 @@ func TestVault(t *testing.T) {
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
 	consulHelmValues := map[string]string{
+		"global.imageK8S":             "kyleschochenmaier/consul-k8s-dev",
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",

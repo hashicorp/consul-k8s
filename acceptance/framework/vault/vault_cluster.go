@@ -166,15 +166,27 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 	// service account token.
 	// The JWT token and CA cert is what Vault server will use to validate service account token
 	// with the Kubernetes API.
+	secretName := saName
 	var sa *corev1.ServiceAccount
 	retry.Run(t, func(r *retry.R) {
 		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
 		require.NoError(r, err)
-		require.Len(r, sa.Secrets, 1)
+		// In Kube 1.21+ the serviceAccount does not have a secret automatically generated.
+		if len(sa.Secrets) == 0 {
+			_, err = v.kubernetesClient.CoreV1().Secrets(saNS).Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        secretName,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": saName},
+				},
+			}, metav1.CreateOptions{})
+			require.NoError(t, err)
+		} else {
+			secretName = sa.Secrets[0].Name
+		}
 	})
 
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
 	require.NoError(t, err)
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
 		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
