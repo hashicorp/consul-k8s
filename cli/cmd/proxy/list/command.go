@@ -209,9 +209,9 @@ func (c *ListCommand) output(pods []v1.Pod) {
 	}
 
 	if c.flagAllNamespaces {
-		c.UI.Output("Namespace: all namespaces")
+		c.UI.Output("Namespace: all namespaces\n")
 	} else {
-		c.UI.Output("Namespace: %s", c.namespace())
+		c.UI.Output("Namespace: %s\n", c.namespace())
 	}
 
 	var tbl *terminal.Table
