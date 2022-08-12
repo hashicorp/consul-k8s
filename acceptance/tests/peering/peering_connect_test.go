@@ -104,7 +104,7 @@ func TestPeering_Connect(t *testing.T) {
 			}
 
 			if !cfg.UseKind {
-				staticServerPeerHelmValues["server.replicas"] = "3"
+				staticClientPeerHelmValues["server.replicas"] = "3"
 			}
 
 			if cfg.UseKind {
