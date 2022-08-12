@@ -1,4 +1,8 @@
-## UNRELEASED
+## 0.47.1 (August 12, 2022)
+
+BUG FIXES:
+* Helm
+  * Update the version of the `imageK8S` in `values.yaml` to the latest control-plane image. [[GH-1355](https://github.com/hashicorp/consul-k8s/pull/1352)]
 
 ## 0.47.0 (August 12, 2022)
 
