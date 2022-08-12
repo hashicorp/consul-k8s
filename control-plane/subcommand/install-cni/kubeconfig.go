@@ -53,7 +53,7 @@ func createKubeConfig(cniNetDir, kubeconfigFile string) error {
 	destFile := filepath.Join(cniNetDir, kubeconfigFile)
 	err = os.WriteFile(destFile, data, os.FileMode(0o644))
 	if err != nil {
-		return fmt.Errorf("error writing kube config file %s: %v", destFile, err)
+		return fmt.Errorf("error writing kube config file %s: %w", destFile, err)
 	}
 
 	return nil
@@ -88,7 +88,7 @@ func kubeConfigYaml(server, token string, certificateAuthorityData []byte) ([]by
 	// Create yaml from the kubeconfig using the yaml writer from kubectl.
 	data, err := clientcmd.Write(kubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("error creating kubeconfig yaml: %v", err)
+		return nil, fmt.Errorf("error creating kubeconfig yaml: %w", err)
 	}
 	return data, nil
 }
@@ -118,11 +118,11 @@ func kubernetesServer() (string, error) {
 // serviceAccountToken gets the service token from a directory on the host.
 func serviceAccountToken(tokenPath string) (string, error) {
 	if _, err := os.Stat(tokenPath); errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("tokenPath does not exist: %v", err)
+		return "", fmt.Errorf("tokenPath does not exist: %w", err)
 	}
 	token, err := ioutil.ReadFile(tokenPath)
 	if err != nil {
-		return "", fmt.Errorf("could not read service account token: %v", err)
+		return "", fmt.Errorf("could not read service account token: %w", err)
 	}
 	return string(token), nil
 }

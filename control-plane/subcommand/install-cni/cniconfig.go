@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/containernetworking/cni/libcni"
+	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"github.com/mitchellh/mapstructure"
 )
@@ -17,12 +17,12 @@ import (
 // Adapted from kubelet: https://github.com/kubernetes/kubernetes/blob/954996e231074dc7429f7be1256a579bedd8344c/pkg/kubelet/dockershim/network/cni/cni.go#L134.
 func defaultCNIConfigFile(dir string) (string, error) {
 	files, err := libcni.ConfFiles(dir, []string{".conf", ".conflist", ".json"})
-	switch {
-	case err != nil:
-		// A real error has been found.
-		return "", fmt.Errorf("error while trying to find files in %s: %v", dir, err)
-	case len(files) == 0:
-		// No config files have shown up yet and it is ok to run this function again.
+	if err != nil {
+		return "", fmt.Errorf("error while trying to find files in %s: %w", dir, err)
+	}
+
+	// No config files have shown up yet and it is ok to run this function again.
+	if len(files) == 0 {
 		return "", nil
 	}
 
@@ -84,7 +84,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 	// Read the config file and convert it to a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
-		return fmt.Errorf("could not convert config file to map: %v", err)
+		return fmt.Errorf("could not convert config file to map: %w", err)
 	}
 
 	// Get the 'plugins' map embedded inside of the exisingMap.
@@ -100,7 +100,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		if plugin["type"] == "consul-cni" {
+		if plugin["type"] == consulCNIName {
 			plugins = append(plugins[:i], plugins[i+1:]...)
 			break
 		}
@@ -109,7 +109,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 	// Take the consul cni config object and convert it to a map so that we can use it with the other maps.
 	consulMap, err := consulMapFromConfig(consulCfg)
 	if err != nil {
-		return fmt.Errorf("error converting consul config into map: %v", err)
+		return fmt.Errorf("error converting consul config into map: %w", err)
 	}
 
 	// Append the consul-cni map to the already existing plugins.
@@ -118,7 +118,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 	// Marshal into a new json object
 	cfgJSON, err := json.MarshalIndent(cfgMap, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error marshalling existing CNI config: %v", err)
+		return fmt.Errorf("error marshalling existing CNI config: %w", err)
 	}
 
 	// Libcni nuance/bug. If the newline is missing, the cni plugin will throw errors saying that it cannot get parse the config.
@@ -127,7 +127,7 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 	// Write the file out.
 	err = os.WriteFile(cfgFile, cfgJSON, os.FileMode(0o644))
 	if err != nil {
-		return fmt.Errorf("error writing config file %s: %v", cfgFile, err)
+		return fmt.Errorf("error writing config file %s: %w", cfgFile, err)
 	}
 	return nil
 }
@@ -135,13 +135,13 @@ func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 // configFileToMap takes an unstructure JSON config file and converts it into a map.
 func configFileToMap(cfgFile string) (map[string]interface{}, error) {
 	if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
-		return nil, fmt.Errorf("config file %s does not exist: %v", cfgFile, err)
+		return nil, fmt.Errorf("config file %s does not exist: %w", cfgFile, err)
 	}
 
 	// Read the main config file.
 	cfgBytes, err := os.ReadFile(cfgFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not read file %s: %v", cfgFile, err)
+		return nil, fmt.Errorf("could not read file %s: %w", cfgFile, err)
 	}
 
 	// Convert the json config file into a map. The map that is created has 2 parts:
@@ -150,7 +150,7 @@ func configFileToMap(cfgFile string) (map[string]interface{}, error) {
 	var cfgMap map[string]interface{}
 	err = json.Unmarshal(cfgBytes, &cfgMap)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling existing config file %s: %v", cfgFile, err)
+		return nil, fmt.Errorf("error unmarshalling existing config file %s: %w", cfgFile, err)
 	}
 	return cfgMap, nil
 }
@@ -169,7 +169,7 @@ func consulMapFromConfig(consulCfg *config.CNIConfig) (map[string]interface{}, e
 	var consulMap map[string]interface{}
 	err := mapstructure.Decode(consulCfg, &consulMap)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding consul config into a map: %v", err)
+		return nil, fmt.Errorf("error decoding consul config into a map: %w", err)
 	}
 	return consulMap, nil
 }
@@ -179,7 +179,7 @@ func removeCNIConfig(cfgFile string) error {
 	// Read the config file and convert it to a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
-		return fmt.Errorf("could not convert config file to map: %v", err)
+		return fmt.Errorf("could not convert config file to map: %w", err)
 	}
 
 	// Get the 'plugins' map embedded inside of the exisingMap.
@@ -190,11 +190,13 @@ func removeCNIConfig(cfgFile string) error {
 
 	// Find the 'consul-cni' plugin and remove it.
 	for i, p := range plugins {
+		// We do not unmarshall this into a map[string]map[string]interface{} because there is no structure to
+		// the plugins. They are unstructured json and can be in any format that the plugin provider wishes.
 		plugin, ok := p.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		if plugin["type"] == "consul-cni" {
+		if plugin["type"] == consulCNIName {
 			cfgMap["plugins"] = append(plugins[:i], plugins[i+1:]...)
 			break
 		}
@@ -203,7 +205,7 @@ func removeCNIConfig(cfgFile string) error {
 	// Marshal into a new json file.
 	cfgJSON, err := json.MarshalIndent(cfgMap, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error marshalling existing CNI config: %v", err)
+		return fmt.Errorf("error marshalling existing CNI config: %w", err)
 	}
 
 	cfgJSON = append(cfgJSON, "\n"...)
@@ -211,7 +213,7 @@ func removeCNIConfig(cfgFile string) error {
 	// Write the file out.
 	err = os.WriteFile(cfgFile, cfgJSON, os.FileMode(0o644))
 	if err != nil {
-		return fmt.Errorf("error writing config file %s: %v", cfgFile, err)
+		return fmt.Errorf("error writing config file %s: %w", cfgFile, err)
 	}
 	return nil
 }
@@ -222,7 +224,7 @@ func validConfig(cfg *config.CNIConfig, cfgFile string) error {
 	// Convert the config file into a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
-		return fmt.Errorf("could not convert config file to map: %v", err)
+		return fmt.Errorf("could not convert config file to map: %w", err)
 	}
 
 	// Get the 'plugins' map embedded inside of the exisingMap.
@@ -241,12 +243,12 @@ func validConfig(cfg *config.CNIConfig, cfgFile string) error {
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		if plugin["type"] == "consul-cni" {
+		if plugin["type"] == consulCNIName {
 			// Populate existingCfg with the consul-cni plugin info so that we can compare it with what
 			// is expected.
 			err := mapstructure.Decode(plugin, &existingCfg)
 			if err != nil {
-				return fmt.Errorf("error decoding consul config into a map: %v", err)
+				return fmt.Errorf("error decoding consul config into a map: %w", err)
 			}
 			found = true
 			// Check to see that consul-cni plugin is the last plugin in the chain.
@@ -263,7 +265,7 @@ func validConfig(cfg *config.CNIConfig, cfgFile string) error {
 
 	// Compare the config that is passed to the installer to what is in the config file. There could be a
 	// difference if the config was corrupted or during a helm update or upgrade.
-	equal := reflect.DeepEqual(existingCfg, cfg)
+	equal := cmp.Equal(existingCfg, cfg)
 	if !equal {
 		return fmt.Errorf("consul-cni config has changed")
 	}

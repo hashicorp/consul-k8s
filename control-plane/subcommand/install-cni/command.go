@@ -20,7 +20,7 @@ import (
 
 const (
 	defaultCNIBinSourceDir = "/bin"
-	consulCNIBinName       = "consul-cni"
+	consulCNIName          = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
 	defaultLogJSON         = false
 )
 
@@ -114,10 +114,7 @@ func (c *Command) Run(args []string) int {
 		"log_level", cfg.LogLevel)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func(sigChan chan os.Signal, cancel context.CancelFunc) {
-		<-sigChan
-		cancel()
-	}(c.sigCh, cancel)
+	defer cancel()
 
 	// Generate the kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
 	c.logger.Debug("Creating kubeconfig", "file", cfg.Kubeconfig)
@@ -129,7 +126,7 @@ func (c *Command) Run(args []string) int {
 
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Debug("Copying consul-cni binary", "destination", cfg.CNIBinDir)
-	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIBinName)
+	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
 	err = copyFile(srcFile, cfg.CNIBinDir)
 	if err != nil {
 		c.logger.Error("could not copy consul-cni binary", "error", err)
@@ -181,14 +178,14 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	if cfgFile != "" {
 		err = removeCNIConfig(cfgFile)
 		if err != nil {
-			c.logger.Error("Unable to cleanup CNI Config: %v", err)
+			c.logger.Error("Unable to cleanup CNI Config: %w", err)
 		}
 	}
 
 	kubeconfig := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
 	err = removeFile(kubeconfig)
 	if err != nil {
-		c.logger.Error("Unable to remove %s file: %v", kubeconfig, err)
+		c.logger.Error("Unable to remove %s file: %w", kubeconfig, err)
 	}
 }
 
@@ -198,13 +195,13 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, dir, cfgFile string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("could not create watcher: %v", err)
+		return fmt.Errorf("could not create watcher: %w", err)
 	}
 
 	c.logger.Info("Creating directory watcher for", "directory", dir)
 	err = watcher.Add(dir)
 	if err != nil {
-		return fmt.Errorf("could not watch %s directory: %v", dir, err)
+		return fmt.Errorf("could not watch %s directory: %w", dir, err)
 	}
 	//}
 
@@ -223,13 +220,13 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			// config file is available, do nothing. This can happen if the consul-cni daemonset was
 			// created before other CNI plugins were installed.
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
-				c.logger.Debug("Modified event", "event", event)
+				c.logger.Info("Modified event", "event", event)
 				// Always get the config file that is on the host as we do not know if it was deleted
 				// or not.
 				cfgFile, err = defaultCNIConfigFile(dir)
 				if err != nil {
 					c.logger.Error("Unable get default config file", "error", err)
-					return err
+					break
 				}
 				if cfgFile != "" {
 					c.logger.Info("Using config file", "file", cfgFile)
@@ -243,14 +240,21 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 							c.logger.Error("Unable to install consul-cni config", "error", err)
 							return err
 						}
+					} else {
+						c.logger.Info("Valid config file detected, nothing to do")
+						break
 					}
 				}
+
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				c.logger.Error("Event watcher event is not ok", "error", err)
 			}
 		case <-ctx.Done():
+			c.cleanup(cfg, cfgFile)
+			return nil
+		case <-c.sigCh:
 			c.cleanup(cfg, cfgFile)
 			return nil
 		}

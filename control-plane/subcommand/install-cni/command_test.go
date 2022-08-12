@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
@@ -40,6 +41,7 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	// Create a Command and context.
 	var err error
 	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	tempDir := t.TempDir()
 
 	// Setup the Command.
@@ -58,7 +60,7 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	}()
 	time.Sleep(50 * time.Millisecond)
 
-	// Copy a base config file that does not contain the consul entry.
+	t.Log("File event 1: Copy a base config file that does not contain the consul entry. Should detect and add consul-cni")
 	err = copyFile(baseConfigFile, tempDir)
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
@@ -71,9 +73,11 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	require.NoError(t, err)
 	// Filewatcher should have detected a change and appended to the config file. Make sure
 	// files match.
-	require.Equal(t, string(expected), string(actual))
+	retry.Run(t, func(r *retry.R) {
+		require.Equal(r, string(expected), string(actual))
+	})
 
-	// Event 2: config file changed where consul is not last in the plugin list.
+	t.Log("File event 2: config file changed and consul-cni is not last in the plugin list.Should detect and fix.")
 	err = replaceFile(notLastConfigFile, filepath.Join(tempDir, configFile))
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
@@ -82,16 +86,22 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	require.NoError(t, err)
 	// Filewatcher should have detected change, fixed and appended to the config file. Make sure
 	// files match.
-	require.Equal(t, string(expected), string(actual))
+	retry.Run(t, func(r *retry.R) {
+		require.Equal(r, string(expected), string(actual))
+	})
 
-	// Event 3: consul config was removed from the config file. Should detect and fix.
+	t.Log("File event 3: consul config was removed from the config file. Should detect and fix.")
 	err = replaceFile(baseConfigFile, filepath.Join(tempDir, configFile))
 	require.NoError(t, err)
-	time.Sleep(50 * time.Millisecond)
 	// Filewatcher should have detected change, fixed and appended to the config file. Make sure
 	// files match.
-	require.Equal(t, string(expected), string(actual))
-	cancel()
+	retry.Run(t, func(r *retry.R) {
+		require.Equal(r, string(expected), string(actual))
+	})
+
+	// If we exit the test too quickly it can cause a race condition where File event 3 is still running and we
+	// delete the config file while the test is doing a write.
+	time.Sleep(50 * time.Millisecond)
 }
 
 func replaceFile(srcFile, destFile string) error {

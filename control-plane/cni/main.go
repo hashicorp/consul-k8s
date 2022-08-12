@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
-	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
@@ -36,16 +34,22 @@ const (
 	// a pod when transparent proxy is done.
 	keyTransparentProxyStatus = "consul.hashicorp.com/transparent-proxy-status"
 
-	// annotationCNIProxyConfig stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
-	annotationCNIProxyConfig = "consul.hashicorp.com/cni-proxy-config"
-
+	// waiting is used in conjunction with keyTransparentProxyStatus as a simple way to
+	// indicate the status of the CNI plugin.
 	waiting = "waiting"
 
-	// retries is the number of backoff retries to attempt while waiting for an cni-proxy-config annotation to
-	// populate. The backoff is constant and will retry every second before failing.
-	retries = 30
+	// complete is used in conjunction with keyTransparentProxyStatus as a simple way to
+	// indicate the status of the CNI plugin.
+	complete = "complete"
+
+	// annotationTrafficRedirection stores iptables.Config information so that the CNI plugin can use it to apply
+	// iptables rules.
+	annotationTrafficRedirection = "consul.hashicorp.com/traffic-redirection-config"
 )
+
+type Command struct {
+	client kubernetes.Interface
+}
 
 type CNIArgs struct {
 	// types.CommonArgs are args that are passed as part of the CNI standard.
@@ -91,22 +95,20 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	cfg := PluginConf{}
 
 	if err := json.Unmarshal(stdin, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse network configuration: %v", err)
+		return nil, fmt.Errorf("failed to parse network configuration: %w", err)
 	}
 
 	// The previous result is passed from the previously run plugin to our plugin. We do not
 	// do anything with the result but instead just pass it on when our plugin is finished.
 	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
-		return nil, fmt.Errorf("could not parse prevResult: %v", err)
+		return nil, fmt.Errorf("could not parse prevResult: %w", err)
 	}
-
-	// TODO: Do validation of the config that is passed in.
 
 	return &cfg, nil
 }
 
 // cmdAdd is called for ADD requests.
-func cmdAdd(args *skel.CmdArgs) error {
+func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	cfg, err := parseConfig(args.StdinData)
 	if err != nil {
 		return err
@@ -142,7 +144,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// that the previous result needs to be passed onto the next plugin.
 	prevResult, err := current.GetResult(cfg.PrevResult)
 	if err != nil {
-		return fmt.Errorf("failed to convert prevResult: %v", err)
+		return fmt.Errorf("failed to convert prevResult: %w", err)
 	}
 
 	if len(prevResult.IPs) == 0 {
@@ -153,39 +155,42 @@ func cmdAdd(args *skel.CmdArgs) error {
 	result := prevResult
 	logger.Debug("consul-cni previous result", "result", result)
 
-	// Connect to kubernetes.
 	ctx := context.Background()
-	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
-	if err != nil {
-		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+	if c.client == nil {
+
+		// Connect to kubernetes.
+		restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+		if err != nil {
+			return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+		}
+
+		c.client, err = kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			return fmt.Errorf("error initializing Kubernetes client: %s", err)
+		}
 	}
 
-	client, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return fmt.Errorf("error initializing Kubernetes client: %s", err)
-	}
-
-	pod, err := client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
+	pod, err := c.client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("error retrieving pod: %s", err)
 	}
 
 	// Skip traffic redirection the correct annotations are not on the pod.
-	if skipTrafficRedirection(*pod, retries) {
+	if skipTrafficRedirection(*pod) {
 		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	pod.Annotations[keyTransparentProxyStatus] = waiting
-	_, err = client.CoreV1().Pods(podNamespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+	err = c.updateTransparentProxyStatusAnnotation(pod, podNamespace, waiting)
 	if err != nil {
-		return fmt.Errorf("error adding waiting annotation to pod: %s", err)
+		return fmt.Errorf("error adding waiting annotation: %s", err)
 	}
 
-	// Check to see if the cni-proxy-config annotation exists and if not, wait, retry and backoff.
-	exists := waitForAnnotation(*pod, annotationCNIProxyConfig, uint64(retries))
-	if !exists {
-		return fmt.Errorf("could not retrieve annotation")
+	// TODO: Insert redirect here
+
+	err = c.updateTransparentProxyStatusAnnotation(pod, podNamespace, complete)
+	if err != nil {
+		return fmt.Errorf("error adding complete annotation: %s", err)
 	}
 
 	// Pass through the result for the next plugin even though we are the final plugin in the chain.
@@ -205,38 +210,22 @@ func cmdCheck(args *skel.CmdArgs) error {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
+	c := &Command{}
+	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
 }
 
 // skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
 // The absence of the annotations is the equivalent of "disabled" because it means that the connect inject mutating
 // webhook did not run against the pod.
-func skipTrafficRedirection(pod corev1.Pod, retries uint64) bool {
-	skip := false
-
+func skipTrafficRedirection(pod corev1.Pod) bool {
 	if anno, ok := pod.Annotations[keyInjectStatus]; !ok || anno == "" {
-		skip = true
+		return true
 	}
 
 	if anno, ok := pod.Annotations[keyTransparentProxyStatus]; !ok || anno == "" {
-		skip = true
+		return true
 	}
-
-	return skip
-}
-
-// waitForAnnotation waits for an annotation to be available. Returns immediately if the annotation exists.
-func waitForAnnotation(pod corev1.Pod, annotation string, retries uint64) bool {
-	var err error
-	err = backoff.Retry(func() error {
-		var ok bool
-		_, ok = pod.Annotations[annotation]
-		if !ok {
-			return fmt.Errorf("annotation %s does not exist yet", annotation)
-		}
-		return err
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), retries))
-	return err == nil
+	return false
 }
 
 // parseAnnotation parses the cni-proxy-config annotation into an iptables.Config object.
@@ -251,4 +240,16 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 		return iptables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
 	}
 	return cfg, nil
+}
+
+// updateTransparentProxyStatusAnnotation updates the transparent-proxy-status annotation. We use it as a simple inicator of
+// CNI status on the pod.
+func (c *Command) updateTransparentProxyStatusAnnotation(pod *corev1.Pod, namespace, status string) error {
+	pod.Annotations[keyTransparentProxyStatus] = status
+	_, err := c.client.CoreV1().Pods(namespace).Update(context.Background(), pod, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("error adding annotation to pod: %s", err)
+	}
+
+	return nil
 }

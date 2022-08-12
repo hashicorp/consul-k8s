@@ -214,8 +214,8 @@ func TestConsulMapFromConfig(t *testing.T) {
 		"kubeconfig":  "ZZZ-consul-cni-kubeconfig",
 		"log_level":   "info",
 		"multus":      false,
-		"name":        "consul-cni",
-		"type":        "consul-cni",
+		"name":        consulCNIName,
+		"type":        consulCNIName,
 	}
 
 	actualMap, err := consulMapFromConfig(consulConfig)
