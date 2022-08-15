@@ -20,7 +20,8 @@ for each feature will be noted below. By versioning this project separately,
 we can iterate on Kubernetes integrations more quickly and release new versions
 without forcing Consul users to do a full Consul upgrade.
 
-> :warning: **Please note**: We take Consul's security and our users' trust very seriously. If
+> **Note**  
+> We take Consul's security and our users' trust very seriously. If
 you believe you have found a security issue in Consul K8s, _please responsibly disclose_
 by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
