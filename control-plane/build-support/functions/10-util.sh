@@ -671,7 +671,7 @@ function update_version_helm {
    fi
    local image_k8s="hashicorp\/consul-k8s-control-plane:$full_version"
 
-   sed_i ${SED_EXT} -e "s/(imageK8S:[[:space:]]*)\"[^\"]*\"/\1${image_k8s}/g" "${vfile}"
+   sed_i ${SED_EXT} -e "s/(imageK8S:[[:space:]]*hashicorp\/consul-k8s-control-plane:)[^\"]*/\1${full_version}/g" "${vfile}"
    sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
    sed_i ${SED_EXT} -e "s/(image:[[:space:]]*hashicorp\/consul-k8s-control-plane:)[^\"]*/\1${full_version}/g" "${cfile}"
 
