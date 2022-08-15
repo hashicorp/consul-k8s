@@ -10,6 +10,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -117,10 +118,10 @@ func (w *MeshWebhook) initCopyContainer() corev1.Container {
 	if !w.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
 			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
-			RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
-			RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
-			RunAsNonRoot:           pointerToBool(true),
-			ReadOnlyRootFilesystem: pointerToBool(true),
+			RunAsUser:              pointer.Int64(copyContainerUserAndGroupID),
+			RunAsGroup:             pointer.Int64(copyContainerUserAndGroupID),
+			RunAsNonRoot:           pointer.Bool(true),
+			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}
 	}
 	return container
@@ -297,11 +298,11 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		// Running consul connect redirect-traffic with iptables
 		// requires both being a root user and having NET_ADMIN capability.
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:  pointerToInt64(rootUserAndGroupID),
-			RunAsGroup: pointerToInt64(rootUserAndGroupID),
+			RunAsUser:  pointer.Int64(rootUserAndGroupID),
+			RunAsGroup: pointer.Int64(rootUserAndGroupID),
 			// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-			RunAsNonRoot: pointerToBool(false),
-			Privileged:   pointerToBool(true),
+			RunAsNonRoot: pointer.Bool(false),
+			Privileged:   pointer.Bool(true),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{netAdminCapability},
 			},
@@ -350,21 +351,6 @@ func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled 
 	}
 	// Else fall back to the global default.
 	return globalEnabled, nil
-}
-
-// pointerToInt64 takes an int64 and returns a pointer to it.
-func pointerToInt64(i int64) *int64 {
-	return &i
-}
-
-// pointerToUInt64 takes an int64 and returns a pointer to it.
-func pointerToUint64(i uint64) *uint64 {
-	return &i
-}
-
-// pointerToBool takes a bool and returns a pointer to it.
-func pointerToBool(b bool) *bool {
-	return &b
 }
 
 // splitCommaSeparatedItemsFromAnnotation takes an annotation and a pod
