@@ -3,6 +3,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -297,12 +298,51 @@ func (h *HelmCluster) CreatePortForwardTunnelToResourcePort(t *testing.T, resour
 		require.NoError(r, tunnel.ForwardPortE(t))
 	})
 
+	doneChan := make(chan bool)
+
 	t.Cleanup(func() {
-		tunnel.Close()
+		close(doneChan)
 	})
 
-	return fmt.Sprintf("127.0.0.1:%d", localPort)
+	go h.monitorPortForwardedServer(t, localPort, tunnel, doneChan, resourceName, remotePort)
 
+	return fmt.Sprintf("127.0.0.1:%d", localPort)
+}
+
+func (h *HelmCluster) monitorPortForwardedServer(t *testing.T, port int, tunnel *terratestk8s.Tunnel, doneChan chan bool, resourceName string, remotePort int) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-doneChan:
+			logger.Log(t, "stopping monitor of the port-forwarded server")
+			tunnel.Close()
+			return
+		case <-ticker.C:
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			if err != nil {
+				logger.Log(t, "lost connection to port-forwarded server; restarting port-forwarding", "port", port)
+				tunnel.Close()
+				tunnel = terratestk8s.NewTunnelWithLogger(
+					h.helmOptions.KubectlOptions,
+					terratestk8s.ResourceTypePod,
+					resourceName,
+					port,
+					remotePort,
+					h.logger)
+				err = tunnel.ForwardPortE(t)
+				if err != nil {
+					// If we couldn't establish a port forwarding channel, continue, so we can try again.
+					continue
+				}
+			}
+			if conn != nil {
+				// Ignore error because we don't care if connection is closed successfully or not.
+				_ = conn.Close()
+			}
+		}
+	}
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {
