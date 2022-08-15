@@ -175,7 +175,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("error retrieving pod: %s", err)
 	}
 
-	// Skip traffic redirection the correct annotations are not on the pod.
+	// Skip traffic redirection if the correct annotations are not on the pod.
 	if skipTrafficRedirection(*pod) {
 		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
