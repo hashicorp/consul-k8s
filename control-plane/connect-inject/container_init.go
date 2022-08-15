@@ -304,19 +304,19 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		// requires both being a root user and having NET_ADMIN capability.
 		if !w.EnableCNI {
 			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:  pointerToInt64(rootUserAndGroupID),
-				RunAsGroup: pointerToInt64(rootUserAndGroupID),
+				RunAsUser:  pointer.Int64(rootUserAndGroupID),
+				RunAsGroup: pointer.Int64(rootUserAndGroupID),
 				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-				RunAsNonRoot: pointerToBool(false),
-				Privileged:   pointerToBool(true),
+				RunAsNonRoot: pointer.Bool(false),
+				Privileged:   pointer.Bool(true),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
 			}
 		} else {
 			container.SecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: pointerToBool(true),
-				Privileged:   pointerToBool(false),
+				RunAsNonRoot: pointer.Bool(true),
+				Privileged:   pointer.Bool(false),
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},

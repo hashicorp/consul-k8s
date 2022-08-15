@@ -408,16 +408,16 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 
 			expectedSecurityContext := &corev1.SecurityContext{}
 			if !c.cniEnabled {
-				expectedSecurityContext.RunAsUser = pointerToInt64(0)
-				expectedSecurityContext.RunAsGroup = pointerToInt64(0)
-				expectedSecurityContext.RunAsNonRoot = pointerToBool(false)
-				expectedSecurityContext.Privileged = pointerToBool(true)
+				expectedSecurityContext.RunAsUser = pointer.Int64(0)
+				expectedSecurityContext.RunAsGroup = pointer.Int64(0)
+				expectedSecurityContext.RunAsNonRoot = pointer.Bool(false)
+				expectedSecurityContext.Privileged = pointer.Bool(true)
 				expectedSecurityContext.Capabilities = &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				}
 			} else {
-				expectedSecurityContext.RunAsNonRoot = pointerToBool(true)
-				expectedSecurityContext.Privileged = pointerToBool(false)
+				expectedSecurityContext.RunAsNonRoot = pointer.Bool(true)
+				expectedSecurityContext.Privileged = pointer.Bool(false)
 				expectedSecurityContext.Capabilities = &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				}
