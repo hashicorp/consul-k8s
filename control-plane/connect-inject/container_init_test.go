@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 const k8sNamespace = "k8snamespace"
@@ -371,13 +372,13 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			pod.Annotations = c.annotations
 
 			expectedSecurityContext := &corev1.SecurityContext{
-				RunAsUser:  pointerToInt64(0),
-				RunAsGroup: pointerToInt64(0),
-				Privileged: pointerToBool(true),
+				RunAsUser:  pointer.Int64(0),
+				RunAsGroup: pointer.Int64(0),
+				Privileged: pointer.Bool(true),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
-				RunAsNonRoot: pointerToBool(false),
+				RunAsNonRoot: pointer.Bool(false),
 			}
 			ns := testNS
 			ns.Labels = c.namespaceLabel
@@ -1166,10 +1167,10 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 				require.Nil(t, container.SecurityContext)
 			} else {
 				expectedSecurityContext := &corev1.SecurityContext{
-					RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
-					RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
-					RunAsNonRoot:           pointerToBool(true),
-					ReadOnlyRootFilesystem: pointerToBool(true),
+					RunAsUser:              pointer.Int64(copyContainerUserAndGroupID),
+					RunAsGroup:             pointer.Int64(copyContainerUserAndGroupID),
+					RunAsNonRoot:           pointer.Bool(true),
+					ReadOnlyRootFilesystem: pointer.Bool(true),
 				}
 				require.Equal(t, expectedSecurityContext, container.SecurityContext)
 			}
