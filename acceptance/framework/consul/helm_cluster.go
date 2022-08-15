@@ -311,6 +311,7 @@ func (h *HelmCluster) CreatePortForwardTunnelToResourcePort(t *testing.T, resour
 
 func (h *HelmCluster) monitorPortForwardedServer(t *testing.T, port int, tunnel *terratestk8s.Tunnel, doneChan chan bool, resourceName string, remotePort int) {
 	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -320,9 +321,8 @@ func (h *HelmCluster) monitorPortForwardedServer(t *testing.T, port int, tunnel 
 			return
 		case <-ticker.C:
 			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-			logger.Log(t, "lost connection to port-forwarded server", "port", port)
 			if err != nil {
-				logger.Log(t, "restarting port-forwarding", "port", port)
+				logger.Log(t, "lost connection to port-forwarded server; restarting port-forwarding", "port", port)
 				tunnel.Close()
 				tunnel = terratestk8s.NewTunnelWithLogger(
 					h.helmOptions.KubectlOptions,
