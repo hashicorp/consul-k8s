@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 func TestHandlerEnvoySidecar(t *testing.T) {
@@ -137,20 +138,20 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointerToInt64(envoyUserAndGroupID),
-				RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
-				RunAsNonRoot:           pointerToBool(true),
-				ReadOnlyRootFilesystem: pointerToBool(true),
+				RunAsUser:              pointer.Int64(envoyUserAndGroupID),
+				RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
 		},
 		"tproxy enabled; openshift disabled": {
 			tproxyEnabled:    true,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointerToInt64(envoyUserAndGroupID),
-				RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
-				RunAsNonRoot:           pointerToBool(true),
-				ReadOnlyRootFilesystem: pointerToBool(true),
+				RunAsUser:              pointer.Int64(envoyUserAndGroupID),
+				RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
 		},
 		"tproxy disabled; openshift enabled": {
@@ -162,10 +163,10 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointerToInt64(envoyUserAndGroupID),
-				RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
-				RunAsNonRoot:           pointerToBool(true),
-				ReadOnlyRootFilesystem: pointerToBool(true),
+				RunAsUser:              pointer.Int64(envoyUserAndGroupID),
+				RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
 		},
 	}
@@ -210,7 +211,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser: pointerToInt64(envoyUserAndGroupID),
+				RunAsUser: pointer.Int64(envoyUserAndGroupID),
 			},
 		},
 	}
@@ -238,14 +239,14 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 							Name: "web",
 							// Setting RunAsUser: 1 should succeed.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointerToInt64(1),
+								RunAsUser: pointer.Int64(1),
 							},
 						},
 						{
 							Name: "app",
 							// Setting RunAsUser: 5995 should fail.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointerToInt64(envoyUserAndGroupID),
+								RunAsUser: pointer.Int64(envoyUserAndGroupID),
 							},
 							Image: "not-envoy",
 						},
@@ -265,14 +266,14 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 							Name: "web",
 							// Setting RunAsUser: 1 should succeed.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointerToInt64(1),
+								RunAsUser: pointer.Int64(1),
 							},
 						},
 						{
 							Name: "sidecar",
 							// Setting RunAsUser: 5995 should succeed if the image matches h.ImageEnvoy.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointerToInt64(envoyUserAndGroupID),
+								RunAsUser: pointer.Int64(envoyUserAndGroupID),
 							},
 							Image: "envoy",
 						},
