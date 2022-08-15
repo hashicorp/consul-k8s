@@ -363,8 +363,6 @@ func realMain(ctx context.Context) error {
 			}); err != nil {
 				return err
 			}
-			// Allow time for ELB deletion to propagate so that we can detach the internet gateway.
-			time.Sleep(30 * time.Second)
 			fmt.Printf("ELB: Destroyed [id=%s]\n", *elbDescrip.LoadBalancerName)
 		}
 
@@ -379,11 +377,17 @@ func realMain(ctx context.Context) error {
 		})
 		for _, igw := range igws.InternetGateways {
 			fmt.Printf("Internet gateway: Detaching from VPC... [id=%s]\n", *igw.InternetGatewayId)
-			_, err := ec2Client.DetachInternetGatewayWithContext(ctx, &ec2.DetachInternetGatewayInput{
-				InternetGatewayId: igw.InternetGatewayId,
-				VpcId:             vpcID,
-			})
-			if err != nil {
+			if err := destroyBackoff(ctx, "Internet Gateway", *igw.InternetGatewayId, func() error {
+				_, err := ec2Client.DetachInternetGatewayWithContext(ctx, &ec2.DetachInternetGatewayInput{
+					InternetGatewayId: igw.InternetGatewayId,
+					VpcId:             vpcID,
+				})
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}); err != nil {
 				return err
 			}
 			fmt.Printf("Internet gateway: Detached [id=%s]\n", *igw.InternetGatewayId)
@@ -409,12 +413,19 @@ func realMain(ctx context.Context) error {
 		})
 		for _, subnet := range subnets.Subnets {
 			fmt.Printf("Subnet: Destroying... [id=%s]\n", *subnet.SubnetId)
-			_, err := ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
-				SubnetId: subnet.SubnetId,
-			})
-			if err != nil {
+			if err := destroyBackoff(ctx, "Subnet", *subnet.SubnetId, func() error {
+				_, err := ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
+					SubnetId: subnet.SubnetId,
+				})
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}); err != nil {
 				return err
 			}
+
 			fmt.Printf("Subnet: Destroyed [id=%s]\n", *subnet.SubnetId)
 		}
 

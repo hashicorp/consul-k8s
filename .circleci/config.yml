@@ -129,8 +129,8 @@ commands:
                   echo "Running $pkgs"
                   gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
                       << parameters.additional-flags >> \
-                      -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
+                      -enable-multi-cluster \
                       -debug-directory="$TEST_RESULTS/debug" \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
@@ -604,6 +604,7 @@ jobs:
   # ACCEPTANCE TESTS
   ########################
   acceptance-gke-1-20:
+    parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -670,6 +671,7 @@ jobs:
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-1-21:
+    parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -725,6 +727,7 @@ jobs:
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-1-19:
+    parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -839,6 +842,7 @@ jobs:
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23:
+    parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
