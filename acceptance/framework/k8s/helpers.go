@@ -109,7 +109,7 @@ func ServiceHost(t *testing.T, cfg *config.TestConfig, ctx environment.TestConte
 	} else {
 		var host string
 		// It can take some time for the load balancers to be ready and have an IP/Hostname.
-		// Wait for 60 seconds before failing.
+		// Wait for 5 minutes before failing.
 		retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 600}, t, func(r *retry.R) {
 			svc, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
 			require.NoError(t, err)
