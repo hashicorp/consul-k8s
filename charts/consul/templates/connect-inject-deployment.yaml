@@ -148,14 +148,14 @@ spec:
                 {{- if .Values.externalServers.enabled }}
                 {{- $port := .Values.externalServers.grpcPort }}
                 {{- range $h := .Values.externalServers.hosts }}
-                -server-address="{{ $h }}:{{ $port }}" \
+                -token-server-address="{{ $h }}:{{ $port }}" \
                 {{- end }}
                 {{- end }}
                 {{- end }}
                 {{- end }}
                 {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") }}
                 {{- range $addr := .Values.global.peering.tokenGeneration.serverAddresses.static }}
-                -server-address="{{ $addr }}" \
+                -token-server-address="{{ $addr }}" \
                 {{- end }}
                 {{- end }}
                 {{- end }}

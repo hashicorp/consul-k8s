@@ -1907,7 +1907,7 @@ EOF
   [[ "$output" =~ "global.peering.tokenGeneration.serverAddresses.source must be one of empty string, 'consul' or 'static'" ]]
 }
 
-@test "connectInject/Deployment: -read-server-expose-service and -server-address is not set when global.peering.tokenGeneration.serverAddresses.source is consul" {
+@test "connectInject/Deployment: -read-server-expose-service and -token-server-address is not set when global.peering.tokenGeneration.serverAddresses.source is consul" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -1920,11 +1920,11 @@ EOF
   local actual=$(echo $command | jq -r ' . | any(contains("-read-server-expose-service=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address"))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: when servers are not enabled and externalServers.enabled=true, passes in -server-address flags with hosts" {
+@test "connectInject/Deployment: when servers are not enabled and externalServers.enabled=true, passes in -token-server-address flags with hosts" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -1937,10 +1937,10 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"1.2.3.4:8503\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"1.2.3.4:8503\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"2.2.3.4:8503\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"2.2.3.4:8503\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1958,14 +1958,14 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"2.2.3.4:1234\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"2.2.3.4:1234\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: when peering token generation source is static passes in -server-address flags with static addresses" {
+@test "connectInject/Deployment: when peering token generation source is static passes in -token-server-address flags with static addresses" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -1977,14 +1977,14 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"2.2.3.4:2234\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"2.2.3.4:2234\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: when peering token generation source is static and externalHosts are set, passes in -server-address flags with static addresses, not externalServers.hosts" {
+@test "connectInject/Deployment: when peering token generation source is static and externalHosts are set, passes in -token-server-address flags with static addresses, not externalServers.hosts" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -2000,10 +2000,10 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"1.2.3.4:1234\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"2.2.3.4:2234\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"2.2.3.4:2234\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
