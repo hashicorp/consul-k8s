@@ -1000,11 +1000,6 @@ workflows:
           requires:
             - build-distros-linux
       # Run acceptance tests using the docker image built for the control plane
-      - cleanup-gcp-resources
-      - acceptance-gke-1-20:
-          requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
       - acceptance:
           context: consul-ci
           requires:
