@@ -102,6 +102,9 @@ type Command struct {
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
 
+	// CNI flag.
+	flagEnableCNI bool
+
 	// Peering flags.
 	flagEnablePeering bool
 
@@ -178,6 +181,8 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableTransparentProxy, "default-enable-transparent-proxy", true,
 		"Enable transparent proxy mode for all Consul service mesh applications by default.")
+	c.flagSet.BoolVar(&c.flagEnableCNI, "enable-cni", false,
+		"Enable CNI traffic redirection for all Consul service mesh applications.")
 	c.flagSet.BoolVar(&c.flagTransparentProxyDefaultOverwriteProbes, "transparent-proxy-default-overwrite-probes", true,
 		"Overwrite Kubernetes probes to point to Envoy by default when in Transparent Proxy mode.")
 	c.flagSet.BoolVar(&c.flagEnableConsulDNS, "enable-consul-dns", false,
@@ -516,6 +521,7 @@ func (c *Command) Run(args []string) int {
 			K8SNSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:       c.flagCrossNamespaceACLPolicy,
 			EnableTransparentProxy:        c.flagDefaultEnableTransparentProxy,
+			EnableCNI:                     c.flagEnableCNI,
 			TProxyOverwriteProbes:         c.flagTransparentProxyDefaultOverwriteProbes,
 			EnableConsulDNS:               c.flagEnableConsulDNS,
 			ResourcePrefix:                c.flagResourcePrefix,

@@ -32,7 +32,7 @@
     {
       "cni_bin_dir": "/opt/cni/bin",
       "cni_net_dir": "/etc/cni/net.d",
-      "kubeconfig": "ZZZZ-consul-cni-kubeconfig",
+      "kubeconfig": "ZZZ-consul-cni-kubeconfig",
       "log_level": "info",
       "multus": false,
       "name": "consul-cni",

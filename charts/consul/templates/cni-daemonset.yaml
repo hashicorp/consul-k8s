@@ -64,7 +64,6 @@ spec:
             - -log-level={{ default .Values.global.logLevel .Values.connectInject.cni.logLevel }}
             - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
             - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
-            - -dns-prefix={{ template "consul.fullname" . }}
           {{- with .Values.connectInject.cni.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
