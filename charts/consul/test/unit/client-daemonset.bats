@@ -254,6 +254,7 @@ load _helpers
   # check that the extra-config volume is defined
   local volume_name=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.volumes[] | select(.name == "extra-config") | .name' | tee /dev/stderr)
   [ "${volume_name}" = "extra-config" ]
@@ -261,6 +262,7 @@ load _helpers
   # check that the consul container mounts the volume at /consul/extra-config
   local mount_path=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "extra-config") | .mountPath' | tee /dev/stderr)
   [ "${mount_path}" = "/consul/extra-config" ]
@@ -987,6 +989,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -1008,6 +1011,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
