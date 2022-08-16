@@ -216,7 +216,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			h := tt.Webhook
 			pod := *tt.Pod(minimal())
 			container, err := h.containerInit(testNS, pod, multiPortInfo{})
-			require.NoError(t, err)
+			if tt.ErrStr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Contains(t, err.Error(), tt.ErrStr)
+			}
 			actual := strings.Join(container.Command, " ")
 			require.Contains(t, actual, tt.Cmd)
 			if tt.CmdNot != "" {
