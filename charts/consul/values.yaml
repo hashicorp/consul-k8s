@@ -271,11 +271,11 @@ global:
         authMethodPath: "kubernetes"
 
         # The path to a PKI secrets engine for the root certificate.
-        # For more details, [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault#configuration).
+        # For more details, [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault##rootpkipath).
         rootPKIPath: ""
 
         # The path to a PKI secrets engine for the generated intermediate certificate.
-        # For more details, [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault#configuration).
+        # For more details, [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault#intermediatepkipath).
         intermediatePKIPath: ""
 
         # Additional Connect CA configuration in JSON format.
