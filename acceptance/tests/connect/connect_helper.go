@@ -207,7 +207,6 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 func (c *ConnectHelper) helmValues() map[string]string {
 	helmValues := map[string]string{
 		"connectInject.enabled":        "true",
-		"global.imageK8S":              "kyleschochenmaier/consul-k8s-dev",
 		"global.tls.enabled":           strconv.FormatBool(c.Secure),
 		"global.tls.enableAutoEncrypt": strconv.FormatBool(c.AutoEncrypt),
 		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
