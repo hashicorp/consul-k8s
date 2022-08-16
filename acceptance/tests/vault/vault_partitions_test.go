@@ -96,9 +96,18 @@ func TestVault_Partitions(t *testing.T) {
 			},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
+		_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        authMethodRBACName,
+				Annotations: map[string]string{"kubernetes.io/service-account.name": authMethodRBACName},
+			},
+			Type: "kubernetes.io/service-account-token",
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
 			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
+			clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server

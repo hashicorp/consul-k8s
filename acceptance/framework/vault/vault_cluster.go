@@ -178,6 +178,7 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 					Name:        secretName,
 					Annotations: map[string]string{"kubernetes.io/service-account.name": saName},
 				},
+				Type: "kubernetes.io/service-account-token",
 			}, metav1.CreateOptions{})
 			require.NoError(t, err)
 		} else {
