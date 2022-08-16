@@ -25,11 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-var (
-	// kubeSystemNamespaces is a set of namespaces that are considered
-	// "system" level namespaces and are always skipped (never injected).
-	kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
-)
+// kubeSystemNamespaces is a set of namespaces that are considered
+// "system" level namespaces and are always skipped (never injected).
+var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
 
 // Webhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
@@ -135,6 +133,11 @@ type MeshWebhook struct {
 	// This means that the injected init container will apply traffic redirection rules
 	// so that all traffic will go through the Envoy proxy.
 	EnableTransparentProxy bool
+
+	// EnableCNI enables the CNI plugin and prevents the connect-inject init container
+	// from running the consul redirect-traffic command as the CNI plugin handles traffic
+	// redirection
+	EnableCNI bool
 
 	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
 	// to point them to the Envoy proxy.

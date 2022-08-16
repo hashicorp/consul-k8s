@@ -15,7 +15,7 @@ bats-tests: ## Run Helm chart bats tests.
 # ===========> Control Plane Targets
 
 control-plane-dev: ## Build consul-k8s-control-plane binary.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o $(GOOS) -a $(GOARCH)
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
 
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
@@ -135,6 +135,7 @@ SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 DEV_IMAGE?=consul-k8s-control-plane-dev
+DOCKER_HUB_USER=$(shell cat $(HOME)/.dockerhub)
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)

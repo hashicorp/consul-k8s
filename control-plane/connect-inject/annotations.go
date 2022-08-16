@@ -164,7 +164,7 @@ const (
 	// by the peering controllers.
 	labelPeeringToken = "consul.hashicorp.com/peering-token"
 
-	// injected is used as the annotation value for annotationInjected.
+	// injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	injected = "injected"
 
 	// endpointsController is the value for keyManagedBy.
