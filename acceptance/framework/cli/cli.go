@@ -33,7 +33,7 @@ func (c *CLI) Run(t *testing.T, options *k8s.KubectlOptions, args ...string) ([]
 
 	// Append configuration from `options` to the command.
 	if options.ConfigPath != "" {
-		args = append(args, "-config", options.ConfigPath)
+		args = append(args, "-kubeconfig", options.ConfigPath)
 	}
 	if options.ContextName != "" {
 		args = append(args, "-context", options.ContextName)
