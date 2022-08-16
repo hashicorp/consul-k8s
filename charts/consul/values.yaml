@@ -1972,8 +1972,8 @@ connectInject:
         memory: "50Mi"
         cpu: "50m"
       limits:
-        memory: "50Mi"
-        cpu: "50m"
+        memory: "75Mi"
+        cpu: "75m"
 
     # Resource quotas for running the daemonset as system critical pods
     resourceQuota:

@@ -91,10 +91,6 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("cni-net-dir=foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("dns-prefix=bar-consul"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -139,7 +135,7 @@ rollingUpdate:
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":"75m","memory":"75Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
 }
 
 @test "cni/DaemonSet: resources can be overridden" {
