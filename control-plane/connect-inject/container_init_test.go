@@ -110,6 +110,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 		t.Run(tt.Name, func(t *testing.T) {
 			w := tt.Webhook
 			pod := *tt.Pod(minimal())
+<<<<<<< HEAD
 			container, err := w.containerInit(testNS, pod, multiPortInfo{})
 			if tt.ErrStr == "" {
 				require.NoError(t, err)
@@ -124,6 +125,18 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				}
 			} else {
 				require.EqualError(t, err, tt.ErrStr)
+=======
+			container, err := h.containerInit(testNS, pod, multiPortInfo{})
+			if tt.ErrStr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Contains(t, err.Error(), tt.ErrStr)
+			}
+			actual := strings.Join(container.Command, " ")
+			require.Contains(t, actual, tt.Cmd)
+			if tt.CmdNot != "" {
+				require.NotContains(t, actual, tt.CmdNot)
+>>>>>>> e6b748b9 (Fix failing unit tests after rebasing Cluster Peering (#1428))
 			}
 		})
 	}
