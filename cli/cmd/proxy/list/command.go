@@ -148,7 +148,7 @@ func (c *ListCommand) initKubernetes() error {
 		return fmt.Errorf("error creating Kubernetes client %v", err)
 	}
 
-	return err
+	return nil
 }
 
 func (c *ListCommand) namespace() string {
