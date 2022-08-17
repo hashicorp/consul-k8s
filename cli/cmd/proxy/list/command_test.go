@@ -332,7 +332,7 @@ func TestNoPodsFound(t *testing.T) {
 			c := setupCommand(buf)
 			c.kubernetes = fake.NewSimpleClientset()
 
-			out := c.Run(tc.args)
+			exitCode := c.Run(tc.args)
 			require.Equal(t, 0, out)
 
 			require.Regexp(t, tc.expected, buf.String())
