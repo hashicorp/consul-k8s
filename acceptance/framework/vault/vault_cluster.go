@@ -153,18 +153,21 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 	// In Kube 1.24+ the serviceAccount does not have a secret automatically generated so we will create one prior to
 	// needing to use it in ConfigureAuthMethod. Vault expects the user to create the secret manually for any
 	// Kube AuthMethod use.
-	sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(vaultServerServiceAccountName).Get(context.Background(), vaultServerServiceAccountName, metav1.GetOptions{})
-	require.NoError(t, err)
-	if len(sa.Secrets) == 0 {
-		_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        vaultServerServiceAccountName,
-				Annotations: map[string]string{"kubernetes.io/service-account.name": vaultServerServiceAccountName},
-			},
-			Type: "kubernetes.io/service-account-token",
-		}, metav1.CreateOptions{})
-		require.NoError(t, err)
-	}
+	var sa *corev1.ServiceAccount
+	retry.Run(t, func(r *retry.R) {
+		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), vaultServerServiceAccountName, metav1.GetOptions{})
+		require.NoError(r, err)
+		if len(sa.Secrets) == 0 {
+			_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        vaultServerServiceAccountName,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": vaultServerServiceAccountName},
+				},
+				Type: "kubernetes.io/service-account-token",
+			}, metav1.CreateOptions{})
+			require.NoError(t, err)
+		}
+	})
 
 	v.ConfigureAuthMethod(t, v.vaultClient, "kubernetes", "https://kubernetes.default.svc", vaultServerServiceAccountName, namespace)
 }
