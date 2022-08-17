@@ -99,12 +99,24 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create service account for the auth method in the secondary cluster.
-		_, err = secondaryCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Create(context.Background(), &corev1.ServiceAccount{
+		svcAcct, err := secondaryCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Create(context.Background(), &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: authMethodRBACName,
 			},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
+		// In Kubernetes 1.24+ the serviceAccount does not automatically populate secrets with permanent JWT tokens, use this instead.
+		// It will be cleaned up by Kubernetes automatically since it references the ServiceAccount.
+		if len(svcAcct.Secrets) == 0 {
+			_, err = secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        authMethodRBACName,
+					Annotations: map[string]string{"kubernetes.io/service-account.name": authMethodRBACName},
+				},
+				Type: "kubernetes.io/service-account-token",
+			}, metav1.CreateOptions{})
+			require.NoError(t, err)
+		}
 		t.Cleanup(func() {
 			secondaryCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
 			secondaryCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
