@@ -299,7 +299,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 						return admission.Errored(http.StatusInternalServerError, err)
 					}
 					if len(sa.Secrets) == 0 {
-						// check to see if there is a secret with the same name as the serviceaccount for Kube1.21+
+						// check to see if there is a secret with the same name as the serviceaccount for Kube-1.24+
 						w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
 						sec, err := w.Clientset.CoreV1().Secrets(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
 						if err != nil {
