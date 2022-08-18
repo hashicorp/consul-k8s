@@ -145,10 +145,62 @@ func TestReadCommandOutput(t *testing.T) {
 // the former does not affect the output of the latter.
 func TestFilterWarnings(t *testing.T) {
 	podName := "fakePod"
-	cases := map[string][]string{
-		"fully qualified domain name doesn't apply to secrets":                {"-fqdn", "default", "-secrets"},
-		"port doesn't apply to secrets or routes":                             {"-port", "8080", "-secrets", "-routes"},
-		"fully qualified domain name doesn't apply to endpoints or listeners": {"-fqdn", "default", "-endpoints", "-listeners"},
+	cases := map[string]struct {
+		input      []string
+		shouldWarn bool
+	}{
+		"fully qualified domain name doesn't apply to listeners": {
+			input:      []string{"-fqdn", "default", "-listeners"},
+			shouldWarn: true,
+		},
+		"fully qualified domain name doesn't apply to routes": {
+			input:      []string{"-fqdn", "default", "-routes"},
+			shouldWarn: true,
+		},
+		"fully qualified domain name doesn't apply to endpoints": {
+			input:      []string{"-fqdn", "default", "-endpoints"},
+			shouldWarn: true,
+		},
+		"fully qualified domain name doesn't apply to secrets": {
+			input:      []string{"-fqdn", "default", "-secrets"},
+			shouldWarn: true,
+		},
+		"fully qualified domain name doesn't apply to endpoints or listeners": {
+			input:      []string{"-fqdn", "default", "-endpoints", "-listeners"},
+			shouldWarn: true,
+		},
+		"fully qualified domain name doesn't apply to listeners, routes, endpoints, or secrets": {
+			input:      []string{"-fqdn", "default", "-listeners", "-routes", "-endpoints", "-secrets"},
+			shouldWarn: true,
+		},
+		"port doesn't apply to routes": {
+			input:      []string{"-port", "8080", "-routes"},
+			shouldWarn: true,
+		},
+		"port doesn't apply to secrets": {
+			input:      []string{"-port", "8080", "-secrets"},
+			shouldWarn: true,
+		},
+		"port doesn't apply to secrets or routes": {
+			input:      []string{"-port", "8080", "-secrets", "-routes"},
+			shouldWarn: true,
+		},
+		"address does not apply to routes": {
+			input:      []string{"-address", "127.0.0.1", "-routes"},
+			shouldWarn: true,
+		},
+		"address does not apply to secrets": {
+			input:      []string{"-address", "127.0.0.1", "-secrets"},
+			shouldWarn: true,
+		},
+		"multiple warnings": {
+			input:      []string{"-address", "127.0.0.1", "-port", "8080", "-secrets"},
+			shouldWarn: true,
+		},
+		"no warning produced (happy case)": {
+			input:      []string{"-fqdn", "default", "-clusters"},
+			shouldWarn: false,
+		},
 	}
 
 	for name, tc := range cases {
@@ -167,10 +219,14 @@ func TestFilterWarnings(t *testing.T) {
 				return testEnvoyConfig, nil
 			}
 
-			out := c.Run(append([]string{podName}, tc...))
-			require.Equal(t, 0, out) // This shouldn't error out, just warn the user.
+			exitCode := c.Run(append([]string{podName}, tc.input...))
+			require.Equal(t, 0, exitCode) // This shouldn't error out, just warn the user.
 
-			require.Regexp(t, "The filter.*does not apply to the tables displayed.", buf.String())
+			if tc.shouldWarn {
+				require.Regexp(t, "The filter.*does not apply to the tables displayed.", buf.String())
+			} else {
+				require.NotRegexp(t, "The filter.*does not apply to the tables displayed.", buf.String())
+			}
 		})
 	}
 }
