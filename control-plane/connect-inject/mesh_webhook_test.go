@@ -733,13 +733,14 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 		{
-			"multi port pod",
+			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref",
 			MeshWebhook{
 				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
-				Clientset:             defaultTestClientWithNamespace(),
+				Clientset:             testClientWithServiceAccountAndSecretRefs(),
+				AuthMethod:            "k8s",
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -748,7 +749,62 @@ func TestHandlerHandle(t *testing.T) {
 						Spec: basicSpec,
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								annotationService: "web, web-admin",
+								annotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(keyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+			},
+		},
+		{
+			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
+			MeshWebhook{
+				Log:                   logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecrets(),
+				AuthMethod:            "k8s",
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationService: "web,web-admin",
 							},
 						},
 					}),
@@ -1904,9 +1960,7 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 			require.Error(t, err)
 			require.Equal(t, tt.expErr, err.Error())
 		})
-
 	}
-
 }
 
 // encodeRaw is a helper to encode some data into a RawExtension.
@@ -1925,6 +1979,74 @@ func escapeJSONPointer(s string) string {
 
 func defaultTestClientWithNamespace() kubernetes.Interface {
 	return clientWithNamespace("default")
+}
+
+func testClientWithServiceAccountAndSecretRefs() kubernetes.Interface {
+	ns := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	sa1 := corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web-admin",
+			Namespace: "default",
+		},
+		Secrets: []corev1.ObjectReference{
+			{
+				Name: "web-admin",
+			},
+		},
+	}
+	sa2 := corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web",
+			Namespace: "default",
+		},
+		Secrets: []corev1.ObjectReference{
+			{
+				Name: "web",
+			},
+		},
+	}
+	return fake.NewSimpleClientset(&ns, &sa1, &sa2)
+}
+
+func testClientWithServiceAccountAndSecrets() kubernetes.Interface {
+	ns := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	sa1 := corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web-admin",
+			Namespace: "default",
+		},
+	}
+	secret1 := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "web-admin",
+			Namespace:   "default",
+			Annotations: map[string]string{"kubernetes.io/service-account.name": "web-admin"},
+		},
+		Type: "kubernetes.io/service-account-token",
+	}
+	sa2 := corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web",
+			Namespace: "default",
+		},
+	}
+	secret2 := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "web",
+			Annotations: map[string]string{"kubernetes.io/service-account.name": "web"},
+			Namespace:   "default",
+		},
+		Type: "kubernetes.io/service-account-token",
+	}
+	return fake.NewSimpleClientset(&ns, &sa1, &sa2, &secret1, &secret2)
 }
 
 func clientWithNamespace(name string) kubernetes.Interface {
