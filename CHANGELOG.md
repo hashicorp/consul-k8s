@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Kubernetes 1.24
+  * Add support for Kubernetes 1.24 where ServiceAccounts no longer have long term JWT tokens. [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
+
 ## 0.47.1 (August 12, 2022)
 
 BUG FIXES:
