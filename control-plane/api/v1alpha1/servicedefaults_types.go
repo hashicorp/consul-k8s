@@ -84,6 +84,9 @@ type ServiceDefaultsSpec struct {
 	// mode. Destinations live outside of Consul's catalog, and because of this, they
 	// do not require an artificial node to be created.
 	Destination *ServiceDefaultsDestination `json:"destination,omitempty"`
+	// MaxInboundConnections is the maximum number of concurrent inbound connections to
+	// each service instance. Defaults to 0 (unlimited) if not set.
+	MaxInboundConnections *int `json:"maxInboundConnections,omitempty"`
 }
 
 type Upstreams struct {
@@ -244,17 +247,22 @@ func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
+	maxInboundConnections := 0
+	if in.Spec.MaxInboundConnections != nil {
+		maxInboundConnections = *in.Spec.MaxInboundConnections
+	}
 	return &capi.ServiceConfigEntry{
-		Kind:             in.ConsulKind(),
-		Name:             in.ConsulName(),
-		Protocol:         in.Spec.Protocol,
-		MeshGateway:      in.Spec.MeshGateway.toConsul(),
-		Expose:           in.Spec.Expose.toConsul(),
-		ExternalSNI:      in.Spec.ExternalSNI,
-		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
-		UpstreamConfig:   in.Spec.UpstreamConfig.toConsul(),
-		Destination:      in.Spec.Destination.toConsul(),
-		Meta:             meta(datacenter),
+		Kind:                  in.ConsulKind(),
+		Name:                  in.ConsulName(),
+		Protocol:              in.Spec.Protocol,
+		MeshGateway:           in.Spec.MeshGateway.toConsul(),
+		Expose:                in.Spec.Expose.toConsul(),
+		ExternalSNI:           in.Spec.ExternalSNI,
+		TransparentProxy:      in.Spec.TransparentProxy.toConsul(),
+		UpstreamConfig:        in.Spec.UpstreamConfig.toConsul(),
+		Destination:           in.Spec.Destination.toConsul(),
+		Meta:                  meta(datacenter),
+		MaxInboundConnections: uint64(maxInboundConnections),
 	}
 }
 
@@ -280,6 +288,11 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	if err := in.Spec.Destination.validate(path.Child("destination")); err != nil {
 		allErrs = append(allErrs, err...)
 	}
+
+	if in.Spec.MaxInboundConnections != nil && *in.Spec.MaxInboundConnections < 0 {
+		allErrs = append(allErrs, field.Invalid(path.Child("maxinboundconnections"), in.Spec.MaxInboundConnections, "MaxInboundConnections must > 0"))
+	}
+
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 

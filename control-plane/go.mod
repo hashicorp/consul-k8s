@@ -129,4 +129,7 @@ require (
 
 replace github.com/hashicorp/consul/sdk v0.10.0 => github.com/hashicorp/consul/sdk v0.4.1-0.20220801192236-988e1fd35d51
 
+// TODO beforing merging: remove the replace
+replace github.com/hashicorp/consul/api => ../../consul/api
+
 go 1.18
