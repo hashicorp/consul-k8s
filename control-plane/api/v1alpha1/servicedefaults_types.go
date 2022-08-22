@@ -262,7 +262,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		UpstreamConfig:        in.Spec.UpstreamConfig.toConsul(),
 		Destination:           in.Spec.Destination.toConsul(),
 		Meta:                  meta(datacenter),
-		MaxInboundConnections: uint64(maxInboundConnections),
+		MaxInboundConnections: maxInboundConnections,
 	}
 }
 
