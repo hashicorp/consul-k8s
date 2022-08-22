@@ -146,60 +146,71 @@ func TestReadCommandOutput(t *testing.T) {
 func TestFilterWarnings(t *testing.T) {
 	podName := "fakePod"
 	cases := map[string]struct {
-		input      []string
-		shouldWarn bool
+		input    []string
+		warnings []string
 	}{
 		"fully qualified domain name doesn't apply to listeners": {
-			input:      []string{"-fqdn", "default", "-listeners"},
-			shouldWarn: true,
+			input:    []string{"-fqdn", "default", "-listeners"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
 		},
 		"fully qualified domain name doesn't apply to routes": {
-			input:      []string{"-fqdn", "default", "-routes"},
-			shouldWarn: true,
+			input:    []string{"-fqdn", "default", "-routes"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
 		},
 		"fully qualified domain name doesn't apply to endpoints": {
-			input:      []string{"-fqdn", "default", "-endpoints"},
-			shouldWarn: true,
+			input:    []string{"-fqdn", "default", "-endpoints"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
 		},
 		"fully qualified domain name doesn't apply to secrets": {
-			input:      []string{"-fqdn", "default", "-secrets"},
-			shouldWarn: true,
+			input:    []string{"-fqdn", "default", "-secrets"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
 		},
 		"fully qualified domain name doesn't apply to endpoints or listeners": {
-			input:      []string{"-fqdn", "default", "-endpoints", "-listeners"},
-			shouldWarn: true,
+			input:    []string{"-fqdn", "default", "-endpoints", "-listeners"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
 		},
 		"fully qualified domain name doesn't apply to listeners, routes, endpoints, or secrets": {
-			input:      []string{"-fqdn", "default", "-listeners", "-routes", "-endpoints", "-secrets"},
-			shouldWarn: true,
+			input:    []string{"-fqdn", "default", "-listeners", "-routes", "-endpoints", "-secrets"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
 		},
 		"port doesn't apply to routes": {
-			input:      []string{"-port", "8080", "-routes"},
-			shouldWarn: true,
+			input:    []string{"-port", "8080", "-routes"},
+			warnings: []string{"The filter `-port 8080` does not apply to the tables displayed."},
 		},
 		"port doesn't apply to secrets": {
-			input:      []string{"-port", "8080", "-secrets"},
-			shouldWarn: true,
+			input:    []string{"-port", "8080", "-secrets"},
+			warnings: []string{"The filter `-port 8080` does not apply to the tables displayed."},
 		},
 		"port doesn't apply to secrets or routes": {
-			input:      []string{"-port", "8080", "-secrets", "-routes"},
-			shouldWarn: true,
+			input:    []string{"-port", "8080", "-secrets", "-routes"},
+			warnings: []string{"The filter `-port 8080` does not apply to the tables displayed."},
 		},
 		"address does not apply to routes": {
-			input:      []string{"-address", "127.0.0.1", "-routes"},
-			shouldWarn: true,
+			input:    []string{"-address", "127.0.0.1", "-routes"},
+			warnings: []string{"The filter `-address 127.0.0.1` does not apply to the tables displayed."},
 		},
 		"address does not apply to secrets": {
-			input:      []string{"-address", "127.0.0.1", "-secrets"},
-			shouldWarn: true,
+			input:    []string{"-address", "127.0.0.1", "-secrets"},
+			warnings: []string{"The filter `-address 127.0.0.1` does not apply to the tables displayed."},
 		},
-		"multiple warnings": {
-			input:      []string{"-address", "127.0.0.1", "-port", "8080", "-secrets"},
-			shouldWarn: true,
+		"warn address and port": {
+			input: []string{"-address", "127.0.0.1", "-port", "8080", "-secrets"},
+			warnings: []string{
+				"The filter `-address 127.0.0.1` does not apply to the tables displayed.",
+				"The filter `-port 8080` does not apply to the tables displayed.",
+			},
+		},
+		"warn fqdn, address, and port": {
+			input: []string{"-fqdn", "default", "-address", "127.0.0.1", "-port", "8080", "-secrets"},
+			warnings: []string{
+				"The filter `-fqdn default` does not apply to the tables displayed.",
+				"The filter `-address 127.0.0.1` does not apply to the tables displayed.",
+				"The filter `-port 8080` does not apply to the tables displayed.",
+			},
 		},
 		"no warning produced (happy case)": {
-			input:      []string{"-fqdn", "default", "-clusters"},
-			shouldWarn: false,
+			input:    []string{"-fqdn", "default", "-clusters"},
+			warnings: []string{},
 		},
 	}
 
@@ -222,10 +233,8 @@ func TestFilterWarnings(t *testing.T) {
 			exitCode := c.Run(append([]string{podName}, tc.input...))
 			require.Equal(t, 0, exitCode) // This shouldn't error out, just warn the user.
 
-			if tc.shouldWarn {
-				require.Regexp(t, "The filter.*does not apply to the tables displayed.", buf.String())
-			} else {
-				require.NotRegexp(t, "The filter.*does not apply to the tables displayed.", buf.String())
+			for _, warning := range tc.warnings {
+				require.Contains(t, buf.String(), warning)
 			}
 		})
 	}
