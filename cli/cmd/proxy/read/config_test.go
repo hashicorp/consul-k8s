@@ -253,7 +253,7 @@ func TestFormatFilters(t *testing.T) {
 					Type:   "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
 					Domain: "database-ratelimit",
 					Descriptors: []filterRateLimitDescriptor{
-						filterRateLimitDescriptor{
+						{
 							Entries: []filterRateLimitDescriptorEntry{
 								{
 									Key:   "PATH",
@@ -294,9 +294,7 @@ func TestFormatFilters(t *testing.T) {
 					Domain:          "database-ratelimit",
 					FailureModeDeny: true,
 					RateLimitService: filterRateLimitServiceConfig{
-						GrpcService: filterGrpcService{
-							GoogleGrpc: ,
-						},
+						GrpcService: filterGrpcService{},
 					},
 				},
 			},

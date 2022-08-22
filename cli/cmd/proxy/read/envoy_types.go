@@ -125,7 +125,7 @@ type filterTypedConfig struct {
 	GrpcService      filterGrpcService            `json:"grpc_service"`
 	TokenBucket      filterTokenBucket            `json:"token_bucket"`
 	Domain           string                       `json:"domain"`
-	Descriptors      []filterRateLimitDescriptors `json:"descriptors"`
+	Descriptors      []filterRateLimitDescriptor  `json:"descriptors"`
 	FailureModeDeny  bool                         `json:"failure_mode_deny"`
 	RateLimitService filterRateLimitServiceConfig `json:"rate_limit_service"`
 }
