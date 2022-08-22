@@ -86,6 +86,7 @@ func NewHelmCluster(
 		KubectlOptions: ctx.KubectlOptions(t),
 		Logger:         logger,
 		ExtraArgs:      extraArgs,
+		Version:        cfg.HelmChartVersion,
 	}
 	return &HelmCluster{
 		ctx:                ctx,

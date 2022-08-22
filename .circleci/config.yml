@@ -881,6 +881,7 @@ jobs:
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
       - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.47.1"
+      - HELM_CHART_VERSION: "0.47.1"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -902,7 +903,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -916,6 +917,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
+      - HELM_CHART_VERSION: "0.47.1"
       - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.47.1"
     machine:
       image: ubuntu-2004:202010-01
@@ -938,7 +940,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -953,6 +955,7 @@ jobs:
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
       - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.47.1"
+      - HELM_CHART_VERSION: "0.47.1"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -974,7 +977,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:

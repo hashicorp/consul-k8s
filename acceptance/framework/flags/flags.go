@@ -29,10 +29,11 @@ type TestFlags struct {
 
 	flagEnableTransparentProxy bool
 
-	flagConsulImage    string
-	flagConsulK8sImage string
-	flagConsulVersion  string
-	flagEnvoyImage     string
+	flagHelmChartVersion string
+	flagConsulImage      string
+	flagConsulK8sImage   string
+	flagConsulVersion    string
+	flagEnvoyImage       string
 
 	flagNoCleanupOnFailure bool
 
@@ -62,6 +63,7 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
+	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
@@ -146,10 +148,11 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		DisablePeering: t.flagDisablePeering,
 
-		ConsulImage:    t.flagConsulImage,
-		ConsulK8SImage: t.flagConsulK8sImage,
-		ConsulVersion:  consulVersion,
-		EnvoyImage:     t.flagEnvoyImage,
+		HelmChartVersion: t.flagHelmChartVersion,
+		ConsulImage:      t.flagConsulImage,
+		ConsulK8SImage:   t.flagConsulK8sImage,
+		ConsulVersion:    consulVersion,
+		EnvoyImage:       t.flagEnvoyImage,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
