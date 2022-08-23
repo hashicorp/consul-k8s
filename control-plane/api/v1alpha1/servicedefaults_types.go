@@ -85,8 +85,8 @@ type ServiceDefaultsSpec struct {
 	// do not require an artificial node to be created.
 	Destination *ServiceDefaultsDestination `json:"destination,omitempty"`
 	// MaxInboundConnections is the maximum number of concurrent inbound connections to
-	// each service instance. Defaults to 0 (unlimited) if not set.
-	MaxInboundConnections *int `json:"maxInboundConnections,omitempty"`
+	// each service instance. Defaults to 0 (using consul's default) if not set.
+	MaxInboundConnections int `json:"maxInboundConnections,omitempty"`
 }
 
 type Upstreams struct {
@@ -247,10 +247,6 @@ func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
-	maxInboundConnections := 0
-	if in.Spec.MaxInboundConnections != nil {
-		maxInboundConnections = *in.Spec.MaxInboundConnections
-	}
 	return &capi.ServiceConfigEntry{
 		Kind:                  in.ConsulKind(),
 		Name:                  in.ConsulName(),
@@ -262,7 +258,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		UpstreamConfig:        in.Spec.UpstreamConfig.toConsul(),
 		Destination:           in.Spec.Destination.toConsul(),
 		Meta:                  meta(datacenter),
-		MaxInboundConnections: maxInboundConnections,
+		MaxInboundConnections: in.Spec.MaxInboundConnections,
 	}
 }
 
@@ -289,7 +285,7 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 		allErrs = append(allErrs, err...)
 	}
 
-	if in.Spec.MaxInboundConnections != nil && *in.Spec.MaxInboundConnections < 0 {
+	if in.Spec.MaxInboundConnections < 0 {
 		allErrs = append(allErrs, field.Invalid(path.Child("maxinboundconnections"), in.Spec.MaxInboundConnections, "MaxInboundConnections must > 0"))
 	}
 

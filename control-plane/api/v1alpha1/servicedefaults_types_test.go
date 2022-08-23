@@ -141,7 +141,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						Addresses: []string{"api.google.com"},
 						Port:      443,
 					},
-					MaxInboundConnections: intPointer(20),
+					MaxInboundConnections: 20,
 				},
 			},
 			&capi.ServiceConfigEntry{
