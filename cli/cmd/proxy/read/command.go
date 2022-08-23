@@ -413,12 +413,15 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 		cfgs[name] = cfg
 	}
 
-	out, err := json.MarshalIndent(cfgs, "", "\t")
+	escaped, err := json.MarshalIndent(cfgs, "", "\t")
 	if err != nil {
 		return err
 	}
 
-	c.UI.Output(string(out))
+	// Unescape `>` the cheap way.
+	out := strings.ReplaceAll(string(escaped), "\\u003e", ">")
+
+	c.UI.Output(out)
 
 	return nil
 }
