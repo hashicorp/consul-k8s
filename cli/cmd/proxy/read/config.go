@@ -257,7 +257,7 @@ func parseEndpoints(rawCfg map[string]interface{}, endpointMapping map[string]st
 
 				endpoints = append(endpoints, Endpoint{
 					Address: address,
-					Cluster: cluster,
+					Cluster: strings.Split(cluster, ".")[0],
 					Weight:  lbEndpoint.LoadBalancingWeight,
 					Status:  lbEndpoint.HealthStatus,
 				})

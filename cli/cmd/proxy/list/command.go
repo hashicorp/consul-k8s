@@ -21,7 +21,6 @@ type ListCommand struct {
 	*common.BaseCommand
 
 	kubernetes kubernetes.Interface
-	namespace  string
 
 	set *flag.Sets
 
@@ -129,8 +128,7 @@ func (c *ListCommand) validateFlags() error {
 	return nil
 }
 
-// initKubernetes initializes the Kubernetes client and sets the namespace based
-// on the user-provided arguments.
+// initKubernetes initializes the Kubernetes client.
 func (c *ListCommand) initKubernetes() error {
 	settings := helmCLI.New()
 
@@ -150,15 +148,19 @@ func (c *ListCommand) initKubernetes() error {
 		return fmt.Errorf("error creating Kubernetes client %v", err)
 	}
 
-	if c.flagAllNamespaces {
-		c.namespace = "" // An empty namespace means all namespaces.
-	} else if c.flagNamespace != "" {
-		c.namespace = c.flagNamespace
-	} else {
-		c.namespace = settings.Namespace()
-	}
+	return nil
+}
 
-	return err
+func (c *ListCommand) namespace() string {
+	settings := helmCLI.New()
+
+	if c.flagAllNamespaces {
+		return "" // An empty namespace means all namespaces.
+	} else if c.flagNamespace != "" {
+		return c.flagNamespace
+	} else {
+		return settings.Namespace()
+	}
 }
 
 // fetchPods fetches all pods in flagNamespace which run Consul proxies.
@@ -166,7 +168,7 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	var pods []v1.Pod
 
 	// Fetch all pods in the namespace with labels matching the gateway component names.
-	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
+	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
 	})
 	if err != nil {
@@ -175,7 +177,7 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	pods = append(pods, gatewaypods.Items...)
 
 	// Fetch all pods in the namespace with a label indicating they are an API gateway.
-	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
+	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
 	})
 	if err != nil {
@@ -184,7 +186,7 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	pods = append(pods, apigatewaypods.Items...)
 
 	// Fetch all pods in the namespace with a label indicating they are a service networked by Consul.
-	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace).List(c.Ctx, metav1.ListOptions{
+	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
 	})
 	if err != nil {
@@ -197,10 +199,19 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 
 // output prints a table of pods to the terminal.
 func (c *ListCommand) output(pods []v1.Pod) {
+	if len(pods) == 0 {
+		if c.flagAllNamespaces {
+			c.UI.Output("No proxies found across all namespaces.")
+		} else {
+			c.UI.Output("No proxies found in %s namespace.", c.namespace())
+		}
+		return
+	}
+
 	if c.flagAllNamespaces {
-		c.UI.Output("Namespace: All Namespaces\n")
-	} else if c.namespace != "" {
-		c.UI.Output("Namespace: %s\n", c.namespace)
+		c.UI.Output("Namespace: all namespaces\n")
+	} else {
+		c.UI.Output("Namespace: %s\n", c.namespace())
 	}
 
 	var tbl *terminal.Table

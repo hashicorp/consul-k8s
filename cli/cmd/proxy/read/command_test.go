@@ -61,44 +61,38 @@ func TestReadCommandOutput(t *testing.T) {
 	// These regular expressions must be present in the output.
 	expectedHeader := fmt.Sprintf("Envoy configuration for %s in namespace default:", podName)
 	expected := map[string][]string{
-		"-clusters": {"==> Clusters \\(6\\)",
+		"-clusters": {"==> Clusters \\(5\\)",
 			"Name.*FQDN.*Endpoints.*Type.*Last Updated",
-			"local_agent.*local_agent.*192\\.168\\.79\\.187:8502.*STATIC.*2022-05-13T04:22:39\\.553Z",
-			"local_app.*local_app.*127\\.0\\.0\\.1:8080.*STATIC.*2022-05-13T04:22:39\\.655Z",
-			"client.*client\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul.*EDS.*2022-06-09T00:39:12\\.948Z",
-			"frontend.*frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul.*EDS.*2022-06-09T00:39:12\\.855Z",
-			"original-destination.*original-destination.*ORIGINAL_DST.*2022-05-13T04:22:39.743Z",
-			"server.*server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul.*EDS.*2022-06-09T00:39:12\\.754Z"},
+			"local_agent.*192\\.168\\.79\\.187:8502.*STATIC.*2022-05-13T04:22:39\\.553Z",
+			"local_app.*127\\.0\\.0\\.1:8080.*STATIC.*2022-05-13T04:22:39\\.655Z",
+			"client.*client\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul.*EDS",
+			"frontend.*frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
+			"original-destination.*ORIGINAL_DST"},
 
-		"-endpoints": {"==> Endpoints \\(9\\)",
+		"-endpoints": {"==> Endpoints \\(6\\)",
 			"Address:Port.*Cluster.*Weight.*Status",
 			"192.168.79.187:8502.*local_agent.*1.00.*HEALTHY",
 			"127.0.0.1:8080.*local_app.*1.00.*HEALTHY",
-			"192.168.31.201:20000.*1.00.*HEALTHY",
-			"192.168.47.235:20000.*1.00.*HEALTHY",
-			"192.168.71.254:20000.*1.00.*HEALTHY",
-			"192.168.63.120:20000.*1.00.*HEALTHY",
-			"192.168.18.110:20000.*1.00.*HEALTHY",
-			"192.168.52.101:20000.*1.00.*HEALTHY",
-			"192.168.65.131:20000.*1.00.*HEALTHY"},
+			"192.168.18.110:20000.*client.*1.00.*HEALTHY",
+			"192.168.52.101:20000.*client.*1.00.*HEALTHY",
+			"192.168.65.131:20000.*client.*1.00.*HEALTHY",
+			"192.168.63.120:20000.*frontend.*1.00.*HEALTHY"},
 
 		"-listeners": {"==> Listeners \\(2\\)",
 			"Name.*Address:Port.*Direction.*Filter Chain Match.*Filters.*Last Updated",
-			"public_listener.*192\\.168\\.69\\.179:20000.*INBOUND.*Any.*\\* to local_app/.*2022-06-09T00:39:27\\.668Z",
-			"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul.*2022-05-24T17:41:59\\.079Z",
-			"10\\.100\\.254\\.176/32, 240\\.0\\.0\\.4/32.*\\* to server\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul/",
-			"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.2/32.*to frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
+			"public_listener.*192\\.168\\.69\\.179:20000.*INBOUND.*Any.*\\* to local_app/",
+			"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+			"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.5/32.*to frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
 			"Any.*to original-destination"},
 
-		"-routes": {"==> Routes \\(2\\)",
+		"-routes": {"==> Routes \\(1\\)",
 			"Name.*Destination Cluster.*Last Updated",
-			"public_listener.*local_app/.*2022-06-09T00:39:27.667Z",
-			"server.*server\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul/.*2022-05-24T17:41:59\\.078Z"},
+			"public_listener.*local_app/"},
 
 		"-secrets": {"==> Secrets \\(2\\)",
 			"Name.*Type.*Last Updated",
-			"default.*Dynamic Active.*2022-05-24T17:41:59.078Z",
-			"ROOTCA.*Dynamic Warming.*2022-03-15T05:14:22.868Z"},
+			"default.*Dynamic Active",
+			"ROOTCA.*Dynamic Warming"},
 	}
 
 	cases := map[string][]string{
@@ -141,6 +135,106 @@ func TestReadCommandOutput(t *testing.T) {
 				for _, expression := range expected[table] {
 					require.Regexp(t, expression, actual)
 				}
+			}
+		})
+	}
+}
+
+// TestFilterWarnings ensures that a warning is printed if the user applies a
+// field filter (e.g. -fqdn default) and a table filter (e.g. -secrets) where
+// the former does not affect the output of the latter.
+func TestFilterWarnings(t *testing.T) {
+	podName := "fakePod"
+	cases := map[string]struct {
+		input    []string
+		warnings []string
+	}{
+		"fully qualified domain name doesn't apply to listeners": {
+			input:    []string{"-fqdn", "default", "-listeners"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
+		},
+		"fully qualified domain name doesn't apply to routes": {
+			input:    []string{"-fqdn", "default", "-routes"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
+		},
+		"fully qualified domain name doesn't apply to endpoints": {
+			input:    []string{"-fqdn", "default", "-endpoints"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
+		},
+		"fully qualified domain name doesn't apply to secrets": {
+			input:    []string{"-fqdn", "default", "-secrets"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
+		},
+		"fully qualified domain name doesn't apply to endpoints or listeners": {
+			input:    []string{"-fqdn", "default", "-endpoints", "-listeners"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
+		},
+		"fully qualified domain name doesn't apply to listeners, routes, endpoints, or secrets": {
+			input:    []string{"-fqdn", "default", "-listeners", "-routes", "-endpoints", "-secrets"},
+			warnings: []string{"The filter `-fqdn default` does not apply to the tables displayed."},
+		},
+		"port doesn't apply to routes": {
+			input:    []string{"-port", "8080", "-routes"},
+			warnings: []string{"The filter `-port 8080` does not apply to the tables displayed."},
+		},
+		"port doesn't apply to secrets": {
+			input:    []string{"-port", "8080", "-secrets"},
+			warnings: []string{"The filter `-port 8080` does not apply to the tables displayed."},
+		},
+		"port doesn't apply to secrets or routes": {
+			input:    []string{"-port", "8080", "-secrets", "-routes"},
+			warnings: []string{"The filter `-port 8080` does not apply to the tables displayed."},
+		},
+		"address does not apply to routes": {
+			input:    []string{"-address", "127.0.0.1", "-routes"},
+			warnings: []string{"The filter `-address 127.0.0.1` does not apply to the tables displayed."},
+		},
+		"address does not apply to secrets": {
+			input:    []string{"-address", "127.0.0.1", "-secrets"},
+			warnings: []string{"The filter `-address 127.0.0.1` does not apply to the tables displayed."},
+		},
+		"warn address and port": {
+			input: []string{"-address", "127.0.0.1", "-port", "8080", "-secrets"},
+			warnings: []string{
+				"The filter `-address 127.0.0.1` does not apply to the tables displayed.",
+				"The filter `-port 8080` does not apply to the tables displayed.",
+			},
+		},
+		"warn fqdn, address, and port": {
+			input: []string{"-fqdn", "default", "-address", "127.0.0.1", "-port", "8080", "-secrets"},
+			warnings: []string{
+				"The filter `-fqdn default` does not apply to the tables displayed.",
+				"The filter `-address 127.0.0.1` does not apply to the tables displayed.",
+				"The filter `-port 8080` does not apply to the tables displayed.",
+			},
+		},
+		"no warning produced (happy case)": {
+			input:    []string{"-fqdn", "default", "-clusters"},
+			warnings: []string{},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			fakePod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: "default",
+				},
+			}
+
+			buf := new(bytes.Buffer)
+			c := setupCommand(buf)
+			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
+			c.fetchConfig = func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
+				return testEnvoyConfig, nil
+			}
+
+			exitCode := c.Run(append([]string{podName}, tc.input...))
+			require.Equal(t, 0, exitCode) // This shouldn't error out, just warn the user.
+
+			for _, warning := range tc.warnings {
+				require.Contains(t, buf.String(), warning)
 			}
 		})
 	}

@@ -102,148 +102,33 @@ func rawEnvoyConfig(t *testing.T) []byte {
 // testEnvoyConfig is what we expect the config at `test_config_dump.json` to be.
 var testEnvoyConfig = &EnvoyConfig{
 	Clusters: []Cluster{
-		{
-			Name:                     "local_agent",
-			FullyQualifiedDomainName: "local_agent",
-			Endpoints:                []string{"192.168.79.187:8502", "172.18.0.2:8502"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.553Z",
-		},
-		{
-			Name:                     "client",
-			FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.948Z",
-		},
-		{
-			Name:                     "frontend",
-			FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.855Z",
-		},
-		{
-			Name:                     "local_app",
-			FullyQualifiedDomainName: "local_app",
-			Endpoints:                []string{"127.0.0.1:8080", "127.0.0.1:0"},
-			Type:                     "STATIC",
-			LastUpdated:              "2022-05-13T04:22:39.655Z",
-		},
-		{
-			Name:                     "original-destination",
-			FullyQualifiedDomainName: "original-destination",
-			Endpoints:                []string{},
-			Type:                     "ORIGINAL_DST",
-			LastUpdated:              "2022-05-13T04:22:39.743Z",
-		},
-		{
-			Name:                     "server",
-			FullyQualifiedDomainName: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			Endpoints:                []string{},
-			Type:                     "EDS",
-			LastUpdated:              "2022-06-09T00:39:12.754Z",
-		},
+		{Name: "local_agent", FullyQualifiedDomainName: "local_agent", Endpoints: []string{"192.168.79.187:8502"}, Type: "STATIC", LastUpdated: "2022-05-13T04:22:39.553Z"},
+		{Name: "client", FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul", Endpoints: []string{"192.168.18.110:20000", "192.168.52.101:20000", "192.168.65.131:20000"}, Type: "EDS", LastUpdated: "2022-08-10T12:30:32.326Z"},
+		{Name: "frontend", FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul", Endpoints: []string{"192.168.63.120:20000"}, Type: "EDS", LastUpdated: "2022-08-10T12:30:32.233Z"},
+		{Name: "local_app", FullyQualifiedDomainName: "local_app", Endpoints: []string{"127.0.0.1:8080"}, Type: "STATIC", LastUpdated: "2022-05-13T04:22:39.655Z"},
+		{Name: "original-destination", FullyQualifiedDomainName: "original-destination", Endpoints: []string{}, Type: "ORIGINAL_DST", LastUpdated: "2022-05-13T04:22:39.743Z"},
 	},
 	Endpoints: []Endpoint{
-		{
-			Address: "192.168.79.187:8502",
-			Cluster: "local_agent",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "127.0.0.1:8080",
-			Cluster: "local_app",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.31.201:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.47.235:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.71.254:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.63.120:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.18.110:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.52.101:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
-		{
-			Address: "192.168.65.131:20000",
-			Weight:  1,
-			Status:  "HEALTHY",
-		},
+		{Address: "192.168.79.187:8502", Cluster: "local_agent", Weight: 1, Status: "HEALTHY"},
+		{Address: "192.168.18.110:20000", Cluster: "client", Weight: 1, Status: "HEALTHY"},
+		{Address: "192.168.52.101:20000", Cluster: "client", Weight: 1, Status: "HEALTHY"},
+		{Address: "192.168.65.131:20000", Cluster: "client", Weight: 1, Status: "HEALTHY"},
+		{Address: "192.168.63.120:20000", Cluster: "frontend", Weight: 1, Status: "HEALTHY"},
+		{Address: "127.0.0.1:8080", Cluster: "local_app", Weight: 1, Status: "HEALTHY"},
 	},
 	Listeners: []Listener{
-		{
-			Name:    "public_listener",
-			Address: "192.168.69.179:20000",
-			FilterChain: []FilterChain{
-				{
-					FilterChainMatch: "Any",
-					Filters:          []string{"* to local_app/"},
-				},
-			},
-			Direction:   "INBOUND",
-			LastUpdated: "2022-06-09T00:39:27.668Z",
-		},
-		{
-			Name:    "outbound_listener",
-			Address: "127.0.0.1:15001",
-			FilterChain: []FilterChain{
-				{
-					FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32",
-					Filters:          []string{"to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"},
-				},
-				{
-					FilterChainMatch: "10.100.254.176/32, 240.0.0.4/32",
-					Filters:          []string{"* to server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul/"},
-				},
-				{
-					FilterChainMatch: "10.100.31.2/32, 240.0.0.2/32",
-					Filters: []string{
-						"to frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-					},
-				},
-				{
-					FilterChainMatch: "Any",
-					Filters:          []string{"to original-destination"},
-				},
-			},
-			Direction:   "OUTBOUND",
-			LastUpdated: "2022-05-24T17:41:59.079Z",
-		},
+		{Name: "public_listener", Address: "192.168.69.179:20000", FilterChain: []FilterChain{{Filters: []string{"* to local_app/"}, FilterChainMatch: "Any"}}, Direction: "INBOUND", LastUpdated: "2022-08-10T12:30:47.142Z"},
+		{Name: "outbound_listener", Address: "127.0.0.1:15001", FilterChain: []FilterChain{
+			{Filters: []string{"to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32"},
+			{Filters: []string{"to frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.31.2/32, 240.0.0.5/32"},
+			{Filters: []string{"to original-destination"}, FilterChainMatch: "Any"},
+		}, Direction: "OUTBOUND", LastUpdated: "2022-07-18T15:31:03.246Z"},
 	},
 	Routes: []Route{
 		{
 			Name:               "public_listener",
 			DestinationCluster: "local_app/",
-			LastUpdated:        "2022-06-09T00:39:27.667Z",
-		},
-		{
-			Name:               "server",
-			DestinationCluster: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul/",
-			LastUpdated:        "2022-05-24T17:41:59.078Z",
+			LastUpdated:        "2022-08-10T12:30:47.141Z",
 		},
 	},
 	Secrets: []Secret{
