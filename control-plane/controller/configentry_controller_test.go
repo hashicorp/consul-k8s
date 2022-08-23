@@ -19,7 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -53,7 +52,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				},
 				Spec: v1alpha1.ServiceDefaultsSpec{
 					Protocol:              "http",
-					MaxInboundConnections: pointer.Int(100),
+					MaxInboundConnections: 100,
 				},
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {

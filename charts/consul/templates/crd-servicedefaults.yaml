@@ -115,8 +115,8 @@ spec:
                 type: string
               maxInboundConnections:
                 description: MaxInboundConnections is the maximum number of concurrent
-                  inbound connections to each service instance. Defaults to 0 (unlimited)
-                  if not set.
+                  inbound connections to each service instance. Defaults to 0 (using
+                  consul's default) if not set.
                 type: integer
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
