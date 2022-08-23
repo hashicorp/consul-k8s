@@ -141,6 +141,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						Addresses: []string{"api.google.com"},
 						Port:      443,
 					},
+					MaxInboundConnections: 20,
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -243,6 +244,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					Addresses: []string{"api.google.com"},
 					Port:      443,
 				},
+				MaxInboundConnections: 20,
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
