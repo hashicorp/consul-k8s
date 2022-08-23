@@ -286,7 +286,7 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	if in.Spec.MaxInboundConnections < 0 {
-		allErrs = append(allErrs, field.Invalid(path.Child("maxinboundconnections"), in.Spec.MaxInboundConnections, "MaxInboundConnections must > 0"))
+		allErrs = append(allErrs, field.Invalid(path.Child("maxinboundconnections"), in.Spec.MaxInboundConnections, "MaxInboundConnections must be > 0"))
 	}
 
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
