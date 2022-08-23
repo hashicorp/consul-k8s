@@ -486,13 +486,44 @@ func formatFilterHTTPConnectionManager(config filter) string {
 
 func formatFilterLocalRatelimit(config filter) string {
 	return fmt.Sprintf("Local rate limit: tokens: max %d per-fill %d, interval: %s",
-		config.TypedConfig.MaxConnections,
+		config.TypedConfig.TokenBucket.MaxTokens,
 		config.TypedConfig.TokenBucket.TokensPerFill,
 		config.TypedConfig.TokenBucket.FillInterval)
 }
 
 func formatFilterRatelimit(config filter) string {
-	return ""
+	out := "Rate limit: "
+
+	if config.TypedConfig.Domain != "" {
+		out += config.TypedConfig.Domain + " "
+	}
+
+	// Rate limit using descriptors.
+	if len(config.TypedConfig.Descriptors) != 0 {
+		for _, descriptor := range config.TypedConfig.Descriptors {
+			for _, entry := range descriptor.Entries {
+				out += fmt.Sprintf("%s:%s ", entry.Key, entry.Value)
+			}
+			out += fmt.Sprintf("%d req per %s", descriptor.Limit.RequestsPerUnit, strings.ToLower(descriptor.Limit.Unit))
+		}
+	}
+
+	// Rate limit using an external Envoy gRPC service.
+	if config.TypedConfig.RateLimitService.GrpcService.EnvoyGrpc.ClusterName != "" {
+		out += fmt.Sprintf("using %s ", config.TypedConfig.RateLimitService.GrpcService.EnvoyGrpc.ClusterName)
+	}
+
+	// Rate limit using an external Google gRPC service.
+	if config.TypedConfig.RateLimitService.GrpcService.GoogleGrpc.TargetUri != "" {
+		out += fmt.Sprintf("using %s ", config.TypedConfig.RateLimitService.GrpcService.GoogleGrpc.TargetUri)
+	}
+
+	// Notify the user that failure to reach the rate limiting service will deny the caller.
+	if config.TypedConfig.FailureModeDeny {
+		out += "will deny if unreachable"
+	}
+
+	return strings.Trim(out, " ")
 }
 
 func formatFilterRBAC(config filter) string {

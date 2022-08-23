@@ -268,7 +268,7 @@ func TestFormatFilters(t *testing.T) {
 					},
 				},
 			},
-			expected: "Rate limit: database-ratelimit PATH /users 42 req per minute",
+			expected: "Rate limit: database-ratelimit PATH:/users 42 req per minute",
 		},
 		"Ratelimit with EnvoyGrpc definted limiter allowing failures": {
 			filter: filter{
@@ -285,20 +285,23 @@ func TestFormatFilters(t *testing.T) {
 					},
 				},
 			},
-			expected: "Rate limit: database-ratelimit using ratelimiter.service with failures allowed.",
+			expected: "Rate limit: database-ratelimit using ratelimiter.service will deny if unreachable",
 		},
 		"Ratelimit with GoogleGrpc defined limiter": {
 			filter: filter{
 				TypedConfig: filterTypedConfig{
-					Type:            "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
-					Domain:          "database-ratelimit",
-					FailureModeDeny: true,
+					Type:   "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
+					Domain: "database-ratelimit",
 					RateLimitService: filterRateLimitServiceConfig{
-						GrpcService: filterGrpcService{},
+						GrpcService: filterGrpcService{
+							GoogleGrpc: filterGoogleGrpc{
+								TargetUri: "ratelimiter.service",
+							},
+						},
 					},
 				},
 			},
-			expected: "Rate limit: database-ratelimit using ratelimiter.service with failures allowed.",
+			expected: "Rate limit: database-ratelimit using ratelimiter.service",
 		},
 		"RBAC": {
 			filter: filter{
