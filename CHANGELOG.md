@@ -1,4 +1,7 @@
 ## UNRELEASED
+FEATURES:
+* MaxInboundConnections in service-defaults CRD
+  * Add support for MaxInboundConnections on the Service Defaults CRD. [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1437)]
 
 IMPROVEMENTS:
 * CLI:

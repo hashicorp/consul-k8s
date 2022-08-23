@@ -113,6 +113,11 @@ spec:
                   TLS SNI value to be changed to a non-connect value when federating
                   with an external system.
                 type: string
+              maxInboundConnections:
+                description: MaxInboundConnections is the maximum number of concurrent
+                  inbound connections to each service instance. Defaults to 0 (using
+                  consul's default) if not set.
+                type: integer
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
                   for this service.
