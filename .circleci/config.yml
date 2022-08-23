@@ -506,7 +506,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2"
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -helm-chart-version="0.47.1"
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
