@@ -315,6 +315,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			}
 		} else {
 			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
+				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
 				RunAsNonRoot: pointer.Bool(true),
 				Privileged:   pointer.Bool(false),
 				Capabilities: &corev1.Capabilities{

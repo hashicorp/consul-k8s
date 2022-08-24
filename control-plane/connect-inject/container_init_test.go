@@ -416,6 +416,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					Add: []corev1.Capability{netAdminCapability},
 				}
 			} else {
+
+				expectedSecurityContext.RunAsUser = pointer.Int64(initContainersUserAndGroupID)
+				expectedSecurityContext.RunAsGroup = pointer.Int64(initContainersUserAndGroupID)
 				expectedSecurityContext.RunAsNonRoot = pointer.Bool(true)
 				expectedSecurityContext.Privileged = pointer.Bool(false)
 				expectedSecurityContext.Capabilities = &corev1.Capabilities{
