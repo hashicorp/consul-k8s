@@ -277,8 +277,7 @@ jobs:
       - run:
           name: build local
           working_directory: *control-plane-path
-          command: | 
-            XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
+          command: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
       # persist to downstream job
       - persist_to_workspace:
           root: .
