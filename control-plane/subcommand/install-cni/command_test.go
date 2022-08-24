@@ -77,7 +77,7 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 		require.Equal(r, string(expected), string(actual))
 	})
 
-	t.Log("File event 2: config file changed and consul-cni is not last in the plugin list.Should detect and fix.")
+	t.Log("File event 2: config file changed and consul-cni is not last in the plugin list. Should detect and fix.")
 	err = replaceFile(notLastConfigFile, filepath.Join(tempDir, configFile))
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
