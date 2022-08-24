@@ -113,7 +113,6 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				EnableCNI: true,
 			},
 			map[string]string{
-				"connectInject.enabled":                         "true",
 				"connectInject.cni.enabled":                     "true",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},

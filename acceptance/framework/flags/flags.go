@@ -89,7 +89,7 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagEnableCNI, "enable-cni", false,
 		"If true, the test suite will run tests with consul-cni plugin enabled. "+
-			"In general, this will only run against tests that are mesh related (connect, dns, mesh-gateway, peering, etc")
+			"In general, this will only run against tests that are mesh related (connect, mesh-gateway, peering, etc")
 
 	flag.BoolVar(&t.flagEnableTransparentProxy, "enable-transparent-proxy", false,
 		"If true, the test suite will run tests with transparent proxy enabled. "+

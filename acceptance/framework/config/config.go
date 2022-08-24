@@ -86,7 +86,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	}
 
 	if t.EnableCNI {
-		setIfNotEmpty(helmValues, "connectInject.enabled", "true")
 		setIfNotEmpty(helmValues, "connectInject.cni.enabled", "true")
 	}
 

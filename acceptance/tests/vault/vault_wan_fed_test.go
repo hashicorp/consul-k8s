@@ -3,7 +3,6 @@ package vault
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -351,11 +350,10 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.acls.replicationToken.secretKey":  replicationTokenSecret.Key,
 
 		// Mesh config.
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-		"controller.enabled":        "true",
-		"meshGateway.enabled":       "true",
-		"meshGateway.replicas":      "1",
+		"connectInject.enabled": "true",
+		"controller.enabled":    "true",
+		"meshGateway.enabled":   "true",
+		"meshGateway.replicas":  "1",
 
 		// Server config.
 		"server.extraVolumes[0].type": "secret",
@@ -427,10 +425,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.acls.replicationToken.secretKey":  replicationTokenSecret.Key,
 
 		// Mesh config.
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-		"meshGateway.enabled":       "true",
-		"meshGateway.replicas":      "1",
+		"connectInject.enabled": "true",
+		"meshGateway.enabled":   "true",
+		"meshGateway.replicas":  "1",
 
 		// Server config.
 		"server.extraVolumes[0].type": "secret",
