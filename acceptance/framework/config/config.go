@@ -42,10 +42,11 @@ type TestConfig struct {
 
 	DisablePeering bool
 
-	ConsulImage    string
-	ConsulK8SImage string
-	ConsulVersion  *version.Version
-	EnvoyImage     string
+	HelmChartVersion string
+	ConsulImage      string
+	ConsulK8SImage   string
+	ConsulVersion    *version.Version
+	EnvoyImage       string
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string

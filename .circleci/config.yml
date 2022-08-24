@@ -880,7 +880,8 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.45.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.47.1"
+      - HELM_CHART_VERSION: "0.47.1"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -902,21 +903,22 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
       - slack/status:
           fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11.x nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-12:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.45.0"
+      - HELM_CHART_VERSION: "0.47.1"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.47.1"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -938,7 +940,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -952,7 +954,8 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.45.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.47.1"
+      - HELM_CHART_VERSION: "0.47.1"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -974,7 +977,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1047,15 +1050,15 @@ workflows:
           requires:
             - dev-upload-docker
 
-#  nightly-acceptance-tests-consul:
-#    triggers:
-#      - schedule:
-#          cron: "0 0 * * *"
-#          filters:
-#            branches:
-#              only:
-#                - main
-#    jobs:
-#      - acceptance-kind-1-23-consul-nightly-1-11
-#      - acceptance-kind-1-23-consul-nightly-1-12
-#      - acceptance-kind-1-23-consul-nightly-1-13
+  nightly-acceptance-tests-consul:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - acceptance-kind-1-23-consul-nightly-1-11
+      - acceptance-kind-1-23-consul-nightly-1-12
+      - acceptance-kind-1-23-consul-nightly-1-13

@@ -86,6 +86,7 @@ func NewHelmCluster(
 		KubectlOptions: ctx.KubectlOptions(t),
 		Logger:         logger,
 		ExtraArgs:      extraArgs,
+		Version:        cfg.HelmChartVersion,
 	}
 	return &HelmCluster{
 		ctx:                ctx,
@@ -110,7 +111,11 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Fail if there are any existing installations of the Helm chart.
 	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
 
-	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
+	chartName := "hashicorp/consul"
+	if h.helmOptions.Version == config.HelmChartPath {
+		chartName = config.HelmChartPath
+	}
+	helm.Install(t, h.helmOptions, chartName, h.releaseName)
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -271,7 +276,11 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
 	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
-	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
+	chartName := "hashicorp/consul"
+	if h.helmOptions.Version == config.HelmChartPath {
+		chartName = config.HelmChartPath
+	}
+	helm.Upgrade(t, h.helmOptions, chartName, h.releaseName)
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
