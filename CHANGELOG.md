@@ -1,4 +1,13 @@
 ## UNRELEASED
+FEATURES:
+* MaxInboundConnections in service-defaults CRD
+  * Add support for MaxInboundConnections on the Service Defaults CRD. [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1437)]
+
+IMPROVEMENTS:
+* CLI:
+  * Display clusters by their short names rather than FQDNs for the `proxy read` command. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
+  * Display a message when `proxy list` returns no results. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
+  * Display a warning when a user passes a field and table filter combination to `proxy read` where the given field is not present in any of the output tables. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
 
 IMPROVEMENTS:
 * Kubernetes 1.24

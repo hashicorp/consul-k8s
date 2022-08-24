@@ -51,7 +51,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceDefaultsSpec{
-					Protocol: "http",
+					Protocol:              "http",
+					MaxInboundConnections: 100,
 				},
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
@@ -68,6 +69,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				svcDefault, ok := consulEntry.(*capi.ServiceConfigEntry)
 				require.True(t, ok, "cast error")
 				require.Equal(t, "http", svcDefault.Protocol)
+				require.Equal(t, 100, svcDefault.MaxInboundConnections)
 			},
 		},
 		{

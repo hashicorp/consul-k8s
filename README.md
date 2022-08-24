@@ -4,6 +4,9 @@
 </h1>
 
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
+ 
+> **Warning**  
+> Please read the following issue to learn more about upcoming breaking changes that will be implemented by Q4 2022 for the default deployment of Consul on Kubernetes: [Enabling of service mesh by default and disabling of node-level client agents from Consul Service Mesh on Kubernetes and Catalog Sync](https://github.com/hashicorp/consul-k8s/issues/1438)
 
 ## Overview
 

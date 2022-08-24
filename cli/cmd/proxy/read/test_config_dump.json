@@ -7,8 +7,8 @@
           "id": "backend-658b679b45-d5xlb-backend-sidecar-proxy",
           "cluster": "backend",
           "metadata": {
-            "partition": "default",
-            "namespace": "default"
+            "namespace": "default",
+            "partition": "default"
           },
           "user_agent_name": "envoy",
           "user_agent_build_version": {
@@ -17,10 +17,10 @@
               "minor_number": 22
             },
             "metadata": {
-              "revision.status": "Clean",
               "ssl.version": "BoringSSL",
-              "revision.sha": "dcd329a2e95b54f754b17aceca3f72724294b502",
-              "build.type": "RELEASE"
+              "revision.status": "Clean",
+              "build.type": "RELEASE",
+              "revision.sha": "dcd329a2e95b54f754b17aceca3f72724294b502"
             }
           },
           "extensions": [
@@ -1255,7 +1255,7 @@
       ],
       "dynamic_active_clusters": [
         {
-          "version_info": "877646fa9c433fbe25febc99b0725a44ab606d9f5407b76a6b7513edd1ac8af2",
+          "version_info": "2eee24224b508d5e77766867b5ad793bc4555abce4d3fa564da125617c68e46a",
           "cluster": {
             "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
             "name": "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
@@ -1278,7 +1278,7 @@
                   "tls_certificates": [
                     {
                       "certificate_chain": {
-                        "inline_string": "-----BEGIN CERTIFICATE-----\nMIICHDCCAcGgAwIBAgIBWDAKBggqhkjOPQQDAjAxMS8wLQYDVQQDEyZwcmktNDl4\ncnFxejQuY29uc3VsLmNhLmJjMzgxNWMyLmNvbnN1bDAeFw0yMjA2MDkwMDM4MTJa\nFw0yMjA2MTIwMDM4MTJaMAAwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARGkJfg\n3Hy48dvsqnsJ7Xmb00ZGzNaGl89++zg3PgppbvXiU+u3oK7qON/pQ3hinsjXnubr\n2y5RRaKjRke+HyTBo4H6MIH3MA4GA1UdDwEB/wQEAwIDuDAdBgNVHSUEFjAUBggr\nBgEFBQcDAgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADApBgNVHQ4EIgQgJK3rY8+n\n0pg4r+1+uIsBl2YqMXGTQdZ45yR8lDILXtEwKwYDVR0jBCQwIoAg1Fr3vJvXDnVW\nt0yAoYFvX8S/Kehuir9zvx8uM1UIaIkwYAYDVR0RAQH/BFYwVIZSc3BpZmZlOi8v\nYmMzODE1YzItMWEwZi1mM2ZmLWEyZTktMjBkNzkxZjA4ZDAwLmNvbnN1bC9ucy9k\nZWZhdWx0L2RjL2RjMS9zdmMvYmFja2VuZDAKBggqhkjOPQQDAgNJADBGAiEAlik6\nBgXf8zAT3cV+ZDEz9d1oApzde8+HLoadXrDimzICIQCCDk3QL/rK5jTv6p0iqkY1\nqUPq56zIQeZ7SHUZe8Wm0A==\n-----END CERTIFICATE-----\n"
+                        "inline_string": "-----BEGIN CERTIFICATE-----\nMIICGzCCAcKgAwIBAgICATgwCgYIKoZIzj0EAwIwMTEvMC0GA1UEAxMmcHJpLTQ5\neHJxcXo0LmNvbnN1bC5jYS5iYzM4MTVjMi5jb25zdWwwHhcNMjIwODEwMTIyOTMx\nWhcNMjIwODEzMTIyOTMxWjAAMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwIK1\nchHdnpY6/q384TYjGoNhuB+rZI0dMYDjc6Zlb6i0wIKDXtGF4mu6pGBZLkTg0Jmi\nWRysYZG0xZXJ3CCCZqOB+jCB9zAOBgNVHQ8BAf8EBAMCA7gwHQYDVR0lBBYwFAYI\nKwYBBQUHAwIGCCsGAQUFBwMBMAwGA1UdEwEB/wQCMAAwKQYDVR0OBCIEIIz1546B\nHMv70/ecIGSXuy/0UFErFDl+x6rL2H5Q1HuCMCsGA1UdIwQkMCKAINRa97yb1w51\nVrdMgKGBb1/Evynoboq/c78fLjNVCGiJMGAGA1UdEQEB/wRWMFSGUnNwaWZmZTov\nL2JjMzgxNWMyLTFhMGYtZjNmZi1hMmU5LTIwZDc5MWYwOGQwMC5jb25zdWwvbnMv\nZGVmYXVsdC9kYy9kYzEvc3ZjL2JhY2tlbmQwCgYIKoZIzj0EAwIDRwAwRAIgGAkg\n9NJtR/hMkaBS7cTEn5aoQ6NcmsKdAy7UXHysdkcCIFas15UPc5cSjjpNie/UnFde\nH0bDhbYMCKTZVGj3hvhr\n-----END CERTIFICATE-----\n"
                       },
                       "private_key": {
                         "inline_string": "[redacted]"
@@ -1304,10 +1304,10 @@
             },
             "alt_stat_name": "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"
           },
-          "last_updated": "2022-06-09T00:39:12.948Z"
+          "last_updated": "2022-08-10T12:30:32.326Z"
         },
         {
-          "version_info": "e0cc5c279829d13f01d2ba3a4d32546c0d3fc65b930bbb0bf66a68ad76e152a0",
+          "version_info": "70b55eac9f1c87dfb54a56d1624279740ddaa2ab72ce7f0baf024b089c396acc",
           "cluster": {
             "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
             "name": "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
@@ -1330,7 +1330,7 @@
                   "tls_certificates": [
                     {
                       "certificate_chain": {
-                        "inline_string": "-----BEGIN CERTIFICATE-----\nMIICHDCCAcGgAwIBAgIBWDAKBggqhkjOPQQDAjAxMS8wLQYDVQQDEyZwcmktNDl4\ncnFxejQuY29uc3VsLmNhLmJjMzgxNWMyLmNvbnN1bDAeFw0yMjA2MDkwMDM4MTJa\nFw0yMjA2MTIwMDM4MTJaMAAwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARGkJfg\n3Hy48dvsqnsJ7Xmb00ZGzNaGl89++zg3PgppbvXiU+u3oK7qON/pQ3hinsjXnubr\n2y5RRaKjRke+HyTBo4H6MIH3MA4GA1UdDwEB/wQEAwIDuDAdBgNVHSUEFjAUBggr\nBgEFBQcDAgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADApBgNVHQ4EIgQgJK3rY8+n\n0pg4r+1+uIsBl2YqMXGTQdZ45yR8lDILXtEwKwYDVR0jBCQwIoAg1Fr3vJvXDnVW\nt0yAoYFvX8S/Kehuir9zvx8uM1UIaIkwYAYDVR0RAQH/BFYwVIZSc3BpZmZlOi8v\nYmMzODE1YzItMWEwZi1mM2ZmLWEyZTktMjBkNzkxZjA4ZDAwLmNvbnN1bC9ucy9k\nZWZhdWx0L2RjL2RjMS9zdmMvYmFja2VuZDAKBggqhkjOPQQDAgNJADBGAiEAlik6\nBgXf8zAT3cV+ZDEz9d1oApzde8+HLoadXrDimzICIQCCDk3QL/rK5jTv6p0iqkY1\nqUPq56zIQeZ7SHUZe8Wm0A==\n-----END CERTIFICATE-----\n"
+                        "inline_string": "-----BEGIN CERTIFICATE-----\nMIICGzCCAcKgAwIBAgICATgwCgYIKoZIzj0EAwIwMTEvMC0GA1UEAxMmcHJpLTQ5\neHJxcXo0LmNvbnN1bC5jYS5iYzM4MTVjMi5jb25zdWwwHhcNMjIwODEwMTIyOTMx\nWhcNMjIwODEzMTIyOTMxWjAAMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwIK1\nchHdnpY6/q384TYjGoNhuB+rZI0dMYDjc6Zlb6i0wIKDXtGF4mu6pGBZLkTg0Jmi\nWRysYZG0xZXJ3CCCZqOB+jCB9zAOBgNVHQ8BAf8EBAMCA7gwHQYDVR0lBBYwFAYI\nKwYBBQUHAwIGCCsGAQUFBwMBMAwGA1UdEwEB/wQCMAAwKQYDVR0OBCIEIIz1546B\nHMv70/ecIGSXuy/0UFErFDl+x6rL2H5Q1HuCMCsGA1UdIwQkMCKAINRa97yb1w51\nVrdMgKGBb1/Evynoboq/c78fLjNVCGiJMGAGA1UdEQEB/wRWMFSGUnNwaWZmZTov\nL2JjMzgxNWMyLTFhMGYtZjNmZi1hMmU5LTIwZDc5MWYwOGQwMC5jb25zdWwvbnMv\nZGVmYXVsdC9kYy9kYzEvc3ZjL2JhY2tlbmQwCgYIKoZIzj0EAwIDRwAwRAIgGAkg\n9NJtR/hMkaBS7cTEn5aoQ6NcmsKdAy7UXHysdkcCIFas15UPc5cSjjpNie/UnFde\nH0bDhbYMCKTZVGj3hvhr\n-----END CERTIFICATE-----\n"
                       },
                       "private_key": {
                         "inline_string": "[redacted]"
@@ -1356,7 +1356,7 @@
             },
             "alt_stat_name": "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"
           },
-          "last_updated": "2022-06-09T00:39:12.855Z"
+          "last_updated": "2022-08-10T12:30:32.233Z"
         },
         {
           "version_info": "642b6322013fd3f776d9644ece515db5c4901fe6a87575ab4ff07498ab5faa47",
@@ -1397,58 +1397,6 @@
             "lb_policy": "CLUSTER_PROVIDED"
           },
           "last_updated": "2022-05-13T04:22:39.743Z"
-        },
-        {
-          "version_info": "1454ffe616e7abd2b3bec548b88f3a14c0500a94de27f2b3e8e3913e7bfd3275",
-          "cluster": {
-            "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-            "name": "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-            "type": "EDS",
-            "eds_cluster_config": {
-              "eds_config": {
-                "ads": {},
-                "resource_api_version": "V3"
-              }
-            },
-            "connect_timeout": "5s",
-            "circuit_breakers": {},
-            "outlier_detection": {},
-            "transport_socket": {
-              "name": "tls",
-              "typed_config": {
-                "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext",
-                "common_tls_context": {
-                  "tls_params": {},
-                  "tls_certificates": [
-                    {
-                      "certificate_chain": {
-                        "inline_string": "-----BEGIN CERTIFICATE-----\nMIICHDCCAcGgAwIBAgIBWDAKBggqhkjOPQQDAjAxMS8wLQYDVQQDEyZwcmktNDl4\ncnFxejQuY29uc3VsLmNhLmJjMzgxNWMyLmNvbnN1bDAeFw0yMjA2MDkwMDM4MTJa\nFw0yMjA2MTIwMDM4MTJaMAAwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARGkJfg\n3Hy48dvsqnsJ7Xmb00ZGzNaGl89++zg3PgppbvXiU+u3oK7qON/pQ3hinsjXnubr\n2y5RRaKjRke+HyTBo4H6MIH3MA4GA1UdDwEB/wQEAwIDuDAdBgNVHSUEFjAUBggr\nBgEFBQcDAgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADApBgNVHQ4EIgQgJK3rY8+n\n0pg4r+1+uIsBl2YqMXGTQdZ45yR8lDILXtEwKwYDVR0jBCQwIoAg1Fr3vJvXDnVW\nt0yAoYFvX8S/Kehuir9zvx8uM1UIaIkwYAYDVR0RAQH/BFYwVIZSc3BpZmZlOi8v\nYmMzODE1YzItMWEwZi1mM2ZmLWEyZTktMjBkNzkxZjA4ZDAwLmNvbnN1bC9ucy9k\nZWZhdWx0L2RjL2RjMS9zdmMvYmFja2VuZDAKBggqhkjOPQQDAgNJADBGAiEAlik6\nBgXf8zAT3cV+ZDEz9d1oApzde8+HLoadXrDimzICIQCCDk3QL/rK5jTv6p0iqkY1\nqUPq56zIQeZ7SHUZe8Wm0A==\n-----END CERTIFICATE-----\n"
-                      },
-                      "private_key": {
-                        "inline_string": "[redacted]"
-                      }
-                    }
-                  ],
-                  "validation_context": {
-                    "trusted_ca": {
-                      "inline_string": "-----BEGIN CERTIFICATE-----\nMIICEDCCAbWgAwIBAgIBBzAKBggqhkjOPQQDAjAxMS8wLQYDVQQDEyZwcmktNDl4\ncnFxejQuY29uc3VsLmNhLmJjMzgxNWMyLmNvbnN1bDAeFw0yMjA1MTMwNDE4MDBa\nFw0zMjA1MTAwNDE4MDBaMDExLzAtBgNVBAMTJnByaS00OXhycXF6NC5jb25zdWwu\nY2EuYmMzODE1YzIuY29uc3VsMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwQHp\nkEZUr0LVB1ng/zQMQyEQnID/wN/0+Ve648F3Lz4+S7D/S41EQ1Q9ImrNGIlmJ1b2\ncL9WcsL1A1/Ts8xNSaOBvTCBujAOBgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/BAUw\nAwEB/zApBgNVHQ4EIgQg1Fr3vJvXDnVWt0yAoYFvX8S/Kehuir9zvx8uM1UIaIkw\nKwYDVR0jBCQwIoAg1Fr3vJvXDnVWt0yAoYFvX8S/Kehuir9zvx8uM1UIaIkwPwYD\nVR0RBDgwNoY0c3BpZmZlOi8vYmMzODE1YzItMWEwZi1mM2ZmLWEyZTktMjBkNzkx\nZjA4ZDAwLmNvbnN1bDAKBggqhkjOPQQDAgNJADBGAiEAhxIMzmCZT1sjtEKsjHIM\nC//yOo+pXZ62GQk+7rsE9HoCIQCxdLmYFUvOOiIXt4S15tvBpuJ6PdrKNlRTbmLx\nA5z5lQ==\n-----END CERTIFICATE-----\n"
-                    },
-                    "match_subject_alt_names": [
-                      {
-                        "exact": "spiffe://bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul/ns/default/dc/dc1/svc/server"
-                      }
-                    ]
-                  }
-                },
-                "sni": "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"
-              }
-            },
-            "common_lb_config": {
-              "healthy_panic_threshold": {}
-            },
-            "alt_stat_name": "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"
-          },
-          "last_updated": "2022-06-09T00:39:12.754Z"
         }
       ]
     },
@@ -1486,117 +1434,6 @@
         }
       ],
       "dynamic_endpoint_configs": [
-        {
-          "endpoint_config": {
-            "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-            "cluster_name": "local_app",
-            "endpoints": [
-              {
-                "locality": {},
-                "lb_endpoints": [
-                  {
-                    "endpoint": {
-                      "address": {
-                        "socket_address": {
-                          "address": "127.0.0.1",
-                          "port_value": 8080
-                        }
-                      },
-                      "health_check_config": {}
-                    },
-                    "health_status": "HEALTHY",
-                    "load_balancing_weight": 1
-                  }
-                ]
-              }
-            ],
-            "policy": {
-              "overprovisioning_factor": 140
-            }
-          }
-        },
-        {
-          "endpoint_config": {
-            "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-            "endpoints": [
-              {
-                "locality": {},
-                "lb_endpoints": [
-                  {
-                    "endpoint": {
-                      "address": {
-                        "socket_address": {
-                          "address": "192.168.31.201",
-                          "port_value": 20000
-                        }
-                      },
-                      "health_check_config": {}
-                    },
-                    "health_status": "HEALTHY",
-                    "load_balancing_weight": 1
-                  },
-                  {
-                    "endpoint": {
-                      "address": {
-                        "socket_address": {
-                          "address": "192.168.47.235",
-                          "port_value": 20000
-                        }
-                      },
-                      "health_check_config": {}
-                    },
-                    "health_status": "HEALTHY",
-                    "load_balancing_weight": 1
-                  },
-                  {
-                    "endpoint": {
-                      "address": {
-                        "socket_address": {
-                          "address": "192.168.71.254",
-                          "port_value": 20000
-                        }
-                      },
-                      "health_check_config": {}
-                    },
-                    "health_status": "HEALTHY",
-                    "load_balancing_weight": 1
-                  }
-                ]
-              }
-            ],
-            "policy": {
-              "overprovisioning_factor": 140
-            }
-          }
-        },
-        {
-          "endpoint_config": {
-            "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-            "endpoints": [
-              {
-                "locality": {},
-                "lb_endpoints": [
-                  {
-                    "endpoint": {
-                      "address": {
-                        "socket_address": {
-                          "address": "192.168.63.120",
-                          "port_value": 20000
-                        }
-                      },
-                      "health_check_config": {}
-                    },
-                    "health_status": "HEALTHY",
-                    "load_balancing_weight": 1
-                  }
-                ]
-              }
-            ],
-            "policy": {
-              "overprovisioning_factor": 140
-            }
-          }
-        },
         {
           "endpoint_config": {
             "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
@@ -1654,7 +1491,64 @@
         {
           "endpoint_config": {
             "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+            "endpoints": [
+              {
+                "locality": {},
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "socket_address": {
+                          "address": "192.168.63.120",
+                          "port_value": 20000
+                        }
+                      },
+                      "health_check_config": {}
+                    },
+                    "health_status": "HEALTHY",
+                    "load_balancing_weight": 1
+                  }
+                ]
+              }
+            ],
+            "policy": {
+              "overprovisioning_factor": 140
+            }
+          }
+        },
+        {
+          "endpoint_config": {
+            "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
             "cluster_name": "original-destination",
+            "policy": {
+              "overprovisioning_factor": 140
+            }
+          }
+        },
+        {
+          "endpoint_config": {
+            "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+            "cluster_name": "local_app",
+            "endpoints": [
+              {
+                "locality": {},
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "socket_address": {
+                          "address": "127.0.0.1",
+                          "port_value": 8080
+                        }
+                      },
+                      "health_check_config": {}
+                    },
+                    "health_status": "HEALTHY",
+                    "load_balancing_weight": 1
+                  }
+                ]
+              }
+            ],
             "policy": {
               "overprovisioning_factor": 140
             }
@@ -1729,6 +1623,16 @@
                                             }
                                           }
                                         }
+                                      },
+                                      {
+                                        "authenticated": {
+                                          "principal_name": {
+                                            "safe_regex": {
+                                              "google_re2": {},
+                                              "regex": "^spiffe://[^/]+/ns/default/dc/[^/]+/svc/ingress-gateway$"
+                                            }
+                                          }
+                                        }
                                       }
                                     ]
                                   }
@@ -1758,7 +1662,7 @@
                         "tls_certificates": [
                           {
                             "certificate_chain": {
-                              "inline_string": "-----BEGIN CERTIFICATE-----\nMIICHDCCAcGgAwIBAgIBWDAKBggqhkjOPQQDAjAxMS8wLQYDVQQDEyZwcmktNDl4\ncnFxejQuY29uc3VsLmNhLmJjMzgxNWMyLmNvbnN1bDAeFw0yMjA2MDkwMDM4MTJa\nFw0yMjA2MTIwMDM4MTJaMAAwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARGkJfg\n3Hy48dvsqnsJ7Xmb00ZGzNaGl89++zg3PgppbvXiU+u3oK7qON/pQ3hinsjXnubr\n2y5RRaKjRke+HyTBo4H6MIH3MA4GA1UdDwEB/wQEAwIDuDAdBgNVHSUEFjAUBggr\nBgEFBQcDAgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADApBgNVHQ4EIgQgJK3rY8+n\n0pg4r+1+uIsBl2YqMXGTQdZ45yR8lDILXtEwKwYDVR0jBCQwIoAg1Fr3vJvXDnVW\nt0yAoYFvX8S/Kehuir9zvx8uM1UIaIkwYAYDVR0RAQH/BFYwVIZSc3BpZmZlOi8v\nYmMzODE1YzItMWEwZi1mM2ZmLWEyZTktMjBkNzkxZjA4ZDAwLmNvbnN1bC9ucy9k\nZWZhdWx0L2RjL2RjMS9zdmMvYmFja2VuZDAKBggqhkjOPQQDAgNJADBGAiEAlik6\nBgXf8zAT3cV+ZDEz9d1oApzde8+HLoadXrDimzICIQCCDk3QL/rK5jTv6p0iqkY1\nqUPq56zIQeZ7SHUZe8Wm0A==\n-----END CERTIFICATE-----\n"
+                              "inline_string": "-----BEGIN CERTIFICATE-----\nMIICGzCCAcKgAwIBAgICATgwCgYIKoZIzj0EAwIwMTEvMC0GA1UEAxMmcHJpLTQ5\neHJxcXo0LmNvbnN1bC5jYS5iYzM4MTVjMi5jb25zdWwwHhcNMjIwODEwMTIyOTMx\nWhcNMjIwODEzMTIyOTMxWjAAMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwIK1\nchHdnpY6/q384TYjGoNhuB+rZI0dMYDjc6Zlb6i0wIKDXtGF4mu6pGBZLkTg0Jmi\nWRysYZG0xZXJ3CCCZqOB+jCB9zAOBgNVHQ8BAf8EBAMCA7gwHQYDVR0lBBYwFAYI\nKwYBBQUHAwIGCCsGAQUFBwMBMAwGA1UdEwEB/wQCMAAwKQYDVR0OBCIEIIz1546B\nHMv70/ecIGSXuy/0UFErFDl+x6rL2H5Q1HuCMCsGA1UdIwQkMCKAINRa97yb1w51\nVrdMgKGBb1/Evynoboq/c78fLjNVCGiJMGAGA1UdEQEB/wRWMFSGUnNwaWZmZTov\nL2JjMzgxNWMyLTFhMGYtZjNmZi1hMmU5LTIwZDc5MWYwOGQwMC5jb25zdWwvbnMv\nZGVmYXVsdC9kYy9kYzEvc3ZjL2JhY2tlbmQwCgYIKoZIzj0EAwIDRwAwRAIgGAkg\n9NJtR/hMkaBS7cTEn5aoQ6NcmsKdAy7UXHysdkcCIFas15UPc5cSjjpNie/UnFde\nH0bDhbYMCKTZVGj3hvhr\n-----END CERTIFICATE-----\n"
                             },
                             "private_key": {
                               "inline_string": "[redacted]"
@@ -1778,7 +1682,7 @@
               ],
               "traffic_direction": "INBOUND"
             },
-            "last_updated": "2022-06-09T00:39:27.668Z"
+            "last_updated": "2022-08-10T12:30:47.142Z"
           }
         },
         {
@@ -1823,64 +1727,11 @@
                   "filter_chain_match": {
                     "prefix_ranges": [
                       {
-                        "address_prefix": "10.100.254.176",
-                        "prefix_len": 32
-                      },
-                      {
-                        "address_prefix": "240.0.0.4",
-                        "prefix_len": 32
-                      }
-                    ]
-                  },
-                  "filters": [
-                    {
-                      "name": "envoy.filters.network.http_connection_manager",
-                      "typed_config": {
-                        "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-                        "stat_prefix": "upstream.server.default.default.dc1",
-                        "route_config": {
-                          "name": "server",
-                          "virtual_hosts": [
-                            {
-                              "name": "server.default.default.dc1",
-                              "domains": ["*"],
-                              "routes": [
-                                {
-                                  "match": {
-                                    "prefix": "/"
-                                  },
-                                  "route": {
-                                    "cluster": "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"
-                                  }
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        "http_filters": [
-                          {
-                            "name": "envoy.filters.http.router",
-                            "typed_config": {
-                              "@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
-                            }
-                          }
-                        ],
-                        "tracing": {
-                          "random_sampling": {}
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "filter_chain_match": {
-                    "prefix_ranges": [
-                      {
                         "address_prefix": "10.100.31.2",
                         "prefix_len": 32
                       },
                       {
-                        "address_prefix": "240.0.0.2",
+                        "address_prefix": "240.0.0.5",
                         "prefix_len": 32
                       }
                     ]
@@ -1919,7 +1770,7 @@
               ],
               "traffic_direction": "OUTBOUND"
             },
-            "last_updated": "2022-05-24T17:41:59.079Z"
+            "last_updated": "2022-07-18T15:31:03.246Z"
           }
         }
       ]
@@ -1951,30 +1802,7 @@
               }
             ]
           },
-          "last_updated": "2022-06-09T00:39:27.667Z"
-        },
-        {
-          "route_config": {
-            "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
-            "name": "server",
-            "virtual_hosts": [
-              {
-                "name": "server.default.default.dc1",
-                "domains": ["*"],
-                "routes": [
-                  {
-                    "match": {
-                      "prefix": "/"
-                    },
-                    "route": {
-                      "cluster": "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "last_updated": "2022-05-24T17:41:59.078Z"
+          "last_updated": "2022-08-10T12:30:47.141Z"
         }
       ]
     },
