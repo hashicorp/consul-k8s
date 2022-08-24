@@ -3,6 +3,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
@@ -106,7 +107,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 	}
 
-	//Bootstrap Token
+	// Bootstrap Token
 	bootstrapToken, err := uuid.GenerateUUID()
 	require.NoError(t, err)
 	bootstrapTokenSecret := &vault.KV2Secret{
@@ -177,9 +178,10 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled":  "true",
-		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
+		"connectInject.enabled":     "true",
+		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
+		"connectInject.replicas":    "1",
+		"controller.enabled":        "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,

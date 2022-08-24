@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -207,9 +208,10 @@ func TestVault(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled":  "true",
-		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
+		"connectInject.enabled":     "true",
+		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
+		"connectInject.replicas":    "1",
+		"controller.enabled":        "true",
 		"global.secretsBackend.vault.connectInject.tlsCert.secretName": connectInjectorWebhookPKIConfig.CertPath,
 		"global.secretsBackend.vault.connectInject.caCert.secretName":  connectInjectorWebhookPKIConfig.CAPath,
 		"global.secretsBackend.vault.controller.tlsCert.secretName":    controllerWebhookPKIConfig.CertPath,

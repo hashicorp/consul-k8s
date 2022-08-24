@@ -205,6 +205,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
+				"connectInject.cni.enabled":    strconv.FormatBool(cfg.EnableCNI),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
@@ -266,7 +267,8 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 
 	helmValues := map[string]string{
-		"connectInject.enabled": "true",
+		"connectInject.enabled":     "true",
+		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
 	}
 
 	releaseName := helpers.RandomName()
@@ -301,8 +303,10 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 	}
 }
 
-const multiport = "multiport"
-const multiportAdmin = "multiport-admin"
+const (
+	multiport      = "multiport"
+	multiportAdmin = "multiport-admin"
+)
 
 // Test that Connect works for an application with multiple ports. The multiport application is a Pod listening on
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
@@ -329,7 +333,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			helmValues := map[string]string{
-				"connectInject.enabled": "true",
+				"connectInject.enabled":     "true",
+				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
 
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),

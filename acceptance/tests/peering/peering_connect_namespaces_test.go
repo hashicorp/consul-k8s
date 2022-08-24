@@ -20,10 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const staticClientName = "static-client"
-const staticServerName = "static-server"
-const staticServerNamespace = "ns1"
-const staticClientNamespace = "ns2"
+const (
+	staticClientName      = "static-client"
+	staticServerName      = "static-server"
+	staticServerNamespace = "ns1"
+	staticClientNamespace = "ns2"
+)
 
 // Test that Connect works in installations for X-Peers networking.
 func TestPeering_ConnectNamespaces(t *testing.T) {
@@ -102,7 +104,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
-				"connectInject.enabled": "true",
+				"connectInject.enabled":     "true",
+				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
 
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
@@ -299,7 +302,15 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			if c.ACLsAndAutoEncryptEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", fmt.Sprintf("curl: (7) Failed to connect to static-server.%s port 80: Connection refused", c.destinationNamespace)}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(
+						t,
+						staticClientOpts,
+						staticClientName,
+						false,
+						[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", fmt.Sprintf("curl: (7) Failed to connect to static-server.%s port 80: Connection refused", c.destinationNamespace)},
+						"",
+						fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer),
+					)
 				} else {
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 				}

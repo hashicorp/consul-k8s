@@ -276,7 +276,8 @@ jobs:
       - run:
           name: build local
           working_directory: *control-plane-path
-          command: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
+          command: |
+            XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
       # persist to downstream job
       - persist_to_workspace:
           root: .
@@ -1231,13 +1232,13 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1246,13 +1247,13 @@ workflows:
       - dev-upload-docker:
           requires:
             - build-distros-linux
-      - cleanup-gcp-resources
-      - cleanup-azure-resources
-      - cleanup-eks-resources
+      # - cleanup-gcp-resources
+      # - cleanup-azure-resources
+      # - cleanup-eks-resources
       # Disable until we can use UBI images.
-      - acceptance-openshift:
-          requires:
-            - cleanup-azure-resources
+      # - acceptance-openshift:
+      #    requires:
+      #      - cleanup-azure-resources
       - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources

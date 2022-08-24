@@ -18,10 +18,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const StaticClientName = "static-client"
-const staticServerName = "static-server"
-const staticServerNamespace = "ns1"
-const StaticClientNamespace = "ns2"
+const (
+	StaticClientName      = "static-client"
+	staticServerName      = "static-server"
+	staticServerNamespace = "ns1"
+	StaticClientNamespace = "ns2"
+)
 
 // Test that Connect works in a default and ACLsAndAutoEncryptEnabled installations for X-Partition and in-partition networking.
 func TestPartitions_Connect(t *testing.T) {
@@ -97,7 +99,8 @@ func TestPartitions_Connect(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
-				"connectInject.enabled": "true",
+				"connectInject.enabled":     "true",
+				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
@@ -442,8 +445,24 @@ func TestPartitions_Connect(t *testing.T) {
 				// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 				logger.Log(t, "checking that connection is unsuccessful")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(
+						t,
+						serverClusterStaticClientOpts,
+						StaticClientName,
+						false,
+						[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"},
+						"",
+						fmt.Sprintf("http://static-server.%s", staticServerNamespace),
+					)
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(
+						t,
+						clientClusterStaticClientOpts,
+						StaticClientName,
+						false,
+						[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"},
+						"",
+						fmt.Sprintf("http://static-server.%s", staticServerNamespace),
+					)
 				} else {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
@@ -616,8 +635,24 @@ func TestPartitions_Connect(t *testing.T) {
 				logger.Log(t, "checking that connection is unsuccessful")
 				if cfg.EnableTransparentProxy {
 					if !c.mirrorK8S {
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, secondaryPartition))
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, defaultPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(
+							t,
+							serverClusterStaticClientOpts,
+							StaticClientName,
+							false,
+							[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"},
+							"",
+							fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, secondaryPartition),
+						)
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(
+							t,
+							clientClusterStaticClientOpts,
+							StaticClientName,
+							false,
+							[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"},
+							"",
+							fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, defaultPartition),
+						)
 					} else {
 						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, secondaryPartition))
 						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, defaultPartition))
