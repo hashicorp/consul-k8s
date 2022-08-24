@@ -81,9 +81,9 @@ func TestReadCommandOutput(t *testing.T) {
 		"-listeners": {"==> Listeners \\(2\\)",
 			"Name.*Address:Port.*Direction.*Filter Chain Match.*Filters.*Last Updated",
 			"public_listener.*192\\.168\\.69\\.179:20000.*INBOUND.*Any.*\\* -> local_app/",
-			"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
-			"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.5/32.*-> frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
-			"Any.*-> original-destination"},
+			"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*TCP: -> client",
+			"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.5/32.*TCP: -> frontend",
+			"Any.*TCP: -> original-destination"},
 
 		"-routes": {"==> Routes \\(1\\)",
 			"Name.*Destination Cluster.*Last Updated",
