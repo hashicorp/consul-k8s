@@ -365,6 +365,18 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[keyInjectStatus] = injected
 
+	tproxyEnabled, err := transparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
+	if err != nil {
+		w.Log.Error(err, "error determining if transparent proxy is enabled", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if transparent proxy is enabled: %s", err))
+	}
+
+	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
+	// to determine if it should traffic redirect or not
+	if tproxyEnabled {
+		pod.Annotations[keyTransparentProxyStatus] = enabled
+	}
+
 	// Add annotations for metrics.
 	if err = w.prometheusAnnotations(&pod); err != nil {
 		w.Log.Error(err, "error configuring prometheus annotations", "request name", req.Name)
@@ -390,6 +402,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if err != nil {
 		w.Log.Error(err, "error overwriting readiness or liveness probes", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
+	}
+
+	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
+	// plugin can apply redirect traffic rules on the pod.
+	if w.EnableCNI && tproxyEnabled {
+		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+			// todo: update this error message
+			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
+		}
 	}
 
 	// Marshall the pod into JSON after it has the desired envs, annotations, labels,

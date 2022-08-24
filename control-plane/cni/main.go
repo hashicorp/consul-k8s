@@ -42,13 +42,16 @@ const (
 	// indicate the status of the CNI plugin.
 	complete = "complete"
 
-	// annotationTrafficRedirection stores iptables.Config information so that the CNI plugin can use it to apply
+	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
-	annotationTrafficRedirection = "consul.hashicorp.com/traffic-redirection-config"
+	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 )
 
 type Command struct {
+	// client is a kubernetes client
 	client kubernetes.Interface
+	// iptablesProvider is the Provider that will apply iptables rules. Used for testing.
+	iptablesProvider iptables.Provider
 }
 
 type CNIArgs struct {
@@ -177,34 +180,57 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	// Skip traffic redirection if the correct annotations are not on the pod.
 	if skipTrafficRedirection(*pod) {
-		logger.Debug("skipping traffic redirect on un-injected pod: %s", pod.Name)
+		logger.Debug("skipping traffic redirection because the pod is either not injected or transparent proxy is disabled: %s", pod.Name)
 		return types.PrintResult(result, cfg.CNIVersion)
 	}
 
-	err = c.updateTransparentProxyStatusAnnotation(pod, podNamespace, waiting)
-	if err != nil {
-		return fmt.Errorf("error adding waiting annotation: %s", err)
+	// We do not throw an error here because kubernetes will often throw a benign error where the pod has been
+	// updated in between the get and update of the annotation. Eventually kubernetes will update the annotation
+	ok := c.updateTransparentProxyStatusAnnotation(pod, podNamespace, waiting)
+	if !ok {
+		logger.Info("unable to update %s pod annotation to waiting", keyTransparentProxyStatus)
 	}
 
-	// TODO: Insert redirect here
-
-	err = c.updateTransparentProxyStatusAnnotation(pod, podNamespace, complete)
+	// Parse the cni-proxy-config annotation into an iptables.Config object.
+	iptablesCfg, err := parseAnnotation(*pod, annotationRedirectTraffic)
 	if err != nil {
-		return fmt.Errorf("error adding complete annotation: %s", err)
+		return err
 	}
 
+	// Set NetNS passed through the CNI.
+	iptablesCfg.NetNS = args.Netns
+
+	// Set the provider to a fake provider in testing, otherwise use the default iptables.Provider
+	if c.iptablesProvider != nil {
+		iptablesCfg.IptablesProvider = c.iptablesProvider
+	}
+
+	// Apply the iptables rules.
+	err = iptables.Setup(iptablesCfg)
+	if err != nil {
+		return fmt.Errorf("could not apply iptables setup: %v", err)
+	}
+
+	// We do not throw an error here because kubernetes will often throw a benign error where the pod has been
+	// updated in between the get and update of the annotation. Eventually kubernetes will update the annotation
+	ok = c.updateTransparentProxyStatusAnnotation(pod, podNamespace, complete)
+	if !ok {
+		logger.Info("unable to update %s pod annotation to complete", keyTransparentProxyStatus)
+	}
+
+	logger.Debug("traffic redirect rules applied to pod: %s", pod.Name)
 	// Pass through the result for the next plugin even though we are the final plugin in the chain.
 	return types.PrintResult(result, cfg.CNIVersion)
 }
 
 // cmdDel is called for DELETE requests.
-func cmdDel(args *skel.CmdArgs) error {
+func cmdDel(_ *skel.CmdArgs) error {
 	// Nothing to do but this function will still be called as part of the CNI specification.
 	return nil
 }
 
 // cmdCheck is called for CHECK requests.
-func cmdCheck(args *skel.CmdArgs) error {
+func cmdCheck(_ *skel.CmdArgs) error {
 	// Nothing to do but this function will still be called as part of the CNI specification.
 	return nil
 }
@@ -243,13 +269,9 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 }
 
 // updateTransparentProxyStatusAnnotation updates the transparent-proxy-status annotation. We use it as a simple inicator of
-// CNI status on the pod.
-func (c *Command) updateTransparentProxyStatusAnnotation(pod *corev1.Pod, namespace, status string) error {
+// CNI status on the pod.  Failing is not fatal.
+func (c *Command) updateTransparentProxyStatusAnnotation(pod *corev1.Pod, namespace, status string) bool {
 	pod.Annotations[keyTransparentProxyStatus] = status
 	_, err := c.client.CoreV1().Pods(namespace).Update(context.Background(), pod, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("error adding annotation to pod: %s", err)
-	}
-
-	return nil
+	return err == nil
 }
