@@ -110,25 +110,24 @@ type filter struct {
 	TypedConfig filterTypedConfig `json:"typed_config"`
 }
 
+// Not all filters have all of these values. This is extensive to cover the
+// numerous configuration types for filters.
 type filterTypedConfig struct {
-	Type                       string                    `json:"@type"`
-	Cluster                    string                    `json:"cluster"`
-	RouteConfig                filterRouteConfig         `json:"route_config"`
-	HttpFilters                []httpFilter              `json:"http_filters"`
-	Rules                      filterRules               `json:"rules"`
-	StatPrefix                 string                    `json:"stat_prefix"`
-	MaxConnections             int64                     `json:"max_connections"`
-	Delay                      string                    `json:"delay"`
-	Response                   filterResponse            `json:"reponse"`
-	GrpcService                filterGrpcService         `json:"grpc_service"`
-	FailureModeAllow           bool                      `json:"failure_mode_allow"`
-	IncludePeerCertificate     bool                      `json:"include_peer_certificate"`
-	TransportApiVersion        filterTransportApiVersion `json:"transport_api_version"`
-	FilterEnabledMetadata      filterEnabledMetadata     `json:"filter_enabled_metadata"`
-	BootstrapMetadataLabelsKey string                    `json:"bootstrap_metadata_labels_key"`
-	TokenBucket                filterTokenBucket         `json:"token_bucket"`
-	RuntimeEnabled             filterRuntimeEnabled      `json:"runtime_enabled"`
-	ShareKey                   string                    `json:"share_key"`
+	Type             string                       `json:"@type"`
+	Cluster          string                       `json:"cluster"`
+	RouteConfig      filterRouteConfig            `json:"route_config"`
+	HttpFilters      []httpFilter                 `json:"http_filters"`
+	Rules            filterRules                  `json:"rules"`
+	StatPrefix       string                       `json:"stat_prefix"`
+	MaxConnections   int64                        `json:"max_connections"`
+	Delay            string                       `json:"delay"`
+	Response         filterResponse               `json:"reponse"`
+	GrpcService      filterGrpcService            `json:"grpc_service"`
+	TokenBucket      filterTokenBucket            `json:"token_bucket"`
+	Domain           string                       `json:"domain"`
+	Descriptors      []filterRateLimitDescriptors `json:"descriptors"`
+	FailureModeDeny  bool                         `json:"failure_mode_deny"`
+	RateLimitService filterRateLimitServiceConfig `json:"rate_limit_service"`
 }
 
 type filterRouteConfig struct {
@@ -240,15 +239,43 @@ type filterResponse struct {
 	EnvironmentVariable string `json:"environment_variable"`
 }
 
-type filterGrpcService struct{}
+type filterGrpcService struct {
+	EnvoyGrpc  filterEnvoyGrpc  `json:"envoy_grpc"`
+	GoogleGrpc filterGoogleGrpc `json:"google_grpc"`
+}
 
-type filterTransportApiVersion struct{}
+type filterEnvoyGrpc struct {
+	ClusterName string `json:"cluster_name"`
+}
 
-type filterEnabledMetadata struct{}
+type filterGoogleGrpc struct {
+	TargetUri string `json:"target_uri"`
+}
 
-type filterTokenBucket struct{}
+type filterTokenBucket struct {
+	MaxTokens     int    `json:"max_tokens"`
+	TokensPerFill int    `json:"tokens_per_fill"`
+	FillInterval  string `json:"fill_interval"`
+}
 
-type filterRuntimeEnabled struct{}
+type filterRateLimitDescriptor struct {
+	Entries []filterRateLimitDescriptorEntry `json:"entries"`
+	Limit   filterRateLimitOverride          `json:"limit"`
+}
+
+type filterRateLimitDescriptorEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type filterRateLimitOverride struct {
+	RequestsPerUnit int    `json:"requests_per_unit"`
+	Unit            string `json:"unit"`
+}
+
+type filterRateLimitServiceConfig struct {
+	GrpcService filterGrpcService `json:"grpc_service"`
+}
 
 type secretsConfigDump struct {
 	ConfigType            string            `json:"@type"`

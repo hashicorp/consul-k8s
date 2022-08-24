@@ -406,34 +406,28 @@ func formatFilters(filters []filter) (formatted []string) {
 		"type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz":                            formatFilterExtAuthz,
 		"type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager": formatFilterHTTPConnectionManager,
 		"type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit":                formatFilterLocalRatelimit,
-		"type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy":                        formatFilterMongoProxy,
 		"type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit":                           formatFilterRatelimit,
 		"type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC":                                     formatFilterRBAC,
-		"type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy":                        formatFilterRedisProxy,
 		"type.googleapis.com/envoy.extensions.filters.network.sni_cluster.v3.SniCluster":                        formatFilterSniCluster,
-		"type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig":        formatFilterSniDynamicForwardProxy,
 		"type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy":                            formatFilterTCPProxy,
-		"type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy":                      formatFilterThriftProxy,
-		"type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm":                                     formatFilterWasm,
-		"type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy":                formatFilterZookeeperProxy,
 	}
 
-	for _, chainFilter := range filters {
-		if formatter, ok := formatters[chainFilter.TypedConfig.Type]; ok {
-			formatted = append(formatted, formatter(chainFilter))
+	for _, filter := range filters {
+		if formatter, ok := formatters[filter.TypedConfig.Type]; ok {
+			formatted = append(formatted, formatter(filter))
 		} else {
-			formatted = append(formatted, "unknown filter format")
+			formatted = append(formatted, fmt.Sprintf("Unknown filter: %s", filter.TypedConfig.Type))
 		}
 	}
 	return formatted
 }
 
 func formatFilterConnectionLimit(config filter) string {
-	return fmt.Sprintf("%d max connections with %s delay", config.TypedConfig.MaxConnections, config.TypedConfig.Delay)
+	return fmt.Sprintf("Connection limit: %d max connections with %s delay", config.TypedConfig.MaxConnections, config.TypedConfig.Delay)
 }
 
 func formatFilterDirectResponse(config filter) string {
-	out := []string{"->"}
+	out := []string{"Direct response: ->"}
 	if file := config.TypedConfig.Response.Filename; file != "" {
 		out = append(out, fmt.Sprintf("file:%s", file))
 	}
@@ -459,15 +453,24 @@ func formatFilterDirectResponse(config filter) string {
 }
 
 func formatFilterEcho(config filter) string {
-	return ""
+	return "Echo: upstream will respond with the data it receives."
 }
 
 func formatFilterExtAuthz(config filter) string {
-	return ""
+	var upstream string
+	if config.TypedConfig.GrpcService.EnvoyGrpc.ClusterName != "" {
+		upstream = config.TypedConfig.GrpcService.EnvoyGrpc.ClusterName
+	} else if config.TypedConfig.GrpcService.GoogleGrpc.TargetUri != "" {
+		upstream = config.TypedConfig.GrpcService.GoogleGrpc.TargetUri
+	} else {
+		upstream = "No upstream configured."
+	}
+
+	return fmt.Sprintf("External authorization: %s", upstream)
 }
 
 func formatFilterHTTPConnectionManager(config filter) string {
-	var out string
+	out := "HTTP: "
 	for _, host := range config.TypedConfig.RouteConfig.VirtualHosts {
 		out += strings.Join(host.Domains, ", ")
 		out += " -> "
@@ -482,11 +485,10 @@ func formatFilterHTTPConnectionManager(config filter) string {
 }
 
 func formatFilterLocalRatelimit(config filter) string {
-	return ""
-}
-
-func formatFilterMongoProxy(config filter) string {
-	return ""
+	return fmt.Sprintf("Local rate limit: tokens: max %d per-fill %d, interval: %s",
+		config.TypedConfig.MaxConnections,
+		config.TypedConfig.TokenBucket.TokensPerFill,
+		config.TypedConfig.TokenBucket.FillInterval)
 }
 
 func formatFilterRatelimit(config filter) string {
@@ -494,7 +496,7 @@ func formatFilterRatelimit(config filter) string {
 }
 
 func formatFilterRBAC(config filter) string {
-	var out string
+	out := "RBAC: "
 	action := config.TypedConfig.Rules.Action
 	for _, principal := range config.TypedConfig.Rules.Policies.ConsulIntentions.Principals {
 		regex := principal.Authenticated.PrincipalName.SafeRegex.Regex
@@ -503,30 +505,14 @@ func formatFilterRBAC(config filter) string {
 	return out
 }
 
-func formatFilterRedisProxy(config filter) string {
-	return ""
-}
-
 func formatFilterSniCluster(config filter) string {
-	return ""
-}
-
-func formatFilterSniDynamicForwardProxy(config filter) string {
-	return ""
+	return "SNI: Upstream cluster name set by SNI field in TLS connection."
 }
 
 func formatFilterTCPProxy(config filter) string {
-	return "-> " + config.TypedConfig.Cluster
-}
+	if config.TypedConfig.Cluster == "" {
+		return "TCP: No upstream cluster configured."
+	}
 
-func formatFilterThriftProxy(config filter) (filter string) {
-	return filter
-}
-
-func formatFilterWasm(config filter) (filter string) {
-	return filter
-}
-
-func formatFilterZookeeperProxy(config filter) (filter string) {
-	return filter
+	return "TCP: -> " + strings.Split(config.TypedConfig.Cluster, ".")[0]
 }
