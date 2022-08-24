@@ -82,6 +82,262 @@ func TestFetchConfig(t *testing.T) {
 	require.Equal(t, testEnvoyConfig.Secrets, envoyConfig.Secrets)
 }
 
+// There are many protobuf types for filter extensions. This test ensures
+// that the different types are formatted correctly.
+func TestFormatFilters(t *testing.T) {
+	cases := map[string]struct {
+		filter   filter
+		expected string
+	}{
+		"Connection Limit": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:           "type.googleapis.com/envoy.extensions.filters.network.connection_limit.v3.ConnectionLimit",
+					MaxConnections: 42,
+					Delay:          "200s",
+				},
+			},
+			expected: "42 max connections with 200s delay",
+		},
+		"Direct Response with file": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						Filename: "cat-photo.jpg",
+					},
+				},
+			},
+			expected: "-> file:cat-photo.jpg",
+		},
+		"Direct Response with bytes": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineBytes: []byte("abcd"),
+					},
+				},
+			},
+			expected: "-> bytes:abcd",
+		},
+		"Direct Response with lots of bytes": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineBytes: []byte("abcdefghijklmnopqrstuvwxyz"),
+					},
+				},
+			},
+			expected: "-> bytes:abcdefghijklmnopqrstuvwx...",
+		},
+		"Direct Response with string": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineString: "efgh",
+					},
+				},
+			},
+			expected: "-> string:efgh",
+		},
+		"Direct Response with long string": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineString: "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width\"/>",
+					},
+				},
+			},
+			expected: "-> string:<!DOCTYPE html><html lan...",
+		},
+		"Direct Response with environment variable": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						EnvironmentVariable: "POSTGRESS_CONNECTION_STRING",
+					},
+				},
+			},
+			expected: "-> env:POSTGRESS_CONNECTION_STRING",
+		},
+		"Echo": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo",
+				},
+			},
+			expected: "TODO",
+		},
+		"External Authorization": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:                       "type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz",
+					GrpcService:                filterGrpcService{},
+					FailureModeAllow:           false,
+					IncludePeerCertificate:     true,
+					TransportApiVersion:        filterTransportApiVersion{},
+					FilterEnabledMetadata:      filterEnabledMetadata{},
+					BootstrapMetadataLabelsKey: "METADATA",
+				},
+			},
+			expected: "TODO",
+		},
+		"HTTP Connection Manager": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+					RouteConfig: filterRouteConfig{
+						Name: "public_listener",
+						VirtualHosts: []filterVirtualHost{
+							{
+								Name:    "public_listener",
+								Domains: []string{"*"},
+								Routes: []filterRoute{
+									{
+										Match: filterMatch{
+											Prefix: "/",
+										},
+										Route: filterRouteCluster{
+											Cluster: "local_app",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "* -> local_app/",
+		},
+		"Local Ratelimit": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit",
+				},
+			},
+			expected: "TODO",
+		},
+		"Mongo Proxy": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy",
+				},
+			},
+			expected: "TODO",
+		},
+		"Ratelimit": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
+				},
+			},
+			expected: "TODO",
+		},
+		"RBAC": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC",
+					Rules: filterRules{
+						Action: "DENY",
+						Policies: filterHttpTypedConfigPolicies{
+							ConsulIntentions: filterHttpTypedConfigConsulIntentions{
+								Principals: []principal{
+									{
+										Authenticated: authenticated{
+											PrincipalName: principalName{
+												SafeRegex: safeRegex{
+													Regex: "^spiffe://[^/]+/ns/default/dc/[^/]+/svc/client$",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "DENY ^spiffe://[^/]+/ns/default/dc/[^/]+/svc/client$",
+		},
+		"Redis Proxy": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy",
+				},
+			},
+			expected: "TODO",
+		},
+		"SNI Cluster": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.sni_cluster.v3.SniCluster",
+				},
+			},
+			expected: "TODO",
+		},
+		"SNI Dynamic Forward Proxy": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig",
+				},
+			},
+			expected: "TODO",
+		},
+		"TCP Proxy": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
+				},
+			},
+			expected: "TODO",
+		},
+		"Thrift Proxy": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy",
+				},
+			},
+			expected: "TODO",
+		},
+		"WASM": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm",
+				},
+			},
+			expected: "TODO",
+		},
+		"Zookeeper Proxy": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy",
+				},
+			},
+			expected: "TODO",
+		},
+		"Unknown format": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.NewFormat",
+				},
+			},
+			expected: "unknown filter format",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := formatFilters([]filter{tc.filter})[0]
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 type mockPortForwarder struct {
 	openBehavior func(context.Context) (string, error)
 }
@@ -117,11 +373,11 @@ var testEnvoyConfig = &EnvoyConfig{
 		{Address: "127.0.0.1:8080", Cluster: "local_app", Weight: 1, Status: "HEALTHY"},
 	},
 	Listeners: []Listener{
-		{Name: "public_listener", Address: "192.168.69.179:20000", FilterChain: []FilterChain{{Filters: []string{"* to local_app/"}, FilterChainMatch: "Any"}}, Direction: "INBOUND", LastUpdated: "2022-08-10T12:30:47.142Z"},
+		{Name: "public_listener", Address: "192.168.69.179:20000", FilterChain: []FilterChain{{Filters: []string{"* -> local_app/"}, FilterChainMatch: "Any"}}, Direction: "INBOUND", LastUpdated: "2022-08-10T12:30:47.142Z"},
 		{Name: "outbound_listener", Address: "127.0.0.1:15001", FilterChain: []FilterChain{
-			{Filters: []string{"to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32"},
-			{Filters: []string{"to frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.31.2/32, 240.0.0.5/32"},
-			{Filters: []string{"to original-destination"}, FilterChainMatch: "Any"},
+			{Filters: []string{"-> client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32"},
+			{Filters: []string{"-> frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.31.2/32, 240.0.0.5/32"},
+			{Filters: []string{"-> original-destination"}, FilterChainMatch: "Any"},
 		}, Direction: "OUTBOUND", LastUpdated: "2022-07-18T15:31:03.246Z"},
 	},
 	Routes: []Route{

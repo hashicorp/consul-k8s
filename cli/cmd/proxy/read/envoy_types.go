@@ -106,16 +106,29 @@ type filterChain struct {
 }
 
 type filter struct {
-	Name        string      `json:"name"`
-	TypedConfig typedConfig `json:"typed_config"`
+	Name        string            `json:"name"`
+	TypedConfig filterTypedConfig `json:"typed_config"`
 }
 
-type typedConfig struct {
-	Type        string            `json:"@type"`
-	Cluster     string            `json:"cluster"`
-	RouteConfig filterRouteConfig `json:"route_config"`
-	HttpFilters []httpFilter      `json:"http_filters"`
-	Rules       rules             `json:"rules"`
+type filterTypedConfig struct {
+	Type                       string                    `json:"@type"`
+	Cluster                    string                    `json:"cluster"`
+	RouteConfig                filterRouteConfig         `json:"route_config"`
+	HttpFilters                []httpFilter              `json:"http_filters"`
+	Rules                      filterRules               `json:"rules"`
+	StatPrefix                 string                    `json:"stat_prefix"`
+	MaxConnections             int64                     `json:"max_connections"`
+	Delay                      string                    `json:"delay"`
+	Response                   filterResponse            `json:"reponse"`
+	GrpcService                filterGrpcService         `json:"grpc_service"`
+	FailureModeAllow           bool                      `json:"failure_mode_allow"`
+	IncludePeerCertificate     bool                      `json:"include_peer_certificate"`
+	TransportApiVersion        filterTransportApiVersion `json:"transport_api_version"`
+	FilterEnabledMetadata      filterEnabledMetadata     `json:"filter_enabled_metadata"`
+	BootstrapMetadataLabelsKey string                    `json:"bootstrap_metadata_labels_key"`
+	TokenBucket                filterTokenBucket         `json:"token_bucket"`
+	RuntimeEnabled             filterRuntimeEnabled      `json:"runtime_enabled"`
+	ShareKey                   string                    `json:"share_key"`
 }
 
 type filterRouteConfig struct {
@@ -156,19 +169,19 @@ type httpFilter struct {
 }
 
 type httpTypedConfig struct {
-	Rules rules `json:"rules"`
+	Rules filterRules `json:"rules"`
 }
 
-type rules struct {
-	Action   string                  `json:"action"`
-	Policies httpTypedConfigPolicies `json:"policies"`
+type filterRules struct {
+	Action   string                        `json:"action"`
+	Policies filterHttpTypedConfigPolicies `json:"policies"`
 }
 
-type httpTypedConfigPolicies struct {
-	ConsulIntentions httpTypedConfigConsulIntentions `json:"consul-intentions-layer4"`
+type filterHttpTypedConfigPolicies struct {
+	ConsulIntentions filterHttpTypedConfigConsulIntentions `json:"consul-intentions-layer4"`
 }
 
-type httpTypedConfigConsulIntentions struct {
+type filterHttpTypedConfigConsulIntentions struct {
 	Principals []principal `json:"principals"`
 }
 
@@ -219,6 +232,23 @@ type routeMatch struct {
 type routeRoute struct {
 	Cluster string `json:"cluster"`
 }
+
+type filterResponse struct {
+	Filename            string `json:"filename"`
+	InlineBytes         []byte `json:"inline_bytes"`
+	InlineString        string `json:"inline_string"`
+	EnvironmentVariable string `json:"environment_variable"`
+}
+
+type filterGrpcService struct{}
+
+type filterTransportApiVersion struct{}
+
+type filterEnabledMetadata struct{}
+
+type filterTokenBucket struct{}
+
+type filterRuntimeEnabled struct{}
 
 type secretsConfigDump struct {
 	ConfigType            string            `json:"@type"`
