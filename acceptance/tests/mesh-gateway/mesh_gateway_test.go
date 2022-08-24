@@ -239,6 +239,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"server.extraVolumes[0].items[0].path": "config.json",
 
 				"connectInject.enabled":  "true",
+				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
 				"connectInject.replicas": "1",
 				"controller.enabled":     "true",
 
