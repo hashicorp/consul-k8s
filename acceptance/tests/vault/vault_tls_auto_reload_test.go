@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -60,7 +59,7 @@ func TestVault_TLSAutoReload(t *testing.T) {
 	// If wanting to make this higher, there is no problem except for consideration of how long the test will
 	// take to complete.
 	expirationInSeconds := 30
-	// Configure Server PKI
+	//Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
 		PolicyName:          "consul-ca-policy",
@@ -170,10 +169,9 @@ func TestVault_TLSAutoReload(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-		"connectInject.replicas":    "1",
-		"controller.enabled":        "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
@@ -279,6 +277,7 @@ func TestVault_TLSAutoReload(t *testing.T) {
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, httpsCert.NotAfter, httpsCert2.NotAfter)
 	require.NotEqual(t, rpcCert.NotAfter, rpcCert2.NotAfter)
+
 }
 
 func getCertificate(t *testing.T, address string) (*x509.Certificate, error) {

@@ -2,12 +2,11 @@ package terminatinggateway
 
 import (
 	"fmt"
-	"strconv"
-	"testing"
-
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
+	"strconv"
+	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -54,9 +53,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"connectInject.enabled":     "true",
-				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-
+				"connectInject.enabled":                    "true",
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
@@ -142,7 +139,6 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 		})
 	}
 }
-
 func createServiceDefaultDestination(t *testing.T, consulClient *api.Client, serviceNamespace string, name string, protocol string, port int, addresses ...string) {
 	t.Helper()
 

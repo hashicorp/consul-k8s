@@ -3,7 +3,6 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -33,10 +32,8 @@ func TestComponentMetrics(t *testing.T) {
 		"global.metrics.enabled":            "true",
 		"global.metrics.enableAgentMetrics": "true",
 
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-
-		"controller.enabled": "true",
+		"connectInject.enabled": "true",
+		"controller.enabled":    "true",
 
 		"meshGateway.enabled":      "true",
 		"meshGateway.replicas":     "1",
@@ -102,9 +99,7 @@ func TestAppMetrics(t *testing.T) {
 		"global.datacenter":      "dc1",
 		"global.metrics.enabled": "true",
 
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-
+		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
 	}
 

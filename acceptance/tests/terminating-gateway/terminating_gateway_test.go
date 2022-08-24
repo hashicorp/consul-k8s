@@ -39,9 +39,7 @@ func TestTerminatingGateway(t *testing.T) {
 			cfg := suite.Config()
 
 			helmValues := map[string]string{
-				"connectInject.enabled":     "true",
-				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-
+				"connectInject.enabled":                    "true",
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
