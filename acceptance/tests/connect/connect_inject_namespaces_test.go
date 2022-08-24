@@ -18,10 +18,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	staticServerNamespace = "ns1"
-	StaticClientNamespace = "ns2"
-)
+const staticServerNamespace = "ns1"
+const StaticClientNamespace = "ns2"
 
 // Test that Connect works with Consul Enterprise namespaces.
 // These tests currently only test non-secure and secure without auto-encrypt installations
@@ -73,7 +71,6 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			helmValues := map[string]string{
 				"global.enableConsulNamespaces": "true",
 				"connectInject.enabled":         "true",
-				"connectInject.cni.enabled":     strconv.FormatBool(cfg.EnableCNI),
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
@@ -229,15 +226,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(
-					t,
-					staticClientOpts,
-					StaticClientName,
-					false,
-					[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"},
-					"",
-					fmt.Sprintf("http://static-server.%s", staticServerNamespace),
-				)
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}
@@ -296,7 +285,6 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 			helmValues := map[string]string{
 				"global.enableConsulNamespaces": "true",
 				"connectInject.enabled":         "true",
-				"connectInject.cni.enabled":     strconv.FormatBool(cfg.EnableCNI),
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),

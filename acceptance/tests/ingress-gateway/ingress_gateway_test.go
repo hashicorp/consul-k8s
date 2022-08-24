@@ -42,7 +42,6 @@ func TestIngressGateway(t *testing.T) {
 			igName := "ingress-gateway"
 			helmValues := map[string]string{
 				"connectInject.enabled":                "true",
-				"connectInject.cni.enabled":            strconv.FormatBool(cfg.EnableCNI),
 				"ingressGateways.enabled":              "true",
 				"ingressGateways.gateways[0].name":     igName,
 				"ingressGateways.gateways[0].replicas": "1",

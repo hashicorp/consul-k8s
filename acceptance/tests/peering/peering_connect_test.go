@@ -61,8 +61,7 @@ func TestPeering_Connect(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
-				"connectInject.enabled":     "true",
-				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
+				"connectInject.enabled": "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -231,15 +230,7 @@ func TestPeering_Connect(t *testing.T) {
 			if c.ACLsAndAutoEncryptEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(
-						t,
-						staticClientOpts,
-						staticClientName,
-						false,
-						[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"},
-						"",
-						fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer),
-					)
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
 				} else {
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 				}
