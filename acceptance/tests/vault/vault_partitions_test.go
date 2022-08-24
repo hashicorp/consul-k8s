@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -286,9 +287,10 @@ func TestVault_Partitions(t *testing.T) {
 
 		"global.enableConsulNamespaces": "true",
 
-		"connectInject.enabled":  "true",
-		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
+		"connectInject.enabled":     "true",
+		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
+		"connectInject.replicas":    "1",
+		"controller.enabled":        "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
