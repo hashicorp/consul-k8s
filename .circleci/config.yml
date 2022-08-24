@@ -48,7 +48,6 @@ commands:
             wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
             tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
             sudo mv linux-amd64/helm /usr/local/bin/helm
-
   create-kind-clusters:
     parameters:
       version:
@@ -59,6 +58,19 @@ commands:
           command: |
             kind create cluster --name dc1 --image kindest/node:<< parameters.version >>
             kind create cluster --name dc2 --image kindest/node:<< parameters.version >>
+  create-kind-cni-clusters:
+    parameters:
+      version:
+        type: string
+    steps:
+      - run:
+          name: Create CNI kind clusters
+          command: |
+            kind create cluster --config=acceptance/framework/environment/cni-kind/kind.config --name dc1 --image kindest/node:<< parameters.version >>
+            make kind-cni-calico
+            sleep 2
+            kind create cluster --config=acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:<< parameters.version >>
+            make kind-cni-calico
   run-acceptance-tests:
     parameters:
       failfast:
@@ -265,7 +277,8 @@ jobs:
       - run:
           name: build local
           working_directory: *control-plane-path
-          command: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
+          command: | 
+            XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
       # persist to downstream job
       - persist_to_workspace:
           root: .
@@ -878,6 +891,42 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+  acceptance-kind-cni-1-23:
+    parallelism: 6 
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - install-prereqs
+      - create-kind-cni-clusters:
+          version: "v1.23.0"
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+      - run: mkdir -p $TEST_RESULTS
+      - run-acceptance-tests:
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+      - slack/status:
+          # temporarily sending to #cni-acceptance-tests channel
+          channel: C03V3K0040G
+          fail_only: true
+          failure_message: "Acceptance tests for CNI against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-kind-1-23-consul-nightly-1-11:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1012,13 +1061,13 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1027,28 +1076,32 @@ workflows:
       - dev-upload-docker:
           requires:
             - build-distros-linux
-      - cleanup-gcp-resources
-      - cleanup-azure-resources
-      - cleanup-eks-resources
+      # - cleanup-gcp-resources
+      # - cleanup-azure-resources
+      # - cleanup-eks-resources
       # Disable until we can use UBI images.
       #      - acceptance-openshift:
       #          requires:
       #          - cleanup-azure-resources
-      - acceptance-gke-1-20:
+      # - acceptance-gke-1-20:
+      #     requires:
+      #       - cleanup-gcp-resources
+      #       - dev-upload-docker
+      # - acceptance-eks-1-19:
+      #     requires:
+      #       - cleanup-eks-resources
+      #       - dev-upload-docker
+      # - acceptance-aks-1-21:
+      #     requires:
+      #       - cleanup-azure-resources
+      #       - dev-upload-docker
+      # - acceptance-kind-1-23:
+      #     requires:
+      #       - dev-upload-docker
+      - acceptance-kind-cni-1-23:
           requires:
-            - cleanup-gcp-resources
             - dev-upload-docker
-      - acceptance-eks-1-19:
-          requires:
-            - cleanup-eks-resources
-            - dev-upload-docker
-      - acceptance-aks-1-21:
-          requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
-      - acceptance-kind-1-23:
-          requires:
-            - dev-upload-docker
+
 
 #  nightly-acceptance-tests-consul:
 #    triggers:

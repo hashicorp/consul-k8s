@@ -45,7 +45,8 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			// Install the Helm chart without the ingress gateway first
 			// so that we can create the namespace for it.
 			helmValues := map[string]string{
-				"connectInject.enabled": "true",
+				"connectInject.enabled":                                     "true",
+				"connectInject.cni.enabled":                                 strconv.FormatBool(cfg.EnableCNI),
 				"connectInject.consulNamespaces.consulDestinationNamespace": testNamespace,
 
 				"global.enableConsulNamespaces": "true",
@@ -187,6 +188,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			// so that we can create the namespace for it.
 			helmValues := map[string]string{
 				"connectInject.enabled":                       "true",
+				"connectInject.cni.enabled":                   strconv.FormatBool(cfg.EnableCNI),
 				"connectInject.consulNamespaces.mirroringK8S": "true",
 
 				"global.enableConsulNamespaces": "true",

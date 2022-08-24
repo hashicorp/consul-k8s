@@ -38,6 +38,8 @@ type TestConfig struct {
 
 	EnablePodSecurityPolicies bool
 
+	EnableCNI bool
+
 	EnableTransparentProxy bool
 
 	DisablePeering bool
@@ -81,6 +83,11 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnablePodSecurityPolicies {
 		setIfNotEmpty(helmValues, "global.enablePodSecurityPolicies", "true")
+	}
+
+	if t.EnableCNI {
+		setIfNotEmpty(helmValues, "connectInject.enabled", "true")
+		setIfNotEmpty(helmValues, "connectInject.cni.enabled", "true")
 	}
 
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
