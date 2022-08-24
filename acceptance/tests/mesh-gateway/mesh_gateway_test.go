@@ -3,7 +3,6 @@ package meshgateway
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -34,10 +33,9 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"global.federation.enabled":                "true",
 		"global.federation.createFederationSecret": "true",
 
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-		"connectInject.replicas":    "1",
-		"controller.enabled":        "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -82,10 +80,9 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"server.extraVolumes[0].items[0].key":  "serverConfigJSON",
 		"server.extraVolumes[0].items[0].path": "config.json",
 
-		"connectInject.enabled":     "true",
-		"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-		"connectInject.replicas":    "1",
-		"controller.enabled":        "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -170,10 +167,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"global.federation.enabled":                "true",
 				"global.federation.createFederationSecret": "true",
 
-				"connectInject.enabled":     "true",
-				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-				"connectInject.replicas":    "1",
-				"controller.enabled":        "true",
+				"connectInject.enabled":  "true",
+				"connectInject.replicas": "1",
+				"controller.enabled":     "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -238,10 +234,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"server.extraVolumes[0].items[0].key":  "serverConfigJSON",
 				"server.extraVolumes[0].items[0].path": "config.json",
 
-				"connectInject.enabled":     "true",
-				"connectInject.cni.enabled": strconv.FormatBool(cfg.EnableCNI),
-				"connectInject.replicas":    "1",
-				"controller.enabled":        "true",
+				"connectInject.enabled":  "true",
+				"connectInject.replicas": "1",
+				"controller.enabled":     "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
