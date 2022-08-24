@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -19,76 +20,137 @@ const (
 	defaultNamespace = "default"
 )
 
-func TestRun_cmdAdd(t *testing.T) {
-	t.Parallel()
+type fakeIptablesProvider struct {
+	rules []string
+}
 
-	cmd := &Command{
-		client: fake.NewSimpleClientset(),
-	}
+func (f *fakeIptablesProvider) AddRule(name string, args ...string) {
+	var rule []string
+	rule = append(rule, name)
+	rule = append(rule, args...)
+
+	f.rules = append(f.rules, strings.Join(rule, " "))
+}
+
+func (f *fakeIptablesProvider) ApplyRules() error {
+	return nil
+}
+
+func (f *fakeIptablesProvider) Rules() []string {
+	return f.rules
+}
+
+func Test_cmdAdd(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		name          string
+		cmd           *Command
 		podName       string
 		stdInData     string
-		configuredPod func(*corev1.Pod) *corev1.Pod
+		configuredPod func(*corev1.Pod, *Command) *corev1.Pod
+		expectedRules bool
 		expectedErr   error
 	}{
 		{
 			name:      "K8S_POD_NAME missing from CNI args, should throw error",
+			cmd:       &Command{},
 			podName:   "",
 			stdInData: goodStdinData,
-			configuredPod: func(pod *corev1.Pod) *corev1.Pod {
+			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
 				return pod
 			},
-			expectedErr: fmt.Errorf("not running in a pod, namespace and pod should have values"),
+			expectedErr:   fmt.Errorf("not running in a pod, namespace and pod should have values"),
+			expectedRules: false, // Rules won't be applied because the command will throw an error first
 		},
 		{
-			name:      "Missing prevResult in stdin data, should throw error",
+			name: "Missing prevResult in stdin data, should throw error",
+			cmd: &Command{
+				client: fake.NewSimpleClientset(),
+			},
 			podName:   "missing-prev-result",
 			stdInData: missingPrevResultStdinData,
-			configuredPod: func(pod *corev1.Pod) *corev1.Pod {
-				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
+				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
 				return pod
 			},
-			expectedErr: fmt.Errorf("must be called as final chained plugin"),
+			expectedErr:   fmt.Errorf("must be called as final chained plugin"),
+			expectedRules: false, // Rules won't be applied because the command will throw an error first
 		},
 		{
-			name:      "Missing IPs in prevResult in stdin data, should throw error",
+			name: "Missing IPs in prevResult in stdin data, should throw error",
+			cmd: &Command{
+				client: fake.NewSimpleClientset(),
+			},
 			podName:   "corrupt-prev-result",
 			stdInData: missingIPsStdinData,
-			configuredPod: func(pod *corev1.Pod) *corev1.Pod {
-				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
+				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
 				return pod
 			},
-			expectedErr: fmt.Errorf("got no container IPs"),
+			expectedErr:   fmt.Errorf("got no container IPs"),
+			expectedRules: false, // Rules won't be applied because the command will throw an error first
 		},
-
 		{
-			name:      "Pod with traffic redirection annotation, should apply redirect",
-			podName:   "pod-with-annotation",
+			name: "Pod with incorrect traffic redirection annotation, should throw error",
+			cmd: &Command{
+				client: fake.NewSimpleClientset(),
+			},
+			podName:   "pod-with-incorrect-annotation",
 			stdInData: goodStdinData,
-			configuredPod: func(pod *corev1.Pod) *corev1.Pod {
-				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-				require.NoError(t, err)
-
-				pod.Annotations[annotationTrafficRedirection] = "{foo}"
-				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Update(context.Background(), pod, metav1.UpdateOptions{})
+			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
+				pod.Annotations[keyInjectStatus] = "true"
+				pod.Annotations[keyTransparentProxyStatus] = "enabled"
+				pod.Annotations[annotationRedirectTraffic] = "{foo}"
+				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
 				return pod
 			},
-			expectedErr: nil,
+			expectedErr:   fmt.Errorf("could not unmarshal %s annotation for %s pod", annotationRedirectTraffic, "pod-with-incorrect-annotation"),
+			expectedRules: false, // Rules won't be applied because the command will throw an error first
+		},
+		{
+			name: "Pod with correct annotations, should create redirect traffic rules",
+			cmd: &Command{
+				client:           fake.NewSimpleClientset(),
+				iptablesProvider: &fakeIptablesProvider{},
+			},
+			podName:   "pod-no-proxy-outbound-port",
+			stdInData: goodStdinData,
+			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
+				pod.Annotations[keyInjectStatus] = "true"
+				pod.Annotations[keyTransparentProxyStatus] = "enabled"
+				cfg := iptables.Config{
+					ProxyUserID:      "123",
+					ProxyInboundPort: 20000,
+				}
+				iptablesConfigJson, err := json.Marshal(&cfg)
+				require.NoError(t, err)
+				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
+				require.NoError(t, err)
+
+				return pod
+			},
+			expectedErr:   nil,
+			expectedRules: true, // Rules will be applied
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_ = c.configuredPod(minimalPod(c.podName))
-			actual := cmd.cmdAdd(minimalSkelArgs(c.podName, defaultNamespace, c.stdInData))
-			require.Equal(t, c.expectedErr, actual)
+			_ = c.configuredPod(minimalPod(c.podName), c.cmd)
+			err := c.cmd.cmdAdd(minimalSkelArgs(c.podName, defaultNamespace, c.stdInData))
+			require.Equal(t, c.expectedErr, err)
+
+			// Check to see that rules have been generated
+			if c.expectedErr == nil && c.expectedRules {
+				require.NotEmpty(t, c.cmd.iptablesProvider.Rules())
+			}
 		})
 	}
 }
@@ -152,7 +214,7 @@ func TestParseAnnotation(t *testing.T) {
 	}{
 		{
 			name:       "Pod with iptables.Config annotation",
-			annotation: annotationTrafficRedirection,
+			annotation: annotationRedirectTraffic,
 			configurePod: func(pod *corev1.Pod) *corev1.Pod {
 				// Use iptables.Config so that if the Config struct ever changes that the test is still valid
 				cfg := iptables.Config{ProxyUserID: "1234"}
@@ -160,7 +222,7 @@ func TestParseAnnotation(t *testing.T) {
 				if err != nil {
 					t.Fatalf("could not marshal iptables config: %v", err)
 				}
-				pod.Annotations[annotationTrafficRedirection] = string(j)
+				pod.Annotations[annotationRedirectTraffic] = string(j)
 				return pod
 			},
 			expected: iptables.Config{
@@ -170,12 +232,12 @@ func TestParseAnnotation(t *testing.T) {
 		},
 		{
 			name:       "Pod without iptables.Config annotation",
-			annotation: annotationTrafficRedirection,
+			annotation: annotationRedirectTraffic,
 			configurePod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
 			expected: iptables.Config{},
-			err:      fmt.Errorf("could not find %s annotation for %s pod", annotationTrafficRedirection, defaultPodName),
+			err:      fmt.Errorf("could not find %s annotation for %s pod", annotationRedirectTraffic, defaultPodName),
 		},
 	}
 	for _, c := range cases {

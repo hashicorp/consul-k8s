@@ -255,14 +255,14 @@ function build_consul_local {
          return 1
       fi
    else
-      status "Building sequentially with go install"
+      status "Building sequentially with go build"
       for os in ${build_os}
       do
          for arch in ${build_arch}
          do
             outdir="pkg.bin.new/${extra_dir}${os}_${arch}"
             osarch="${os}/${arch}"
-            if test "${osarch}" == "darwin/arm" -o "${osarch}" == "darwin/arm64" -o "${osarch}" == "freebsd/arm64" -o "${osarch}" == "windows/arm" -o "${osarch}" == "windows/arm64"
+            if test "${osarch}" == "darwin/arm" -o "${osarch}" == "freebsd/arm64" -o "${osarch}" == "windows/arm" -o "${osarch}" == "windows/arm64"
             then
                continue
             fi
@@ -287,7 +287,7 @@ function build_consul_local {
             else
               OS_BIN_EXTENSION=""
             fi
-            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}"/control-plane${OS_BIN_EXTENSION} "${outdir}/${bin_name}"
+            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go build -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" -o "${outdir}/${bin_name}"
             if test $? -ne 0
             then
                err "ERROR: Failed to build Consul for ${osarch}"

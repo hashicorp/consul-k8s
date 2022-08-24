@@ -416,6 +416,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					Add: []corev1.Capability{netAdminCapability},
 				}
 			} else {
+
+				expectedSecurityContext.RunAsUser = pointer.Int64(initContainersUserAndGroupID)
+				expectedSecurityContext.RunAsGroup = pointer.Int64(initContainersUserAndGroupID)
 				expectedSecurityContext.RunAsNonRoot = pointer.Bool(true)
 				expectedSecurityContext.Privileged = pointer.Bool(false)
 				expectedSecurityContext.Capabilities = &corev1.Capabilities{
@@ -1215,8 +1218,8 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 				require.Nil(t, container.SecurityContext)
 			} else {
 				expectedSecurityContext := &corev1.SecurityContext{
-					RunAsUser:              pointer.Int64(copyContainerUserAndGroupID),
-					RunAsGroup:             pointer.Int64(copyContainerUserAndGroupID),
+					RunAsUser:              pointer.Int64(initContainersUserAndGroupID),
+					RunAsGroup:             pointer.Int64(initContainersUserAndGroupID),
 					RunAsNonRoot:           pointer.Bool(true),
 					ReadOnlyRootFilesystem: pointer.Bool(true),
 				}

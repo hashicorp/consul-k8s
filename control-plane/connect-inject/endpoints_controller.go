@@ -57,6 +57,9 @@ const (
 	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
+
+	// proxyDefaultInboundPort is the default inbound port for the proxy.
+	proxyDefaultInboundPort = 20000
 )
 
 type EndpointsController struct {
@@ -493,7 +496,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	proxyConfig.Upstreams = upstreams
 
-	proxyPort := 20000
+	proxyPort := proxyDefaultInboundPort
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
