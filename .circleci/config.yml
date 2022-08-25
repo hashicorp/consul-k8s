@@ -558,6 +558,38 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
 
+  acceptance-tproxy-cni:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: xlarge
+    parallelism: 6
+    steps:
+      - checkout
+      - install-prereqs
+      - create-kind-clusters:
+          version: "v1.22.4"
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+      - run: mkdir -p $TEST_RESULTS
+      - run-acceptance-tests:
+          failfast: true
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
   ##########################
   # CLEANUP CLOUD RESOURCES
   ##########################
@@ -1054,7 +1086,7 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
-      - acceptance-kind-cni-1-23:
+      - acceptance-tproxy-cni:
           context: consul-ci
           requires:
             - dev-upload-docker
