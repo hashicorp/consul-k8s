@@ -135,7 +135,7 @@ rollingUpdate:
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"75m","memory":"75Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"100Mi"},"requests":{"cpu":"75m","memory":"75Mi"}}' ]
 }
 
 @test "cni/DaemonSet: resources can be overridden" {
