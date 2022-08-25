@@ -841,6 +841,63 @@ jobs:
           fail_only: true
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+  acceptance-aks-cni-1-21:
+    parallelism: 6
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    docker:
+      # This image is built from test/docker/Test.dockerfile
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: terraform init & apply
+          working_directory: *aks-terraform-path
+          command: |
+            terraform init
+
+            terraform apply \
+              -var client_id="$ARM_CLIENT_ID" \
+              -var client_secret="$ARM_CLIENT_SECRET" \
+              -var cluster_count=2 \
+              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
+              -auto-approve
+
+            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+
+            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run-acceptance-tests:
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+      - run:
+          name: terraform destroy
+          working_directory: *aks-terraform-path
+          command: |
+            terraform destroy -auto-approve
+          when: always
+      - slack/status:
+          # temporarily sending to #cni-acceptance-tests channel
+          channel: C03V3K0040G
+          fail_only: true
+          failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-eks-1-19:
     parallelism: 6
     environment:
@@ -1231,13 +1288,13 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1250,9 +1307,9 @@ workflows:
       - cleanup-azure-resources
       - cleanup-eks-resources
       # Disable until we can use UBI images.
-      - acceptance-openshift:
-               requires:
-               - cleanup-azure-resources
+      # - acceptance-openshift:
+      #    requires:
+      #      - cleanup-azure-resources
       - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources
@@ -1268,16 +1325,17 @@ workflows:
       - acceptance-eks-cni-1-19:
           requires:
             # TODO: Cleanup on merge
-            #  - cleanup-eks-resources
+            - cleanup-eks-resources
             - dev-upload-docker
       - acceptance-aks-1-21:
           requires:
             - cleanup-azure-resources
             - dev-upload-docker
-      - acceptance-kind-1-23:
+      - acceptance-aks-cni-1-21:
           requires:
+            - cleanup-azure-resources
             - dev-upload-docker
-      - acceptance-kind-cni-1-23:
+      - acceptance-kind-1-23:
           requires:
             - dev-upload-docker
       - acceptance-kind-cni-1-23:
