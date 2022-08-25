@@ -1251,8 +1251,8 @@ workflows:
       - cleanup-eks-resources
       # Disable until we can use UBI images.
       - acceptance-openshift:
-               requires:
-               - cleanup-azure-resources
+          requires:
+            - cleanup-azure-resources
       - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources
@@ -1275,9 +1275,6 @@ workflows:
             - cleanup-azure-resources
             - dev-upload-docker
       - acceptance-kind-1-23:
-          requires:
-            - dev-upload-docker
-      - acceptance-kind-cni-1-23:
           requires:
             - dev-upload-docker
       - acceptance-kind-cni-1-23:
