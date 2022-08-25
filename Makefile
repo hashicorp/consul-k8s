@@ -91,10 +91,10 @@ acceptance-lint: ## Run linter in the control-plane directory.
 # without another plugin installed first
 kind-cni-calico:
 	kubectl create namespace calico-system ||true
-	kubectl create -f https://docs.projectcalico.org/archive/v3.24/manifests/tigera-operator.yaml
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
-	kubectl create -f https://docs.projectcalico.org/archive/v3.24/manifests/custom-resources.yaml
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@sleep 20 
 
 # ===========> Shared Targets
