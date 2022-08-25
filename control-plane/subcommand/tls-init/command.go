@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -176,13 +176,13 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCaFile != "" && c.flagKeyFile != "" {
 		c.log.Info("reading CA certificate from provided file")
-		caBytes, err = ioutil.ReadFile(c.flagCaFile)
+		caBytes, err = os.ReadFile(c.flagCaFile)
 		if err != nil {
 			c.log.Error("error reading provided CA file", "err", err)
 			return 1
 		}
 		c.log.Info("reading CA private key from provided file")
-		keyBytes, err = ioutil.ReadFile(c.flagKeyFile)
+		keyBytes, err = os.ReadFile(c.flagKeyFile)
 		if err != nil {
 			c.log.Error("error reading provided private key file", "err", err)
 			return 1

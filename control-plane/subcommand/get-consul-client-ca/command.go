@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -111,7 +111,7 @@ func (c *Command) Run(args []string) int {
 		return nil
 	}, backoff.NewConstantBackOff(1*time.Second))
 
-	err = ioutil.WriteFile(c.flagOutputFile, []byte(activeRoot), 0644)
+	err = os.WriteFile(c.flagOutputFile, []byte(activeRoot), 0644)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error writing CA file: %s", err))
 		return 1
@@ -154,11 +154,11 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 // consulServerAddr returns the consul server address
 // as a string in the <server_ip_or_dns_name>:<server_port> format.
 //
-// 1. If the server address is a cloud auto-join URL,
-//    it calls go-discover library to discover server addresses,
-//    picks the first address from the list and uses the provided port.
-// 2. Otherwise, it uses the address provided by the -server-addr
-//    and the -server-port flags.
+//  1. If the server address is a cloud auto-join URL,
+//     it calls go-discover library to discover server addresses,
+//     picks the first address from the list and uses the provided port.
+//  2. Otherwise, it uses the address provided by the -server-addr
+//     and the -server-port flags.
 func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
 
 	// First, check if the server address is a cloud auto-join string.

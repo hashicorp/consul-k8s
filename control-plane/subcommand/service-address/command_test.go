@@ -3,7 +3,7 @@ package serviceaddress
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,7 +97,7 @@ func TestRun_UnresolvableHostname(t *testing.T) {
 		UI:        ui,
 		k8sClient: k8s,
 	}
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	require.NoError(err)
 	defer os.RemoveAll(tmpDir)
 	outputFile := filepath.Join(tmpDir, "address.txt")
@@ -198,7 +198,7 @@ func TestRun_ServiceTypes(t *testing.T) {
 				UI:        ui,
 				k8sClient: k8s,
 			}
-			tmpDir, err := ioutil.TempDir("", "")
+			tmpDir, err := os.MkdirTemp("", "")
 			require.NoError(err)
 			defer os.RemoveAll(tmpDir)
 			outputFile := filepath.Join(tmpDir, "address.txt")
@@ -217,7 +217,7 @@ func TestRun_ServiceTypes(t *testing.T) {
 				require.Contains(ui.ErrorWriter.String(), c.ExpErr)
 			} else {
 				require.Equal(0, responseCode, ui.ErrorWriter.String())
-				actAddressBytes, err := ioutil.ReadFile(outputFile)
+				actAddressBytes, err := os.ReadFile(outputFile)
 				require.NoError(err)
 				require.Equal(c.ExpAddress, string(actAddressBytes))
 			}
@@ -289,7 +289,7 @@ func TestRun_FileWrittenAfterRetry(t *testing.T) {
 				k8sClient:     k8s,
 				retryDuration: 10 * time.Millisecond,
 			}
-			tmpDir, err := ioutil.TempDir("", "")
+			tmpDir, err := os.MkdirTemp("", "")
 			require.NoError(t, err)
 			defer os.RemoveAll(tmpDir)
 			outputFile := filepath.Join(tmpDir, "address.txt")
@@ -300,7 +300,7 @@ func TestRun_FileWrittenAfterRetry(t *testing.T) {
 				"-output-file", outputFile,
 			})
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-			actAddressBytes, err := ioutil.ReadFile(outputFile)
+			actAddressBytes, err := os.ReadFile(outputFile)
 			require.NoError(t, err)
 			require.Equal(t, ip, string(actAddressBytes))
 		})

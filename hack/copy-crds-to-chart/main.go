@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +35,7 @@ func realMain(helmPath string) error {
 
 		printf("processing %s", filepath.Base(path))
 
-		contentBytes, err := ioutil.ReadFile(path)
+		contentBytes, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ func realMain(helmPath string) error {
 
 		// Write it.
 		printf("writing to %s", destinationPath)
-		return ioutil.WriteFile(destinationPath, []byte(contents), 0644)
+		return os.WriteFile(destinationPath, []byte(contents), 0644)
 	})
 }
 

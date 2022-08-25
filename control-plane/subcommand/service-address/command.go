@@ -5,8 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -143,7 +143,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write the address to file.
-	err = ioutil.WriteFile(c.flagOutputFile, []byte(address), 0600)
+	err = os.WriteFile(c.flagOutputFile, []byte(address), 0600)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to write address to file: %s", err))
 		return 1

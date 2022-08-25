@@ -5,8 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -345,7 +345,7 @@ func (c *Command) Run(args []string) int {
 	var consulCACert []byte
 	if cfg.TLSConfig.CAFile != "" {
 		var err error
-		consulCACert, err = ioutil.ReadFile(cfg.TLSConfig.CAFile)
+		consulCACert, err = os.ReadFile(cfg.TLSConfig.CAFile)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
 			return 1
@@ -545,7 +545,7 @@ func (c *Command) Run(args []string) int {
 func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 	webhookConfigName := fmt.Sprintf("%s-connect-injector", c.flagResourcePrefix)
 	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, WebhookCAFilename)
-	caCert, err := ioutil.ReadFile(caPath)
+	caCert, err := os.ReadFile(caPath)
 	if err != nil {
 		return err
 	}

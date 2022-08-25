@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -285,7 +285,7 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 			c.logger.Error(fmt.Sprintf("Error closing envoy metrics body: %s", err.Error()))
 		}
 	}()
-	envoyMetricsBody, err := ioutil.ReadAll(envoyMetrics.Body)
+	envoyMetricsBody, err := io.ReadAll(envoyMetrics.Body)
 	if err != nil {
 		c.logger.Error("Could not read Envoy proxy metrics", "err", err)
 		http.Error(rw, fmt.Sprintf("Could not read Envoy proxy metrics: %s", err), http.StatusInternalServerError)
@@ -316,7 +316,7 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 			c.logger.Error(fmt.Sprintf("Error closing service metrics body: %s", err.Error()))
 		}
 	}()
-	serviceMetricsBody, err := ioutil.ReadAll(serviceMetrics.Body)
+	serviceMetricsBody, err := io.ReadAll(serviceMetrics.Body)
 	if err != nil {
 		c.logger.Error("Could not read service metrics", "err", err)
 		writeResponse(rw, serviceMetricSuccess(false), "service metrics success", c.logger)

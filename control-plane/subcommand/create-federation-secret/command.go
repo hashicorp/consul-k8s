@@ -6,7 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -137,7 +137,7 @@ func (c *Command) Run(args []string) int {
 	// Add gossip encryption key if it exists.
 	if c.flagGossipKeyFile != "" {
 		logger.Info("Retrieving gossip encryption key data")
-		gossipKey, err := ioutil.ReadFile(c.flagGossipKeyFile)
+		gossipKey, err := os.ReadFile(c.flagGossipKeyFile)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error reading gossip encryption key file: %s", err))
 			return 1
@@ -152,7 +152,7 @@ func (c *Command) Run(args []string) int {
 
 	// Add server CA cert.
 	logger.Info("Retrieving server CA cert data")
-	caCert, err := ioutil.ReadFile(c.flagServerCACertFile)
+	caCert, err := os.ReadFile(c.flagServerCACertFile)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error reading server CA cert file: %s", err))
 		return 1
@@ -162,7 +162,7 @@ func (c *Command) Run(args []string) int {
 
 	// Add server CA key.
 	logger.Info("Retrieving server CA key data")
-	caKey, err := ioutil.ReadFile(c.flagServerCAKeyFile)
+	caKey, err := os.ReadFile(c.flagServerCAKeyFile)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error reading server CA key file: %s", err))
 		return 1
@@ -432,7 +432,7 @@ func (c *Command) validateCAFileFlag() error {
 	if cfg.TLSConfig.CAFile == "" {
 		return errors.New("-ca-file or CONSUL_CACERT must be set")
 	}
-	_, err := ioutil.ReadFile(cfg.TLSConfig.CAFile)
+	_, err := os.ReadFile(cfg.TLSConfig.CAFile)
 	if err != nil {
 		return fmt.Errorf("error reading CA file: %s", err)
 	}

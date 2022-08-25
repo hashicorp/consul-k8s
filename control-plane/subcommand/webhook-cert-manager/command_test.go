@@ -2,7 +2,7 @@ package webhookcertmanager
 
 import (
 	"context"
-	"io/ioutil"
+
 	"os"
 	"syscall"
 	"testing"
@@ -88,7 +88,7 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 		}
 		cmd.init()
 
-		file, err := ioutil.TempFile("", "config.json")
+		file, err := os.CreateTemp("", "config.json")
 		require.NoError(t, err)
 		defer os.Remove(file.Name())
 
@@ -211,7 +211,7 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 	}
 	cmd.init()
 
-	file, err := ioutil.TempFile("", "config.json")
+	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
 	defer os.Remove(file.Name())
 
@@ -339,7 +339,7 @@ func TestRun_SecretExists(t *testing.T) {
 	}
 	cmd.init()
 
-	file, err := ioutil.TempFile("", "config.json")
+	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
 	defer os.Remove(file.Name())
 
@@ -439,7 +439,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 	}
 	cmd.init()
 
-	file, err := ioutil.TempFile("", "config.json")
+	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
 	defer os.Remove(file.Name())
 
@@ -629,7 +629,7 @@ func TestCertWatcher(t *testing.T) {
 	}
 	cmd.init()
 
-	file, err := ioutil.TempFile("", "config.json")
+	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
 	defer os.Remove(file.Name())
 

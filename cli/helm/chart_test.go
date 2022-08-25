@@ -8,6 +8,7 @@ import (
 )
 
 // Embed a test chart to test against.
+//
 //go:embed test_fixtures/consul/* test_fixtures/consul/templates/_helpers.tpl
 var testChartFiles embed.FS
 

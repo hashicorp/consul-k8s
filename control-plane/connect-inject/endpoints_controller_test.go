@@ -1830,13 +1830,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 // Tests updating an Endpoints object.
 //   - Tests updates via the register codepath:
-//     - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated.
-//     - When an address is added to an Endpoint, an additional service instance in Consul is registered.
-//     - When an address in an Endpoint is updated - via health check change - the corresponding service instance is updated.
+//   - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated.
+//   - When an address is added to an Endpoint, an additional service instance in Consul is registered.
+//   - When an address in an Endpoint is updated - via health check change - the corresponding service instance is updated.
 //   - Tests updates via the deregister codepath:
-//     - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
-//     - When an address is removed from an Endpoint *and there are no addresses left in the Endpoint*, the
+//   - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
+//   - When an address is removed from an Endpoint *and there are no addresses left in the Endpoint*, the
 //     corresponding service instance in Consul is deregistered.
+//
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 // This test covers EndpointsController.deregisterServiceOnAllAgents when services should be selectively deregistered

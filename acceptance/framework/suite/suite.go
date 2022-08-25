@@ -3,7 +3,7 @@ package suite
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -49,7 +49,7 @@ func (s *suite) Run() int {
 	// Create test debug directory if it doesn't exist
 	if s.cfg.DebugDirectory == "" {
 		var err error
-		s.cfg.DebugDirectory, err = ioutil.TempDir("", "consul-test")
+		s.cfg.DebugDirectory, err = os.MkdirTemp("", "consul-test")
 		if err != nil {
 			fmt.Printf("Failed to create debug directory: %s\n", err)
 			return 1
