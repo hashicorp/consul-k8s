@@ -86,7 +86,7 @@ func TestCommand_createAuthMethodTmpl(t *testing.T) {
 			Name:   secretName,
 			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			Annotations: map[string]string{
-				corev1.ServiceAccountNameKey: serviceAccountName,
+				v1.ServiceAccountNameKey: serviceAccountName,
 			},
 		},
 		Data: map[string][]byte{},
