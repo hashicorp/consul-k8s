@@ -1303,9 +1303,9 @@ workflows:
       - dev-upload-docker:
           requires:
             - build-distros-linux
-      # - cleanup-gcp-resources
-      # - cleanup-azure-resources
-      # - cleanup-eks-resources
+      - cleanup-gcp-resources
+      - cleanup-azure-resources
+      - cleanup-eks-resources
       # Disable until we can use UBI images.
       # - acceptance-openshift:
       #    requires:
@@ -1325,9 +1325,13 @@ workflows:
       - acceptance-eks-cni-1-19:
           requires:
             # TODO: Cleanup on merge
-            #  - cleanup-eks-resources
+            - cleanup-eks-resources
             - dev-upload-docker
       - acceptance-aks-1-21:
+          requires:
+            - cleanup-azure-resources
+            - dev-upload-docker
+      - acceptance-aks-cni-1-21:
           requires:
             - cleanup-azure-resources
             - dev-upload-docker
