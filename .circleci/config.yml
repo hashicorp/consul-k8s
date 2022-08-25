@@ -834,6 +834,70 @@ jobs:
           fail_only: true
           failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+  acceptance-eks-cni-1-19:
+    parallelism: 6
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    docker:
+      # This image is built from test/docker/Test.dockerfile
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: configure aws
+          command: |
+            aws configure --profile helm_user set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+            aws configure --profile helm_user set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+            aws configure set role_arn "$AWS_ROLE_ARN"
+            aws configure set source_profile helm_user
+
+            echo "unset AWS_ACCESS_KEY_ID" >> $BASH_ENV
+            echo "unset AWS_SECRET_ACCESS_KEY" >> $BASH_ENV
+
+      - run:
+          name: terraform init & apply
+          working_directory: *eks-terraform-path
+          command: |
+            terraform init
+
+            terraform apply -var cluster_count=2 -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" -auto-approve
+
+            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+
+            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run-acceptance-tests:
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+      - run:
+          name: terraform destroy
+          working_directory: *eks-terraform-path
+          command: |
+            terraform destroy -var cluster_count=2 -auto-approve
+          when: always
+
+      - slack/status:
+          # temporarily sending to #cni-acceptance-tests channel
+          channel: C03V3K0040G
+          fail_only: true
+          failure_message: "EKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-openshift:
     environment:
       TEST_RESULTS: /tmp/test-results
@@ -1128,6 +1192,11 @@ workflows:
       #     requires:
       #       - cleanup-eks-resources
       #       - dev-upload-docker
+      - acceptance-eks-cni-1-19:
+          requires:
+            # TODO: Cleanup on merge
+            #  - cleanup-eks-resources
+            - dev-upload-docker
       # - acceptance-aks-1-21:
       #     requires:
       #       - cleanup-azure-resources
