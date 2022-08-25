@@ -922,7 +922,7 @@ jobs:
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-cni-1-23:
-    parallelism: 6 
+    parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -1072,10 +1072,10 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-     # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
-     # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
-     # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
-     # be moved
+      # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
+      # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
+      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
+      # be moved
       - build-distro:
           OS: "linux"
           ARCH: "amd64 arm64"
@@ -1138,7 +1138,6 @@ workflows:
       - acceptance-kind-cni-1-23:
           requires:
             - dev-upload-docker
-
 
   nightly-acceptance-tests-consul:
     triggers:
