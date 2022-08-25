@@ -95,7 +95,7 @@ RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
-COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
+COPY dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
