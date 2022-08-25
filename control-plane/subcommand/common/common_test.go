@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -71,7 +70,7 @@ func TestConsulLogin(t *testing.T) {
 	_, err = ConsulLogin(client, params, log)
 	require.NoError(t, err)
 	// Validate that the token file was written to disk.
-	data, err := ioutil.ReadFile(tokenFile)
+	data, err := os.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.Equal(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
 }
@@ -119,7 +118,7 @@ func TestConsulLogin_Retries(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, numLoginCalls)
 	// Validate that the token file was written to disk.
-	data, err := ioutil.ReadFile(tokenFile)
+	data, err := os.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.Equal(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
 }
@@ -221,7 +220,7 @@ func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 	t.Parallel()
 	rand.Seed(time.Now().UnixNano())
 	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
-	err := ioutil.WriteFile(randFileName, []byte("foo"), os.FileMode(0444))
+	err := os.WriteFile(randFileName, []byte("foo"), os.FileMode(0444))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		os.Remove(randFileName)
@@ -229,7 +228,7 @@ func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 	payload := "abcd"
 	err = WriteFileWithPerms(randFileName, payload, os.FileMode(0444))
 	require.NoError(t, err)
-	data, err := ioutil.ReadFile(randFileName)
+	data, err := os.ReadFile(randFileName)
 	require.NoError(t, err)
 	require.Equal(t, payload, string(data))
 }
@@ -252,7 +251,7 @@ func TestWriteFileWithPerms(t *testing.T) {
 	require.Equal(t, file.Mode(), mode)
 	require.Equal(t, file.Size(), int64(len(payload)))
 	// Validate the data was written correctly.
-	data, err := ioutil.ReadFile(randFileName)
+	data, err := os.ReadFile(randFileName)
 	require.NoError(t, err)
 	require.Equal(t, payload, string(data))
 }

@@ -2,7 +2,6 @@ package connectinit
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -218,7 +217,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 			// Validate the ACL token was written.
-			tokenData, err := ioutil.ReadFile(tokenFile)
+			tokenData, err := os.ReadFile(tokenFile)
 			require.NoError(t, err)
 			require.NotEmpty(t, tokenData)
 
@@ -230,7 +229,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
 
 			// Validate contents of proxyFile.
-			data, err := ioutil.ReadFile(proxyFile)
+			data, err := os.ReadFile(proxyFile)
 			require.NoError(t, err)
 			if tt.multiport {
 				require.Contains(t, string(data), "counting-admin-sidecar-proxy-id")
@@ -340,7 +339,7 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 			// Validate contents of proxyFile.
-			data, err := ioutil.ReadFile(proxyFile)
+			data, err := os.ReadFile(proxyFile)
 			require.NoError(t, err)
 			if tt.multiport {
 				require.Contains(t, string(data), "counting-admin-sidecar-proxy-id")
@@ -576,7 +575,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	require.Equal(t, 0, code)
 
 	// Validate contents of proxyFile.
-	data, err := ioutil.ReadFile(proxyFile)
+	data, err := os.ReadFile(proxyFile)
 	require.NoError(t, err)
 	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
@@ -766,11 +765,11 @@ func TestRun_LoginWithRetries(t *testing.T) {
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, c.LoginAttemptsCount, counter)
 			// Validate that the token was written to disk if we succeeded.
-			tokenData, err := ioutil.ReadFile(tokenFile)
+			tokenData, err := os.ReadFile(tokenFile)
 			require.NoError(t, err)
 			require.Equal(t, "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586", string(tokenData))
 			// Validate contents of proxyFile.
-			proxydata, err := ioutil.ReadFile(proxyFile)
+			proxydata, err := os.ReadFile(proxyFile)
 			require.NoError(t, err)
 			require.Equal(t, "counting-counting-sidecar-proxy", string(proxydata))
 		})

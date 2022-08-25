@@ -5,7 +5,6 @@ package serveraclinit
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1216,7 +1215,7 @@ func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	partitionToken := "123e4567-e89b-12d3-a456-426614174000"
-	partitionTokenFile, err := ioutil.TempFile("", "partitiontoken")
+	partitionTokenFile, err := os.CreateTemp("", "partitiontoken")
 	require.NoError(t, err)
 	defer os.Remove(partitionTokenFile.Name())
 

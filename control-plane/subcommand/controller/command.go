@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -365,7 +365,7 @@ func (c *Command) updateWebhookCABundle() error {
 
 	webhookConfigName := fmt.Sprintf("%s-controller", c.flagResourcePrefix)
 	caPath := fmt.Sprintf("%s/%s", c.flagWebhookTLSCertDir, WebhookCAFilename)
-	caCert, err := ioutil.ReadFile(caPath)
+	caCert, err := os.ReadFile(caPath)
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -109,7 +109,7 @@ func (t *TestConfig) entImage() (string, error) {
 	}
 
 	// Unmarshal values.yaml to current global.image value.
-	valuesContents, err := ioutil.ReadFile(filepath.Join(t.helmChartPath, "values.yaml"))
+	valuesContents, err := os.ReadFile(filepath.Join(t.helmChartPath, "values.yaml"))
 	if err != nil {
 		return "", err
 	}

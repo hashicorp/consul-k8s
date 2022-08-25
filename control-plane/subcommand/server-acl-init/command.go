@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -988,7 +988,7 @@ func (c *Command) validateFlags() error {
 
 func loadTokenFromFile(tokenFile string) (string, error) {
 	// Load the bootstrap token from file.
-	tokenBytes, err := ioutil.ReadFile(tokenFile)
+	tokenBytes, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return "", fmt.Errorf("unable to read token from file %q: %s", tokenFile, err)
 	}

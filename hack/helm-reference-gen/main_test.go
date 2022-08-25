@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -493,15 +493,15 @@ key:
 
 // Test against a full values file and compare against a golden file.
 func TestFullValues(t *testing.T) {
-	inputBytes, err := ioutil.ReadFile(filepath.Join("fixtures", "full-values.yaml"))
+	inputBytes, err := os.ReadFile(filepath.Join("fixtures", "full-values.yaml"))
 	require.NoError(t, err)
-	expBytes, err := ioutil.ReadFile(filepath.Join("fixtures", "full-values.golden"))
+	expBytes, err := os.ReadFile(filepath.Join("fixtures", "full-values.golden"))
 	require.NoError(t, err)
 
 	actual, err := GenerateDocs(string(inputBytes))
 	require.NoError(t, err)
 	if actual != string(expBytes) {
-		require.NoError(t, ioutil.WriteFile(filepath.Join("fixtures", "full-values.actual"), []byte(actual), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join("fixtures", "full-values.actual"), []byte(actual), 0644))
 		require.FailNow(t, "output not equal, actual output to full-values.actual")
 	}
 }
