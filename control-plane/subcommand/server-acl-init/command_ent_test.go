@@ -5,7 +5,6 @@ package serveraclinit
 import (
 	"context"
 	"fmt"
-
 	"net/http"
 	"net/http/httptest"
 	"os"

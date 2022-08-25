@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-
 	"os"
 	"path/filepath"
 	"regexp"

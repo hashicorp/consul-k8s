@@ -4,7 +4,6 @@ package connectinit
 
 import (
 	"fmt"
-
 	"math/rand"
 	"os"
 	"testing"

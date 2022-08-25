@@ -2,7 +2,6 @@ package getconsulclientca
 
 import (
 	"fmt"
-
 	"os"
 	"strings"
 	"sync"

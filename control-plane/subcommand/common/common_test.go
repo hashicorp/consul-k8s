@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-
 	"math/rand"
 	"net/http"
 	"net/http/httptest"

@@ -2,7 +2,6 @@ package cert
 
 import (
 	"context"
-
 	"os"
 	"os/exec"
 	"path/filepath"

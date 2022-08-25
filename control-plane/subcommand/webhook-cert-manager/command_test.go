@@ -2,7 +2,6 @@ package webhookcertmanager
 
 import (
 	"context"
-
 	"os"
 	"syscall"
 	"testing"

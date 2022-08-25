@@ -2,7 +2,6 @@ package connectinit
 
 import (
 	"fmt"
-
 	"math/rand"
 	"net/http"
 	"net/http/httptest"

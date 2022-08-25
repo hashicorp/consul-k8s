@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-
 	"os"
 	"os/signal"
 	"strings"

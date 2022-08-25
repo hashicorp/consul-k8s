@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
