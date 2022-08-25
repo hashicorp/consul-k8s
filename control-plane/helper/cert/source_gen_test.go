@@ -2,7 +2,6 @@ package cert
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,15 +77,15 @@ func testGenSource() *GenSource {
 func testBundleDir(t *testing.T, bundle *Bundle, dir string) string {
 	if dir == "" {
 		// Create a temporary directory for storing the certs
-		td, err := ioutil.TempDir("", "consul")
+		td, err := os.MkdirTemp("", "consul")
 		require.NoError(t, err)
 		dir = td
 	}
 
 	// Write the cert
-	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "ca.pem"), bundle.CACert, 0644))
-	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "leaf.pem"), bundle.Cert, 0644))
-	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "leaf.key.pem"), bundle.Key, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ca.pem"), bundle.CACert, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "leaf.pem"), bundle.Cert, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "leaf.key.pem"), bundle.Key, 0644))
 
 	return dir
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -27,7 +26,7 @@ import (
 
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -100,7 +99,7 @@ func TestRun_FlagValidation(t *testing.T) {
 
 func TestRun_CAFileMissing(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -123,7 +122,7 @@ func TestRun_CAFileMissing(t *testing.T) {
 
 func TestRun_ServerCACertFileMissing(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -146,7 +145,7 @@ func TestRun_ServerCACertFileMissing(t *testing.T) {
 
 func TestRun_ServerCAKeyFileMissing(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -169,7 +168,7 @@ func TestRun_ServerCAKeyFileMissing(t *testing.T) {
 
 func TestRun_GossipEncryptionKeyFileMissing(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -193,7 +192,7 @@ func TestRun_GossipEncryptionKeyFileMissing(t *testing.T) {
 
 func TestRun_GossipEncryptionKeyFileEmpty(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -219,7 +218,7 @@ func TestRun_GossipEncryptionKeyFileEmpty(t *testing.T) {
 // token key, we return error.
 func TestRun_ReplicationTokenMissingExpectedKey(t *testing.T) {
 	t.Parallel()
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -425,9 +424,9 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 			gossipEncryptionKey := "oGaLv60gQ0E+Uvn+Lokz9APjbu5fJaYx7kglOmg4jZc="
 			var gossipKeyFile string
 			if c.gossipKey {
-				f, err := ioutil.TempFile("", "")
+				f, err := os.CreateTemp("", "")
 				require.NoError(t, err)
-				err = ioutil.WriteFile(f.Name(), []byte(gossipEncryptionKey), 0644)
+				err = os.WriteFile(f.Name(), []byte(gossipEncryptionKey), 0644)
 				require.NoError(t, err)
 				gossipKeyFile = f.Name()
 			}
@@ -463,13 +462,13 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 
 			// CA Cert
 			require.Contains(t, secret.Data, "caCert")
-			caFileBytes, err := ioutil.ReadFile(caFile)
+			caFileBytes, err := os.ReadFile(caFile)
 			require.NoError(t, err)
 			require.Equal(t, string(caFileBytes), string(secret.Data["caCert"]))
 
 			// CA Key
 			require.Contains(t, secret.Data, "caKey")
-			keyFileBytes, err := ioutil.ReadFile(keyFile)
+			keyFileBytes, err := os.ReadFile(keyFile)
 			require.NoError(t, err)
 			require.Equal(t, string(keyFileBytes), string(secret.Data["caKey"]))
 
@@ -1119,7 +1118,7 @@ func TestRun_Autoencrypt(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Contains(t, secret.Data, "caCert")
-	keyFileBytes, err := ioutil.ReadFile(keyFile)
+	keyFileBytes, err := os.ReadFile(keyFile)
 	require.NoError(t, err)
 	require.Equal(t, string(keyFileBytes), string(secret.Data["caCert"]))
 }

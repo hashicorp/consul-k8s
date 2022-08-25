@@ -1,10 +1,11 @@
 package connectinject
 
 import (
-	"github.com/stretchr/testify/require"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReady(t *testing.T) {
@@ -26,14 +27,14 @@ func TestReady(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "")
+			tmpDir, err := os.MkdirTemp("", "")
 			require.NoError(t, err)
 			if tt.certFileContents != nil {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, "tls.crt"), []byte(*tt.certFileContents), 0666)
+				err := os.WriteFile(filepath.Join(tmpDir, "tls.crt"), []byte(*tt.certFileContents), 0666)
 				require.NoError(t, err)
 			}
 			if tt.keyFileContents != nil {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, "tls.key"), []byte(*tt.keyFileContents), 0666)
+				err := os.WriteFile(filepath.Join(tmpDir, "tls.key"), []byte(*tt.keyFileContents), 0666)
 				require.NoError(t, err)
 			}
 			rc := ReadinessCheck{tmpDir}

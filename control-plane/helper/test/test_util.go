@@ -2,7 +2,6 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -26,13 +25,13 @@ const (
 func GenerateServerCerts(t *testing.T) (string, string, string) {
 	require := require.New(t)
 
-	caFile, err := ioutil.TempFile("", "ca")
+	caFile, err := os.CreateTemp("", "ca")
 	require.NoError(err)
 
-	certFile, err := ioutil.TempFile("", "cert")
+	certFile, err := os.CreateTemp("", "cert")
 	require.NoError(err)
 
-	certKeyFile, err := ioutil.TempFile("", "key")
+	certKeyFile, err := os.CreateTemp("", "key")
 	require.NoError(err)
 
 	// Generate CA
