@@ -17,6 +17,8 @@ const (
 	ipv4RegEx = `^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})`
 )
 
+var isIP = regexp.MustCompile(ipv4RegEx + "|" + ipv6RegEx)
+
 // EnvoyConfig represents the configuration retrieved from a config dump at the
 // admin endpoint. It wraps the Envoy ConfigDump struct to give us convenient
 // access to the different sections of the config.
@@ -205,12 +207,7 @@ func parseClusters(rawCfg map[string]interface{}, clusterMapping map[string][]st
 		for _, endpoint := range cluster.Cluster.LoadAssignment.Endpoints {
 			for _, lbEndpoint := range endpoint.LBEndpoints {
 				// Only add endpoints defined by IP addresses.
-				addr := lbEndpoint.Endpoint.Address.SocketAddress.Address
-				match, err := regexp.MatchString(ipv4RegEx+"|"+ipv6RegEx, addr)
-				if err != nil {
-					return clusters, err
-				}
-				if match {
+				if addr := lbEndpoint.Endpoint.Address.SocketAddress.Address; isIP.MatchString(addr) {
 					endpoints = append(endpoints, fmt.Sprintf("%s:%d", addr, int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)))
 				}
 			}
