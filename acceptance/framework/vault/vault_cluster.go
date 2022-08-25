@@ -160,14 +160,13 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 			_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        vaultServerServiceAccountName,
-					Annotations: map[string]string{"kubernetes.io/service-account.name": vaultServerServiceAccountName},
+					Annotations: map[string]string{corev1.ServiceAccountNameKey: vaultServerServiceAccountName},
 				},
-				Type: "kubernetes.io/service-account-token",
+				Type: corev1.SecretTypeServiceAccountToken,
 			}, metav1.CreateOptions{})
 			require.NoError(t, err)
 		}
 	})
-
 	v.ConfigureAuthMethod(t, v.vaultClient, "kubernetes", "https://kubernetes.default.svc", vaultServerServiceAccountName, namespace)
 }
 

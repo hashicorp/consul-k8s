@@ -2028,9 +2028,9 @@ func testClientWithServiceAccountAndSecrets() kubernetes.Interface {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "web-admin",
 			Namespace:   "default",
-			Annotations: map[string]string{"kubernetes.io/service-account.name": "web-admin"},
+			Annotations: map[string]string{corev1.ServiceAccountNameKey: "web-admin"},
 		},
-		Type: "kubernetes.io/service-account-token",
+		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	sa2 := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2041,10 +2041,10 @@ func testClientWithServiceAccountAndSecrets() kubernetes.Interface {
 	secret2 := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "web",
-			Annotations: map[string]string{"kubernetes.io/service-account.name": "web"},
+			Annotations: map[string]string{corev1.ServiceAccountNameKey: "web"},
 			Namespace:   "default",
 		},
-		Type: "kubernetes.io/service-account-token",
+		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	return fake.NewSimpleClientset(&ns, &sa1, &sa2, &secret1, &secret2)
 }

@@ -111,9 +111,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 			_, err = secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        authMethodRBACName,
-					Annotations: map[string]string{"kubernetes.io/service-account.name": authMethodRBACName},
+					Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
 				},
-				Type: "kubernetes.io/service-account-token",
+				Type: corev1.SecretTypeServiceAccountToken,
 			}, metav1.CreateOptions{})
 			require.NoError(t, err)
 		}

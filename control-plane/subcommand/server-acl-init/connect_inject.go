@@ -108,7 +108,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.A
 		}
 	}
 	// Because there could be multiple secrets attached to the service account,
-	// we need pick the first one of type "kubernetes.io/service-account-token".
+	// we need pick the first one of type corev1.SecretTypeServiceAccountToken.
 	// We will fetch the Secrets regardless of whether we created the Secret or Kubernetes did automatically.
 	for _, secretName := range secretNames {
 		var secret *apiv1.Secret
