@@ -54,6 +54,7 @@ type TestConfig struct {
 	DebugDirectory     string
 
 	UseKind bool
+	UseGKE  bool
 
 	helmChartPath string
 }
@@ -88,6 +89,10 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableCNI {
 		setIfNotEmpty(helmValues, "connectInject.cni.enabled", "true")
+		// GKE is currently the only cloud provider that uses a different CNI bin dir.
+		if t.UseGKE {
+			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/home/kubernetes/bin")
+		}
 	}
 
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
