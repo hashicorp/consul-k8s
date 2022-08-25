@@ -12,8 +12,8 @@ metadata:
     component: cni 
 spec:
   privileged: true
-  # Required to prevent escalations to root.
-  allowPrivilegeEscalation: false
+  # GKE requires that allowPrivilegeEscalation:true if privileged: true.
+  allowPrivilegeEscalation: true 
   volumes:
   - hostPath
   - secret

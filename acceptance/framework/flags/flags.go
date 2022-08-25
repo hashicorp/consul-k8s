@@ -42,6 +42,7 @@ type TestFlags struct {
 	flagDebugDirectory string
 
 	flagUseKind bool
+	flagUseGKE  bool
 
 	flagDisablePeering bool
 
@@ -106,6 +107,9 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagUseKind, "use-kind", false,
 		"If true, the tests will assume they are running against a local kind cluster(s).")
+	flag.BoolVar(&t.flagUseGKE, "use-gke", false,
+		"If true, the tests will assume they are running against a GKE cluster(s).")
+
 	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
 		"If true, the peering tests will not run.")
 
@@ -165,5 +169,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
 		UseKind:            t.flagUseKind,
+		UseGKE:             t.flagUseGKE,
 	}
 }
