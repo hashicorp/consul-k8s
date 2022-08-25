@@ -48,7 +48,6 @@ commands:
             wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
             tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
             sudo mv linux-amd64/helm /usr/local/bin/helm
-
   create-kind-clusters:
     parameters:
       version:
@@ -59,6 +58,18 @@ commands:
           command: |
             kind create cluster --name dc1 --image kindest/node:<< parameters.version >>
             kind create cluster --name dc2 --image kindest/node:<< parameters.version >>
+  create-kind-cni-clusters:
+    parameters:
+      version:
+        type: string
+    steps:
+      - run:
+          name: Create CNI kind clusters
+          command: |
+            kind create cluster --config=acceptance/framework/environment/cni-kind/kind.config --name dc1 --image kindest/node:<< parameters.version >>
+            make kind-cni-calico
+            kind create cluster --config=acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:<< parameters.version >>
+            make kind-cni-calico
   run-acceptance-tests:
     parameters:
       failfast:
@@ -547,6 +558,38 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
 
+  acceptance-tproxy-cni:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: xlarge
+    parallelism: 6
+    steps:
+      - checkout
+      - install-prereqs
+      - create-kind-clusters:
+          version: "v1.22.4"
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+      - run: mkdir -p $TEST_RESULTS
+      - run-acceptance-tests:
+          failfast: true
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
   ##########################
   # CLEANUP CLOUD RESOURCES
   ##########################
@@ -878,6 +921,42 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+  acceptance-kind-cni-1-23:
+    parallelism: 6 
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - install-prereqs
+      - create-kind-cni-clusters:
+          version: "v1.23.0"
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - run:
+          name: go mod download
+          working_directory: *acceptance-mod-path
+          command: go mod download
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+      - run: mkdir -p $TEST_RESULTS
+      - run-acceptance-tests:
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+      - slack/status:
+          # temporarily sending to #cni-acceptance-tests channel
+          channel: C03V3K0040G
+          fail_only: true
+          failure_message: "Acceptance tests for CNI against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-kind-1-23-consul-nightly-1-11:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1010,6 +1089,10 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
+      - acceptance-tproxy-cni:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
       - acceptance-tproxy:
           context: consul-ci
           requires:
@@ -1052,6 +1135,10 @@ workflows:
       - acceptance-kind-1-23:
           requires:
             - dev-upload-docker
+      - acceptance-kind-cni-1-23:
+          requires:
+            - dev-upload-docker
+
 
   nightly-acceptance-tests-consul:
     triggers:

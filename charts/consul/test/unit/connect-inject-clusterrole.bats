@@ -32,7 +32,7 @@ load _helpers
 #--------------------------------------------------------------------
 # rules
 
-@test "connectInject/ClusterRole: sets get, list, and watch access to endpoints, services, and namespaces in all api groups" {
+@test "connectInject/ClusterRole: sets get, list, and watch access to endpoints, services, namespaces and nodes in all api groups" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -49,6 +49,9 @@ load _helpers
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.resources[| index("namespaces")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.resources[| index("nodes")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)

@@ -28,6 +28,9 @@ import (
 // a command line arg or an environment variable.
 func TestSnapshotAgent_K8sSecret(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.EnableCNI {
+		t.Skipf("skipping because -enable-cni is set and snapshot agent is already tested with regular tproxy")
+	}
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
 	ns := kubectlOptions.Namespace

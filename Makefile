@@ -66,7 +66,14 @@ cni-plugin-lint:
 ctrl-generate: get-controller-gen ## Run CRD code generation.
 	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
-
+# Helper target for doing local cni acceptance testing
+kind-cni:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image kindest/node:v1.23.6
+	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:v1.23.6
+	make kind-cni-calico
 
 
 # ===========> CLI Targets
@@ -75,13 +82,20 @@ cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
 
 
-
-
 # ===========> Acceptance Tests Targets
 
 acceptance-lint: ## Run linter in the control-plane directory.
 	cd acceptance; golangci-lint run -c ../.golangci.yml
 
+# For CNI acceptance tests, the calico CNI pluging needs to be installed on Kind. Our consul-cni plugin will not work 
+# without another plugin installed first
+kind-cni-calico:
+	kubectl create namespace calico-system ||true
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
+	# Sleeps are needed as installs can happen too quickly for Kind to handle it
+	@sleep 30
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
+	@sleep 20 
 
 # ===========> Shared Targets
 
