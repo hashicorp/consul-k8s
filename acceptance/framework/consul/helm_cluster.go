@@ -111,9 +111,16 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Fail if there are any existing installations of the Helm chart.
 	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
 
-	chartName := "hashicorp/consul"
-	if h.helmOptions.Version == config.HelmChartPath {
-		chartName = config.HelmChartPath
+	chartName := config.HelmChartPath
+	if h.helmOptions.Version != config.HelmChartPath {
+		chartName = "hashicorp/consul"
+		helm.AddRepo(t, h.helmOptions, "hashicorp", "https://helm.releases.hashicorp.com")
+		// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
+		// asserting a chart version on Install which would fail in an obvious way should this not succeed.
+		_, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+		if err != nil {
+			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
+		}
 	}
 	helm.Install(t, h.helmOptions, chartName, h.releaseName)
 
