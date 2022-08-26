@@ -10,7 +10,7 @@ executors:
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
-slack-channel: &slack-channel C03V3K0040G
+slack-channel: &slack-channel CBXF3CGAF
 control-plane-path: &control-plane-path control-plane
 cli-path: &cli-path cli
 acceptance-mod-path: &acceptance-mod-path acceptance
@@ -565,7 +565,7 @@ jobs:
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
-    parallelism: 6
+    parallelism: 3
     steps:
       - checkout
       - install-prereqs
@@ -722,7 +722,7 @@ jobs:
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-gke-cni-1-20:
-    parallelism: 6
+    parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -847,7 +847,7 @@ jobs:
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-cni-1-21:
-    parallelism: 6
+    parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -966,7 +966,7 @@ jobs:
           failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-cni-1-19:
-    parallelism: 6
+    parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -1118,7 +1118,7 @@ jobs:
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-cni-1-23:
-    parallelism: 6
+    parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -1296,13 +1296,13 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    # triggers:
-    #   - schedule:
-    #       cron: "0 0 * * *"
-    #       filters:
-    #         branches:
-    #           only:
-    #             - main
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
     jobs:
       - build-distro:
           OS: "linux"
