@@ -1,9 +1,36 @@
 ## UNRELEASED
+
 FEATURES:
 * MaxInboundConnections in service-defaults CRD
   * Add support for MaxInboundConnections on the Service Defaults CRD. [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1437)]
 * Consul CNI Plugin
   * CNI Plugin for Consul-k8s [[GH-1465](https://github.com/hashicorp/consul-k8s/pull/1456)]
+* Kubernetes 1.24 Support
+  * Add support for Kubernetes 1.24 where ServiceAccounts no longer have long term JWT tokens. [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
+  * Upgrade kubeVersion in helm chart to support Kubernetes 1.21+.
+
+BREAKING CHANGES:
+* Kubernetes 1.24 Support
+  * Users deploying multiple services to the same Pod (multiport) on Kubernetes 1.24+ must also deploy a Kube Secret for each ServiceAccount associated with the Consul service. The name of the Secret must match the ServiceAccount name and be of type 'kubernetes.io/service-account-token'
+
+Example:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: svc1
+  annotations:
+    kubernetes.io/service-account.name: svc1
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: svc2
+  annotations:
+    kubernetes.io/service-account.name: svc2
+type: kubernetes.io/service-account-token
+```
 
 IMPROVEMENTS:
 * CLI:
@@ -11,10 +38,6 @@ IMPROVEMENTS:
   * Display a message when `proxy list` returns no results. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
   * Display a warning when a user passes a field and table filter combination to `proxy read` where the given field is not present in any of the output tables. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
 
-FEATURES:
-* Kubernetes 1.24
-  * Add support for Kubernetes 1.24 where ServiceAccounts no longer have long term JWT tokens. [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
-  * Upgrade kubeVersion in helm chart to support Kubernetes 1.21+.
 
 ## 0.47.1 (August 12, 2022)
 
