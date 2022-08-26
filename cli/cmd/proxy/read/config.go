@@ -5,19 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 )
-
-const (
-	ipv6RegEx = `^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$`
-	ipv4RegEx = `^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})`
-)
-
-var isIP = regexp.MustCompile(ipv4RegEx + "|" + ipv6RegEx)
 
 // EnvoyConfig represents the configuration retrieved from a config dump at the
 // admin endpoint. It wraps the Envoy ConfigDump struct to give us convenient
@@ -207,7 +200,7 @@ func parseClusters(rawCfg map[string]interface{}, clusterMapping map[string][]st
 		for _, endpoint := range cluster.Cluster.LoadAssignment.Endpoints {
 			for _, lbEndpoint := range endpoint.LBEndpoints {
 				// Only add endpoints defined by IP addresses.
-				if addr := lbEndpoint.Endpoint.Address.SocketAddress.Address; isIP.MatchString(addr) {
+				if addr := lbEndpoint.Endpoint.Address.SocketAddress.Address; net.ParseIP(addr) != nil {
 					endpoints = append(endpoints, fmt.Sprintf("%s:%d", addr, int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)))
 				}
 			}
