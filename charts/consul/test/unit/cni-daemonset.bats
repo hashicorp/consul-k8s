@@ -60,7 +60,6 @@ load _helpers
       -s templates/cni-daemonset.yaml \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.cni.multus=foo' \
       --set 'connectInject.cni.logLevel=bar' \
       --set 'connectInject.cni.cniBinDir=baz' \
       --set 'connectInject.cni.cniNetDir=foo' \
@@ -74,10 +73,6 @@ load _helpers
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("install-cni"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("multus=foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |

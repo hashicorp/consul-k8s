@@ -60,7 +60,6 @@ spec:
           command:
             - consul-k8s-control-plane
             - install-cni
-            - -multus={{ .Values.connectInject.cni.multus }}
             - -log-level={{ default .Values.global.logLevel .Values.connectInject.cni.logLevel }}
             - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
             - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
