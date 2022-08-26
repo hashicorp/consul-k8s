@@ -295,22 +295,31 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Info(fmt.Sprintf("service: %s", svc))
 			if w.AuthMethod != "" {
 				if svc != "" && pod.Spec.ServiceAccountName != svc {
+					secretName := ""
 					sa, err := w.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
 					if err != nil {
 						w.Log.Error(err, "couldn't get service accounts")
 						return admission.Errored(http.StatusInternalServerError, err)
 					}
 					if len(sa.Secrets) == 0 {
+						// Check to see if there is a secret with the same name as the ServiceAccount for Kube-1.24+.
 						w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
-						return admission.Errored(http.StatusInternalServerError, fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
+						sec, err := w.Clientset.CoreV1().Secrets(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
+						if err != nil {
+							w.Log.Error(err, "couldn't get Secret associated with Service Account")
+							return admission.Errored(http.StatusInternalServerError, err)
+						}
+						secretName = sec.Name
+						w.Log.Info(fmt.Sprintf("fetched secret: %s", secretName))
+					} else {
+						secretName = sa.Secrets[0].Name
 					}
-					saSecret := sa.Secrets[0].Name
-					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
+					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", secretName)
 					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 						Name: fmt.Sprintf("%s-service-account", svc),
 						VolumeSource: corev1.VolumeSource{
 							Secret: &corev1.SecretVolumeSource{
-								SecretName: saSecret,
+								SecretName: secretName,
 							},
 						},
 					})

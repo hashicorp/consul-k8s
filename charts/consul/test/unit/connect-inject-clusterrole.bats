@@ -125,7 +125,7 @@ load _helpers
   [ "${actual}" != null ]
 }
 
-@test "connectInject/ClusterRole: sets get access to serviceaccounts when manageSystemACLSis true" {
+@test "connectInject/ClusterRole: sets get access to serviceaccounts and secrets when manageSystemACLSis true" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -137,6 +137,9 @@ load _helpers
       yq -r '.rules[0]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("serviceaccounts")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.resources[| index("secrets")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)

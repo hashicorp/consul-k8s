@@ -11,6 +11,11 @@ IMPROVEMENTS:
   * Display a message when `proxy list` returns no results. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
   * Display a warning when a user passes a field and table filter combination to `proxy read` where the given field is not present in any of the output tables. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
 
+FEATURES:
+* Kubernetes 1.24
+  * Add support for Kubernetes 1.24 where ServiceAccounts no longer have long term JWT tokens. [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
+  * Upgrade kubeVersion in helm chart to support Kubernetes 1.21+.
+
 ## 0.47.1 (August 12, 2022)
 
 BUG FIXES:
