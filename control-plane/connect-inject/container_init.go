@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	InjectInitCopyContainerName = "copy-consul-bin"
-	InjectInitContainerName     = "consul-connect-inject-init"
-	rootUserAndGroupID          = 0
-	envoyUserAndGroupID         = 5995
-	copyContainerUserAndGroupID = 5996
-	netAdminCapability          = "NET_ADMIN"
-	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
+	InjectInitCopyContainerName  = "copy-consul-bin"
+	InjectInitContainerName      = "consul-connect-inject-init"
+	rootUserAndGroupID           = 0
+	envoyUserAndGroupID          = 5995
+	initContainersUserAndGroupID = 5996
+	netAdminCapability           = "NET_ADMIN"
+	dnsServiceHostEnvSuffix      = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {
@@ -60,6 +60,10 @@ type initContainerCommandData struct {
 	// i.e. run consul connect redirect-traffic command and add the required privileges to the
 	// container to do that.
 	EnableTransparentProxy bool
+
+	// EnableCNI configures this init container to skip the redirect-traffic command as traffic
+	// redirection is handled by the CNI plugin on pod creation.
+	EnableCNI bool
 
 	// TProxyExcludeInboundPorts is a list of inbound ports to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
@@ -118,8 +122,8 @@ func (w *MeshWebhook) initCopyContainer() corev1.Container {
 	if !w.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
 			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
-			RunAsUser:              pointer.Int64(copyContainerUserAndGroupID),
-			RunAsGroup:             pointer.Int64(copyContainerUserAndGroupID),
+			RunAsUser:              pointer.Int64(initContainersUserAndGroupID),
+			RunAsGroup:             pointer.Int64(initContainersUserAndGroupID),
 			RunAsNonRoot:           pointer.Bool(true),
 			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}
@@ -161,6 +165,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
 		ConsulCACert:               w.ConsulCACert,
 		EnableTransparentProxy:     tproxyEnabled,
+		EnableCNI:                  w.EnableCNI,
 		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
@@ -297,15 +302,27 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if tproxyEnabled {
 		// Running consul connect redirect-traffic with iptables
 		// requires both being a root user and having NET_ADMIN capability.
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:  pointer.Int64(rootUserAndGroupID),
-			RunAsGroup: pointer.Int64(rootUserAndGroupID),
-			// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-			RunAsNonRoot: pointer.Bool(false),
-			Privileged:   pointer.Bool(true),
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{netAdminCapability},
-			},
+		if !w.EnableCNI {
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:  pointer.Int64(rootUserAndGroupID),
+				RunAsGroup: pointer.Int64(rootUserAndGroupID),
+				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
+				RunAsNonRoot: pointer.Bool(false),
+				Privileged:   pointer.Bool(true),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{netAdminCapability},
+				},
+			}
+		} else {
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
+				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
+				RunAsNonRoot: pointer.Bool(true),
+				Privileged:   pointer.Bool(false),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			}
 		}
 	}
 
@@ -457,6 +474,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 
 {{- if .EnableTransparentProxy }}
+{{- if not .EnableCNI }}
 {{- /* The newline below is intentional to allow extra space
        in the rendered template between this and the previous commands. */}}
 
@@ -488,5 +506,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid={{ .EnvoyUID }}
+{{- end }}
 {{- end }}
 `

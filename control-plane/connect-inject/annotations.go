@@ -5,6 +5,10 @@ const (
 	// a pod after an injection is done.
 	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
 
+	// keyTransparentProxyStatus is the key of the annotation that is added to
+	// a pod when transparent proxy is done.
+	keyTransparentProxyStatus = "consul.hashicorp.com/transparent-proxy-status"
+
 	// keyManagedBy is the key of the label that is added to pods managed
 	// by the Endpoints controller. This is to support upgrading from consul-k8s
 	// without Endpoints controller to consul-k8s with Endpoints controller
@@ -148,6 +152,10 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
+	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
+	// iptables rules.
+	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
+
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/meshWebhook.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
@@ -164,8 +172,11 @@ const (
 	// by the peering controllers.
 	labelPeeringToken = "consul.hashicorp.com/peering-token"
 
-	// injected is used as the annotation value for annotationInjected.
+	// injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	injected = "injected"
+
+	// enabled is used as the annotation value for keyTransparentProxyStatus.
+	enabled = "enabled"
 
 	// endpointsController is the value for keyManagedBy.
 	managedByValue = "consul-k8s-endpoints-controller"

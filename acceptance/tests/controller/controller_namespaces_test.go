@@ -33,6 +33,9 @@ const (
 // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestControllerNamespaces(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.EnableCNI {
+		t.Skipf("skipping because -enable-cni is set and controller is already tested with regular tproxy")
+	}
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}

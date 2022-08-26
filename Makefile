@@ -15,7 +15,7 @@ bats-tests: ## Run Helm chart bats tests.
 # ===========> Control Plane Targets
 
 control-plane-dev: ## Build consul-k8s-control-plane binary.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o $(GOOS) -a $(GOARCH)
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
 
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
@@ -57,13 +57,23 @@ control-plane-clean: ## Delete bin and pkg dirs.
 		$(CURDIR)/control-plane/bin \
 		$(CURDIR)/control-plane/pkg
 
-control-plane-lint: ## Run linter in the control-plane directory.
+control-plane-lint: cni-plugin-lint ## Run linter in the control-plane directory.
 	cd control-plane; golangci-lint run -c ../.golangci.yml
+
+cni-plugin-lint:
+	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
 	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
-
+# Helper target for doing local cni acceptance testing
+kind-cni:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image kindest/node:v1.23.6
+	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:v1.23.6
+	make kind-cni-calico
 
 
 # ===========> CLI Targets
@@ -72,21 +82,28 @@ cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
 
 
-
-
 # ===========> Acceptance Tests Targets
 
 acceptance-lint: ## Run linter in the control-plane directory.
 	cd acceptance; golangci-lint run -c ../.golangci.yml
 
+# For CNI acceptance tests, the calico CNI pluging needs to be installed on Kind. Our consul-cni plugin will not work 
+# without another plugin installed first
+kind-cni-calico:
+	kubectl create namespace calico-system ||true
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
+	# Sleeps are needed as installs can happen too quickly for Kind to handle it
+	@sleep 30
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
+	@sleep 20 
 
 # ===========> Shared Targets
 
 help: ## Show targets and their descriptions.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-38s\033[0m %s\n", $$1, $$2}'
 
-lint: ## Run linter in the control-plane, cli, and acceptance directories.
-	for p in control-plane cli acceptance; do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
+lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance directories.
+	for p in control-plane cli acceptance;  do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
 
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
@@ -132,6 +149,7 @@ SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 DEV_IMAGE?=consul-k8s-control-plane-dev
+DOCKER_HUB_USER=$(shell cat $(HOME)/.dockerhub)
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)

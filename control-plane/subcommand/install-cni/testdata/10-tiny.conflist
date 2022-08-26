@@ -1,0 +1,12 @@
+{
+  "name": "k8s-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "calico"
+    },
+    {
+      "type": "bandwidth"
+    }
+  ]
+}

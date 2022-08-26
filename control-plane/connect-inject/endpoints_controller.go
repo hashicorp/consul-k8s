@@ -57,6 +57,9 @@ const (
 	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
 	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
 	exposedPathsStartupPortsRangeStart = 20500
+
+	// proxyDefaultInboundPort is the default inbound port for the proxy.
+	proxyDefaultInboundPort = 20000
 )
 
 type EndpointsController struct {
@@ -182,7 +185,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 				serviceName, ok := pod.Annotations[annotationKubernetesService]
 				if ok && serviceEndpoints.Name != serviceName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-					// deregistration for service instances that don't match the annotation happens later because we don't add this pod to the endpointAddressMap.
+					// deregistration for service instances that don't match the annotation happens
+					// later because we don't add this pod to the endpointAddressMap.
 					continue
 				}
 
@@ -287,7 +291,6 @@ func (r *EndpointsController) registerServicesAndHealthCheck(pod corev1.Pod, ser
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -493,7 +496,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	proxyConfig.Upstreams = upstreams
 
-	proxyPort := 20000
+	proxyPort := proxyDefaultInboundPort
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
@@ -636,7 +639,6 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			}
 		}
 	}
-
 	return service, proxyService, nil
 }
 
@@ -901,7 +903,6 @@ func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstre
 	preparedQuery = strings.TrimSpace(parts[1])
 	var upstream api.Upstream
 	if port > 0 {
-
 		upstream = api.Upstream{
 			DestinationType: api.UpstreamDestTypePreparedQuery,
 			DestinationName: preparedQuery,
@@ -974,7 +975,6 @@ func (r *EndpointsController) processUnlabeledUpstream(pod corev1.Pod, rawUpstre
 		}
 	}
 	return upstream, nil
-
 }
 
 // processLabeledUpstream processes an upstream in the format:
@@ -1023,7 +1023,6 @@ func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream
 		default:
 			return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 		}
-
 	} else {
 		switch len(pieces) {
 		case 4:
@@ -1042,7 +1041,6 @@ func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream
 		default:
 			return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 		}
-
 	}
 
 	if port > 0 {
@@ -1057,7 +1055,6 @@ func (r *EndpointsController) processLabeledUpstream(pod corev1.Pod, rawUpstream
 		}
 	}
 	return upstream, nil
-
 }
 
 // remoteConsulClient returns an *api.Client that points at the consul agent local to the pod for a provided namespace.

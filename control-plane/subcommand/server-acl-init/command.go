@@ -742,17 +742,17 @@ type gatewayRulesGenerator func(name, namespace string) (string, error)
 type ConfigureGatewayParams struct {
 	// GatewayType specifies whether it is an ingress or terminating gateway.
 	GatewayType string
-	//GatewayNames is the collection of gateways that have been specified.
+	// GatewayNames is the collection of gateways that have been specified.
 	GatewayNames []string
-	//AuthMethodName is the authmethod for which to register the binding rules and policies for the gateways
+	// AuthMethodName is the authmethod for which to register the binding rules and policies for the gateways
 	AuthMethodName string
-	//RuleGenerator is the function that supplies the rules that will be added to the policy.
+	// RuleGenerator is the function that supplies the rules that will be added to the policy.
 	RulesGenerator gatewayRulesGenerator
-	//ConsulDC is the name of the DC where the gateways will be registered
+	// ConsulDC is the name of the DC where the gateways will be registered
 	ConsulDC string
-	//PrimaryDC is the name of the Primary Data Center
+	// PrimaryDC is the name of the Primary Data Center
 	PrimaryDC string
-	//Primary specifies whether the ConsulDC is the Primary Data Center
+	// Primary specifies whether the ConsulDC is the Primary Data Center
 	Primary bool
 }
 
@@ -954,7 +954,7 @@ func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
-	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	invalidDnsRe := regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
 	const maxDNSLabelLength = 63
 
 	if invalidDnsRe.MatchString(c.flagSyncConsulNodeName) {
