@@ -12,7 +12,7 @@
 
 The `consul-k8s-control-plane` binary includes first-class integrations between Consul and
 Kubernetes. The project encapsulates multiple use cases such as syncing
-services, injecting Connect sidecars, and more.
+services, injecting Consul sidecars, and more.
 The Kubernetes integrations with Consul are
 [documented directly on the Consul website](https://www.consul.io/docs/platform/k8s/index.html).
 
@@ -30,8 +30,8 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
 ## Features
     
-  * [**Consul Service Mesh (Connect)**](https://www.consul.io/docs/k8s/connect):
-    Run Consul Service Mesh (aka Consul Connect) on Kubernetes. This feature
+  * [**Consul Service Mesh**](https://www.consul.io/docs/k8s/connect):
+    Run Consul Service Mesh on Kubernetes. This feature
     injects Envoy sidecars and registers your Pods with Consul.
     
   * [**Catalog Sync**](https://www.consul.io/docs/k8s/service-sync):
@@ -67,7 +67,7 @@ use Consul with Kubernetes, please see the
 
 ### Prerequisites
   * **Helm 3.2+** (Helm 2 is not supported)
-  * **Kubernetes 1.21+** - This is the earliest version of Kubernetes tested.
+  * **Kubernetes 1.21-1.24** - This is the earliest version of Kubernetes tested.
     It is possible that this chart works with earlier versions, but it is
     untested.
 
