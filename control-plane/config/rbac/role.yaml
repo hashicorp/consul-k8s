@@ -86,6 +86,28 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - terminatinggatewayservices
+- apiGroups:
+    - consul.hashicorp.com
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
+    - consul.hashicorp.com
+  resources:
   - peeringacceptors
   verbs:
   - create
@@ -259,6 +281,26 @@ rules:
   - consul.hashicorp.com
   resources:
   - terminatinggateways/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - terminatinggatewayservices/status
   verbs:
   - get
   - patch

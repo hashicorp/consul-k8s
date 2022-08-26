@@ -1,0 +1,608 @@
+{{- if and .Values.connectInject.enabled .Values.global.peering.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: terminatinggatewayservices.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: TerminatingGatewayService
+    listKind: TerminatingGatewayServiceList
+    plural: terminatinggatewayservices
+    singular: terminatinggatewayservice
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: TerminatingGatewayService is the Schema for the terminatinggatewayservices
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TerminatingGatewayServiceSpec defines the desired state of
+              TerminatingGatewayService.
+            properties:
+              service:
+                description: CatalogRegistration contains information about a service,
+                  needed for registration or de-registration.
+                properties:
+                  SkipNodeUpdate:
+                    description: SkipNodeUpdate specifies whether to skip updating
+                      the node's information in the registration.
+                    type: boolean
+                  address:
+                    description: Address specifies the address to register.
+                    type: string
+                  check:
+                    description: Check specifies to register a check.
+                    properties:
+                      checkID:
+                        description: CheckID can be omitted and will default to the
+                          value of Name.
+                        type: string
+                      definition:
+                        description: Definition specifies the definition associated
+                          with the check.
+                        properties:
+                          DeregisterCriticalServiceAfter:
+                            description: DeregisterCriticalServiceAfter DEPRECATED
+                              in Consul 1.4.1. Use the above time.Duration fields
+                              instead.
+                            format: int64
+                            type: integer
+                          GRPC:
+                            description: GRPC specifies a gRPC check's endpoint that
+                              supports the standard gRPC health checking protocol.
+                            type: string
+                          GRPCUseTLS:
+                            description: GRPCUseTLS specifies whether to use TLS for
+                              this gRPC health check.
+                            type: boolean
+                          TCP:
+                            description: TCP specifies a TCP to connect against the
+                              value of TCP (expected to be an IP or hostname plus
+                              port combination) every Interval
+                            type: string
+                          TLSServerName:
+                            description: TLSServerName specifies an optional string
+                              used to set the SNI host when connecting via TLS.
+                            type: string
+                          TLSSkipVerify:
+                            description: TLSSkipVerify specifies if the certificate
+                              for an HTTPS check should not be verified.
+                            type: boolean
+                          UDP:
+                            description: UDP specifies the UDP associated with this
+                              HealthCheckDefinition
+                            type: string
+                          body:
+                            description: Body specifies a body that should be sent
+                              with HTTP checks.
+                            type: string
+                          deregisterCriticalServiceAfterDuration:
+                            description: DeregisterCriticalServiceAfterDuration specifies
+                              that checks associated with a service should deregister
+                              after this time.
+                            format: int64
+                            type: integer
+                          header:
+                            additionalProperties:
+                              items:
+                                type: string
+                              type: array
+                            description: Header specifies a set of headers that should
+                              be set for HTTP checks
+                            type: object
+                          http:
+                            description: HTTP specifies an HTTP check to perform a
+                              GET request against the value of HTTP (expected to be
+                              a URL) every Interval.
+                            type: string
+                          interval:
+                            description: Interval DEPRECATED in Consul 1.4.1. Use
+                              the above time.Duration fields instead.
+                            format: int64
+                            type: integer
+                          intervalDuration:
+                            description: IntervalDuration specifies the frequency
+                              at which to run this check. This is required for HTTP
+                              and TCP checks.
+                            format: int64
+                            type: integer
+                          method:
+                            description: Method specifies a different HTTP method
+                              to be used for an HTTP check.
+                            type: string
+                          timeout:
+                            description: Timeout DEPRECATED in Consul 1.4.1. Use the
+                              above time.Duration fields instead.
+                            format: int64
+                            type: integer
+                          timeoutDuration:
+                            description: TimeoutDuration specifies a timeout for outgoing
+                              connections in the case of a Script, HTTP, TCP, or gRPC
+                              check.
+                            format: int64
+                            type: integer
+                        type: object
+                      exposedPort:
+                        description: ExposedPort specifies the exposed port associated
+                          with the check.
+                        type: integer
+                      name:
+                        description: Name specifies the name of the check.
+                        type: string
+                      node:
+                        description: Node specifies the node associated with this
+                          AgentCheck
+                        type: string
+                      notes:
+                        description: Notes is an opaque field that is meant to hold
+                          human-readable text.
+                        type: string
+                      output:
+                        description: Output contains information about check.
+                        type: string
+                      serviceID:
+                        description: 'ServiceID: If a ServiceID is provided that matches
+                          the ID of a service on that node, the check is treated as
+                          a service level health check instead of a node level health
+                          check.'
+                        type: string
+                      serviceName:
+                        description: ServiceName specifies the service associated
+                          with the check.
+                        type: string
+                      status:
+                        description: Status must be one of passing, warning, or critical.
+                        type: string
+                      type:
+                        description: Type specifies the type of the check.
+                        type: string
+                    type: object
+                  checks:
+                    description: Checks allows you to provide multiple checks by replacing
+                      Check with Checks and sending an array of Check objects.
+                    items:
+                      properties:
+                        checkID:
+                          description: CheckID specifies a unique ID for this check
+                            on the node. This defaults to the "Name" parameter, but
+                            it may be necessary to provide an ID for uniqueness.
+                          type: string
+                        name:
+                          description: Name specifies the name of the check.
+                          type: string
+                        node:
+                          description: Node specifies the node associated with this
+                            HealthCheck
+                          type: string
+                        notes:
+                          description: Notes specifies arbitrary information for humans.
+                          type: string
+                        output:
+                          description: Output contains information about check.
+                          type: string
+                        serviceID:
+                          description: 'ServiceID: If a ServiceID is provided that
+                            matches the ID of a service on that node, the check is
+                            treated as a service level health check instead of a node
+                            level health check.'
+                          type: string
+                        serviceName:
+                          description: ServiceName specifies the service associated
+                            with the check.
+                          type: string
+                        serviceTags:
+                          description: ServiceTags specifies the serviceTags of the
+                            check.
+                          items:
+                            type: string
+                          type: array
+                        status:
+                          description: Status specifies the initial status of the
+                            health check.
+                          type: string
+                        type:
+                          description: Type specifies the type of the check.
+                          type: string
+                      type: object
+                    type: array
+                  datacenter:
+                    description: Datacenter specifies the datacenter, which defaults
+                      to the agent's datacenter if not provided.
+                    type: string
+                  node:
+                    description: Node specifies the node ID to register.
+                    type: string
+                  nodeMeta:
+                    additionalProperties:
+                      type: string
+                    description: NodeMeta specifies arbitrary KV metadata pairs for
+                      filtering purposes.
+                    type: object
+                  service:
+                    description: Service specifies information about a service.
+                    properties:
+                      ID:
+                        description: ID specifies to register a service. If ID is
+                          not provided, it will be defaulted to the value of the ServiceName
+                          property.
+                        type: string
+                      address:
+                        description: Address specifies the address of the service.
+                          If not provided, the agent's address is used as the address
+                          for the service during DNS queries.
+                        type: string
+                      enableTagOverride:
+                        description: EnableTagOverride specifies to disable the anti-entropy
+                          feature for this service's tags. If set to true then external
+                          agents can update this service in the catalog and modify
+                          the tags.
+                        type: boolean
+                      meta:
+                        additionalProperties:
+                          type: string
+                        description: Meta specifies arbitrary KV metadata linked to
+                          the service instance.
+                        type: object
+                      port:
+                        description: Port specifies the port of the service.
+                        type: integer
+                      proxy:
+                        description: 'Proxy: From 1.2.3 on, specifies the configuration
+                          for a "Connect" service proxy instance.'
+                        properties:
+                          config:
+                            additionalProperties:
+                              type: string
+                            description: 'Config: Managed Proxies are a deprecated
+                              method for deploying sidecar proxies, and have been
+                              removed in Consul 1.6.'
+                            type: object
+                          destinationName:
+                            description: 'DestinationName: Managed Proxies are a deprecated
+                              method for deploying sidecar proxies, and have been
+                              removed in Consul 1.6.'
+                            type: string
+                          destinationServiceID:
+                            description: 'DestinationServiceID: Managed Proxies are
+                              a deprecated method for deploying sidecar proxies, and
+                              have been removed in Consul 1.6.'
+                            type: string
+                          destinationServiceName:
+                            description: 'DestinationServiceName: Managed Proxies
+                              are a deprecated method for deploying sidecar proxies,
+                              and have been removed in Consul 1.6.'
+                            type: string
+                          expose:
+                            description: 'Expose: Managed Proxies are a deprecated
+                              method for deploying sidecar proxies, and have been
+                              removed in Consul 1.6.'
+                            properties:
+                              checks:
+                                description: 'Checks: Managed Proxies are a deprecated
+                                  method for deploying sidecar proxies, and have been
+                                  removed in Consul 1.6.'
+                                type: boolean
+                              paths:
+                                description: 'Paths: Managed Proxies are a deprecated
+                                  method for deploying sidecar proxies, and have been
+                                  removed in Consul 1.6.'
+                                items:
+                                  properties:
+                                    listenerPort:
+                                      description: ListenerPort defines the port of
+                                        the proxy's listener for exposed paths.
+                                      type: integer
+                                    localPathPort:
+                                      description: LocalPathPort is the port that
+                                        the service is listening on for the given
+                                        path.
+                                      type: integer
+                                    path:
+                                      description: Path is the path to expose through
+                                        the proxy, ie. "/metrics".
+                                      type: string
+                                    protocol:
+                                      description: Protocol describes the upstream's
+                                        service protocol. Valid values are "http"
+                                        and "http2", defaults to "http".
+                                      type: string
+                                  type: object
+                                type: array
+                            type: object
+                          localServiceAddress:
+                            description: 'LocalServiceAddress: Managed Proxies are
+                              a deprecated method for deploying sidecar proxies, and
+                              have been removed in Consul 1.6.'
+                            type: string
+                          localServicePort:
+                            description: 'LocalServicePort: Managed Proxies are a
+                              deprecated method for deploying sidecar proxies, and
+                              have been removed in Consul 1.6.'
+                            type: integer
+                          localServiceSocketPath:
+                            description: 'LocalServiceSocketPath: Managed Proxies
+                              are a deprecated method for deploying sidecar proxies,
+                              and have been removed in Consul 1.6.'
+                            type: string
+                          meshGateway:
+                            description: 'MeshGateway: Managed Proxies are a deprecated
+                              method for deploying sidecar proxies, and have been
+                              removed in Consul 1.6.'
+                            properties:
+                              mode:
+                                description: 'Mode: Managed Proxies are a deprecated
+                                  method for deploying sidecar proxies, and have been
+                                  removed in Consul 1.6.'
+                                type: string
+                            type: object
+                          mode:
+                            description: 'Mode: Managed Proxies are a deprecated method
+                              for deploying sidecar proxies, and have been removed
+                              in Consul 1.6.'
+                            type: string
+                          transparentProxy:
+                            description: 'TransparentProxy: Managed Proxies are a
+                              deprecated method for deploying sidecar proxies, and
+                              have been removed in Consul 1.6.'
+                            properties:
+                              dialedDirectly:
+                                description: 'DialedDirectly: Managed Proxies are
+                                  a deprecated method for deploying sidecar proxies,
+                                  and have been removed in Consul 1.6.'
+                                type: boolean
+                              outboundListenerPort:
+                                description: 'OutboundListenerPort: Managed Proxies
+                                  are a deprecated method for deploying sidecar proxies,
+                                  and have been removed in Consul 1.6.'
+                                type: integer
+                            type: object
+                          upstreams:
+                            description: 'Upstreams: Managed Proxies are a deprecated
+                              method for deploying sidecar proxies, and have been
+                              removed in Consul 1.6.'
+                            items:
+                              properties:
+                                connectTimeoutMs:
+                                  description: ConnectTimeoutMs is the number of milliseconds
+                                    to timeout making a new connection to this upstream.
+                                    Defaults to 5000 (5 seconds) if not set.
+                                  type: integer
+                                envoyClusterJSON:
+                                  description: 'EnvoyClusterJSON is a complete override
+                                    ("escape hatch") for the upstream''s cluster.
+                                    The Connect client TLS certificate and context
+                                    will be injected overriding any TLS settings present.
+                                    Note: This escape hatch is NOT compatible with
+                                    the discovery chain and will be ignored if a discovery
+                                    chain is active.'
+                                  type: string
+                                envoyListenerJSON:
+                                  description: 'EnvoyListenerJSON is a complete override
+                                    ("escape hatch") for the upstream''s listener.
+                                    Note: This escape hatch is NOT compatible with
+                                    the discovery chain and will be ignored if a discovery
+                                    chain is active.'
+                                  type: string
+                                limits:
+                                  description: Limits are the set of limits that are
+                                    applied to the proxy for a specific upstream of
+                                    a service instance.
+                                  properties:
+                                    maxConcurrentRequests:
+                                      description: MaxConcurrentRequests is the maximum
+                                        number of in-flight requests that will be
+                                        allowed to the upstream cluster at a point
+                                        in time. This is mostly applicable to HTTP/2
+                                        clusters since all HTTP/1.1 requests are limited
+                                        by MaxConnections.
+                                      type: integer
+                                    maxConnections:
+                                      description: MaxConnections is the maximum number
+                                        of connections the local proxy can make to
+                                        the upstream service.
+                                      type: integer
+                                    maxPendingRequests:
+                                      description: MaxPendingRequests is the maximum
+                                        number of requests that will be queued waiting
+                                        for an available connection. This is mostly
+                                        applicable to HTTP/1.1 clusters since all
+                                        HTTP/2 requests are streamed over a single
+                                        connection.
+                                      type: integer
+                                  type: object
+                                meshGateway:
+                                  description: MeshGatewayConfig controls how Mesh
+                                    Gateways are configured and used.
+                                  properties:
+                                    mode:
+                                      description: Mode is the mode that should be
+                                        used for the upstream connection. One of none,
+                                        local, or remote.
+                                      type: string
+                                  type: object
+                                name:
+                                  description: Name is only accepted within a service-defaults
+                                    config entry.
+                                  type: string
+                                namespace:
+                                  description: Namespace is only accepted within a
+                                    service-defaults config entry.
+                                  type: string
+                                partition:
+                                  description: Partition is only accepted within a
+                                    service-defaults config entry.
+                                  type: string
+                                passiveHealthCheck:
+                                  description: PassiveHealthCheck configuration determines
+                                    how upstream proxy instances will be monitored
+                                    for removal from the load balancing pool.
+                                  properties:
+                                    interval:
+                                      description: Interval between health check analysis
+                                        sweeps. Each sweep may remove hosts or return
+                                        hosts to the pool.
+                                      type: string
+                                    maxFailures:
+                                      description: MaxFailures is the count of consecutive
+                                        failures that results in a host being removed
+                                        from the pool.
+                                      format: int32
+                                      type: integer
+                                  type: object
+                                protocol:
+                                  description: Protocol describes the upstream's service
+                                    protocol. Valid values are "tcp", "http" and "grpc".
+                                    Anything else is treated as tcp. This enables
+                                    protocol aware features like per-request metrics
+                                    and connection pooling, tracing, routing etc.
+                                  type: string
+                              type: object
+                            type: array
+                        type: object
+                      service:
+                        description: Service specifies the logical name of the service.
+                        type: string
+                      taggedAddresses:
+                        additionalProperties:
+                          properties:
+                            address:
+                              description: Address specifies the address of the service.
+                              type: string
+                            port:
+                              description: Port specifies the port of the service.
+                              type: integer
+                          type: object
+                        description: TaggedAddresses specifies a map of explicit LAN
+                          and WAN addresses for the service instance.
+                        type: object
+                      tags:
+                        description: ServiceTags specifies a list of tags to assign
+                          to the service. These tags can be used for later filtering
+                          and are exposed via the APIs.
+                        items:
+                          type: string
+                        type: array
+                      weights:
+                        description: 'Weights specifies weights for the service. If
+                          this field is not provided weights will default to {"Passing":
+                          1, "Warning": 1}.'
+                        properties:
+                          passing:
+                            description: Passing specifies the weight of the passing
+                              field for a Service's Weight.
+                            type: integer
+                          warning:
+                            description: Warning specifies the weight of the warning
+                              field for a Service's Weight.
+                            type: integer
+                        type: object
+                    type: object
+                  taggedAddresses:
+                    additionalProperties:
+                      type: string
+                    description: TaggedAddresses specifies the tagged addresses.
+                    type: object
+                type: object
+            type: object
+          status:
+            description: TerminatingGatewayServiceStatus defines the observed state
+              of TerminatingGatewayService.
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+              serviceInfoRef:
+                description: 'Important: Run "make" to regenerate code after modifying
+                  this file ServiceInfoRef shows information about the service.'
+                properties:
+                  policyName:
+                    description: ServiceName specifies the name of the policy created
+                      by the CRD.
+                    type: string
+                  serviceName:
+                    description: ServiceName specifies the name of the service registered
+                      by the CRD.
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

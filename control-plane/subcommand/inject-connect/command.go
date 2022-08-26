@@ -105,6 +105,9 @@ type Command struct {
 	// Peering flags.
 	flagEnablePeering bool
 
+	// TerminatingGatewayService flag.
+	flagEnableTermGtwService bool
+
 	// Consul DNS flags.
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
@@ -146,6 +149,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
+	c.flagSet.BoolVar(&c.flagEnableTermGtwService, "enable-terminating-gateway-service", false, "Enable terminating gateway service controller.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
@@ -483,6 +487,27 @@ func (c *Command) Run(args []string) int {
 				Client:       mgr.GetClient(),
 				ConsulClient: c.consulClient,
 				Logger:       ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
+			}})
+	}
+
+	if c.flagEnableTermGtwService {
+		if err = (&connectinject.TerminatingGatewayServiceController{
+			Client:       mgr.GetClient(),
+			ConsulClient: c.consulClient,
+			Log:          ctrl.Log.WithName("controller").WithName("terminating-gateway-service"),
+			Scheme:       mgr.GetScheme(),
+			Context:      ctx,
+			AclEnabled:   c.flagACLAuthMethod == "",
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "terminating-gateway-service")
+			return 1
+		}
+
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggatewayservices",
+			&webhook.Admission{Handler: &v1alpha1.TerminatingGatewayServiceWebhook{
+				Client:       mgr.GetClient(),
+				ConsulClient: c.consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName("terminating-gateway-service"),
 			}})
 	}
 
