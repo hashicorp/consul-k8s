@@ -20,6 +20,7 @@ FROM alpine:3.16 AS dev
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
+ARG CNI_BIN_NAME=consul-cni
 ARG VERSION
 ARG TARGETARCH
 ARG TARGETOS
@@ -43,6 +44,7 @@ RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
 COPY pkg/bin/linux_${TARGETARCH}/${BIN_NAME} /bin
+COPY cni/pkg/bin/linux_${TARGETARCH}/${CNI_BIN_NAME} /bin
 
 USER 100
 CMD /bin/${BIN_NAME}
@@ -67,6 +69,7 @@ CMD /bin/${BIN_NAME}
 FROM alpine:3.16 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
+ARG CNI_BIN_NAME=consul-cni
 ARG PRODUCT_VERSION
 
 LABEL name=${BIN_NAME} \
@@ -90,7 +93,9 @@ ARG TARGETARCH
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
+
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
+COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
@@ -112,6 +117,8 @@ ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
 ARG PRODUCT_REVISION
 ARG BIN_NAME
+ARG CNI_BIN_NAME=consul-cni
+ARG VERSION
 
 # PRODUCT_NAME and PRODUCT_VERSION are the name of the software on releases.hashicorp.com
 # and the version to download. Example: PRODUCT_NAME=consul PRODUCT_VERSION=1.2.3.
@@ -149,6 +156,7 @@ RUN groupadd --gid 1000 ${BIN_NAME} && \
     usermod -a -G root ${BIN_NAME}
 
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
+COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}

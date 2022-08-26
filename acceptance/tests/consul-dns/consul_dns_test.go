@@ -17,6 +17,10 @@ import (
 const podName = "dns-pod"
 
 func TestConsulDNS(t *testing.T) {
+	cfg := suite.Config()
+	if cfg.EnableCNI {
+		t.Skipf("skipping because -enable-cni is set")
+	}
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {

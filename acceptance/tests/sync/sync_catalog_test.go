@@ -18,6 +18,10 @@ import (
 // The test will create a test service and a pod and will
 // wait for the service to be synced *to* consul.
 func TestSyncCatalog(t *testing.T) {
+	cfg := suite.Config()
+	if cfg.EnableCNI {
+		t.Skipf("skipping because -enable-cni is set and sync catalog is already tested with regular tproxy")
+	}
 	cases := []struct {
 		name       string
 		helmValues map[string]string

@@ -2,6 +2,8 @@
 FEATURES:
 * MaxInboundConnections in service-defaults CRD
   * Add support for MaxInboundConnections on the Service Defaults CRD. [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1437)]
+* Consul CNI Plugin
+  * CNI Plugin for Consul-k8s [[GH-1465](https://github.com/hashicorp/consul-k8s/pull/1456)]
 
 IMPROVEMENTS:
 * CLI:
