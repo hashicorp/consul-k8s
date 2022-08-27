@@ -8,6 +8,7 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
+      - "curtbushko/add-cni-to-crt"
 
 env:
   PKG_NAME: "consul-k8s"
@@ -227,10 +228,9 @@ jobs:
       - name: extract consul-cni zip
         env:
           ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
-          ZIP_NAME: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip"
         run: |
           cd "${ZIP_LOCATION}"
-          unzip -j ${ZIP_NAME}
+          unzip -j *.zip
       - name: Docker Build (Action)
         uses: hashicorp/actions-docker-build@v1
         with:
@@ -272,10 +272,9 @@ jobs:
       - name: extract consul-cni zip
         env:
           ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
-          ZIP_NAME: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip"
         run: |
           cd "${ZIP_LOCATION}"
-          unzip -j ${ZIP_NAME}
+          unzip -j *.zip
       - name: Copy LICENSE.md
         run:
          cp LICENSE.md ./control-plane
@@ -315,10 +314,9 @@ jobs:
       - name: extract consul-cni zip
         env:
           ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
-          ZIP_NAME: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip"
         run: |
           cd ${ZIP_LOCATION}
-          unzip -j ${ZIP_NAME}
+          unzip -j *.zip
       - name: Copy LICENSE.md
         run:
           cp LICENSE.md ./control-plane
