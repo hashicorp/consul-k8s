@@ -95,7 +95,7 @@ RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
-COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
+COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
@@ -156,7 +156,7 @@ RUN groupadd --gid 1000 ${BIN_NAME} && \
     usermod -a -G root ${BIN_NAME}
 
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
-COPY cni/dist/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
+COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
