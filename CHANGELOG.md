@@ -40,7 +40,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Helm
-  * API Gateway: Configure ACL auth for controller correctly when deployed in secondary datacenter [[GH-1462](https://github.com/hashicorp/consul-k8s/pull/1462)]
+  * API Gateway: Configure ACL auth for controller correctly when deployed in secondary datacenter with federation enabled [[GH-1462](https://github.com/hashicorp/consul-k8s/pull/1462)]
 
 ## 0.47.1 (August 12, 2022)
 
