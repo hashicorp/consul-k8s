@@ -406,6 +406,8 @@ load _helpers
       -s templates/api-gateway-controller-deployment.yaml \
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=foo' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.acls.manageSystemACLs=true' \
