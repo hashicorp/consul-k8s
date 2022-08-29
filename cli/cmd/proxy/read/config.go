@@ -396,7 +396,7 @@ func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
 	return secrets, nil
 }
 
-func formatFilters(filters []filter) (formatted []string) {
+func formatFilters(filters []filter) []string {
 	// Filters can have many custom configurations, each must be handled differently.
 	// [List of known extensions](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/listener/v3/listener_components.proto).
 	formatters := map[string]func(filter) string{
