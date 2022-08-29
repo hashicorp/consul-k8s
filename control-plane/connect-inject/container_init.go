@@ -107,6 +107,15 @@ type initContainerCommandData struct {
 	// ConsulAPITimeout is the duration that the consul API client will
 	// wait for a response from the API before cancelling the request.
 	ConsulAPITimeout time.Duration
+
+	// TLSEnabled indicates whether we should use TLS for communicating to Consul.
+	TLSEnabled bool
+
+	// ConsulHTTPPort is the HTTP or HTTPs port we should use to talk to Consul.
+	ConsulHTTPPort string
+
+	// ConsulGRPCPort is the gRPC port we should use to talk to Consul.
+	ConsulGRPCPort string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -172,6 +181,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		ConsulNamespace:            w.consulNamespace(namespace.Name),
 		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
 		ConsulCACert:               w.ConsulCACert,
+		TLSEnabled:                 w.TLSEnabled,
+		ConsulHTTPPort:             w.ConsulHTTPPort,
+		ConsulGRPCPort:             w.ConsulGRPCPort,
 		ConsulAddress:              w.ConsulAddress,
 		ConsulNodeName:             ConsulNodeName,
 		EnableTransparentProxy:     tproxyEnabled,
@@ -394,16 +406,18 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
-{{- if .ConsulCACert}}
-export CONSUL_HTTP_ADDR="https://{{ .ConsulAddress }}:8501"
-export CONSUL_GRPC_ADDR="https://{{ .ConsulAddress }}:8502"
+{{- if .TLSEnabled }}
+export CONSUL_HTTP_ADDR="https://{{ .ConsulAddress }}:{{ .ConsulHTTPPort }}"
+export CONSUL_GRPC_ADDR="https://{{ .ConsulAddress }}:{{ .ConsulGRPCPort }}"
+{{- if .ConsulCACert }}
 export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
 cat <<EOF >/consul/connect-inject/consul-ca.pem
 {{ .ConsulCACert }}
 EOF
+{{- end }}
 {{- else}}
-export CONSUL_HTTP_ADDR="{{ .ConsulAddress }}:8500"
-export CONSUL_GRPC_ADDR="{{ .ConsulAddress }}:8502"
+export CONSUL_HTTP_ADDR="{{ .ConsulAddress }}:{{ .ConsulHTTPPort }}"
+export CONSUL_GRPC_ADDR="{{ .ConsulAddress }}:{{ .ConsulGRPCPort }}"
 {{- end}}
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-api-timeout={{ .ConsulAPITimeout }} \

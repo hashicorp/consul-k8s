@@ -62,6 +62,15 @@ type MeshWebhook struct {
 	// If not set, will use HTTP.
 	ConsulCACert string
 
+	// TLSEnabled indicates whether we should use TLS for communicating to Consul.
+	TLSEnabled bool
+
+	// ConsulHTTPPort is the HTTP or HTTPs port we should use to talk to Consul.
+	ConsulHTTPPort string
+
+	// ConsulGRPCPort is the gRPC port we should use to talk to Consul.
+	ConsulGRPCPort string
+
 	// ConsulAddress is the address of the Consul server. This should be only the
 	// host (i.e. not including port or protocol).
 	ConsulAddress string
