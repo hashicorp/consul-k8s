@@ -90,6 +90,19 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+        # consul-cni
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
@@ -207,6 +220,16 @@ jobs:
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v3
+        with:
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
+          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+      - name: extract consul-cni zip
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+        run: |
+          cd "${ZIP_LOCATION}"
+          unzip -j *.zip
       - name: Docker Build (Action)
         uses: hashicorp/actions-docker-build@v1
         with:
@@ -241,6 +264,16 @@ jobs:
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v3
+        with:
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
+          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+      - name: extract consul-cni zip
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+        run: |
+          cd "${ZIP_LOCATION}"
+          unzip -j *.zip
       - name: Copy LICENSE.md
         run:
          cp LICENSE.md ./control-plane
@@ -273,6 +306,16 @@ jobs:
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v3
+        with:
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
+          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+      - name: extract consul-cni zip
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+        run: |
+          cd ${ZIP_LOCATION}
+          unzip -j *.zip
       - name: Copy LICENSE.md
         run:
           cp LICENSE.md ./control-plane
