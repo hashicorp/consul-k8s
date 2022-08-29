@@ -61,7 +61,9 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "10.0.0.0",
+				ConsulAddress:  "10.0.0.0",
+				ConsulHTTPPort: "8500",
+				ConsulGRPCPort: "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -96,6 +98,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				AuthMethod:       "an-auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
+				ConsulHTTPPort:   "8500",
+				ConsulGRPCPort:   "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -615,6 +619,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulPartition:            "",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -643,6 +649,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "default",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -673,6 +681,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -701,6 +711,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "non-default-part",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -732,6 +744,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "default",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -770,6 +784,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "non-default",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -807,6 +823,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -842,6 +860,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -883,6 +903,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
+				ConsulHTTPPort:             "8500",
+				ConsulGRPCPort:             "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="10.0.0.0:8500"
@@ -987,6 +1009,8 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			MeshWebhook{
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
+				ConsulHTTPPort:   "8500",
+				ConsulGRPCPort:   "8502",
 			},
 			2,
 			[]multiPortInfo{
@@ -1043,6 +1067,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				AuthMethod:       "auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
+				ConsulHTTPPort:   "8500",
+				ConsulGRPCPort:   "8502",
 			},
 			2,
 			[]multiPortInfo{
@@ -1161,43 +1187,60 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`)
 }
 
-// If Consul CA cert is set,
+// If TLSEnabled is set,
 // Consul addresses should use HTTPS
-// and CA cert should be set as env variable.
-func TestHandlerContainerInit_WithTLS(t *testing.T) {
-	w := MeshWebhook{
-		ConsulCACert:     "consul-ca-cert",
-		ConsulAPITimeout: 5 * time.Second,
-		ConsulAddress:    "10.0.0.0",
-	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				annotationService: "foo",
-			},
-		},
-
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
+// and CA cert should be set as env variable if provided.
+// Additionally, test that the init container is correctly configured
+// when http or gRPC ports are different from defaults.
+func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
+	for _, caProvided := range []bool{true, false} {
+		name := fmt.Sprintf("ca provided: %t", caProvided)
+		t.Run(name, func(t *testing.T) {
+			w := MeshWebhook{
+				ConsulAPITimeout: 5 * time.Second,
+				ConsulAddress:    "10.0.0.0",
+				TLSEnabled:       true,
+				ConsulHTTPPort:   "443",
+				ConsulGRPCPort:   "8503",
+			}
+			if caProvided {
+				w.ConsulCACert = "consul-ca-cert"
+			}
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "foo",
+					},
 				},
-			},
-		},
-	}
-	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
-	require.NoError(t, err)
-	actual := strings.Join(container.Command, " ")
-	require.Contains(t, actual, `
-export CONSUL_HTTP_ADDR="https://10.0.0.0:8501"
-export CONSUL_GRPC_ADDR="https://10.0.0.0:8502"
+
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}
+			container, err := w.containerInit(testNS, *pod, multiPortInfo{})
+			require.NoError(t, err)
+			actual := strings.Join(container.Command, " ")
+			if caProvided {
+				require.Contains(t, actual, `
+export CONSUL_HTTP_ADDR="https://10.0.0.0:443"
+export CONSUL_GRPC_ADDR="https://10.0.0.0:8503"
 export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
 cat <<EOF >/consul/connect-inject/consul-ca.pem
 consul-ca-cert
 EOF`)
-	require.NotContains(t, actual, `
-export CONSUL_HTTP_ADDR="10.0.0.0:8500"
-export CONSUL_GRPC_ADDR="10.0.0.0:8502"`)
+			} else {
+				require.Contains(t, actual, `
+export CONSUL_HTTP_ADDR="https://10.0.0.0:443"
+export CONSUL_GRPC_ADDR="https://10.0.0.0:8503"
+`)
+			}
+
+		})
+	}
 }
 
 func TestHandlerContainerInit_Resources(t *testing.T) {

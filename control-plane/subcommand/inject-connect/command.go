@@ -382,14 +382,14 @@ func (c *Command) Run(args []string) int {
 		cfg.Address = serverAddr
 	}
 
-	consulURLRaw := cfg.Address
 	// cfg.Address may or may not be prefixed with scheme.
 	if !strings.Contains(cfg.Address, "://") {
-		consulURLRaw = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
+		cfg.Address = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
 	}
-	consulURL, err := url.Parse(consulURLRaw)
+
+	consulURL, err := url.Parse(cfg.Address)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", consulURLRaw, err))
+		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", cfg.Address, err))
 		return 1
 	}
 
@@ -537,6 +537,9 @@ func (c *Command) Run(args []string) int {
 			RequireAnnotation:             !c.flagDefaultInject,
 			AuthMethod:                    c.flagACLAuthMethod,
 			ConsulCACert:                  string(consulCACert),
+			TLSEnabled:                    consulURL.Scheme == "https",
+			ConsulHTTPPort:                consulURL.Port(),
+			ConsulGRPCPort:                "8502", // todo(ishustava): should be passed via flag
 			ConsulAddress:                 consulURL.Hostname(),
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
