@@ -372,6 +372,80 @@ func TestFormatFilters(t *testing.T) {
 	}
 }
 
+// TestClusterParsingEndpoints checks that the parseClusters function correctly
+// maps endpoints from the config dump and cluster mapping into a config object.
+// This includes omitting endpoints that are defined by domain names as seen in
+// Logical DNS clusters.
+func TestClusterParsingEndpoints(t *testing.T) {
+	expected := []Cluster{
+		{
+			Name:                     "logical_dns_cluster",
+			FullyQualifiedDomainName: "logical_dns_cluster.service.host",
+			Endpoints:                []string{"192.168.18.110:20000", "192.168.52.101:20000", "192.168.65.131:20000"},
+			Type:                     "LOGICAL_DNS",
+			LastUpdated:              "2022-08-30T12:31:03.354Z",
+		},
+	}
+
+	rawCfg := map[string]interface{}{
+		"dynamic_active_clusters": []map[string]interface{}{
+			{
+				"cluster": map[string]interface{}{
+					"name": "logical_dns_cluster.service.host",
+					"type": "LOGICAL_DNS",
+					"load_assignment": map[string]interface{}{
+						"endpoints": []map[string]interface{}{
+							{
+								"lb_endpoints": []map[string]interface{}{
+									{
+										"endpoint": map[string]interface{}{
+											"address": map[string]interface{}{
+												"socket_address": map[string]interface{}{
+													"address":    "192.168.18.110",
+													"port_value": 20000,
+												},
+											},
+										},
+									},
+									{
+										"endpoints": map[string]interface{}{
+											"address": map[string]interface{}{
+												"socket_address": map[string]interface{}{
+													"address":    "192.168.52.101",
+													"port_value": 20000,
+												},
+											},
+										},
+									},
+									{
+										"endpoints": map[string]interface{}{
+											"address": map[string]interface{}{
+												"socket_address": map[string]interface{}{
+													"address":    "domain-name",
+													"port_value": 20000,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				"last_updated": "2022-08-30T12:31:03.354Z",
+			},
+		},
+	}
+	clusterMapping := map[string][]string{
+		"logical_dns_cluster.service.host": {"192.168.52.101:20000", "192.168.65.131:20000"},
+	}
+
+	actual, err := parseClusters(rawCfg, clusterMapping)
+	require.NoError(t, err)
+
+	require.Equal(t, expected, actual)
+}
+
 type mockPortForwarder struct {
 	openBehavior func(context.Context) (string, error)
 }
