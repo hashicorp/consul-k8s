@@ -82,6 +82,296 @@ func TestFetchConfig(t *testing.T) {
 	require.Equal(t, testEnvoyConfig.Secrets, envoyConfig.Secrets)
 }
 
+// There are many protobuf types for filter extensions. This test ensures
+// that the different types are formatted correctly.
+func TestFormatFilters(t *testing.T) {
+	cases := map[string]struct {
+		filter   filter
+		expected string
+	}{
+		"Connection Limit": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:           "type.googleapis.com/envoy.extensions.filters.network.connection_limit.v3.ConnectionLimit",
+					MaxConnections: 42,
+					Delay:          "200s",
+				},
+			},
+			expected: "Connection limit: 42 max connections with 200s delay",
+		},
+		"Direct Response with file": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						Filename: "cat-photo.jpg",
+					},
+				},
+			},
+			expected: "Direct response: -> file:cat-photo.jpg",
+		},
+		"Direct Response with bytes": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineBytes: []byte("abcd"),
+					},
+				},
+			},
+			expected: "Direct response: -> bytes:abcd",
+		},
+		"Direct Response with lots of bytes": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineBytes: []byte("abcdefghijklmnopqrstuvwxyz"),
+					},
+				},
+			},
+			expected: "Direct response: -> bytes:abcdefghijklmnopqrstuvwx...",
+		},
+		"Direct Response with string": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineString: "efgh",
+					},
+				},
+			},
+			expected: "Direct response: -> string:efgh",
+		},
+		"Direct Response with long string": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						InlineString: "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width\"/>",
+					},
+				},
+			},
+			expected: "Direct response: -> string:<!DOCTYPE html><html lan...",
+		},
+		"Direct Response with environment variable": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config",
+					Response: filterResponse{
+						EnvironmentVariable: "POSTGRESS_CONNECTION_STRING",
+					},
+				},
+			},
+			expected: "Direct response: -> env:POSTGRESS_CONNECTION_STRING",
+		},
+		"Echo": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo",
+				},
+			},
+			expected: "Echo: upstream will respond with the data it receives.",
+		},
+		"External Authorization using Envoy gRPC": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz",
+					GrpcService: filterGrpcService{
+						EnvoyGrpc: filterEnvoyGrpc{
+							ClusterName: "auth-server",
+						},
+					},
+				},
+			},
+			expected: "External authorization: auth-server",
+		},
+		"External Authorization using Google gRPC": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz",
+					GrpcService: filterGrpcService{
+						GoogleGrpc: filterGoogleGrpc{
+							TargetUri: "auth.endpoint",
+						},
+					},
+				},
+			},
+			expected: "External authorization: auth.endpoint",
+		},
+		"External Authorization unset": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz",
+				},
+			},
+			expected: "External authorization: No upstream configured.",
+		},
+		"HTTP Connection Manager": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+					RouteConfig: filterRouteConfig{
+						Name: "public_listener",
+						VirtualHosts: []filterVirtualHost{
+							{
+								Name:    "public_listener",
+								Domains: []string{"*"},
+								Routes: []filterRoute{
+									{
+										Match: filterMatch{
+											Prefix: "/",
+										},
+										Route: filterRouteCluster{
+											Cluster: "local_app",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "HTTP: * -> local_app/",
+		},
+		"Local Ratelimit": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit",
+					TokenBucket: filterTokenBucket{
+						MaxTokens:     24,
+						TokensPerFill: 2,
+						FillInterval:  "20s",
+					},
+				},
+			},
+			expected: "Local rate limit: tokens: max 24 per-fill 2, interval: 20s",
+		},
+		"Ratelimit with descriptors": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:   "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
+					Domain: "database-ratelimit",
+					Descriptors: []filterRateLimitDescriptor{
+						{
+							Entries: []filterRateLimitDescriptorEntry{
+								{
+									Key:   "PATH",
+									Value: "/users",
+								},
+							},
+							Limit: filterRateLimitOverride{
+								RequestsPerUnit: 42,
+								Unit:            "MINUTE",
+							},
+						},
+					},
+				},
+			},
+			expected: "Rate limit: database-ratelimit PATH:/users 42 req per minute",
+		},
+		"Ratelimit with EnvoyGrpc definted limiter allowing failures": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:            "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
+					Domain:          "database-ratelimit",
+					FailureModeDeny: true,
+					RateLimitService: filterRateLimitServiceConfig{
+						GrpcService: filterGrpcService{
+							EnvoyGrpc: filterEnvoyGrpc{
+								ClusterName: "ratelimiter.service",
+							},
+						},
+					},
+				},
+			},
+			expected: "Rate limit: database-ratelimit using ratelimiter.service will deny if unreachable",
+		},
+		"Ratelimit with GoogleGrpc defined limiter": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:   "type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit",
+					Domain: "database-ratelimit",
+					RateLimitService: filterRateLimitServiceConfig{
+						GrpcService: filterGrpcService{
+							GoogleGrpc: filterGoogleGrpc{
+								TargetUri: "ratelimiter.service",
+							},
+						},
+					},
+				},
+			},
+			expected: "Rate limit: database-ratelimit using ratelimiter.service",
+		},
+		"RBAC": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC",
+					Rules: filterRules{
+						Action: "DENY",
+						Policies: filterHttpTypedConfigPolicies{
+							ConsulIntentions: filterHttpTypedConfigConsulIntentions{
+								Principals: []principal{
+									{
+										Authenticated: authenticated{
+											PrincipalName: principalName{
+												SafeRegex: safeRegex{
+													Regex: "^spiffe://[^/]+/ns/default/dc/[^/]+/svc/client$",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "RBAC: DENY ^spiffe://[^/]+/ns/default/dc/[^/]+/svc/client$",
+		},
+		"SNI Cluster": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.sni_cluster.v3.SniCluster",
+				},
+			},
+			expected: "SNI: Upstream cluster name set by SNI field in TLS connection.",
+		},
+		"TCP Proxy with cluster": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type:    "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
+					Cluster: "server.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
+				},
+			},
+			expected: "TCP: -> server",
+		},
+		"TCP Proxy without cluster": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
+				},
+			},
+			expected: "TCP: No upstream cluster configured.",
+		},
+		"Unknown format": {
+			filter: filter{
+				TypedConfig: filterTypedConfig{
+					Type: "type.googleapis.com/envoy.extensions.filters.network.NewFormat",
+				},
+			},
+			expected: "Unknown filter: type.googleapis.com/envoy.extensions.filters.network.NewFormat",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := formatFilters([]filter{tc.filter})[0]
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 type mockPortForwarder struct {
 	openBehavior func(context.Context) (string, error)
 }
@@ -117,11 +407,11 @@ var testEnvoyConfig = &EnvoyConfig{
 		{Address: "127.0.0.1:8080", Cluster: "local_app", Weight: 1, Status: "HEALTHY"},
 	},
 	Listeners: []Listener{
-		{Name: "public_listener", Address: "192.168.69.179:20000", FilterChain: []FilterChain{{Filters: []string{"* to local_app/"}, FilterChainMatch: "Any"}}, Direction: "INBOUND", LastUpdated: "2022-08-10T12:30:47.142Z"},
+		{Name: "public_listener", Address: "192.168.69.179:20000", FilterChain: []FilterChain{{Filters: []string{"HTTP: * -> local_app/"}, FilterChainMatch: "Any"}}, Direction: "INBOUND", LastUpdated: "2022-08-10T12:30:47.142Z"},
 		{Name: "outbound_listener", Address: "127.0.0.1:15001", FilterChain: []FilterChain{
-			{Filters: []string{"to client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32"},
-			{Filters: []string{"to frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul"}, FilterChainMatch: "10.100.31.2/32, 240.0.0.5/32"},
-			{Filters: []string{"to original-destination"}, FilterChainMatch: "Any"},
+			{Filters: []string{"TCP: -> client"}, FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32"},
+			{Filters: []string{"TCP: -> frontend"}, FilterChainMatch: "10.100.31.2/32, 240.0.0.5/32"},
+			{Filters: []string{"TCP: -> original-destination"}, FilterChainMatch: "Any"},
 		}, Direction: "OUTBOUND", LastUpdated: "2022-07-18T15:31:03.246Z"},
 	},
 	Routes: []Route{

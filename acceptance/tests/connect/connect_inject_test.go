@@ -114,7 +114,7 @@ func TestConnectInject(t *testing.T) {
 					// Static Client must have Static Server as a cluster and endpoint.
 					if strings.Contains(podName, "static-client") {
 						require.Regexp(r, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
-						require.Regexp(r, ipv4RegEx+".*static-server.default.dc1.internal", output)
+						require.Regexp(r, ipv4RegEx+".*static-server", output)
 					}
 
 				}

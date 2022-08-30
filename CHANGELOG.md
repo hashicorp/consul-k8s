@@ -37,10 +37,14 @@ IMPROVEMENTS:
   * Display clusters by their short names rather than FQDNs for the `proxy read` command. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
   * Display a message when `proxy list` returns no results. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
   * Display a warning when a user passes a field and table filter combination to `proxy read` where the given field is not present in any of the output tables. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
+  * Extend the timeout for `consul-k8s proxy read` to establish a connection from 5s to 10s.
+  * Expand the set of Envoy Listener Filters that may be parsed and output to the Listeners table.
 
 BUG FIXES:
 * Helm
   * API Gateway: Configure ACL auth for controller correctly when deployed in secondary datacenter with federation enabled [[GH-1462](https://github.com/hashicorp/consul-k8s/pull/1462)]
+* CLI
+  * Fix issue where SNI filters for Terminating Gateways showed up as blank lines.
 
 ## 0.47.1 (August 12, 2022)
 
