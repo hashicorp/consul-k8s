@@ -109,17 +109,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 										Kind:      "Pod",
 										Name:      "pod2",
 										Namespace: testCase.SourceKubeNS,
-<<<<<<< HEAD
-									},
-								},
-								{
-									IP: "3.3.3.3",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "mesh-gateway",
-										Namespace: testCase.SourceKubeNS,
-=======
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
 									},
 								},
 								{
@@ -152,7 +141,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: testCase.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
 					Namespace:      testCase.ExpConsulNS,
-<<<<<<< HEAD
 				},
 				{
 					ServiceID:      "mesh-gateway",
@@ -172,8 +160,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					Namespace: "default",
-=======
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
 				},
 				{
 					ServiceID:      "mesh-gateway",
@@ -263,7 +249,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					Output:      kubernetesSuccessReasonMsg,
 					Type:        ConsulKubernetesCheckType,
 					Namespace:   testCase.ExpConsulNS,
-<<<<<<< HEAD
 				},
 				{
 					CheckID:     fmt.Sprintf("%s/mesh-gateway", testCase.SourceKubeNS),
@@ -274,8 +259,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					Output:      kubernetesSuccessReasonMsg,
 					Type:        ConsulKubernetesCheckType,
 					Namespace:   "default",
-=======
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
 				},
 				{
 					CheckID:     fmt.Sprintf("%s/mesh-gateway", testCase.SourceKubeNS),
@@ -336,18 +319,12 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			// After reconciliation, Consul should have the service with the correct number of instances.
 			serviceInstances, _, err := consulClient.Catalog().Service(setup.consulSvcName, "", &api.QueryOptions{Namespace: testCase.ExpConsulNS})
 			require.NoError(t, err)
-<<<<<<< HEAD
 			service, _, err := consulClient.Catalog().Service("mesh-gateway", "", &api.QueryOptions{Namespace: "default"})
 			require.NoError(t, err)
 			serviceInstances = append(serviceInstances, service...)
-=======
-<<<<<<< HEAD
 			service, _, err := consulClient.Catalog().Service("mesh-gateway", "", &api.QueryOptions{Namespace: "default"})
 			require.NoError(t, err)
 			serviceInstances = append(serviceInstances, service...)
-=======
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 			require.Len(t, serviceInstances, len(setup.expectedConsulSvcInstances))
 			for i, instance := range serviceInstances {
 				require.Equal(t, setup.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
@@ -375,10 +352,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 
 			// Check that the Consul health checks was created for the k8s pod.
 			for _, expectedCheck := range setup.expectedHealthChecks {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				var checks api.HealthChecks
 				filter := fmt.Sprintf("CheckID == `%s`", expectedCheck.CheckID)
 				checks, _, err := consulClient.Health().Checks(expectedCheck.ServiceName, &api.QueryOptions{Filter: filter})
@@ -386,13 +359,8 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					checks, _, err = consulClient.Health().Checks("mesh-gateway", &api.QueryOptions{Namespace: "default"})
 					require.NoError(t, err)
 				}
-<<<<<<< HEAD
-=======
-=======
 				filter := fmt.Sprintf("CheckID == `%s`", expectedCheck.CheckID)
 				checks, _, err := consulClient.Health().Checks(expectedCheck.ServiceName, &api.QueryOptions{Filter: filter})
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				require.NoError(t, err)
 				require.Equal(t, len(checks), 1)
 				var ignoredFields = []string{"Node", "Definition", "Partition", "CreateIndex", "ModifyIndex", "ServiceTags"}
