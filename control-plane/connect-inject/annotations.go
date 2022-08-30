@@ -20,11 +20,16 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
+<<<<<<< HEAD
 	// annotationGatewayKind is the key of the annotation that indicates pods
+=======
+	// annotationGatewayKind is the key of the annotation that annotates pods
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	// that represent Consul Connect Gateways. This should be set to a
 	// value that is either "mesh", "ingress" or "terminating".
 	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"
 
+<<<<<<< HEAD
 	// annotationMeshGatewayConsulServiceName is the key of the annotation whose value
 	// is the service name with which the mesh gateway is registered.
 	annotationMeshGatewayConsulServiceName = "consul.hashicorp.com/mesh-gateway-consul-service-name"
@@ -45,6 +50,26 @@ const (
 
 	// annotationMeshGatewayWANPort is the key of the annotation whose value is the
 	// WAN port for the mesh-gateway service registration.
+=======
+	// annotationMeshGatewaySource is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
+
+	// annotationMeshGatewaySource is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewaySource = "consul.hashicorp.com/mesh-gateway-source"
+
+	// annotationGatewayKind is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewayWANAddress = "consul.hashicorp.com/mesh-gateway-wan-address"
+
+	// annotationGatewayKind is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	annotationMeshGatewayWANPort = "consul.hashicorp.com/mesh-gateway-wan-port"
 
 	// annotationInjectMountVolumes is the key of the annotation that controls whether

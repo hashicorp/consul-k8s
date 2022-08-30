@@ -74,6 +74,16 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "unknown log level: invalid",
 		},
+		{
+			flags: []string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-service-account-name", "foo",
+				"-gateway",
+				"-consul-node-name", "bar",
+			},
+			expErr: "-gateway-kind must be set if -gateway is set",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -88,10 +98,24 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // TestRun_ConnectServices tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
 // auth method and using the obtained token find the services for the provided pod name
 // and namespace provided and write the proxy ID of the proxy service to a file.
 func TestRun_ConnectServices(t *testing.T) {
+=======
+<<<<<<< HEAD
+// TestRun_ConnectServices tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
+// auth method and using the obtained token find the services for the provided pod name
+// and namespace provided and write the proxy ID of the proxy service to a file.
+func TestRun_ConnectServices(t *testing.T) {
+=======
+// TestRun tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
+// auth method and using the obtained token find the services for the provided pod name
+// and namespace provided and write the proxy ID of the proxy service to a file.
+func TestRun(t *testing.T) {
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	t.Parallel()
 
 	cases := []struct {
@@ -232,7 +256,11 @@ func TestRun_ConnectServices(t *testing.T) {
 
 			if tt.aclsEnabled {
 				// Validate the ACL token was written.
+<<<<<<< HEAD
 				tokenData, err := os.ReadFile(tokenFile)
+=======
+				tokenData, err := ioutil.ReadFile(tokenFile)
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
 				require.NoError(t, err)
 				require.NotEmpty(t, tokenData)
 
@@ -256,6 +284,10 @@ func TestRun_ConnectServices(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 // TestRun_Gateways tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
 // auth method and using the obtained token find the service for the provided gateway
 // and namespace provided and write the proxy ID of the gateway service to a file.
@@ -428,6 +460,10 @@ func TestRun_Gateways(t *testing.T) {
 			// CONSUL_HTTP_ADDR when it processes the command template.
 			flags := []string{"-pod-name", testGatewayName,
 				"-pod-namespace", testPodNamespace,
+<<<<<<< HEAD
+=======
+				"-gateway",
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				"-gateway-kind", tt.gatewayKind,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-proxy-id-file", proxyFile,
@@ -450,7 +486,11 @@ func TestRun_Gateways(t *testing.T) {
 
 			if tt.aclsEnabled {
 				// Validate the ACL token was written.
+<<<<<<< HEAD
 				tokenData, err := os.ReadFile(tokenFile)
+=======
+				tokenData, err := ioutil.ReadFile(tokenFile)
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				require.NoError(t, err)
 				require.NotEmpty(t, tokenData)
 
@@ -459,11 +499,19 @@ func TestRun_Gateways(t *testing.T) {
 				require.NoError(t, err)
 				token, _, err := consulClient.ACL().TokenReadSelf(nil)
 				require.NoError(t, err)
+<<<<<<< HEAD
 				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s","pod":"%s/%s"}`, tt.gatewayKind, testPodNamespace, testGatewayName), token.Description)
 			}
 
 			// Validate contents of proxyFile.
 			data, err := os.ReadFile(proxyFile)
+=======
+				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s"}`, tt.gatewayKind), token.Description)
+			}
+
+			// Validate contents of proxyFile.
+			data, err := ioutil.ReadFile(proxyFile)
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 			require.NoError(t, err)
 			require.Contains(t, string(data), tt.gatewayKind)
 		})
@@ -471,8 +519,18 @@ func TestRun_Gateways(t *testing.T) {
 }
 
 // TestRun_ConnectServices_Errors tests that when registered services could not be found,
+<<<<<<< HEAD
 // we error out.
 func TestRun_ConnectServices_Errors(t *testing.T) {
+=======
+// we error out.
+func TestRun_ConnectServices_Errors(t *testing.T) {
+=======
+// TestRun_Errors tests that when registered services could not be found,
+// we error out.
+func TestRun_Errors(t *testing.T) {
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	t.Parallel()
 
 	cases := []struct {
@@ -645,6 +703,103 @@ func TestRun_ConnectServices_Errors(t *testing.T) {
 				"-proxy-id-file", proxyFile,
 				"-consul-api-timeout", "5s",
 				"-consul-node-name", connectinject.ConsulNodeName,
+<<<<<<< HEAD
+			}
+
+			code := cmd.Run(flags)
+			require.Equal(t, 1, code)
+		})
+	}
+}
+
+// TestRun_Gateways_Errors tests that when registered services could not be found,
+// we error out.
+func TestRun_Gateways_Errors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		services []api.AgentServiceRegistration
+	}{
+		{
+			name: "gateway without pod-name or k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+				},
+			},
+		},
+		{
+			name: "gateway with pod-name meta but without k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "mesh-gateway",
+					},
+				},
+			},
+		},
+		{
+			name: "service and proxy with k8s-namespace meta but pod-name meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyKubeNS: "default-ns",
+					},
+				},
+			}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				os.Remove(proxyFile)
+			})
+
+			// Start Consul server.
+			server, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer server.Stop()
+			server.WaitForLeader(t)
+			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+			require.NoError(t, err)
+
+			// Register Consul services.
+			for _, svc := range c.services {
+				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+			}
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                                 ui,
+				serviceRegistrationPollingAttempts: 1,
+			}
+			flags := []string{
+				"-http-addr", server.HTTPAddr,
+				"-gateway",
+				"-gateway-kind", "mesh-gateway",
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-proxy-id-file", proxyFile,
+				"-consul-api-timeout", "5s",
+				"-consul-node-name", connectinject.ConsulNodeName,
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
 			}
 
 			code := cmd.Run(flags)

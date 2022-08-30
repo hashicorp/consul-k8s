@@ -854,7 +854,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				AuthMethod:       "auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
-				ConsulHTTPPort:   "8500",
 				ConsulGRPCPort:   "8502",
 			},
 			2,

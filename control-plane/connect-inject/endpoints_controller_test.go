@@ -1085,7 +1085,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedHealthChecks       []*api.HealthCheck
+<<<<<<< HEAD
 		metricsEnabled             bool
+=======
+<<<<<<< HEAD
+		metricsEnabled             bool
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 		expErr                     string
 	}{
 		{
@@ -1192,12 +1199,20 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "mesh-gateway",
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
+<<<<<<< HEAD
 					annotationMeshGatewayConsulServiceName: "mesh-gateway",
 					annotationMeshGatewaySource:            "Static",
 					annotationMeshGatewayWANAddress:        "2.3.4.5",
 					annotationMeshGatewayWANPort:           "443",
 					annotationMeshGatewayContainerPort:     "8443",
 					annotationGatewayKind:                  "mesh"})
+=======
+					annotationMeshGatewaySource:        "Static",
+					annotationMeshGatewayWANAddress:    "2.3.4.5",
+					annotationMeshGatewayWANPort:       "443",
+					annotationMeshGatewayContainerPort: "8443",
+					annotationGatewayKind:              "mesh"})
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "mesh-gateway",
@@ -1259,12 +1274,20 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "mesh-gateway",
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
+<<<<<<< HEAD
 					annotationMeshGatewayConsulServiceName: "mesh-gateway",
 					annotationMeshGatewaySource:            "Static",
 					annotationMeshGatewayWANAddress:        "2.3.4.5",
 					annotationMeshGatewayWANPort:           "443",
 					annotationMeshGatewayContainerPort:     "8443",
 					annotationGatewayKind:                  "mesh"})
+=======
+					annotationMeshGatewaySource:        "Static",
+					annotationMeshGatewayWANAddress:    "2.3.4.5",
+					annotationMeshGatewayWANPort:       "443",
+					annotationMeshGatewayContainerPort: "8443",
+					annotationGatewayKind:              "mesh"})
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "mesh-gateway",
@@ -1815,6 +1838,15 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
+<<<<<<< HEAD
+			}
+			if tt.metricsEnabled {
+				ep.MetricsConfig = MetricsConfig{
+					DefaultEnableMetrics: true,
+					EnableGatewayMetrics: true,
+				}
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
 			}
 			if tt.metricsEnabled {
 				ep.MetricsConfig = MetricsConfig{
@@ -3551,7 +3583,15 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					},
 				},
 			}
+<<<<<<< HEAD
 			pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+=======
+<<<<<<< HEAD
+			pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+=======
+			pod1 := createPod("pod1", "1.2.3.4", true, true)
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			k8sObjects := []runtime.Object{endpoint, pod1, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
@@ -5660,7 +5700,11 @@ func Test_GetWANData(t *testing.T) {
 			},
 			wanAddr: "test-loadbalancer-hostname",
 			wanPort: 1234,
+<<<<<<< HEAD
 			expErr:  "failed to read annotation consul.hashicorp.com/mesh-gateway-wan-address-source",
+=======
+			expErr:  "failed to read annotation consul.hashicorp.com/mesh-gateway-source",
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 		},
 		"no Service with Source=Service": {
 			gatewayPod: corev1.Pod{
@@ -5739,6 +5783,7 @@ func Test_GetWANData(t *testing.T) {
 			wanPort: 1234,
 			expErr:  "failed to parse WAN port from value not-a-valid-port",
 		},
+<<<<<<< HEAD
 		"source=Service, serviceType=LoadBalancer no Ingress configured": {
 			gatewayPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5784,6 +5829,8 @@ func Test_GetWANData(t *testing.T) {
 			wanPort: 1234,
 			expErr:  "failed to read ingress config for loadbalancer for service gateway in namespace default",
 		},
+=======
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	}
 
 	for name, c := range cases {
@@ -5831,6 +5878,10 @@ func createServicePod(name, ip string, inject bool, managedByEndpointsController
 	}
 	return pod
 }
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 
 func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Pod {
 	pod := &corev1.Pod{
@@ -5852,3 +5903,8 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 	}
 	return pod
 }
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)

@@ -232,7 +232,6 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 						annotationService: "web,web-admin",
 					},
 				},
-
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{

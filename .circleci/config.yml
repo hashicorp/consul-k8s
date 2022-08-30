@@ -110,7 +110,14 @@ commands:
                   do
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
+<<<<<<< HEAD
                           -enable-multi-cluster \
+=======
+<<<<<<< HEAD
+                          -enable-multi-cluster \
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-image=hashicorppreview/consul-enterprise:1.14-dev \
@@ -1218,10 +1225,13 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
+<<<<<<< HEAD
 #      - acceptance-tproxy-cni:
 #          context: consul-ci
 #          requires:
 #            - dev-upload-docker
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
 #      - acceptance-tproxy:
 #          context: consul-ci
 #          requires:
