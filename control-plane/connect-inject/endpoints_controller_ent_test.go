@@ -87,7 +87,13 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPodWithNamespace("pod1", testCase.SourceKubeNS, "1.2.3.4", true, true)
 				pod2 := createPodWithNamespace("pod2", testCase.SourceKubeNS, "2.2.3.4", true, true)
-				endpointWithTwoAddresses := &corev1.Endpoints{
+				meshGateway := createGatewayWithNamespace("mesh-gateway", testCase.SourceKubeNS, "3.3.3.3", map[string]string{
+					annotationMeshGatewaySource:        "Static",
+					annotationMeshGatewayWANAddress:    "2.3.4.5",
+					annotationMeshGatewayWANPort:       "443",
+					annotationMeshGatewayContainerPort: "8443",
+					annotationGatewayKind:              "mesh"})
+				endpointWithAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: testCase.SourceKubeNS,
@@ -111,11 +117,19 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 										Namespace: testCase.SourceKubeNS,
 									},
 								},
+								{
+									IP: "3.3.3.3",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "mesh-gateway",
+										Namespace: testCase.SourceKubeNS,
+									},
+								},
 							},
 						},
 					},
 				}
-				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+				return []runtime.Object{pod1, pod2, meshGateway, endpointWithAddresses}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -133,6 +147,25 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: testCase.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
 					Namespace:      testCase.ExpConsulNS,
+				},
+				{
+					ServiceID:      "mesh-gateway",
+					ServiceName:    "mesh-gateway",
+					ServiceAddress: "3.3.3.3",
+					ServiceMeta:    map[string]string{MetaKeyPodName: "mesh-gateway", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: testCase.SourceKubeNS, MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+					ServicePort:    8443,
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "3.3.3.3",
+							Port:    8443,
+						},
+						"wan": {
+							Address: "2.3.4.5",
+							Port:    443,
+						},
+					},
+					Namespace: "default",
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -204,6 +237,16 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					Type:        ConsulKubernetesCheckType,
 					Namespace:   testCase.ExpConsulNS,
 				},
+				{
+					CheckID:     fmt.Sprintf("%s/mesh-gateway", testCase.SourceKubeNS),
+					ServiceName: "mesh-gateway",
+					ServiceID:   "mesh-gateway",
+					Name:        ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ConsulKubernetesCheckType,
+					Namespace:   "default",
+				},
 			},
 		}
 		t.Run(name, func(t *testing.T) {
@@ -259,6 +302,9 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			// After reconciliation, Consul should have the service with the correct number of instances.
 			serviceInstances, _, err := consulClient.Catalog().Service(setup.consulSvcName, "", &api.QueryOptions{Namespace: testCase.ExpConsulNS})
 			require.NoError(t, err)
+			service, _, err := consulClient.Catalog().Service("mesh-gateway", "", &api.QueryOptions{Namespace: "default"})
+			require.NoError(t, err)
+			serviceInstances = append(serviceInstances, service...)
 			require.Len(t, serviceInstances, len(setup.expectedConsulSvcInstances))
 			for i, instance := range serviceInstances {
 				require.Equal(t, setup.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
@@ -267,6 +313,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 				require.Equal(t, setup.expectedConsulSvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, setup.expectedConsulSvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, setup.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
+				require.Equal(t, setup.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
 			}
 			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", setup.consulSvcName), "", &api.QueryOptions{
 				Namespace: testCase.ExpConsulNS,
@@ -285,8 +332,13 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 
 			// Check that the Consul health checks was created for the k8s pod.
 			for _, expectedCheck := range setup.expectedHealthChecks {
+				var checks api.HealthChecks
 				filter := fmt.Sprintf("CheckID == `%s`", expectedCheck.CheckID)
 				checks, _, err := consulClient.Health().Checks(expectedCheck.ServiceName, &api.QueryOptions{Filter: filter})
+				if expectedCheck.ServiceName == "mesh-gateway" {
+					checks, _, err = consulClient.Health().Checks("mesh-gateway", &api.QueryOptions{Namespace: "default"})
+					require.NoError(t, err)
+				}
 				require.NoError(t, err)
 				require.Equal(t, len(checks), 1)
 				var ignoredFields = []string{"Node", "Definition", "Partition", "CreateIndex", "ModifyIndex", "ServiceTags"}
@@ -1621,6 +1673,32 @@ func createPodWithNamespace(name, namespace, ip string, inject bool, managedByEn
 	}
 	if managedByEndpointsController {
 		pod.Labels[keyManagedBy] = managedByValue
+	}
+	return pod
+
+}
+
+func createGatewayWithNamespace(name, namespace, ip string, annotations map[string]string) *corev1.Pod {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				keyManagedBy: managedByValue,
+			},
+			Annotations: annotations,
+		},
+		Status: corev1.PodStatus{
+			PodIP:  ip,
+			HostIP: "127.0.0.1",
+			Phase:  corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
 	}
 	return pod
 

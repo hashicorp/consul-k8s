@@ -19,7 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test that Sync Catalog works in a default and ACLsAndAutoEncryptEnabled installations for partitions.
+// Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
 func TestPartitions_Sync(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
@@ -35,10 +35,10 @@ func TestPartitions_Sync(t *testing.T) {
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
 	cases := []struct {
-		name                      string
-		destinationNamespace      string
-		mirrorK8S                 bool
-		ACLsAndAutoEncryptEnabled bool
+		name                 string
+		destinationNamespace string
+		mirrorK8S            bool
+		ACLsEnabled          bool
 	}{
 		{
 			"default destination namespace",
@@ -87,14 +87,13 @@ func TestPartitions_Sync(t *testing.T) {
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
+				"global.image":                   "thisisnotashwin/consul@sha256:477091fe84cde79a68a37cc9cc69fb7a5ab35e647a0f5f2632451ace5ecc5e7c",
+				"global.enableConsulNamespaces":  "true",
 
-				"global.enableConsulNamespaces": "true",
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"syncCatalog.enabled": "true",
 				// When mirroringK8S is set, this setting is ignored.
@@ -133,7 +132,7 @@ func TestPartitions_Sync(t *testing.T) {
 			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
 			k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, caCertSecretName)
 
-			if !c.ACLsAndAutoEncryptEnabled {
+			if !c.ACLsEnabled {
 				// When auto-encrypt is disabled, we need both
 				// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
 				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
@@ -141,7 +140,7 @@ func TestPartitions_Sync(t *testing.T) {
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
 				k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, partitionToken)
 			}
@@ -169,7 +168,7 @@ func TestPartitions_Sync(t *testing.T) {
 				"client.join[0]":           partitionSvcAddress,
 			}
 
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				// Setup partition token and auth method host if ACLs enabled.
 				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
 				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
@@ -222,7 +221,7 @@ func TestPartitions_Sync(t *testing.T) {
 				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
+			consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			defaultPartitionQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: defaultPartition}
 			secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: secondaryPartition}
@@ -233,12 +232,12 @@ func TestPartitions_Sync(t *testing.T) {
 			}
 
 			// Check that the ACL token is deleted.
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				// We need to register the cleanup function before we create the deployments
 				// because golang will execute them in reverse order i.e. the last registered
 				// cleanup function will be executed first.
 				t.Cleanup(func() {
-					if c.ACLsAndAutoEncryptEnabled {
+					if c.ACLsEnabled {
 						retry.Run(t, func(r *retry.R) {
 							tokens, _, err := consulClient.ACL().TokenList(defaultPartitionQueryOpts)
 							require.NoError(r, err)

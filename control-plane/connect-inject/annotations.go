@@ -20,6 +20,31 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
+	// annotationGatewayKind is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// value that is either "mesh", "ingress" or "terminating".
+	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"
+
+	// annotationMeshGatewaySource is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
+
+	// annotationMeshGatewaySource is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewaySource = "consul.hashicorp.com/mesh-gateway-source"
+
+	// annotationGatewayKind is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewayWANAddress = "consul.hashicorp.com/mesh-gateway-wan-address"
+
+	// annotationGatewayKind is the key of the annotation that annotates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// truthy or falsy value, as parseable by strconv.ParseBool.
+	annotationMeshGatewayWANPort = "consul.hashicorp.com/mesh-gateway-wan-port"
+
 	// annotationInjectMountVolumes is the key of the annotation that controls whether
 	// the data volume that connect inject uses to store data including the Consul ACL token
 	// is mounted to other containers in the pod. It is a comma-separated list of container names

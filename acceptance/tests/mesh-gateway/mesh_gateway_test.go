@@ -28,6 +28,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	primaryHelmValues := map[string]string{
 		"global.datacenter":                        "dc1",
+		"global.image":                             "thisisnotashwin/consul@sha256:477091fe84cde79a68a37cc9cc69fb7a5ab35e647a0f5f2632451ace5ecc5e7c",
 		"global.tls.enabled":                       "true",
 		"global.tls.httpsOnly":                     "false",
 		"global.federation.enabled":                "true",
@@ -63,8 +64,8 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	// Create secondary cluster
 	secondaryHelmValues := map[string]string{
-		"global.datacenter": "dc2",
-
+		"global.datacenter":            "dc2",
+		"global.image":                 "thisisnotashwin/consul@sha256:477091fe84cde79a68a37cc9cc69fb7a5ab35e647a0f5f2632451ace5ecc5e7c",
 		"global.tls.enabled":           "true",
 		"global.tls.httpsOnly":         "false",
 		"global.tls.caCert.secretName": federationSecretName,
@@ -135,16 +136,10 @@ func TestMeshGatewayDefault(t *testing.T) {
 // with ACLs and TLS with and without auto-encrypt enabled.
 func TestMeshGatewaySecure(t *testing.T) {
 	cases := []struct {
-		name              string
-		enableAutoEncrypt string
+		name string
 	}{
 		{
-			"with ACLs and TLS without auto-encrypt",
-			"false",
-		},
-		{
-			"with ACLs and auto-encrypt",
-			"true",
+			"with ACLs and TLS",
 		},
 	}
 
@@ -157,9 +152,8 @@ func TestMeshGatewaySecure(t *testing.T) {
 			secondaryContext := env.Context(t, environment.SecondaryContextName)
 
 			primaryHelmValues := map[string]string{
-				"global.datacenter":            "dc1",
-				"global.tls.enabled":           "true",
-				"global.tls.enableAutoEncrypt": c.enableAutoEncrypt,
+				"global.datacenter":  "dc1",
+				"global.tls.enabled": "true",
 
 				"global.acls.manageSystemACLs":       "true",
 				"global.acls.createReplicationToken": "true",
@@ -214,7 +208,6 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         "false",
-				"global.tls.enableAutoEncrypt": c.enableAutoEncrypt,
 				"global.tls.caCert.secretName": federationSecretName,
 				"global.tls.caCert.secretKey":  "caCert",
 				"global.tls.caKey.secretName":  federationSecretName,
