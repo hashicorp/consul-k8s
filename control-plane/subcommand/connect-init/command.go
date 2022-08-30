@@ -328,6 +328,9 @@ func (c *Command) validateFlags() error {
 	if c.flagConsulNodeName == "" {
 		return errors.New("-consul-node-name must be set")
 	}
+	if c.flagGateway && c.flagGatewayKind == "" {
+		return errors.New("-gateway-kind must be set if -gateway is set")
+	}
 
 	if c.http.ConsulAPITimeout() <= 0 {
 		return errors.New("-consul-api-timeout must be set to a value greater than 0")
