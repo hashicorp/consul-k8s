@@ -245,6 +245,12 @@ spec:
               {{- if .Values.global.acls.manageSystemACLs }}
               -static-token="$(cat /consul/service/acl-token)" \
               {{- end }}
+              -tls-enabled \
+              -tls-ca-certs-path=/consul/tls/ca/tls.crt \
+              {{- if .Values.global.acls.manageSystemACLs }}
+              -static-token=$(cat /consul/service/acl-token)
+              {{- end }}
+              -tls-server-name="server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}" \
               {{- if .Values.global.adminPartitions.enabled }}
               -service-partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}

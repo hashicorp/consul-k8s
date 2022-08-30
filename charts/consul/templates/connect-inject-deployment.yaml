@@ -407,6 +407,7 @@ spec:
               {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
               -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
               -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+              -enable-federation \
               {{- else }}
               -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
               {{- end }}

@@ -176,11 +176,19 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceTags:    []string{},
 					ServicePort:    8443,
 					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+<<<<<<< HEAD
 						"lan": {
 							Address: "3.3.3.3",
 							Port:    8443,
 						},
 						"wan": {
+=======
+						"lan": api.ServiceAddress{
+							Address: "3.3.3.3",
+							Port:    8443,
+						},
+						"wan": api.ServiceAddress{
+>>>>>>> f05840f4 ([WIP] Register mesh-gateways using the endpoints controller.)
 							Address: "2.3.4.5",
 							Port:    443,
 						},
