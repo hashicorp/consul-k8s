@@ -329,6 +329,9 @@ func (c *Command) validateFlags() error {
 	if c.flagConsulNodeName == "" {
 		return errors.New("-consul-node-name must be set")
 	}
+	if c.flagGateway && c.flagGatewayKind == "" {
+		return errors.New("-gateway-kind must be set if -gateway is set")
+	}
 
 	return nil
 }
