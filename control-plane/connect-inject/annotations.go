@@ -20,7 +20,11 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
+<<<<<<< HEAD
 	// annotationGatewayKind is the key of the annotation that indicates pods
+=======
+	// annotationGatewayKind is the key of the annotation that annotates pods
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	// that represent Consul Connect Gateways. This should be set to a
 	// value that is either "mesh", "ingress" or "terminating".
 	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"

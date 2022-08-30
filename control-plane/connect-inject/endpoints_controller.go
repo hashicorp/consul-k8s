@@ -783,9 +783,12 @@ func (r *EndpointsController) getWanData(pod corev1.Pod, endpoints corev1.Endpoi
 		case corev1.ServiceTypeClusterIP:
 			wanAddr = svc.Spec.ClusterIP
 		case corev1.ServiceTypeLoadBalancer:
+<<<<<<< HEAD
 			if len(svc.Status.LoadBalancer.Ingress) == 0 {
 				return "", 0, fmt.Errorf("failed to read ingress config for loadbalancer for service %s in namespace %s", endpoints.Name, endpoints.Namespace)
 			}
+=======
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 			for _, ingr := range svc.Status.LoadBalancer.Ingress {
 				if ingr.IP != "" {
 					wanAddr = ingr.IP
@@ -1225,8 +1228,15 @@ func hasBeenInjected(pod corev1.Pod) bool {
 
 // isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
 func isGateway(pod corev1.Pod) bool {
+<<<<<<< HEAD
 	anno, ok := pod.Annotations[annotationGatewayKind]
 	return ok && anno != ""
+=======
+	if anno, ok := pod.Annotations[annotationGatewayKind]; ok && anno != "" {
+		return true
+	}
+	return false
+>>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.
