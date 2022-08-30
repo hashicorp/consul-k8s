@@ -68,6 +68,42 @@ spec:
               failover:
                 additionalProperties:
                   properties:
+                    targets:
+                      description: Targets specifies a fixed list of failover
+                        targets to try during failover.
+                      items:
+                        type: object
+                        properties:
+                          namespace:
+                            description: Namespace is the namespace to resolve the requested
+                              service from to form the failover group of instances. If empty
+                              the current namespace is used.
+                            type: string
+                          namespace:
+                            description: Partition is the partition to resolve the requested
+                              service from to form the failover group of instances. If empty
+                              the current partition is used.
+                            type: string
+                          datacenter:
+                            description: Datacenter is the datacenter to resolve the requested
+                              service from to form the failover group of instances. If empty
+                              the current datacenter is used.
+                            type: string
+                          peer:
+                            description: Peer is the peer to resolve the requested
+                              service from to form the failover group of instances. If empty
+                              the current peer is used.
+                            type: string
+                          service:
+                            description: Service is the service to resolve instead of the
+                              default as the failover group of instances during failover.
+                            type: string
+                          serviceSubset:
+                            description: ServiceSubset is the named subset of the requested
+                              service to resolve as the failover group of instances. If
+                              empty the default subset for the requested service is used.
+                            type: string
+                      type: array
                     datacenters:
                       description: Datacenters is a fixed list of datacenters to try
                         during failover.

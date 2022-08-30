@@ -91,6 +91,9 @@ type ServiceResolverRedirect struct {
 	// Datacenter is the datacenter to resolve the service from instead of the
 	// current one.
 	Datacenter string `json:"datacenter,omitempty"`
+	// Peer is the name of the cluster peer to resolve the service from instead
+	// of the current one.
+	Peer string `json:",omitempty"`
 }
 
 type ServiceResolverSubsetMap map[string]ServiceResolverSubset
@@ -123,6 +126,23 @@ type ServiceResolverFailover struct {
 	Namespace string `json:"namespace,omitempty"`
 	// Datacenters is a fixed list of datacenters to try during failover.
 	Datacenters []string `json:"datacenters,omitempty"`
+	// Targets specifies a fixed list of failover targets to try during failover.
+	Targets []ServiceResolverFailoverTarget `json:"targets,omitempty"`
+}
+
+type ServiceResolverFailoverTarget struct {
+	// Service specifies the name of the service to try during failover.
+	Service string `json:"service,omitempty"`
+	// ServiceSubset specifies the service subset to try during failover.
+	ServiceSubset string `json:"serviceSubset,omitempty"`
+	// Partition specifies the partition to try during failover.
+	Partition string `json:"partition,omitempty"`
+	// Namespace specifies the namespace to try during failover.
+	Namespace string `json:"namespace,omitempty"`
+	// Datacenter specifies the datacenter to try during failover.
+	Datacenter string `json:"datacenter,omitempty"`
+	// Peer specifies the name of the cluster peer to try during failover.
+	Peer string `json:"peer,omitempty"`
 }
 
 type LoadBalancer struct {
@@ -347,6 +367,8 @@ func (in *ServiceResolverRedirect) toConsul() *capi.ServiceResolverRedirect {
 		ServiceSubset: in.ServiceSubset,
 		Namespace:     in.Namespace,
 		Datacenter:    in.Datacenter,
+		Partition:     in.Partition,
+		Peer:          in.Peer,
 	}
 }
 
@@ -362,11 +384,28 @@ func (in ServiceResolverFailoverMap) toConsul() map[string]capi.ServiceResolverF
 }
 
 func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
+	var targets []capi.ServiceResolverFailoverTarget
+	for _, target := range in.Targets {
+		targets = append(targets, target.toConsul())
+	}
+
 	return capi.ServiceResolverFailover{
 		Service:       in.Service,
 		ServiceSubset: in.ServiceSubset,
 		Namespace:     in.Namespace,
 		Datacenters:   in.Datacenters,
+		Targets:       targets,
+	}
+}
+
+func (in ServiceResolverFailoverTarget) toConsul() capi.ServiceResolverFailoverTarget {
+	return capi.ServiceResolverFailoverTarget{
+		Service:       in.Service,
+		ServiceSubset: in.ServiceSubset,
+		Namespace:     in.Namespace,
+		Partition:     in.Partition,
+		Datacenter:    in.Datacenter,
+		Peer:          in.Peer,
 	}
 }
 

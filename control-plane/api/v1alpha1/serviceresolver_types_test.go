@@ -59,6 +59,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						ServiceSubset: "redirect_subset",
 						Namespace:     "redirect_namespace",
 						Datacenter:    "redirect_datacenter",
+						Peer:          "redirect_peer",
 					},
 					Failover: map[string]ServiceResolverFailover{
 						"failover1": {
@@ -72,6 +73,12 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							ServiceSubset: "failover_subset2",
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						},
+						"failover3": {
+							Targets: []ServiceResolverFailoverTarget{
+								{Peer: "failover_peer3"},
+								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							},
 						},
 					},
 					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
@@ -119,6 +126,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 					ServiceSubset: "redirect_subset",
 					Namespace:     "redirect_namespace",
 					Datacenter:    "redirect_datacenter",
+					Peer:          "redirect_peer",
 				},
 				Failover: map[string]capi.ServiceResolverFailover{
 					"failover1": {
@@ -132,6 +140,12 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						ServiceSubset: "failover_subset2",
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+					},
+					"failover3": {
+						Targets: []capi.ServiceResolverFailoverTarget{
+							{Peer: "failover_peer3"},
+							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+						},
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
@@ -228,6 +242,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						ServiceSubset: "redirect_subset",
 						Namespace:     "redirect_namespace",
 						Datacenter:    "redirect_datacenter",
+						Partition:     "redirect_partition",
 					},
 					Failover: map[string]ServiceResolverFailover{
 						"failover1": {
@@ -241,6 +256,12 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							ServiceSubset: "failover_subset2",
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						},
+						"failover3": {
+							Targets: []ServiceResolverFailoverTarget{
+								{Peer: "failover_peer3"},
+								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							},
 						},
 					},
 					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
@@ -288,6 +309,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 					ServiceSubset: "redirect_subset",
 					Namespace:     "redirect_namespace",
 					Datacenter:    "redirect_datacenter",
+					Partition:     "redirect_partition",
 				},
 				Failover: map[string]capi.ServiceResolverFailover{
 					"failover1": {
@@ -301,6 +323,12 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						ServiceSubset: "failover_subset2",
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+					},
+					"failover3": {
+						Targets: []capi.ServiceResolverFailoverTarget{
+							{Peer: "failover_peer3"},
+							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+						},
 					},
 				},
 				ConnectTimeout: 1 * time.Second,

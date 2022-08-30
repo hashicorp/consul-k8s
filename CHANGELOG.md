@@ -38,6 +38,9 @@ FEATURES:
 * Kubernetes 1.24 Support
   * Add support for Kubernetes 1.24 where ServiceAccounts no longer have long-term JWT tokens. [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
   * Upgrade kubeVersion in helm chart to support Kubernetes 1.21+.
+* Cluster Peering:
+  * Add support for setting failover `Targets` on the Service Resolver CRD.  [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
+  * Add support for redirecting to cluster peers on the Service Resolver CRD.  [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
 
 BREAKING CHANGES:
 * Kubernetes 1.24 Support
