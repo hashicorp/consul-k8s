@@ -171,7 +171,6 @@ spec:
                 -partition={{ .Values.global.adminPartitions.name }} \
                 {{- end }}
                 {{- if .Values.global.acls.manageSystemACLs }}
-                -acl-token-sink=/consul/service/acl-token \
                 {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
                 -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
                 -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
