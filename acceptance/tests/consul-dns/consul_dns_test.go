@@ -67,11 +67,7 @@ func TestConsulDNS(t *testing.T) {
 			})
 
 			retry.Run(t, func(r *retry.R) {
-				// Testing to see if this bug is in fact causing the problem:
-				// https://github.com/kubernetes/kubectl/issues/1098
-				options := ctx.KubectlOptions(t)
-				options.Env["KUBECTL_COMMAND_HEADERS"] = "false"
-				logs, err := k8s.RunKubectlAndGetOutputE(t, options, dnsTestPodArgs...)
+				logs, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
 				require.NoError(r, err)
 
 				// When the `dig` request is successful, a section of it's response looks like the following:
