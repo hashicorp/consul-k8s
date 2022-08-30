@@ -351,11 +351,17 @@ func (c *Command) validateFlags() error {
 		return errors.New("-consul-node-name must be set")
 	}
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if c.flagGateway && c.flagGatewayKind == "" {
 		return errors.New("-gateway-kind must be set if -gateway is set")
 	}
 =======
 >>>>>>> e26b5af0 (Initial support for agentless (#1267))
+=======
+	if c.flagGateway && c.flagGatewayKind == "" {
+		return errors.New("-gateway-kind must be set if -gateway is set")
+	}
+>>>>>>> e4ce8794 (Register mesh-gateways using the endpoints controller.)
 
 	if c.http.ConsulAPITimeout() <= 0 {
 		return errors.New("-consul-api-timeout must be set to a value greater than 0")

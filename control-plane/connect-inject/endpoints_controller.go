@@ -308,6 +308,38 @@ func (r *EndpointsController) registerGateway(pod corev1.Pod, serviceEndpoints c
 	return nil
 }
 
+// registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
+// It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
+func (r *EndpointsController) registerGateway(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
+	// Build the endpointAddressMap up for deregistering service instances later.
+	endpointAddressMap[pod.Status.PodIP] = true
+
+	var managedByEndpointsController bool
+	if raw, ok := pod.Labels[keyManagedBy]; ok && raw == managedByValue {
+		managedByEndpointsController = true
+	}
+	// For pods managed by this controller, create and register the service instance.
+	if managedByEndpointsController {
+		// Get information from the pod to create service instance registrations.
+		serviceRegistration, err := r.createGatewayRegistrations(pod, serviceEndpoints, healthStatus)
+		if err != nil {
+			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+			return err
+		}
+
+		// Register the service instance with Consul.
+		r.Log.Info("registering gateway with Consul", "name", serviceRegistration.Service.Service,
+			"id", serviceRegistration.ID)
+		_, err = r.ConsulClient.Catalog().Register(serviceRegistration, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to register gateway", "name", serviceRegistration.Service.Service)
+			return err
+		}
+	}
+
+	return nil
+}
+
 // serviceName computes the service name to register with Consul from the pod and endpoints object. In a single port
 // service, it defaults to the endpoints name, but can be overridden by a pod annotation. In a multi port service, the
 // endpoints name is always used since the pod annotation will have multiple service names listed (one per port).

@@ -98,24 +98,10 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 // TestRun_ConnectServices tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
 // auth method and using the obtained token find the services for the provided pod name
 // and namespace provided and write the proxy ID of the proxy service to a file.
 func TestRun_ConnectServices(t *testing.T) {
-=======
-<<<<<<< HEAD
-// TestRun_ConnectServices tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
-// auth method and using the obtained token find the services for the provided pod name
-// and namespace provided and write the proxy ID of the proxy service to a file.
-func TestRun_ConnectServices(t *testing.T) {
-=======
-// TestRun tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
-// auth method and using the obtained token find the services for the provided pod name
-// and namespace provided and write the proxy ID of the proxy service to a file.
-func TestRun(t *testing.T) {
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	t.Parallel()
 
 	cases := []struct {
@@ -256,11 +242,7 @@ func TestRun(t *testing.T) {
 
 			if tt.aclsEnabled {
 				// Validate the ACL token was written.
-<<<<<<< HEAD
 				tokenData, err := os.ReadFile(tokenFile)
-=======
-				tokenData, err := ioutil.ReadFile(tokenFile)
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
 				require.NoError(t, err)
 				require.NotEmpty(t, tokenData)
 
@@ -284,10 +266,6 @@ func TestRun(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 // TestRun_Gateways tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
 // auth method and using the obtained token find the service for the provided gateway
 // and namespace provided and write the proxy ID of the gateway service to a file.
@@ -460,10 +438,6 @@ func TestRun_Gateways(t *testing.T) {
 			// CONSUL_HTTP_ADDR when it processes the command template.
 			flags := []string{"-pod-name", testGatewayName,
 				"-pod-namespace", testPodNamespace,
-<<<<<<< HEAD
-=======
-				"-gateway",
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				"-gateway-kind", tt.gatewayKind,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-proxy-id-file", proxyFile,
@@ -486,11 +460,7 @@ func TestRun_Gateways(t *testing.T) {
 
 			if tt.aclsEnabled {
 				// Validate the ACL token was written.
-<<<<<<< HEAD
 				tokenData, err := os.ReadFile(tokenFile)
-=======
-				tokenData, err := ioutil.ReadFile(tokenFile)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				require.NoError(t, err)
 				require.NotEmpty(t, tokenData)
 
@@ -499,19 +469,11 @@ func TestRun_Gateways(t *testing.T) {
 				require.NoError(t, err)
 				token, _, err := consulClient.ACL().TokenReadSelf(nil)
 				require.NoError(t, err)
-<<<<<<< HEAD
 				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s","pod":"%s/%s"}`, tt.gatewayKind, testPodNamespace, testGatewayName), token.Description)
 			}
 
 			// Validate contents of proxyFile.
 			data, err := os.ReadFile(proxyFile)
-=======
-				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s"}`, tt.gatewayKind), token.Description)
-			}
-
-			// Validate contents of proxyFile.
-			data, err := ioutil.ReadFile(proxyFile)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 			require.NoError(t, err)
 			require.Contains(t, string(data), tt.gatewayKind)
 		})
@@ -519,18 +481,8 @@ func TestRun_Gateways(t *testing.T) {
 }
 
 // TestRun_ConnectServices_Errors tests that when registered services could not be found,
-<<<<<<< HEAD
 // we error out.
 func TestRun_ConnectServices_Errors(t *testing.T) {
-=======
-// we error out.
-func TestRun_ConnectServices_Errors(t *testing.T) {
-=======
-// TestRun_Errors tests that when registered services could not be found,
-// we error out.
-func TestRun_Errors(t *testing.T) {
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	t.Parallel()
 
 	cases := []struct {
@@ -703,7 +655,6 @@ func TestRun_Errors(t *testing.T) {
 				"-proxy-id-file", proxyFile,
 				"-consul-api-timeout", "5s",
 				"-consul-node-name", connectinject.ConsulNodeName,
-<<<<<<< HEAD
 			}
 
 			code := cmd.Run(flags)
@@ -798,8 +749,6 @@ func TestRun_Gateways_Errors(t *testing.T) {
 				"-proxy-id-file", proxyFile,
 				"-consul-api-timeout", "5s",
 				"-consul-node-name", connectinject.ConsulNodeName,
-=======
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
 			}
 
 			code := cmd.Run(flags)

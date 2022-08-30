@@ -1086,13 +1086,20 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedHealthChecks       []*api.HealthCheck
 <<<<<<< HEAD
+<<<<<<< HEAD
 		metricsEnabled             bool
 =======
 <<<<<<< HEAD
 		metricsEnabled             bool
 =======
 >>>>>>> e26b5af0 (Initial support for agentless (#1267))
+<<<<<<< HEAD
 >>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
+=======
+=======
+		metricsEnabled             bool
+>>>>>>> e4ce8794 (Register mesh-gateways using the endpoints controller.)
+>>>>>>> 0c59ab64 (Register mesh-gateways using the endpoints controller.)
 		expErr                     string
 	}{
 		{
@@ -3584,6 +3591,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				},
 			}
 <<<<<<< HEAD
+<<<<<<< HEAD
 			pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 =======
 <<<<<<< HEAD
@@ -3591,7 +3599,13 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 =======
 			pod1 := createPod("pod1", "1.2.3.4", true, true)
 >>>>>>> e26b5af0 (Initial support for agentless (#1267))
+<<<<<<< HEAD
 >>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
+=======
+=======
+			pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+>>>>>>> e4ce8794 (Register mesh-gateways using the endpoints controller.)
+>>>>>>> 0c59ab64 (Register mesh-gateways using the endpoints controller.)
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			k8sObjects := []runtime.Object{endpoint, pod1, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
@@ -5879,9 +5893,15 @@ func createServicePod(name, ip string, inject bool, managedByEndpointsController
 	return pod
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 >>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> e4ce8794 (Register mesh-gateways using the endpoints controller.)
+>>>>>>> 0c59ab64 (Register mesh-gateways using the endpoints controller.)
 
 func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Pod {
 	pod := &corev1.Pod{
@@ -5904,7 +5924,14 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 	return pod
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> e26b5af0 (Initial support for agentless (#1267))
 >>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
+=======
+=======
+>>>>>>> e26b5af0 (Initial support for agentless (#1267))
+=======
+>>>>>>> e4ce8794 (Register mesh-gateways using the endpoints controller.)
+>>>>>>> 0c59ab64 (Register mesh-gateways using the endpoints controller.)
