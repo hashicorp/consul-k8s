@@ -303,7 +303,7 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 
 			filterChain = append(filterChain, FilterChain{
 				FilterChainMatch: strings.Join(filterChainMatch, ", "),
-				Filters:          formatFilters(chain),
+				Filters:          formatFilters(chain.Filters),
 			})
 		}
 
@@ -396,45 +396,156 @@ func parseSecrets(rawCfg map[string]interface{}) ([]Secret, error) {
 	return secrets, nil
 }
 
-func formatFilters(filterChain filterChain) (filters []string) {
+func formatFilters(filters []filter) []string {
+	formatted := []string{}
+
 	// Filters can have many custom configurations, each must be handled differently.
-	formatters := map[string]func(typedConfig) string{
-		"type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC":                                     formatFilterRBAC,
-		"type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy":                            formatFilterTCPProxy,
+	// [List of known extensions](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/listener/v3/listener_components.proto).
+	formatters := map[string]func(filter) string{
+		"type.googleapis.com/envoy.extensions.filters.network.connection_limit.v3.ConnectionLimit":              formatFilterConnectionLimit,
+		"type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config":                        formatFilterDirectResponse,
+		"type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo":                                     formatFilterEcho,
+		"type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz":                            formatFilterExtAuthz,
 		"type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager": formatFilterHTTPConnectionManager,
+		"type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit":                formatFilterLocalRatelimit,
+		"type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit":                           formatFilterRatelimit,
+		"type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC":                                     formatFilterRBAC,
+		"type.googleapis.com/envoy.extensions.filters.network.sni_cluster.v3.SniCluster":                        formatFilterSniCluster,
+		"type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy":                            formatFilterTCPProxy,
 	}
 
-	for _, chainFilter := range filterChain.Filters {
-		if formatter, ok := formatters[chainFilter.TypedConfig.Type]; ok {
-			filters = append(filters, formatter(chainFilter.TypedConfig))
+	for _, filter := range filters {
+		if formatter, ok := formatters[filter.TypedConfig.Type]; ok {
+			formatted = append(formatted, formatter(filter))
+		} else {
+			formatted = append(formatted, fmt.Sprintf("Unknown filter: %s", filter.TypedConfig.Type))
 		}
 	}
-	return
+	return formatted
 }
 
-func formatFilterTCPProxy(config typedConfig) (filter string) {
-	return "to " + config.Cluster
+func formatFilterConnectionLimit(config filter) string {
+	return fmt.Sprintf("Connection limit: %d max connections with %s delay", config.TypedConfig.MaxConnections, config.TypedConfig.Delay)
 }
 
-func formatFilterRBAC(cfg typedConfig) (filter string) {
-	action := cfg.Rules.Action
-	for _, principal := range cfg.Rules.Policies.ConsulIntentions.Principals {
-		regex := principal.Authenticated.PrincipalName.SafeRegex.Regex
-		filter += fmt.Sprintf("%s %s", action, regex)
+func formatFilterDirectResponse(config filter) string {
+	out := []string{"Direct response: ->"}
+	if file := config.TypedConfig.Response.Filename; file != "" {
+		out = append(out, fmt.Sprintf("file:%s", file))
 	}
-	return
+	if inlineBytes := config.TypedConfig.Response.InlineBytes; len(inlineBytes) != 0 {
+		if len(inlineBytes) > 24 {
+			out = append(out, fmt.Sprintf("bytes:%s...", string(inlineBytes)[:24]))
+		} else {
+			out = append(out, fmt.Sprintf("bytes:%s", string(inlineBytes)))
+		}
+	}
+	if inlineString := config.TypedConfig.Response.InlineString; inlineString != "" {
+		if len(inlineString) > 24 {
+			out = append(out, fmt.Sprintf("string:%s...", inlineString[:24]))
+		} else {
+			out = append(out, fmt.Sprintf("string:%s", inlineString))
+		}
+	}
+	if envVar := config.TypedConfig.Response.EnvironmentVariable; envVar != "" {
+		out = append(out, fmt.Sprintf("env:%s", envVar))
+	}
+
+	return strings.Join(out, " ")
 }
 
-func formatFilterHTTPConnectionManager(cfg typedConfig) (filter string) {
-	for _, host := range cfg.RouteConfig.VirtualHosts {
-		filter += strings.Join(host.Domains, ", ")
-		filter += " to "
+func formatFilterEcho(config filter) string {
+	return "Echo: upstream will respond with the data it receives."
+}
+
+func formatFilterExtAuthz(config filter) string {
+	var upstream string
+	if config.TypedConfig.GrpcService.EnvoyGrpc.ClusterName != "" {
+		upstream = config.TypedConfig.GrpcService.EnvoyGrpc.ClusterName
+	} else if config.TypedConfig.GrpcService.GoogleGrpc.TargetUri != "" {
+		upstream = config.TypedConfig.GrpcService.GoogleGrpc.TargetUri
+	} else {
+		upstream = "No upstream configured."
+	}
+
+	return fmt.Sprintf("External authorization: %s", upstream)
+}
+
+func formatFilterHTTPConnectionManager(config filter) string {
+	out := "HTTP: "
+	for _, host := range config.TypedConfig.RouteConfig.VirtualHosts {
+		out += strings.Join(host.Domains, ", ")
+		out += " -> "
 
 		routes := ""
 		for _, route := range host.Routes {
 			routes += fmt.Sprintf("%s%s", route.Route.Cluster, route.Match.Prefix)
 		}
-		filter += routes
+		out += routes
 	}
-	return
+	return out
+}
+
+func formatFilterLocalRatelimit(config filter) string {
+	return fmt.Sprintf("Local rate limit: tokens: max %d per-fill %d, interval: %s",
+		config.TypedConfig.TokenBucket.MaxTokens,
+		config.TypedConfig.TokenBucket.TokensPerFill,
+		config.TypedConfig.TokenBucket.FillInterval)
+}
+
+func formatFilterRatelimit(config filter) string {
+	out := "Rate limit: "
+
+	if config.TypedConfig.Domain != "" {
+		out += config.TypedConfig.Domain + " "
+	}
+
+	// Rate limit using descriptors.
+	if len(config.TypedConfig.Descriptors) != 0 {
+		for _, descriptor := range config.TypedConfig.Descriptors {
+			for _, entry := range descriptor.Entries {
+				out += fmt.Sprintf("%s:%s ", entry.Key, entry.Value)
+			}
+			out += fmt.Sprintf("%d req per %s", descriptor.Limit.RequestsPerUnit, strings.ToLower(descriptor.Limit.Unit))
+		}
+	}
+
+	// Rate limit using an external Envoy gRPC service.
+	if config.TypedConfig.RateLimitService.GrpcService.EnvoyGrpc.ClusterName != "" {
+		out += fmt.Sprintf("using %s ", config.TypedConfig.RateLimitService.GrpcService.EnvoyGrpc.ClusterName)
+	}
+
+	// Rate limit using an external Google gRPC service.
+	if config.TypedConfig.RateLimitService.GrpcService.GoogleGrpc.TargetUri != "" {
+		out += fmt.Sprintf("using %s ", config.TypedConfig.RateLimitService.GrpcService.GoogleGrpc.TargetUri)
+	}
+
+	// Notify the user that failure to reach the rate limiting service will deny the caller.
+	if config.TypedConfig.FailureModeDeny {
+		out += "will deny if unreachable"
+	}
+
+	return strings.Trim(out, " ")
+}
+
+func formatFilterRBAC(config filter) string {
+	out := "RBAC: "
+	action := config.TypedConfig.Rules.Action
+	for _, principal := range config.TypedConfig.Rules.Policies.ConsulIntentions.Principals {
+		regex := principal.Authenticated.PrincipalName.SafeRegex.Regex
+		out += fmt.Sprintf("%s %s", action, regex)
+	}
+	return out
+}
+
+func formatFilterSniCluster(config filter) string {
+	return "SNI: Upstream cluster name set by SNI field in TLS connection."
+}
+
+func formatFilterTCPProxy(config filter) string {
+	if config.TypedConfig.Cluster == "" {
+		return "TCP: No upstream cluster configured."
+	}
+
+	return "TCP: -> " + strings.Split(config.TypedConfig.Cluster, ".")[0]
 }

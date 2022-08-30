@@ -103,7 +103,7 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 	case <-ctx.Done():
 		pf.Close()
 		return "", fmt.Errorf("port forward cancelled")
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Second * 10):
 		pf.Close()
 		return "", fmt.Errorf("port forward timed out")
 	}

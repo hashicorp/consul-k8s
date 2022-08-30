@@ -106,16 +106,28 @@ type filterChain struct {
 }
 
 type filter struct {
-	Name        string      `json:"name"`
-	TypedConfig typedConfig `json:"typed_config"`
+	Name        string            `json:"name"`
+	TypedConfig filterTypedConfig `json:"typed_config"`
 }
 
-type typedConfig struct {
-	Type        string            `json:"@type"`
-	Cluster     string            `json:"cluster"`
-	RouteConfig filterRouteConfig `json:"route_config"`
-	HttpFilters []httpFilter      `json:"http_filters"`
-	Rules       rules             `json:"rules"`
+// Not all filters have all of these values. This is extensive to cover the
+// numerous configuration types for filters.
+type filterTypedConfig struct {
+	Type             string                       `json:"@type"`
+	Cluster          string                       `json:"cluster"`
+	RouteConfig      filterRouteConfig            `json:"route_config"`
+	HttpFilters      []httpFilter                 `json:"http_filters"`
+	Rules            filterRules                  `json:"rules"`
+	StatPrefix       string                       `json:"stat_prefix"`
+	MaxConnections   int64                        `json:"max_connections"`
+	Delay            string                       `json:"delay"`
+	Response         filterResponse               `json:"reponse"`
+	GrpcService      filterGrpcService            `json:"grpc_service"`
+	TokenBucket      filterTokenBucket            `json:"token_bucket"`
+	Domain           string                       `json:"domain"`
+	Descriptors      []filterRateLimitDescriptor  `json:"descriptors"`
+	FailureModeDeny  bool                         `json:"failure_mode_deny"`
+	RateLimitService filterRateLimitServiceConfig `json:"rate_limit_service"`
 }
 
 type filterRouteConfig struct {
@@ -156,19 +168,19 @@ type httpFilter struct {
 }
 
 type httpTypedConfig struct {
-	Rules rules `json:"rules"`
+	Rules filterRules `json:"rules"`
 }
 
-type rules struct {
-	Action   string                  `json:"action"`
-	Policies httpTypedConfigPolicies `json:"policies"`
+type filterRules struct {
+	Action   string                        `json:"action"`
+	Policies filterHttpTypedConfigPolicies `json:"policies"`
 }
 
-type httpTypedConfigPolicies struct {
-	ConsulIntentions httpTypedConfigConsulIntentions `json:"consul-intentions-layer4"`
+type filterHttpTypedConfigPolicies struct {
+	ConsulIntentions filterHttpTypedConfigConsulIntentions `json:"consul-intentions-layer4"`
 }
 
-type httpTypedConfigConsulIntentions struct {
+type filterHttpTypedConfigConsulIntentions struct {
 	Principals []principal `json:"principals"`
 }
 
@@ -218,6 +230,51 @@ type routeMatch struct {
 
 type routeRoute struct {
 	Cluster string `json:"cluster"`
+}
+
+type filterResponse struct {
+	Filename            string `json:"filename"`
+	InlineBytes         []byte `json:"inline_bytes"`
+	InlineString        string `json:"inline_string"`
+	EnvironmentVariable string `json:"environment_variable"`
+}
+
+type filterGrpcService struct {
+	EnvoyGrpc  filterEnvoyGrpc  `json:"envoy_grpc"`
+	GoogleGrpc filterGoogleGrpc `json:"google_grpc"`
+}
+
+type filterEnvoyGrpc struct {
+	ClusterName string `json:"cluster_name"`
+}
+
+type filterGoogleGrpc struct {
+	TargetUri string `json:"target_uri"`
+}
+
+type filterTokenBucket struct {
+	MaxTokens     int    `json:"max_tokens"`
+	TokensPerFill int    `json:"tokens_per_fill"`
+	FillInterval  string `json:"fill_interval"`
+}
+
+type filterRateLimitDescriptor struct {
+	Entries []filterRateLimitDescriptorEntry `json:"entries"`
+	Limit   filterRateLimitOverride          `json:"limit"`
+}
+
+type filterRateLimitDescriptorEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type filterRateLimitOverride struct {
+	RequestsPerUnit int    `json:"requests_per_unit"`
+	Unit            string `json:"unit"`
+}
+
+type filterRateLimitServiceConfig struct {
+	GrpcService filterGrpcService `json:"grpc_service"`
 }
 
 type secretsConfigDump struct {
