@@ -8,6 +8,7 @@
 {{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
 {{- if not (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") (eq .Values.global.peering.tokenGeneration.serverAddresses.source "consul"))) }}{{ fail "global.peering.tokenGeneration.serverAddresses.source must be one of empty string, 'consul' or 'static'" }}{{ end }}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+{{ template "consul.validateCloudConfiguration" . }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
