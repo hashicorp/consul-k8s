@@ -603,130 +603,7 @@ jobs:
   ########################
   # ACCEPTANCE TESTS
   ########################
-  acceptance-gke-1-20:
-    parallelism: 6
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
-
-    steps:
-      - run:
-          name: Exit if forked PR
-          command: |
-            if [ -n "$CIRCLE_PR_NUMBER" ]; then
-                echo "Skipping acceptance tests for forked PRs; marking step successful."
-                circleci step halt
-            fi
-
-      - checkout
-
-      - run:
-          name: terraform init & apply
-          working_directory: *gke-terraform-path
-          command: |
-            terraform init
-            echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
-
-            # On GKE, we're setting the build number instead of build URL because label values
-            # cannot contain '/'.
-            terraform apply \
-              -var project=${CLOUDSDK_CORE_PROJECT} \
-              -var init_cli=true \
-              -var cluster_count=2 \
-              -var labels="{\"build_number\": \"$CIRCLE_BUILD_NUM\"}" \
-              -auto-approve
-
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
-
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
-
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
-
-      - run: mkdir -p $TEST_RESULTS
-
-      - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
-
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-
-      - run:
-          name: terraform destroy
-          working_directory: *gke-terraform-path
-          command: |
-            terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
-          when: always
-
-      - slack/status:
-          fail_only: true
-          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
-  acceptance-aks-1-21:
-    parallelism: 6
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
-
-    steps:
-      - checkout
-
-      - run:
-          name: terraform init & apply
-          working_directory: *aks-terraform-path
-          command: |
-            terraform init
-
-            terraform apply \
-              -var client_id="$ARM_CLIENT_ID" \
-              -var client_secret="$ARM_CLIENT_SECRET" \
-              -var cluster_count=2 \
-              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
-              -auto-approve
-
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
-
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
-
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
-
-      - run: mkdir -p $TEST_RESULTS
-
-      - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
-
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-
-      - run:
-          name: terraform destroy
-          working_directory: *aks-terraform-path
-          command: |
-            terraform destroy -auto-approve
-          when: always
-
-      - slack/status:
-          fail_only: true
-          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
-  acceptance-eks-1-19:
+  acceptance-eks-1-23:
     parallelism: 6
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1012,13 +889,6 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1034,20 +904,9 @@ workflows:
       #      - acceptance-openshift:
       #          requires:
       #          - cleanup-azure-resources
-      - acceptance-gke-1-20:
-          requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
-      - acceptance-eks-1-19:
+      - acceptance-eks-1-23:
           requires:
             - cleanup-eks-resources
-            - dev-upload-docker
-      - acceptance-aks-1-21:
-          requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
-      - acceptance-kind-1-23:
-          requires:
             - dev-upload-docker
 
   nightly-acceptance-tests-consul:
