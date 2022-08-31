@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -198,8 +199,10 @@ func parseClusters(rawCfg map[string]interface{}, clusterMapping map[string][]st
 		endpoints := make([]string, 0)
 		for _, endpoint := range cluster.Cluster.LoadAssignment.Endpoints {
 			for _, lbEndpoint := range endpoint.LBEndpoints {
-				endpoints = append(endpoints, fmt.Sprintf("%s:%d", lbEndpoint.Endpoint.Address.SocketAddress.Address,
-					int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)))
+				// Only add endpoints defined by IP addresses.
+				if addr := lbEndpoint.Endpoint.Address.SocketAddress.Address; net.ParseIP(addr) != nil {
+					endpoints = append(endpoints, fmt.Sprintf("%s:%d", addr, int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)))
+				}
 			}
 		}
 
