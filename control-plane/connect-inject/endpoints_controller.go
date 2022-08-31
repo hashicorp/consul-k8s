@@ -33,7 +33,7 @@ const (
 	TokenMetaPodNameKey        = "pod"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
-	envoySidecarContainer      = "envoy-sidecar"
+	sidecarContainer           = "consul-dataplane"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.

@@ -631,6 +631,11 @@ global:
   # @default: envoyproxy/envoy-alpine:<latest supported version>
   imageEnvoy: "envoyproxy/envoy:v1.22.4"
 
+  # The name (and tag) of the consul-dataplane Docker image used for the
+  # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
+  # @default: hashicorp/consul-dataplane:<latest supported version>
+  imageConsulDataplane: "ishustava/consul-dataplane:latest@sha256:5ac25d6a159e360b9cbe9b12ea6be70cde8f4677cbf00ae4885e5f5fd9b1ad36"
+
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:

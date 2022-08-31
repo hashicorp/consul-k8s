@@ -42,7 +42,7 @@ type Command struct {
 	flagCertDir               string // Directory with TLS certs for listening (PEM)
 	flagDefaultInject         bool   // True to inject by default
 	flagConsulImage           string // Docker image for Consul
-	flagEnvoyImage            string // Docker image for Envoy
+	flagConsulDataplaneImage  string // Docker image for Envoy
 	flagConsulK8sImage        string // Docker image for consul-k8s
 	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
 	flagWriteServiceDefaults  bool   // True to enable central config injection
@@ -148,8 +148,8 @@ func (c *Command) init() {
 		"Directory with PEM-encoded TLS certificate and key to serve.")
 	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", "",
 		"Docker image for Consul.")
-	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", "",
-		"Docker image for Envoy.")
+	c.flagSet.StringVar(&c.flagConsulDataplaneImage, "consul-dataplane-image", "",
+		"Docker image for Consul Dataplane.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
@@ -269,6 +269,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
+
 	if c.flagDefaultSidecarProxyCPULimit != "" {
 		sidecarProxyCPULimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
 		if err != nil {
@@ -526,7 +527,7 @@ func (c *Command) Run(args []string) int {
 			Clientset:                     c.clientset,
 			ConsulClient:                  c.consulClient,
 			ImageConsul:                   c.flagConsulImage,
-			ImageEnvoy:                    c.flagEnvoyImage,
+			ImageConsulDataplane:          c.flagConsulDataplaneImage,
 			EnvoyExtraArgs:                c.flagEnvoyExtraArgs,
 			ImageConsulK8S:                c.flagConsulK8sImage,
 			RequireAnnotation:             !c.flagDefaultInject,
@@ -536,6 +537,7 @@ func (c *Command) Run(args []string) int {
 			ConsulHTTPPort:                consulURL.Port(),
 			ConsulGRPCPort:                "8502", // todo(ishustava): should be passed via flag
 			ConsulAddress:                 consulURL.Hostname(),
+			ConsulTLSServerName:           c.http.TLSServerName(),
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,
@@ -600,8 +602,8 @@ func (c *Command) validateFlags() error {
 	if c.flagConsulImage == "" {
 		return errors.New("-consul-image must be set")
 	}
-	if c.flagEnvoyImage == "" {
-		return errors.New("-envoy-image must be set")
+	if c.flagConsulDataplaneImage == "" {
+		return errors.New("-consul-dataplane-image must be set")
 	}
 	if c.flagWriteServiceDefaults {
 		return errors.New("-enable-central-config is no longer supported")

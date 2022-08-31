@@ -4684,7 +4684,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 					},
 				},
 				{
-					Name: envoySidecarContainer,
+					Name: sidecarContainer,
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "http",

@@ -94,7 +94,7 @@ func TestConnectInject(t *testing.T) {
 					logger.Log(t, output)
 
 					// Both proxies must see their own local agent and app as clusters.
-					require.Regexp(r, "local_agent.*STATIC", output)
+					require.Regexp(r, "consul-dataplane.*STATIC", output)
 					require.Regexp(r, "local_app.*STATIC", output)
 
 					// Static Client must have Static Server as a cluster and endpoint.
@@ -102,7 +102,6 @@ func TestConnectInject(t *testing.T) {
 						require.Regexp(r, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
 						require.Regexp(r, ipv4RegEx+".*static-server.default.dc1.internal", output)
 					}
-
 				}
 			})
 
@@ -175,26 +174,16 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_CleanupKilledPods(t *testing.T) {
-	cases := []struct {
-		secure      bool
-		autoEncrypt bool
-	}{
-		{false, false},
-		{true, false},
-		{true, true},
-	}
-
-	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+	for _, secure := range []bool{false, true} {
+		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
-				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 			}
 
 			releaseName := helpers.RandomName()
@@ -206,7 +195,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
-			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, secure)
 			retry.Run(t, func(r *retry.R) {
 				for _, name := range []string{"static-client", "static-client-sidecar-proxy"} {
 					instances, _, err := consulClient.Catalog().Service(name, "", nil)
@@ -253,17 +242,9 @@ const multiportAdmin = "multiport-admin"
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
 // multiport app to static-server.
 func TestConnectInject_MultiportServices(t *testing.T) {
-	cases := []struct {
-		secure      bool
-		autoEncrypt bool
-	}{
-		{false, false},
-		{true, false},
-		{true, true},
-	}
-
-	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+	t.Skipf("skipping until multi-port workaround is supported")
+	for _, secure := range []bool{false, true} {
+		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
@@ -276,9 +257,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
 
-				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 			}
 
 			releaseName := helpers.RandomName()
@@ -286,10 +266,10 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+			consulClient, _ := consulCluster.SetupConsulClient(t, secure)
 
 			// Check that the ACL token is deleted.
-			if c.secure {
+			if secure {
 				// We need to register the cleanup function before we create the deployments
 				// because golang will execute them in reverse order i.e. the last registered
 				// cleanup function will be executed first.
@@ -328,7 +308,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			require.Len(t, podList.Items, 1)
 			require.Len(t, podList.Items[0].Spec.Containers, 4)
 
-			if c.secure {
+			if secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:2234")
@@ -373,7 +353,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
 			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.
-			if c.secure {
+			if secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")

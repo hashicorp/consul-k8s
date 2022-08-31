@@ -90,6 +90,10 @@ func (f *HTTPFlags) SetTokenFile(v string) error {
 	return f.tokenFile.Set(v)
 }
 
+func (f *HTTPFlags) TLSServerName() string {
+	return f.tlsServerName.String()
+}
+
 func (f *HTTPFlags) ReadTokenFile() (string, error) {
 	tokenFile := f.tokenFile.String()
 	if tokenFile == "" {

@@ -128,12 +128,13 @@ spec:
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \
-                -envoy-image="{{ .Values.global.imageEnvoy }}" \
+                -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
+                -tls-server-name="server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}" \
                 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
                 {{- if .Values.externalServers.enabled }}
                 {{- if .Values.global.tls.enabled }}
