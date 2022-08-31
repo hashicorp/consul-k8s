@@ -1882,3 +1882,62 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-federation"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.cloud
+
+
+@test "serverACLInit/Job: -tls-server-name is not specified on command of post-install-job container when tls and auto-encrypt is enabled but global.cloud.enabled is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select(.name == "post-install-job")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: -tls-server-name is specified on command of post-install-job container when tls and auto-encrypt is enabled and global.cloud.enabled is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=consul-hcp-config' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select(.name == "post-install-job")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-consul-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
+}

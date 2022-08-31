@@ -14,12 +14,14 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/posener/complete"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -77,12 +79,6 @@ type Command struct {
 }
 
 func (c *Command) init() {
-	// Store all the possible preset values in 'presetList'. Printed in the help message.
-	var presetList []string
-	for name := range config.Presets {
-		presetList = append(presetList, name)
-	}
-
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.BoolVar(&flag.BoolVar{
@@ -107,7 +103,7 @@ func (c *Command) init() {
 		Name:    flagNamePreset,
 		Target:  &c.flagPreset,
 		Default: defaultPreset,
-		Usage:   fmt.Sprintf("Use an upgrade preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+		Usage:   fmt.Sprintf("Use an upgrade preset, one of %s. Defaults to none", strings.Join(preset.Presets, ", ")),
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetValues,
@@ -238,7 +234,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Handle preset, value files, and set values logic.
-	chartValues, err := c.mergeValuesFlagsWithPrecedence(settings)
+	chartValues, err := c.mergeValuesFlagsWithPrecedence(settings, namespace)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -247,7 +243,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	chartValues = common.MergeMaps(config.Convert(config.GlobalNameConsul), chartValues)
+	chartValues = common.MergeMaps(config.ConvertToMap(config.GlobalNameConsul), chartValues)
 
 	// Print out the upgrade summary.
 	if err = c.printDiff(currentChartValues, chartValues); err != nil {
@@ -350,7 +346,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if ok := slices.Contains(preset.Presets, c.flagPreset); c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if _, err := time.ParseDuration(c.flagTimeout); err != nil {
@@ -376,7 +372,7 @@ func (c *Command) validateFlags(args []string) error {
 // 5. -set-file
 // For example, -set-file will override a value provided via -set.
 // Within each of these groups the rightmost flag value has the highest precedence.
-func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) (map[string]interface{}, error) {
+func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings, namespace string) (map[string]interface{}, error) {
 	p := getter.All(settings)
 	v := &values.Options{
 		ValueFiles:   c.flagValueFiles,
@@ -390,7 +386,14 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	}
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
+		p, err := c.getPreset(c.flagPreset, namespace)
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset provider: %s", err)
+		}
+		presetMap, err := p.GetValueMap()
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset values: %s", err)
+		}
 		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
@@ -444,4 +447,20 @@ func (c *Command) printDiff(old, new map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+// getPreset is a factory function that, given a string, produces a struct that
+// implements the Preset interface.  If the string is not recognized an error is
+// returned.
+func (c *Command) getPreset(name string, namespace string) (preset.Preset, error) {
+	getPresetConfig := &preset.GetPresetConfig{
+		Name: name,
+		CloudPreset: &preset.CloudPreset{
+			KubernetesClient:    c.kubernetes,
+			KubernetesNamespace: namespace,
+			SkipSavingSecrets:   true,
+			UI:                  c.UI,
+		},
+	}
+	return preset.GetPreset(getPresetConfig)
 }

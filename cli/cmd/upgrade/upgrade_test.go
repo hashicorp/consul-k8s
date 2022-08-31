@@ -8,9 +8,11 @@ import (
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestValidateFlags tests the validate flags function.
@@ -100,4 +102,40 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	cmd := getInitializedCommand(t)
 	c := cmd.AutocompleteArgs()
 	assert.Equal(t, complete.PredictNothing, c)
+}
+
+func TestGetPreset(t *testing.T) {
+	testCases := []struct {
+		description string
+		presetName  string
+	}{
+		{
+			"'cloud' should return a CloudPreset'.",
+			preset.PresetCloud,
+		},
+		{
+			"'demo' should return a DemoPreset'.",
+			preset.PresetDemo,
+		},
+		{
+			"'secure' should return a SecurePreset'.",
+			preset.PresetSecure,
+		},
+	}
+
+	for _, tc := range testCases {
+		c := getInitializedCommand(t)
+		t.Run(tc.description, func(t *testing.T) {
+			p, err := c.getPreset(tc.presetName, "consul")
+			require.NoError(t, err)
+			switch p.(type) {
+			case *preset.CloudPreset:
+				require.Equal(t, preset.PresetCloud, tc.presetName)
+			case *preset.DemoPreset:
+				require.Equal(t, preset.PresetDemo, tc.presetName)
+			case *preset.SecurePreset:
+				require.Equal(t, preset.PresetSecure, tc.presetName)
+			}
+		})
+	}
 }

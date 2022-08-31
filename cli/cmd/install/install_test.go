@@ -9,7 +9,9 @@ import (
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
@@ -214,6 +216,7 @@ func getInitializedCommand(t *testing.T) *Command {
 
 	baseCommand := &common.BaseCommand{
 		Log: log,
+		UI:  terminal.NewBasicUI(context.TODO()),
 	}
 
 	c := &Command{
@@ -282,4 +285,131 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	cmd := getInitializedCommand(t)
 	c := cmd.AutocompleteArgs()
 	assert.Equal(t, complete.PredictNothing, c)
+}
+
+// TestValidateCloudPresets tests the validate flags function when passed the cloud preset.
+func TestValidateCloudPresets(t *testing.T) {
+	testCases := []struct {
+		description        string
+		input              []string
+		preProcessingFunc  func()
+		postProcessingFunc func()
+		expectError        bool
+	}{
+		{
+			"Should not error on cloud preset when HCP_CLIENT_ID and HCP_CLIENT_SECRET envvars are present and hcp-resource-id parameter is provided.",
+			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
+			func() {
+				os.Setenv("HCP_CLIENT_ID", "foo")
+				os.Setenv("HCP_CLIENT_SECRET", "bar")
+			},
+			func() {
+				os.Unsetenv("HCP_CLIENT_ID")
+				os.Unsetenv("HCP_CLIENT_SECRET")
+			},
+			false,
+		},
+		{
+			"Should error on cloud preset when HCP_CLIENT_ID is not provided.",
+			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
+			func() {
+				os.Unsetenv("HCP_CLIENT_ID")
+				os.Setenv("HCP_CLIENT_SECRET", "bar")
+			},
+			func() {
+				os.Unsetenv("HCP_CLIENT_ID")
+				os.Unsetenv("HCP_CLIENT_SECRET")
+			},
+			true,
+		},
+		{
+			"Should error on cloud preset when HCP_CLIENT_SECRET is not provided.",
+			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
+			func() {
+				os.Setenv("HCP_CLIENT_ID", "foo")
+				os.Unsetenv("HCP_CLIENT_SECRET")
+			},
+			func() {
+				os.Unsetenv("HCP_CLIENT_ID")
+				os.Unsetenv("HCP_CLIENT_SECRET")
+			},
+			true,
+		},
+		{
+			"Should error on cloud preset when -hcp-resource-id flag is not provided.",
+			[]string{"-preset=cloud"},
+			func() {
+				os.Setenv("HCP_CLIENT_ID", "foo")
+				os.Setenv("HCP_CLIENT_SECRET", "bar")
+			},
+			func() {
+				os.Unsetenv("HCP_CLIENT_ID")
+				os.Unsetenv("HCP_CLIENT_SECRET")
+			},
+			true,
+		},
+		{
+			"Should error when -hcp-resource-id flag is provided but cloud preset is not specified.",
+			[]string{"-hcp-resource-id=foobar"},
+			func() {
+				os.Setenv("HCP_CLIENT_ID", "foo")
+				os.Setenv("HCP_CLIENT_SECRET", "bar")
+			},
+			func() {
+				os.Unsetenv("HCP_CLIENT_ID")
+				os.Unsetenv("HCP_CLIENT_SECRET")
+			},
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase.preProcessingFunc()
+		c := getInitializedCommand(t)
+		t.Run(testCase.description, func(t *testing.T) {
+			err := c.validateFlags(testCase.input)
+			if testCase.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+		defer testCase.postProcessingFunc()
+	}
+}
+
+func TestGetPreset(t *testing.T) {
+	testCases := []struct {
+		description string
+		presetName  string
+	}{
+		{
+			"'cloud' should return a CloudPreset'.",
+			preset.PresetCloud,
+		},
+		{
+			"'demo' should return a DemoPreset'.",
+			preset.PresetDemo,
+		},
+		{
+			"'secure' should return a SecurePreset'.",
+			preset.PresetSecure,
+		},
+	}
+
+	for _, tc := range testCases {
+		c := getInitializedCommand(t)
+		t.Run(tc.description, func(t *testing.T) {
+			p, err := c.getPreset(tc.presetName)
+			require.NoError(t, err)
+			switch p.(type) {
+			case *preset.CloudPreset:
+				require.Equal(t, preset.PresetCloud, tc.presetName)
+			case *preset.DemoPreset:
+				require.Equal(t, preset.PresetDemo, tc.presetName)
+			case *preset.SecurePreset:
+				require.Equal(t, preset.PresetSecure, tc.presetName)
+			}
+		})
+	}
 }

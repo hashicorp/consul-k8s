@@ -236,6 +236,9 @@ This template is for an init container.
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
+        {{- if .Values.global.cloud.enabled }}
+        -tls-server-name=server.{{.Values.global.datacenter}}.{{.Values.global.domain}} \
+        {{- end}}
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
@@ -310,5 +313,17 @@ Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- if or (not .Values.global.secretsBackend.vault.connectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.controllerRole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
 {{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
 {{ end }}
+{{ end }}
+{{- end -}}
+
+{{/*
+Fails global.cloud.enabled is true and global.cloud.secretName is nil or tempty.
+
+Usage: {{ template "consul.validateCloudConfiguration" . }}
+
+*/}}
+{{- define "consul.validateCloudConfiguration" -}}
+{{- if and .Values.global.cloud.enabled (not .Values.global.cloud.secretName) }}
+{{fail "When global.cloud.enabled is true, global.cloud.secretName must also be set."}}
 {{ end }}
 {{- end -}}

@@ -3,6 +3,7 @@ package install
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/consul-k8s/cli/validation"
 	"github.com/posener/complete"
@@ -25,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/yaml"
 )
 
@@ -56,12 +59,21 @@ const (
 
 	flagNameContext    = "context"
 	flagNameKubeconfig = "kubeconfig"
+
+	flagHCPResourceID = "hcp-resource-id"
+
+	envHCPClientID     = "HCP_CLIENT_ID"
+	envHCPClientSecret = "HCP_CLIENT_SECRET"
+	envHCPAuthURL      = "HCP_AUTH_URL"
+	envHCPAPIHost      = "HCP_API_HOST"
 )
 
 type Command struct {
 	*common.BaseCommand
 
 	kubernetes kubernetes.Interface
+
+	httpClient *http.Client
 
 	set *flag.Sets
 
@@ -77,6 +89,7 @@ type Command struct {
 	timeoutDuration     time.Duration
 	flagVerbose         bool
 	flagWait            bool
+	flagHCPResourceID   string
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -86,12 +99,6 @@ type Command struct {
 }
 
 func (c *Command) init() {
-	// Store all the possible preset values in 'presetList'. Printed in the help message.
-	var presetList []string
-	for name := range config.Presets {
-		presetList = append(presetList, name)
-	}
-
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.BoolVar(&flag.BoolVar{
@@ -122,7 +129,7 @@ func (c *Command) init() {
 		Name:    flagNamePreset,
 		Target:  &c.flagPreset,
 		Default: defaultPreset,
-		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(preset.Presets, ", ")),
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetValues,
@@ -173,6 +180,12 @@ func (c *Command) init() {
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagHCPResourceID,
+		Target:  &c.flagHCPResourceID,
+		Default: "",
+		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
 	})
 
 	c.help = c.set.Help()
@@ -257,6 +270,18 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Output("No existing Consul persistent volume claims found", terminal.WithSuccessStyle())
 
+	release := release.Release{
+		Name:      "consul",
+		Namespace: c.flagNamespace,
+	}
+
+	msg, err := c.checkForPreviousSecrets(release)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	c.UI.Output(msg, terminal.WithSuccessStyle())
+
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
 	if err != nil {
@@ -276,18 +301,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	rel := release.Release{
-		Name:          "consul",
-		Namespace:     c.flagNamespace,
-		Configuration: helmVals,
-	}
-
-	msg, err := c.checkForPreviousSecrets(rel)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output(msg, terminal.WithSuccessStyle())
+	release.Configuration = values
 
 	// If an enterprise license secret was provided, check that the secret exists and that the enterprise Consul image is set.
 	if helmVals.Global.EnterpriseLicense.SecretName != "" {
@@ -314,7 +328,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = common.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
+	vals = common.MergeMaps(config.ConvertToMap(config.GlobalNameConsul), vals)
 
 	if c.flagDryRun {
 		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
@@ -500,7 +514,14 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	}
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
+		p, err := c.getPreset(c.flagPreset)
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset provider: %s", err)
+		}
+		presetMap, err := p.GetValueMap()
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset values: %s", err)
+		}
 		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
@@ -517,13 +538,28 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if ok := slices.Contains(preset.Presets, c.flagPreset); c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !common.IsValidLabel(c.flagNamespace) {
 		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
 			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character", c.flagNamespace)
 	}
+
+	if c.flagPreset == preset.PresetCloud {
+		clientID := os.Getenv(envHCPClientID)
+		clientSecret := os.Getenv(envHCPClientSecret)
+		if clientID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientID)
+		} else if clientSecret == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientSecret)
+		} else if c.flagHCPResourceID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagHCPResourceID)
+		}
+	} else if c.flagHCPResourceID != "" {
+		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagHCPResourceID, preset.PresetCloud)
+	}
+
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
@@ -551,4 +587,29 @@ func (c *Command) checkValidEnterprise(secretName string) error {
 		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
 	return nil
+}
+
+// getPreset is a factory function that, given a string, produces a struct that
+// implements the Preset interface.  If the string is not recognized an error is
+// returned.
+func (c *Command) getPreset(name string) (preset.Preset, error) {
+	hcpConfig := &preset.HCPConfig{
+		ResourceID:   c.flagHCPResourceID,
+		ClientID:     os.Getenv(envHCPClientID),
+		ClientSecret: os.Getenv(envHCPClientSecret),
+		AuthURL:      os.Getenv(envHCPAuthURL),
+		APIHostname:  os.Getenv(envHCPAPIHost),
+	}
+	getPresetConfig := &preset.GetPresetConfig{
+		Name: name,
+		CloudPreset: &preset.CloudPreset{
+			KubernetesClient:    c.kubernetes,
+			KubernetesNamespace: c.flagNamespace,
+			HCPConfig:           hcpConfig,
+			UI:                  c.UI,
+			HTTPClient:          c.httpClient,
+			Context:             c.Ctx,
+		},
+	}
+	return preset.GetPreset(getPresetConfig)
 }

@@ -1540,7 +1540,7 @@ EOF
 #--------------------------------------------------------------------
 # Vault
 
-@test "terminatingGateway/Deployment: configures server CA to come from vault when vault is enabled" {
+@test "terminatingGateways/Deployment: configures server CA to come from vault when vault is enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
@@ -1573,7 +1573,7 @@ EOF
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 }
 
-@test "terminatingGateway/Deployment: vault CA is not configured by default" {
+@test "terminatingGateways/Deployment: vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/terminating-gateways-deployment.yaml  \
@@ -1594,7 +1594,7 @@ EOF
   [ "${actual}" = "false" ]
 }
 
-@test "terminatingGateway/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
+@test "terminatingGateways/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/terminating-gateways-deployment.yaml  \
@@ -1616,7 +1616,7 @@ EOF
   [ "${actual}" = "false" ]
 }
 
-@test "terminatingGateway/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
+@test "terminatingGateways/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/terminating-gateways-deployment.yaml  \
@@ -1638,7 +1638,7 @@ EOF
   [ "${actual}" = "false" ]
 }
 
-@test "terminatingGateway/Deployment: vault CA is configured when both secretName and secretKey are set" {
+@test "terminatingGateways/Deployment: vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/terminating-gateways-deployment.yaml  \
@@ -1664,7 +1664,7 @@ EOF
 #--------------------------------------------------------------------
 # Vault agent annotations
 
-@test "terminatingGateway/Deployment: no vault agent annotations defined by default" {
+@test "terminatingGateways/Deployment: no vault agent annotations defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
@@ -1680,7 +1680,7 @@ EOF
   [ "${actual}" = "{}" ]
 }
 
-@test "terminatingGateway/Deployment: vault agent annotations can be set" {
+@test "terminatingGateways/Deployment: vault agent annotations can be set" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
@@ -1697,4 +1697,63 @@ EOF
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "terminatingGateways/Deployment: -tls-server-name is not specified on command of get-auto-encrypt-client-ca init container when tls and auto-encrypt are enabled but global.cloud.enabled is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: -tls-server-name is specified on command of get-auto-encrypt-client-ca init container when tls and auto-encrypt is enabled and global.cloud.enabled is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=consul-hcp-config' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
 }

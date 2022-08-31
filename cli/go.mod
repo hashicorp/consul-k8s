@@ -9,6 +9,7 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/go-hclog v0.16.2
+	github.com/hashicorp/hcp-sdk-go v0.0.0-00010101000000-000000000000
 	github.com/kr/text v0.2.0
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/cli v1.1.2
@@ -25,7 +26,7 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.54.0 // indirect
+	cloud.google.com/go v0.65.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
@@ -46,7 +47,7 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect
+	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 // indirect
@@ -66,11 +67,19 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
-	github.com/go-logr/logr v0.4.0 // indirect
-	github.com/go-openapi/jsonpointer v0.19.3 // indirect
-	github.com/go-openapi/jsonreference v0.19.3 // indirect
-	github.com/go-openapi/spec v0.19.5 // indirect
+	github.com/go-logr/logr v1.2.2 // indirect
+	github.com/go-openapi/analysis v0.20.0 // indirect
+	github.com/go-openapi/errors v0.20.2 // indirect
+	github.com/go-openapi/jsonpointer v0.19.5 // indirect
+	github.com/go-openapi/jsonreference v0.19.5 // indirect
+	github.com/go-openapi/loads v0.20.2 // indirect
+	github.com/go-openapi/runtime v0.19.24 // indirect
+	github.com/go-openapi/spec v0.20.3 // indirect
+	github.com/go-openapi/strfmt v0.20.0 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
+	github.com/go-openapi/validate v0.20.2 // indirect
+	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible // indirect
+	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -83,8 +92,9 @@ require (
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.0 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -101,7 +111,8 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/copystructure v1.1.1 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/mitchellh/reflectwalk v1.0.1 // indirect
+	github.com/mitchellh/mapstructure v1.4.1 // indirect
+	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -129,17 +140,18 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
-	go.opencensus.io v0.22.3 // indirect
+	go.mongodb.org/mongo-driver v1.4.6 // indirect
+	go.opencensus.io v0.22.4 // indirect
 	go.starlark.net v0.0.0-20200707032745-474f21a9602d // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
+	golang.org/x/oauth2 v0.0.0-20201109201403-9fd604954f58 // indirect
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a // indirect
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	google.golang.org/appengine v1.6.5 // indirect
+	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
 	google.golang.org/grpc v1.36.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
@@ -159,8 +171,11 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 )
 
-// This replace directive is to avoid having to manually bump the version of the charts module upon changes to the Helm
-// chart. When the CLI compiles, all changes to the local charts directory are picked up automatically. This directive
-// works because of the monorepo setup, where the charts module and CLI module are in the same repository. Otherwise,
-// this won't work.
-replace github.com/hashicorp/consul-k8s/charts => ../charts
+replace (
+	// This replace directive is to avoid having to manually bump the version of the charts module upon changes to the Helm
+	// chart. When the CLI compiles, all changes to the local charts directory are picked up automatically. This directive
+	// works because of the monorepo setup, where the charts module and CLI module are in the same repository. Otherwise,
+	// this won't work.
+	github.com/hashicorp/consul-k8s/charts => ../charts
+	github.com/hashicorp/hcp-sdk-go => github.com/hashicorp/hcp-sdk-go-internal v0.0.0-20220810133347-f88d33e2d02b
+)

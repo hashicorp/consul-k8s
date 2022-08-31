@@ -1092,3 +1092,58 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       yq -r '.spec.template.spec.containers[0].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "client/SnapshotAgentDeployment: -tls-server-name is not specified on command of get-auto-encrypt-client-ca init container when tls and auto-encrypt is enabled but global.cloud.enabled is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/SnapshotAgentDeployment: -tls-server-name is specified on command of get-auto-encrypt-client-ca init container when tls and auto-encrypt is enabled and global.cloud.enabled is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=consul-hcp-config' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/SnapshotAgentDeployment: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
+}
