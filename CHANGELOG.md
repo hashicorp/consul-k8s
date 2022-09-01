@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.48.0 (September 01, 2022)
 
 FEATURES:
 * MaxInboundConnections in service-defaults CRD
