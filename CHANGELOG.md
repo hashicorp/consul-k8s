@@ -34,6 +34,9 @@ BREAKING CHANGES:
   type: kubernetes.io/service-account-token
   ```
 
+* Control Plane
+  * Rename flag `server-address` to `token-server-address` in the `inject-connect` subcommand to avoid overloading the context of the `server-address` flag. [[GH-1426](https://github.com/hashicorp/consul-k8s/pull/1426)]
+
 IMPROVEMENTS:
 * CLI:
   * Display clusters by their short names rather than FQDNs for the `proxy read` command. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
