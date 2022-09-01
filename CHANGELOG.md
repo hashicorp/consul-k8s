@@ -11,7 +11,8 @@ FEATURES:
 
 BREAKING CHANGES:
 * Kubernetes 1.24 Support
-  * Users deploying multiple services to the same Pod (multiport) on Kubernetes 1.24+ must also deploy a Kubernetes Secret for each ServiceAccount associated with the Consul service. The name of the Secret must match the ServiceAccount name and be of type `kubernetes.io/service-account-token` [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
+  * Users deploying multiple services to the same Pod (multiport) on Kubernetes 1.24 must also deploy a Kubernetes Secret for each ServiceAccount associated with the Consul service. The name of the Secret must match the ServiceAccount name and be of type `kubernetes.io/service-account-token` [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
+  * Kubernetes 1.19 and 1.20 are no longer supported.
 
   Example:
 
