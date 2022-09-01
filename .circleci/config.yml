@@ -538,7 +538,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.22.4"
+          version: "v1.24.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -570,7 +570,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.22.4"
+          version: "v1.24.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -653,8 +653,8 @@ jobs:
   ########################
   # ACCEPTANCE TESTS
   ########################
-  acceptance-gke-1-20:
-    parallelism: 6
+  acceptance-gke-1-23:
+    parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -721,8 +721,8 @@ jobs:
           fail_only: true
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-gke-cni-1-20:
-    parallelism: 3
+  acceptance-gke-cni-1-23:
+    parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -789,8 +789,8 @@ jobs:
           fail_only: true
           failure_message: "GKE CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-21:
-    parallelism: 6
+  acceptance-aks-1-22:
+    parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -846,7 +846,7 @@ jobs:
           fail_only: true
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-cni-1-21:
+  acceptance-aks-cni-1-22:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -902,8 +902,8 @@ jobs:
           fail_only: true
           failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-1-19:
-    parallelism: 6
+  acceptance-eks-1-21:
+    parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -965,7 +965,7 @@ jobs:
           fail_only: true
           failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-cni-1-19:
+  acceptance-eks-cni-1-21:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1081,76 +1081,6 @@ jobs:
           channel: *slack-channel
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
-  acceptance-kind-1-23:
-    parallelism: 6
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: xlarge
-    steps:
-      - checkout
-      - install-prereqs
-      - create-kind-clusters:
-          version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      - run:
-          name: go mod download
-          working_directory: *acceptance-mod-path
-          command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
-      - run: mkdir -p $TEST_RESULTS
-      - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
-  acceptance-kind-cni-1-23:
-    parallelism: 3
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: xlarge
-    steps:
-      - checkout
-      - install-prereqs
-      - create-kind-cni-clusters:
-          version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      - run:
-          name: go mod download
-          working_directory: *acceptance-mod-path
-          command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
-      - run: mkdir -p $TEST_RESULTS
-      - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "Acceptance tests for CNI against Kind with Kubernetes v1.23 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-11:
     environment:
@@ -1318,35 +1248,29 @@ workflows:
       # - acceptance-openshift:
       #    requires:
       #      - cleanup-azure-resources
-      - acceptance-gke-1-20:
+      - acceptance-gke-1-23:
           requires:
             - cleanup-gcp-resources
             - dev-upload-docker
-      - acceptance-gke-cni-1-20:
+      - acceptance-gke-cni-1-23:
           requires:
             - cleanup-gcp-resources
             - dev-upload-docker
-      - acceptance-eks-1-19:
+      - acceptance-eks-1-21:
           requires:
             - cleanup-eks-resources
             - dev-upload-docker
-      - acceptance-eks-cni-1-19:
+      - acceptance-eks-cni-1-21:
           requires:
             - cleanup-eks-resources
             - dev-upload-docker
-      - acceptance-aks-1-21:
+      - acceptance-aks-1-22:
           requires:
             - cleanup-azure-resources
             - dev-upload-docker
-      - acceptance-aks-cni-1-21:
+      - acceptance-aks-cni-1-22:
           requires:
             - cleanup-azure-resources
-            - dev-upload-docker
-      - acceptance-kind-1-23:
-          requires:
-            - dev-upload-docker
-      - acceptance-kind-cni-1-23:
-          requires:
             - dev-upload-docker
 
   nightly-acceptance-tests-consul:
