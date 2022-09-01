@@ -44,6 +44,8 @@ IMPROVEMENTS:
   * Display a warning when a user passes a field and table filter combination to `proxy read` where the given field is not present in any of the output tables. [[GH-1412](https://github.com/hashicorp/consul-k8s/pull/1412)]
   * Extend the timeout for `consul-k8s proxy read` to establish a connection from 5s to 10s. [[GH-1442](https://github.com/hashicorp/consul-k8s/pull/1442)]
   * Expand the set of Envoy Listener Filters that may be parsed and output to the Listeners table. [[GH-1442](https://github.com/hashicorp/consul-k8s/pull/1442)]
+* Helm:
+  * The default Envoy proxy image is now `envoyproxy/envoy:v1.23.1`. [[GH-1473](https://github.com/hashicorp/consul-k8s/pull/1473)]
 
 BUG FIXES:
 * Helm
