@@ -10,8 +10,7 @@ executors:
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
-slack-channel: &slack-channel AAAAAAAAA
-#slack-channel: &slack-channel CBXF3CGAF
+slack-channel: &slack-channel CBXF3CGAF
 control-plane-path: &control-plane-path control-plane
 cli-path: &cli-path cli
 acceptance-mod-path: &acceptance-mod-path acceptance
@@ -1227,13 +1226,13 @@ workflows:
           requires:
             - dev-upload-docker
   nightly-acceptance-tests:
-    #triggers:
-    #  - schedule:
-    #      cron: "0 0 * * *"
-    #      filters:
-    #        branches:
-    #          only:
-    #            - main
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
     jobs:
       - build-distro:
           OS: "linux"
