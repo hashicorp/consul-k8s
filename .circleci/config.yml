@@ -655,7 +655,7 @@ jobs:
   # ACCEPTANCE TESTS
   ########################
   acceptance-gke-1-23:
-    parallelism: 3
+    parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -723,7 +723,7 @@ jobs:
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-gke-cni-1-23:
-    parallelism: 3
+    parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
