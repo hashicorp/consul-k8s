@@ -93,7 +93,7 @@ type ServiceResolverRedirect struct {
 	Datacenter string `json:"datacenter,omitempty"`
 	// Peer is the name of the cluster peer to resolve the service from instead
 	// of the current one.
-	Peer string `json:",omitempty"`
+	Peer string `json:"peer,omitempty"`
 }
 
 type ServiceResolverSubsetMap map[string]ServiceResolverSubset
