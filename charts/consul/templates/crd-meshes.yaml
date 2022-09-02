@@ -63,6 +63,18 @@ spec:
                 required:
                 - sanitizeXForwardedClientCert
                 type: object
+              peering:
+                description: Peering defines the peering configuration for the service
+                  mesh.
+                properties:
+                  peerThroughMeshGateways:
+                    description: PeerThroughMeshGateways determines whether peering
+                      traffic between control planes should flow through mesh gateways.
+                      If enabled, Consul servers will advertise mesh gateway addresses
+                      as their own. Additionally, mesh gateways will configure themselves
+                      to expose the local servers using a peering-specific SNI.
+                    type: boolean
+                type: object
               tls:
                 description: TLS defines the TLS configuration for the service mesh.
                 properties:
