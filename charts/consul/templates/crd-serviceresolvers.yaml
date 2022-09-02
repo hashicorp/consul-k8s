@@ -68,42 +68,6 @@ spec:
               failover:
                 additionalProperties:
                   properties:
-                    targets:
-                      description: Targets specifies a fixed list of failover
-                        targets to try during failover.
-                      items:
-                        type: object
-                        properties:
-                          namespace:
-                            description: Namespace is the namespace to resolve the requested
-                              service from to form the failover group of instances. If empty
-                              the current namespace is used.
-                            type: string
-                          namespace:
-                            description: Partition is the partition to resolve the requested
-                              service from to form the failover group of instances. If empty
-                              the current partition is used.
-                            type: string
-                          datacenter:
-                            description: Datacenter is the datacenter to resolve the requested
-                              service from to form the failover group of instances. If empty
-                              the current datacenter is used.
-                            type: string
-                          peer:
-                            description: Peer is the peer to resolve the requested
-                              service from to form the failover group of instances. If empty
-                              the current peer is used.
-                            type: string
-                          service:
-                            description: Service is the service to resolve instead of the
-                              default as the failover group of instances during failover.
-                            type: string
-                          serviceSubset:
-                            description: ServiceSubset is the named subset of the requested
-                              service to resolve as the failover group of instances. If
-                              empty the default subset for the requested service is used.
-                            type: string
-                      type: array
                     datacenters:
                       description: Datacenters is a fixed list of datacenters to try
                         during failover.
@@ -124,6 +88,37 @@ spec:
                         service to resolve as the failover group of instances. If
                         empty the default subset for the requested service is used.
                       type: string
+                    targets:
+                      description: Targets specifies a fixed list of failover targets
+                        to try during failover.
+                      items:
+                        properties:
+                          datacenter:
+                            description: Datacenter specifies the datacenter to try
+                              during failover.
+                            type: string
+                          namespace:
+                            description: Namespace specifies the namespace to try
+                              during failover.
+                            type: string
+                          partition:
+                            description: Partition specifies the partition to try
+                              during failover.
+                            type: string
+                          peer:
+                            description: Peer specifies the name of the cluster peer
+                              to try during failover.
+                            type: string
+                          service:
+                            description: Service specifies the name of the service
+                              to try during failover.
+                            type: string
+                          serviceSubset:
+                            description: ServiceSubset specifies the service subset
+                              to try during failover.
+                            type: string
+                        type: object
+                      type: array
                   type: object
                 description: Failover controls when and how to reroute traffic to
                   an alternate pool of service instances. The map is keyed by the
@@ -232,6 +227,10 @@ spec:
                     description: Partition is the Consul partition to resolve the
                       service from instead of the current partition. If empty the
                       current partition is assumed.
+                    type: string
+                  peer:
+                    description: Peer is the name of the cluster peer to resolve the
+                      service from instead of the current one.
                     type: string
                   service:
                     description: Service is a service to resolve instead of the current
