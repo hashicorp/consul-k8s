@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,52 +13,146 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-func TestHandlerEnvoySidecar(t *testing.T) {
-	h := MeshWebhook{}
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				annotationService: "foo",
+func TestHandlerConsulDataplaneSidecar(t *testing.T) {
+	cases := map[string]struct {
+		webhookSetupFunc     func(w *MeshWebhook)
+		additionalExpCmdArgs string
+	}{
+		"default": {
+			webhookSetupFunc: nil,
+		},
+		"with custom gRPC port": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.ConsulGRPCPort = "8602"
 			},
 		},
+		"with ACLs": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.AuthMethod = "test-auth-method"
+			},
+			additionalExpCmdArgs: " -static-token=$(cat /consul/connect-inject/acl-token)",
+		},
+		"with TLS and CA cert provided": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.TLSEnabled = true
+				w.ConsulTLSServerName = "server.dc1.consul"
+				w.ConsulCACert = "consul-ca-cert"
+			},
+			additionalExpCmdArgs: " -tls-enabled -tls-server-name=server.dc1.consul -tls-ca-certs-path=/consul/connect-inject/consul-ca.pem",
+		},
+		"with TLS and no CA cert provided": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.TLSEnabled = true
+				w.ConsulTLSServerName = "server.dc1.consul"
+			},
+			additionalExpCmdArgs: " -tls-enabled -tls-server-name=server.dc1.consul",
+		},
+		"with single destination namespace": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.EnableNamespaces = true
+				w.ConsulDestinationNamespace = "consul-namespace"
+			},
+			additionalExpCmdArgs: " -service-namespace=consul-namespace",
+		},
+		"with namespace mirroring": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.EnableNamespaces = true
+				w.EnableK8SNSMirroring = true
+			},
+			additionalExpCmdArgs: " -service-namespace=k8snamespace",
+		},
+		"with namespace mirroring prefix": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.EnableNamespaces = true
+				w.EnableK8SNSMirroring = true
+				w.K8SNSMirroringPrefix = "foo-"
+			},
+			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace",
+		},
+		"with partitions": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.ConsulPartition = "partition-1"
+			},
+			additionalExpCmdArgs: " -service-partition=partition-1",
+		},
+		"with different log level": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.LogLevel = "debug"
+			},
+		},
+		"with different log level and log json": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.LogLevel = "debug"
+				w.LogJSON = true
+			},
+		},
+	}
 
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := &MeshWebhook{
+				ConsulAddress:  "1.1.1.1",
+				ConsulGRPCPort: "8502",
+				LogLevel:       "info",
+				LogJSON:        false,
+			}
+			if c.webhookSetupFunc != nil {
+				c.webhookSetupFunc(w)
+			}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						annotationService: "foo",
+					},
 				},
-			},
-		},
-	}
 
-	container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
-	require.NoError(t, err)
-	require.Equal(t, container.Command, []string{
-		"envoy",
-		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-		"--concurrency", "0",
-	})
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}
 
-	require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
-		},
-	})
-	expectedProbe := &corev1.Probe{
-		Handler: corev1.Handler{
-			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(EnvoyInboundListenerPort),
-			},
-		},
-		InitialDelaySeconds: 1,
+			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+			require.NoError(t, err)
+			// todo(agentless): test default concurrency
+			expCmd := []string{
+				"/bin/sh", "-ec",
+				"consul-dataplane -addresses=1.1.1.1 -grpc-port=" + w.ConsulGRPCPort +
+					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
+					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + c.additionalExpCmdArgs}
+			require.Equal(t, container.Command, expCmd)
+
+			require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+				{
+					Name:      volumeName,
+					MountPath: "/consul/connect-inject",
+				},
+			})
+			expectedProbe := &corev1.Probe{
+				Handler: corev1.Handler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(EnvoyInboundListenerPort),
+					},
+				},
+				InitialDelaySeconds: 1,
+			}
+			require.Equal(t, expectedProbe, container.ReadinessProbe)
+			require.Equal(t, expectedProbe, container.LivenessProbe)
+			require.Nil(t, container.StartupProbe)
+			require.Len(t, container.Env, 1)
+			require.Equal(t, container.Env[0].Name, "TMPDIR")
+			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
+		})
 	}
-	require.Equal(t, expectedProbe, container.ReadinessProbe)
-	require.Equal(t, expectedProbe, container.LivenessProbe)
-	require.Nil(t, container.StartupProbe)
 }
 
-func TestHandlerEnvoySidecar_Concurrency(t *testing.T) {
+func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
+	// todo(agentless): re-enable once we support passing extra flags to Envoy.
+	t.Skipf("skip until we support extra flag to Envoy")
 	cases := map[string]struct {
 		annotations map[string]string
 		expCommand  []string
@@ -108,7 +203,7 @@ func TestHandlerEnvoySidecar_Concurrency(t *testing.T) {
 					},
 				},
 			}
-			container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
+			container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
@@ -119,68 +214,87 @@ func TestHandlerEnvoySidecar_Concurrency(t *testing.T) {
 	}
 }
 
-func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
-	h := MeshWebhook{}
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				annotationService: "web,web-admin",
-			},
-		},
+func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
+	for _, aclsEnabled := range []bool{false, true} {
+		name := fmt.Sprintf("acls enabled: %t", aclsEnabled)
+		t.Run(name, func(t *testing.T) {
+			w := MeshWebhook{
+				ConsulAddress:  "1.1.1.1",
+				ConsulGRPCPort: "8502",
+				LogLevel:       "info",
+			}
+			if aclsEnabled {
+				w.AuthMethod = "test-auth-method"
+			}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "web,web-admin",
+					},
+				},
 
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+						{
+							Name: "web-admin",
+						},
+					},
+				},
+			}
+			multiPortInfos := []multiPortInfo{
 				{
-					Name: "web",
+					serviceIndex: 0,
+					serviceName:  "web",
 				},
 				{
-					Name: "web-admin",
+					serviceIndex: 1,
+					serviceName:  "web-admin",
 				},
-			},
-		},
-	}
-	multiPortInfos := []multiPortInfo{
-		{
-			serviceIndex: 0,
-			serviceName:  "web",
-		},
-		{
-			serviceIndex: 1,
-			serviceName:  "web-admin",
-		},
-	}
-	expCommand := map[int][]string{
-		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0", "--concurrency", "0"},
-		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1", "--concurrency", "0"},
-	}
-	for i := 0; i < 2; i++ {
-		container, err := h.envoySidecar(testNS, pod, multiPortInfos[i])
-		require.NoError(t, err)
-		require.Equal(t, expCommand[i], container.Command)
+			}
+			expCommand := [][]string{
+				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-admin-bind-port=19000"},
+				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-admin-bind-port=19001"},
+			}
+			if aclsEnabled {
+				expCommand = [][]string{
+					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -static-token=$(cat /consul/connect-inject/acl-token-web) -envoy-admin-bind-port=19000"},
+					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -static-token=$(cat /consul/connect-inject/acl-token-web-admin) -envoy-admin-bind-port=19001"},
+				}
+			}
 
-		require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
-			{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
-			},
+			for i, expCmd := range expCommand {
+				container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfos[i])
+				require.NoError(t, err)
+				require.Equal(t, expCmd, container.Command)
+
+				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+					{
+						Name:      volumeName,
+						MountPath: "/consul/connect-inject",
+					},
+				})
+
+				port := EnvoyInboundListenerPort + i
+				expectedProbe := &corev1.Probe{
+					Handler: corev1.Handler{
+						TCPSocket: &corev1.TCPSocketAction{
+							Port: intstr.FromInt(port),
+						},
+					},
+					InitialDelaySeconds: 1,
+				}
+				require.Equal(t, expectedProbe, container.ReadinessProbe)
+				require.Equal(t, expectedProbe, container.LivenessProbe)
+				require.Nil(t, container.StartupProbe)
+			}
 		})
-
-		port := EnvoyInboundListenerPort + i
-		expectedProbe := &corev1.Probe{
-			Handler: corev1.Handler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(port),
-				},
-			},
-			InitialDelaySeconds: 1,
-		}
-		require.Equal(t, expectedProbe, container.ReadinessProbe)
-		require.Equal(t, expectedProbe, container.LivenessProbe)
-		require.Nil(t, container.StartupProbe)
 	}
 }
 
-func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
+func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 	cases := map[string]struct {
 		tproxyEnabled      bool
 		openShiftEnabled   bool
@@ -190,8 +304,8 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointer.Int64(envoyUserAndGroupID),
-				RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
 				RunAsNonRoot:           pointer.Bool(true),
 				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
@@ -200,8 +314,8 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointer.Int64(envoyUserAndGroupID),
-				RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
 				RunAsNonRoot:           pointer.Bool(true),
 				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
@@ -215,8 +329,8 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointer.Int64(envoyUserAndGroupID),
-				RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
 				RunAsNonRoot:           pointer.Bool(true),
 				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
@@ -243,16 +357,16 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 					},
 				},
 			}
-			ec, err := w.envoySidecar(testNS, pod, multiPortInfo{})
+			ec, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, c.expSecurityContext, ec.SecurityContext)
 		})
 	}
 }
 
-// Test that if the user specifies a pod security context with the same uid as `envoyUserAndGroupID` that we return
+// Test that if the user specifies a pod security context with the same uid as `sidecarUserAndGroupID` that we return
 // an error to the meshWebhook.
-func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
+func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
 	require := require.New(t)
 	w := MeshWebhook{}
 	pod := corev1.Pod{
@@ -263,27 +377,27 @@ func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser: pointer.Int64(envoyUserAndGroupID),
+				RunAsUser: pointer.Int64(sidecarUserAndGroupID),
 			},
 		},
 	}
-	_, err := w.envoySidecar(testNS, pod, multiPortInfo{})
-	require.Error(err, fmt.Sprintf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID))
+	_, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+	require.EqualError(err, fmt.Sprintf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID))
 }
 
-// Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID` that we
-// return an error to the meshWebhook. If a container using the envoy image has the same uid, we don't return an error
-// because in multiport pod there can be multiple envoy sidecars.
-func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
+// Test that if the user specifies a container with security context with the same uid as `sidecarUserAndGroupID` that we
+// return an error to the meshWebhook. If a container using the consul-dataplane image has the same uid, we don't return an error
+// because in multiport pod there can be multiple consul-dataplane sidecars.
+func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
 	cases := []struct {
 		name          string
 		pod           corev1.Pod
 		webhook       MeshWebhook
 		expErr        bool
-		expErrMessage error
+		expErrMessage string
 	}{
 		{
-			name: "fails with non envoy image",
+			name: "fails with non consul-dataplane image",
 			pod: corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -298,16 +412,16 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 							Name: "app",
 							// Setting RunAsUser: 5995 should fail.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(envoyUserAndGroupID),
+								RunAsUser: pointer.Int64(sidecarUserAndGroupID),
 							},
-							Image: "not-envoy",
+							Image: "not-consul-dataplane",
 						},
 					},
 				},
 			},
 			webhook:       MeshWebhook{},
 			expErr:        true,
-			expErrMessage: fmt.Errorf("container app has runAsUser set to the same uid %q as envoy which is not allowed", envoyUserAndGroupID),
+			expErrMessage: fmt.Sprintf("container \"app\" has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", sidecarUserAndGroupID),
 		},
 		{
 			name: "doesn't fail with envoy image",
@@ -323,9 +437,9 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 						},
 						{
 							Name: "sidecar",
-							// Setting RunAsUser: 5995 should succeed if the image matches h.ImageEnvoy.
+							// Setting RunAsUser: 5995 should succeed if the image matches h.ImageConsulDataplane.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(envoyUserAndGroupID),
+								RunAsUser: pointer.Int64(sidecarUserAndGroupID),
 							},
 							Image: "envoy",
 						},
@@ -333,7 +447,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 				},
 			},
 			webhook: MeshWebhook{
-				ImageEnvoy: "envoy",
+				ImageConsulDataplane: "envoy",
 			},
 			expErr: false,
 		},
@@ -341,9 +455,9 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.webhook.envoySidecar(testNS, tc.pod, multiPortInfo{})
+			_, err := tc.webhook.consulDataplaneSidecar(testNS, tc.pod, multiPortInfo{})
 			if tc.expErr {
-				require.Error(t, err, tc.expErrMessage)
+				require.EqualError(t, err, tc.expErrMessage)
 			} else {
 				require.NoError(t, err)
 			}
@@ -354,7 +468,9 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 // Test that we can pass extra args to envoy via the extraEnvoyArgs flag
 // or via pod annotations. When arguments are passed in both ways, the
 // arguments set via pod annotations are used.
-func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
+func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
+	// todo(agentless): enable when we support passing extra args to Envoy.
+	t.Skipf("skip until we support passing extra args to Envoy")
 	cases := []struct {
 		name                     string
 		envoyExtraArgs           string
@@ -435,19 +551,19 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			h := MeshWebhook{
-				ImageConsul:    "hashicorp/consul:latest",
-				ImageEnvoy:     "hashicorp/consul-k8s:latest",
-				EnvoyExtraArgs: tc.envoyExtraArgs,
+				ImageConsul:          "hashicorp/consul:latest",
+				ImageConsulDataplane: "hashicorp/consul-k8s:latest",
+				EnvoyExtraArgs:       tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(testNS, *tc.pod, multiPortInfo{})
+			c, err := h.consulDataplaneSidecar(testNS, *tc.pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
 	}
 }
 
-func TestHandlerEnvoySidecar_UserVolumeMounts(t *testing.T) {
+func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 	cases := []struct {
 		name                          string
 		pod                           corev1.Pod
@@ -495,10 +611,10 @@ func TestHandlerEnvoySidecar_UserVolumeMounts(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			h := MeshWebhook{
-				ImageConsul: "hashicorp/consul:latest",
-				ImageEnvoy:  "hashicorp/consul-k8s:latest",
+				ImageConsul:          "hashicorp/consul:latest",
+				ImageConsulDataplane: "hashicorp/consul-k8s:latest",
 			}
-			c, err := h.envoySidecar(testNS, tc.pod, multiPortInfo{})
+			c, err := h.consulDataplaneSidecar(testNS, tc.pod, multiPortInfo{})
 			if tc.expErr == "" {
 				require.NoError(t, err)
 				require.Equal(t, tc.expectedContainerVolumeMounts, c.VolumeMounts)
@@ -510,7 +626,7 @@ func TestHandlerEnvoySidecar_UserVolumeMounts(t *testing.T) {
 	}
 }
 
-func TestHandlerEnvoySidecar_Resources(t *testing.T) {
+func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 	mem1 := resource.MustParse("100Mi")
 	mem2 := resource.MustParse("200Mi")
 	cpu1 := resource.MustParse("100m")
@@ -677,7 +793,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.webhook.envoySidecar(testNS, pod, multiPortInfo{})
+			container, err := c.webhook.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)
