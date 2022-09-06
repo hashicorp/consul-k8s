@@ -9,6 +9,7 @@ import (
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -57,6 +58,12 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 			return corev1.Container{}, err
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount...)
+	}
+
+
+	probe, err := w.envoySidecarHealthProbe(pod)
+	if err == nil {
+		container.LivenessProbe = probe
 	}
 
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
@@ -147,6 +154,31 @@ func (w *MeshWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcNam
 		}
 	}
 	return cmd, nil
+}
+
+func shouldConfigureProbe(pod corev1.Pod) (bool, error) {
+	if raw, ok := pod.Annotations[annotationSidecarProxyConfigureProbes]; ok {
+		return strconv.ParseBool(raw)
+	}
+
+	return false, nil
+}
+
+func (w *MeshWebhook) envoySidecarHealthProbe(pod corev1.Pod) (*corev1.Probe, error) {
+
+	configureProbe, err := shouldConfigureProbe(pod)
+	if err != nil || configureProbe != true {
+		return nil, err
+	}
+	probe := &corev1.Probe{
+		Handler: corev1.Handler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(20200),
+			},
+		},
+	}
+	return probe, nil
+
 }
 
 func (w *MeshWebhook) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
