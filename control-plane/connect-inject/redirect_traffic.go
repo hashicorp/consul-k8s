@@ -22,7 +22,7 @@ import (
 //   ExcludeUIDs: pod annotations
 func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
 	cfg := iptables.Config{
-		ProxyUserID: strconv.Itoa(envoyUserAndGroupID),
+		ProxyUserID: strconv.Itoa(sidecarUserAndGroupID),
 	}
 
 	// Set the proxy's inbound port.
@@ -53,7 +53,7 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 	if overwriteProbes {
 		for i, container := range pod.Spec.Containers {
 			// skip the "envoy-sidecar" container from having its probes overridden
-			if container.Name == envoySidecarContainer {
+			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {

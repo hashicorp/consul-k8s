@@ -317,14 +317,14 @@ EOF
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: envoy-image can be set via global" {
+@test "connectInject/Deployment: consul-dataplane-image can be set via global" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.imageEnvoy=foo' \
+      --set 'global.imageConsulDataplane=foo' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-envoy-image=\"foo\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-dataplane-image=\"foo\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

@@ -68,7 +68,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:       "",
-				ProxyUserID:       strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:  proxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"5996"},
@@ -101,7 +101,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
-				ProxyUserID:         strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    proxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
@@ -135,7 +135,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
-				ProxyUserID:         strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    proxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
@@ -177,7 +177,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
-				ProxyUserID:         strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    proxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
@@ -210,7 +210,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
-				ProxyUserID:         strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    proxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
@@ -243,7 +243,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:          "",
-				ProxyUserID:          strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     proxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:          []string{"5996"},
@@ -276,7 +276,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:          "",
-				ProxyUserID:          strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     proxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:          []string{strconv.Itoa(initContainersUserAndGroupID)},
@@ -309,7 +309,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:       "",
-				ProxyUserID:       strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:  proxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
@@ -344,7 +344,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:          "",
-				ProxyUserID:          strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     proxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
 				ExcludeInboundPorts:  []string{"1111", "11111"},
@@ -381,7 +381,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:       dnsIP,
-				ProxyUserID:       strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:  proxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{strconv.Itoa(initContainersUserAndGroupID)},
@@ -415,7 +415,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ConsulDNSIP:       dnsIP,
-				ProxyUserID:       strconv.Itoa(envoyUserAndGroupID),
+				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:  proxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{strconv.Itoa(initContainersUserAndGroupID)},
