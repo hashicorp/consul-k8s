@@ -1771,7 +1771,7 @@ func TestOverwriteProbes(t *testing.T) {
 			overwriteProbes: true,
 			podContainers: []corev1.Container{
 				{
-					Name: envoySidecarContainer,
+					Name: sidecarContainer,
 				},
 			},
 		},

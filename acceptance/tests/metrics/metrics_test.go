@@ -90,6 +90,7 @@ func TestComponentMetrics(t *testing.T) {
 // Test that merged service and envoy metrics are accessible from the
 // endpoints that have been exposed on the service.
 func TestAppMetrics(t *testing.T) {
+	t.Skipf("Skipping this test because it's not yet supported with agentless")
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
