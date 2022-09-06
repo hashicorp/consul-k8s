@@ -111,6 +111,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			w := tt.Webhook
 			pod := *tt.Pod(minimal())
 <<<<<<< HEAD
+<<<<<<< HEAD
 			container, err := w.containerInit(testNS, pod, multiPortInfo{})
 			if tt.ErrStr == "" {
 				require.NoError(t, err)
@@ -127,9 +128,22 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				require.EqualError(t, err, tt.ErrStr)
 =======
 			container, err := h.containerInit(testNS, pod, multiPortInfo{})
+=======
+			container, err := w.containerInit(testNS, pod, multiPortInfo{})
+>>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 			if tt.ErrStr == "" {
 				require.NoError(t, err)
+				require.Equal(t, "CONSUL_HTTP_ADDR", container.Env[2].Name)
+				require.Equal(t, fmt.Sprintf("%s:%s", w.ConsulAddress, w.ConsulHTTPPort), container.Env[2].Value)
+				require.Equal(t, "CONSUL_GRPC_ADDR", container.Env[3].Name)
+				require.Equal(t, fmt.Sprintf("%s:%s", w.ConsulAddress, w.ConsulGRPCPort), container.Env[3].Value)
+				actual := strings.Join(container.Command, " ")
+				require.Contains(t, actual, tt.Cmd)
+				if tt.CmdNot != "" {
+					require.NotContains(t, actual, tt.CmdNot)
+				}
 			} else {
+<<<<<<< HEAD
 				require.Contains(t, err.Error(), tt.ErrStr)
 			}
 			actual := strings.Join(container.Command, " ")
@@ -137,6 +151,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			if tt.CmdNot != "" {
 				require.NotContains(t, actual, tt.CmdNot)
 >>>>>>> e6b748b9 (Fix failing unit tests after rebasing Cluster Peering (#1428))
+=======
+				require.EqualError(t, err, tt.ErrStr)
+>>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 			}
 		})
 	}

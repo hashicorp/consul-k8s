@@ -563,9 +563,12 @@ func (c *Command) Run(args []string) int {
 			ConsulGRPCPort:                "8502", // todo(ishustava): should be passed via flag
 			ConsulAddress:                 consulURL.Hostname(),
 			ConsulTLSServerName:           c.http.TLSServerName(),
+<<<<<<< HEAD
 =======
 			ConsulAddress:                 consulURL.Hostname(),
 >>>>>>> e26b5af0 (Initial support for agentless (#1267))
+=======
+>>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,
