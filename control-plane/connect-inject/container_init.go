@@ -13,6 +13,7 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	InjectInitCopyContainerName  = "copy-consul-bin"
 	InjectInitContainerName      = "consul-connect-inject-init"
 	rootUserAndGroupID           = 0
@@ -20,6 +21,15 @@ const (
 	initContainersUserAndGroupID = 5996
 	netAdminCapability           = "NET_ADMIN"
 	dnsServiceHostEnvSuffix      = "DNS_SERVICE_HOST"
+=======
+	InjectInitCopyContainerName = "copy-consul-bin"
+	InjectInitContainerName     = "consul-connect-inject-init"
+	rootUserAndGroupID          = 0
+	sidecarUserAndGroupID       = 5995
+	copyContainerUserAndGroupID = 5996
+	netAdminCapability          = "NET_ADMIN"
+	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
+>>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 )
 
 type initContainerCommandData struct {
