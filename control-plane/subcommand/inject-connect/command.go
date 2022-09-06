@@ -539,6 +539,7 @@ func (c *Command) Run(args []string) int {
 			AuthMethod:                    c.flagACLAuthMethod,
 			ConsulCACert:                  string(consulCACert),
 			ConsulAddress:                 consulURL.Hostname(),
+			ConsulTLSServerName:           c.http.TLSServerName(),
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,
