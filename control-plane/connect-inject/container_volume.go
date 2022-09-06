@@ -14,7 +14,7 @@ func (w *MeshWebhook) containerVolume() corev1.Volume {
 	return corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
+			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
 		},
 	}
 }
