@@ -291,19 +291,6 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				require.Nil(t, container.StartupProbe)
 			}
 		})
-
-		port := EnvoyInboundListenerPort + i
-		expectedProbe := &corev1.Probe{
-			Handler: corev1.Handler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(port),
-				},
-			},
-			InitialDelaySeconds: 1,
-		}
-		require.Equal(t, expectedProbe, container.ReadinessProbe)
-		require.Equal(t, expectedProbe, container.LivenessProbe)
-		require.Nil(t, container.StartupProbe)
 	}
 }
 
