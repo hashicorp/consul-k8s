@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -9,14 +10,66 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
 const (
 	componentAuthMethod = "consul-k8s-component-auth-method"
 )
+
+type TestServerClient struct {
+	TestServer *testutil.TestServer
+	APIClient  *api.Client
+	Cfg        *consul.Config
+	Watcher    *discovery.Watcher
+}
+
+func TestServerWithConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCallback) *TestServerClient {
+	t.Helper()
+
+	var cfg *testutil.TestServerConfig
+	consulServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		if callback != nil {
+			callback(c)
+		}
+		cfg = c
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = consulServer.Stop()
+	})
+	consulServer.WaitForSerfCheck(t)
+
+	consulConfig := &consul.Config{
+		APIClientConfig: &api.Config{Address: consulServer.HTTPAddr},
+		HTTPPort:        cfg.Ports.HTTP,
+	}
+	if cfg.ACL.Tokens.InitialManagement != "" {
+		consulConfig.APIClientConfig.Token = cfg.ACL.Tokens.InitialManagement
+	}
+	client, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	t.Cleanup(cancelFunc)
+	watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "exec=echo 127.0.0.1", GRPCPort: cfg.Ports.GRPC}, hclog.NewNullLogger())
+	require.NoError(t, err)
+	t.Cleanup(watcher.Stop)
+	go watcher.Run()
+
+	return &TestServerClient{
+		TestServer: consulServer,
+		APIClient:  client,
+		Cfg:        consulConfig,
+		Watcher:    watcher,
+	}
+}
 
 // GenerateServerCerts generates Consul CA
 // and a server certificate and saves them to temp files.
