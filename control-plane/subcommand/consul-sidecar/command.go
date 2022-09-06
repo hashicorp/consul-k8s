@@ -243,7 +243,13 @@ func (c *Command) createMergedMetricsServer() *http.Server {
 	mux.HandleFunc("/stats/prometheus", c.mergedMetricsHandler)
 
 	mergedMetricsServerAddr := fmt.Sprintf("127.0.0.1:%s", c.flagMergedMetricsPort)
-	server := &http.Server{Addr: mergedMetricsServerAddr, Handler: mux}
+	server := &http.Server{
+		Addr:         mergedMetricsServerAddr,
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
 
 	// http.Client satisfies the metricsGetter interface.
 	// The default http.Client timeout is indefinite, so adding a timeout makes
