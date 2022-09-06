@@ -392,10 +392,16 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 		return nil
 	}
 
+	var enforcingConsecutive5xx uint32
+	if in.EnforcingConsecutive5xx == nil {
+		enforcingConsecutive5xx = 100
+	} else {
+		enforcingConsecutive5xx = *in.EnforcingConsecutive5xx
+	}
 	return &capi.PassiveHealthCheck{
 		Interval:                in.Interval.Duration,
 		MaxFailures:             in.MaxFailures,
-		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
+		EnforcingConsecutive5xx: enforcingConsecutive5xx,
 	}
 }
 
