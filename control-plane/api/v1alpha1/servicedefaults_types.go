@@ -2,6 +2,9 @@ package v1alpha1
 
 import (
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -12,8 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"net"
-	"strings"
 )
 
 const (
@@ -160,6 +161,10 @@ type PassiveHealthCheck struct {
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
 	MaxFailures uint32 `json:"maxFailures,omitempty"`
+	// EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+	// when an outlier status is detected through consecutive 5xx.
+	// This setting can be used to disable ejection or to ramp it up slowly.
+	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
 }
 
 type ServiceDefaultsDestination struct {
@@ -386,9 +391,17 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 	if in == nil {
 		return nil
 	}
+
+	var enforcingConsecutive5xx uint32
+	if in.EnforcingConsecutive5xx == nil {
+		enforcingConsecutive5xx = 100
+	} else {
+		enforcingConsecutive5xx = *in.EnforcingConsecutive5xx
+	}
 	return &capi.PassiveHealthCheck{
-		Interval:    in.Interval.Duration,
-		MaxFailures: in.MaxFailures,
+		Interval:                in.Interval.Duration,
+		MaxFailures:             in.MaxFailures,
+		EnforcingConsecutive5xx: enforcingConsecutive5xx,
 	}
 }
 
