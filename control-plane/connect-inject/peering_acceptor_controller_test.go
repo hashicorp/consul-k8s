@@ -9,8 +9,8 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +28,6 @@ import (
 // TestReconcile_CreateUpdatePeeringAcceptor creates a peering acceptor.
 func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := []struct {
 		name                    string
 		k8sObjects              func() []runtime.Object
@@ -557,22 +556,12 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
 
 			if tt.initialConsulPeerName != "" {
 				// Add the initial peerings into Consul by calling the Generate token endpoint.
-				_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerName}, nil)
+				_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.initialConsulPeerName}, nil)
 				require.NoError(t, err)
 			}
 
@@ -584,7 +573,8 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 				ExposeServersServiceName:  "test-expose-servers",
 				ReleaseNamespace:          "default",
 				Log:                       logrtest.TestLogger{T: t},
-				ConsulClient:              consulClient,
+				ConsulClientConfig:        testClient.Cfg,
+				ConsulServerConnMgr:       testClient.Watcher,
 				Scheme:                    s,
 			}
 			namespacedName := types.NamespacedName{
@@ -693,30 +683,22 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
+	// Create test consulServer server
 	// Create test consul server.
-	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-		c.NodeName = "test-node"
-	})
-	require.NoError(t, err)
-	defer consul.Stop()
-	consul.WaitForServiceIntentions(t)
-
-	cfg := &api.Config{
-		Address: consul.HTTPAddr,
-	}
-	consulClient, err := api.NewClient(cfg)
-	require.NoError(t, err)
+	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	consulClient := testClient.APIClient
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.
-	_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-deleted"}, nil)
+	_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-deleted"}, nil)
 	require.NoError(t, err)
 
 	// Create the peering acceptor controller.
 	controller := &PeeringAcceptorController{
-		Client:       fakeClient,
-		Log:          logrtest.TestLogger{T: t},
-		ConsulClient: consulClient,
-		Scheme:       s,
+		Client:              fakeClient,
+		Log:                 logrtest.TestLogger{T: t},
+		ConsulClientConfig:  testClient.Cfg,
+		ConsulServerConnMgr: testClient.Watcher,
+		Scheme:              s,
 	}
 	namespacedName := types.NamespacedName{
 		Name:      "acceptor-deleted",
@@ -750,7 +732,6 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 // scenarios involving the user setting the version annotation.
 func TestReconcile_VersionAnnotation(t *testing.T) {
 	t.Parallel()
-	nodeName := "test-node"
 	cases := map[string]struct {
 		annotations    map[string]string
 		expErr         string
@@ -849,28 +830,19 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
 
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
-
-			_, _, err = consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-created"}, nil)
+			_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-created"}, nil)
 			require.NoError(t, err)
 
 			// Create the peering acceptor controller
 			controller := &PeeringAcceptorController{
-				Client:       fakeClient,
-				Log:          logrtest.TestLogger{T: t},
-				ConsulClient: consulClient,
-				Scheme:       s,
+				Client:              fakeClient,
+				Log:                 logrtest.TestLogger{T: t},
+				ConsulClientConfig:  testClient.Cfg,
+				ConsulServerConnMgr: testClient.Watcher,
+				Scheme:              s,
 			}
 			namespacedName := types.NamespacedName{
 				Name:      "acceptor-created",

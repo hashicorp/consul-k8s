@@ -23,7 +23,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 		},
 		"with custom gRPC port": {
 			webhookSetupFunc: func(w *MeshWebhook) {
-				w.ConsulGRPCPort = "8602"
+				w.ConsulGRPCPort = 8602
 			},
 		},
 		"with ACLs": {
@@ -92,7 +92,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			w := &MeshWebhook{
 				ConsulAddress:  "1.1.1.1",
-				ConsulGRPCPort: "8502",
+				ConsulGRPCPort: 8502,
 				LogLevel:       "info",
 				LogJSON:        false,
 			}
@@ -121,7 +121,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			// todo(agentless): test default concurrency
 			expCmd := []string{
 				"/bin/sh", "-ec",
-				"consul-dataplane -addresses=1.1.1.1 -grpc-port=" + w.ConsulGRPCPort +
+				"consul-dataplane -addresses=1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulGRPCPort) +
 					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
 					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + c.additionalExpCmdArgs}
 			require.Equal(t, container.Command, expCmd)
@@ -220,7 +220,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			w := MeshWebhook{
 				ConsulAddress:  "1.1.1.1",
-				ConsulGRPCPort: "8502",
+				ConsulGRPCPort: 8502,
 				LogLevel:       "info",
 			}
 			if aclsEnabled {

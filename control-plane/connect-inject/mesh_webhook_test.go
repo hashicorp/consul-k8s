@@ -8,6 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
@@ -851,14 +852,14 @@ func TestHandlerHandle(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
+			tt.Webhook.ConsulConfig = &consul.Config{HTTPPort: 8500}
 			ctx := context.Background()
 			resp := tt.Webhook.Handle(ctx, tt.Req)
 			if (tt.Err == "") != resp.Allowed {
 				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
 			}
 			if tt.Err != "" {
-				require.Contains(resp.Result.Message, tt.Err)
+				require.Contains(t, resp.Result.Message, tt.Err)
 				return
 			}
 
@@ -868,7 +869,7 @@ func TestHandlerHandle(t *testing.T) {
 					actual[i].Value = nil
 				}
 			}
-			require.ElementsMatch(tt.Patches, actual)
+			require.ElementsMatch(t, tt.Patches, actual)
 		})
 	}
 }
