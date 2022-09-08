@@ -292,10 +292,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 						annotationService: "web,web-admin",
 					},
 				},
-<<<<<<< HEAD
-=======
 
->>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
 						{

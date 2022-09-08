@@ -90,10 +90,6 @@ func TestPartitions_Connect(t *testing.T) {
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
-<<<<<<< HEAD
-=======
-				"global.image":                   "thisisnotashwin/consul@sha256:477091fe84cde79a68a37cc9cc69fb7a5ab35e647a0f5f2632451ace5ecc5e7c",
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 				"global.enableConsulNamespaces":  "true",
 				"global.logLevel":                "debug",
 

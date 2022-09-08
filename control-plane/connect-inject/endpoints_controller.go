@@ -334,38 +334,6 @@ func (r *EndpointsController) registerGateway(apiClient *api.Client, pod corev1.
 	return nil
 }
 
-// registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
-// It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *EndpointsController) registerGateway(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
-	// Build the endpointAddressMap up for deregistering service instances later.
-	endpointAddressMap[pod.Status.PodIP] = true
-
-	var managedByEndpointsController bool
-	if raw, ok := pod.Labels[keyManagedBy]; ok && raw == managedByValue {
-		managedByEndpointsController = true
-	}
-	// For pods managed by this controller, create and register the service instance.
-	if managedByEndpointsController {
-		// Get information from the pod to create service instance registrations.
-		serviceRegistration, err := r.createGatewayRegistrations(pod, serviceEndpoints, healthStatus)
-		if err != nil {
-			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-			return err
-		}
-
-		// Register the service instance with Consul.
-		r.Log.Info("registering gateway with Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
-		_, err = r.ConsulClient.Catalog().Register(serviceRegistration, nil)
-		if err != nil {
-			r.Log.Error(err, "failed to register gateway", "name", serviceRegistration.Service.Service)
-			return err
-		}
-	}
-
-	return nil
-}
-
 // serviceName computes the service name to register with Consul from the pod and endpoints object. In a single port
 // service, it defaults to the endpoints name, but can be overridden by a pod annotation. In a multi port service, the
 // endpoints name is always used since the pod annotation will have multiple service names listed (one per port).
@@ -815,12 +783,9 @@ func (r *EndpointsController) getWanData(pod corev1.Pod, endpoints corev1.Endpoi
 		case corev1.ServiceTypeClusterIP:
 			wanAddr = svc.Spec.ClusterIP
 		case corev1.ServiceTypeLoadBalancer:
-<<<<<<< HEAD
 			if len(svc.Status.LoadBalancer.Ingress) == 0 {
 				return "", 0, fmt.Errorf("failed to read ingress config for loadbalancer for service %s in namespace %s", endpoints.Name, endpoints.Namespace)
 			}
-=======
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 			for _, ingr := range svc.Status.LoadBalancer.Ingress {
 				if ingr.IP != "" {
 					wanAddr = ingr.IP
@@ -1260,15 +1225,8 @@ func hasBeenInjected(pod corev1.Pod) bool {
 
 // isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
 func isGateway(pod corev1.Pod) bool {
-<<<<<<< HEAD
 	anno, ok := pod.Annotations[annotationGatewayKind]
 	return ok && anno != ""
-=======
-	if anno, ok := pod.Annotations[annotationGatewayKind]; ok && anno != "" {
-		return true
-	}
-	return false
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.

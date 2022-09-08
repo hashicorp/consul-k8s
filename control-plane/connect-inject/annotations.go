@@ -20,11 +20,7 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
-<<<<<<< HEAD
 	// annotationGatewayKind is the key of the annotation that indicates pods
-=======
-	// annotationGatewayKind is the key of the annotation that annotates pods
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 	// that represent Consul Connect Gateways. This should be set to a
 	// value that is either "mesh", "ingress" or "terminating".
 	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"
@@ -50,6 +46,10 @@ const (
 	// annotationGatewayWANPort is the key of the annotation whose value is the
 	// WAN port for the mesh-gateway service registration.
 	annotationGatewayWANPort = "consul.hashicorp.com/gateway-wan-port"
+
+	// annotationGatewayNamespace is the key of the annotation that indicates the
+	// Consul namespace where a Terminating or Ingress Gateway pod is deployed.
+	annotationGatewayNamespace = "consul.hashicorp.com/gateway-namespace"
 
 	// annotationGatewayNamespace is the key of the annotation that indicates the
 	// Consul namespace where a Terminating or Ingress Gateway pod is deployed.
