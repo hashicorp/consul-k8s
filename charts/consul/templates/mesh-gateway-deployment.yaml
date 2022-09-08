@@ -2,13 +2,7 @@
 {{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{- if and .Values.global.acls.manageSystemACLs (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
 {{- if .Values.meshGateway.globalMode }}{{ fail "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end -}}
-<<<<<<< HEAD
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
-=======
-{{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
-{{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
-{{- if and (eq .Values.meshGateway.wanAddress.source "Service") (not .Values.meshGateway.service.enabled) }}{{ fail "if meshGateway.wanAddress.source=Service then meshGateway.service.enabled must be set to true" }}{{ end }}
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 {{- if and (eq .Values.meshGateway.wanAddress.source "Static") (eq .Values.meshGateway.wanAddress.static "") }}{{ fail "if meshGateway.wanAddress.source=Static then meshGateway.wanAddress.static cannot be empty" }}{{ end }}
 {{- if and (eq .Values.meshGateway.wanAddress.source "Service") (eq .Values.meshGateway.service.type "NodePort") (not .Values.meshGateway.service.nodePort) }}{{ fail "if meshGateway.wanAddress.source=Service and meshGateway.service.type=NodePort, meshGateway.service.nodePort must be set" }}{{ end }}
 apiVersion: apps/v1
@@ -40,17 +34,11 @@ spec:
         consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/gateway-kind": "mesh"
-<<<<<<< HEAD
+        "consul.hashicorp.com/gateway-kind": "mesh-gateway"
         "consul.hashicorp.com/mesh-gateway-consul-service-name": "{{ .Values.meshGateway.consulServiceName }}"
         "consul.hashicorp.com/mesh-gateway-wan-address-source": "{{ .Values.meshGateway.wanAddress.source }}"
         "consul.hashicorp.com/mesh-gateway-container-port": "{{ .Values.meshGateway.containerPort }}"
         "consul.hashicorp.com/mesh-gateway-wan-address-static": "{{ .Values.meshGateway.wanAddress.static }}"
-=======
-        "consul.hashicorp.com/mesh-gateway-source": "{{ .Values.meshGateway.wanAddress.source }}"
-        "consul.hashicorp.com/mesh-gateway-container-port": "{{ .Values.meshGateway.containerPort }}"
-        "consul.hashicorp.com/mesh-gateway-wan-address": "{{ .Values.meshGateway.wanAddress.static }}"
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
         {{- if eq .Values.meshGateway.wanAddress.source "Service" }}
         {{- if eq .Values.meshGateway.service.type "NodePort" }}
         "consul.hashicorp.com/mesh-gateway-wan-port": "{{ .Values.meshGateway.service.nodePort }}"
@@ -132,17 +120,6 @@ spec:
           - name: POD_NAMESPACE
             valueFrom:
               fieldRef:
-<<<<<<< HEAD
-=======
-                fieldPath: status.podIP
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
                 fieldPath: metadata.namespace
           {{- if .Values.global.tls.enabled }}
           - name: CONSUL_CACERT
@@ -160,17 +137,14 @@ spec:
             - |
                consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
                 -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
-<<<<<<< HEAD
                 -gateway-kind="mesh-gateway" \
-=======
-                -gateway -gateway-kind="mesh-gateway" \
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
                 -consul-node-name="k8s-service-mesh" \
                 -proxy-id-file=/consul/service/proxy-id \
                 {{- if .Values.global.adminPartitions.enabled }}
                 -partition={{ .Values.global.adminPartitions.name }} \
                 {{- end }}
                 {{- if .Values.global.acls.manageSystemACLs }}
+                -acl-token-sink=/consul/service/acl-token \
                 {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
                 -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
                 -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
@@ -194,11 +168,7 @@ spec:
           {{- end }}
       containers:
         - name: mesh-gateway
-<<<<<<< HEAD
           image: {{ .Values.global.imageConsulDataplane | quote }}
-=======
-          image: {{ .Values.global.imageConsulDataplane }}
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
           {{- if .Values.meshGateway.resources }}
           resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
@@ -245,12 +215,6 @@ spec:
               {{- if .Values.global.acls.manageSystemACLs }}
               -static-token="$(cat /consul/service/acl-token)" \
               {{- end }}
-              -tls-enabled \
-              -tls-ca-certs-path=/consul/tls/ca/tls.crt \
-              {{- if .Values.global.acls.manageSystemACLs }}
-              -static-token=$(cat /consul/service/acl-token)
-              {{- end }}
-              -tls-server-name="server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}" \
               {{- if .Values.global.adminPartitions.enabled }}
               -service-partition={{ .Values.global.adminPartitions.name }} \
               {{- end }}

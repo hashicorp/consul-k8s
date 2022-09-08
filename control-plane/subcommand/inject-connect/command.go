@@ -389,7 +389,6 @@ func (c *Command) Run(args []string) int {
 		cfg.Address = serverAddr
 	}
 
-<<<<<<< HEAD
 	// cfg.Address may or may not be prefixed with scheme.
 	if !strings.Contains(cfg.Address, "://") {
 		cfg.Address = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
@@ -398,16 +397,6 @@ func (c *Command) Run(args []string) int {
 	consulURL, err := url.Parse(cfg.Address)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", cfg.Address, err))
-=======
-	consulURLRaw := cfg.Address
-	// cfg.Address may or may not be prefixed with scheme.
-	if !strings.Contains(cfg.Address, "://") {
-		consulURLRaw = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
-	}
-	consulURL, err := url.Parse(consulURLRaw)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", consulURLRaw, err))
->>>>>>> 3c0daa9e (Enable connect-injector to talk to external servers. (#1323))
 		return 1
 	}
 
@@ -557,18 +546,11 @@ func (c *Command) Run(args []string) int {
 			RequireAnnotation:             !c.flagDefaultInject,
 			AuthMethod:                    c.flagACLAuthMethod,
 			ConsulCACert:                  string(consulCACert),
-<<<<<<< HEAD
 			TLSEnabled:                    consulURL.Scheme == "https",
 			ConsulHTTPPort:                consulURL.Port(),
 			ConsulGRPCPort:                "8502", // todo(ishustava): should be passed via flag
 			ConsulAddress:                 consulURL.Hostname(),
 			ConsulTLSServerName:           c.http.TLSServerName(),
-<<<<<<< HEAD
-=======
-			ConsulAddress:                 consulURL.Hostname(),
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
-=======
->>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
 			DefaultProxyCPULimit:          sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,

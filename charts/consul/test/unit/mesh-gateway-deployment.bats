@@ -44,11 +44,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
-<<<<<<< HEAD
   [ "${actual}" = "7" ]
-=======
-  [ "${actual}" = "6" ]
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 }
 
 @test "meshGateway/Deployment: extra annotations can be set" {
@@ -61,11 +57,7 @@ load _helpers
 key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
-<<<<<<< HEAD
   [ "${actual}" = "9" ]
-=======
-  [ "${actual}" = "8" ]
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 }
 
 #--------------------------------------------------------------------
@@ -305,24 +297,6 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
-<<<<<<< HEAD
-=======
-# dataplane Image
-
-@test "meshGateway/Deployment: consul/dataplane image has default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [[ "${actual}" =~ "ishustava/consul-dataplane:latest" ]]
-
-}
-
-#--------------------------------------------------------------------
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 # resources
 
 @test "meshGateway/Deployment: resources has default" {
@@ -503,15 +477,11 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[4].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-<<<<<<< HEAD
       yq '[.env[2].value] | any(contains("http://release-name-consul-server.default.svc:8500"))' | tee /dev/stderr)
-=======
-      yq '[.env[4].value] | any(contains("http://release-name-consul-server.default.svc:8500"))' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -539,15 +509,11 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[5].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-<<<<<<< HEAD
       yq '[.env[3].value] | any(contains("https://release-name-consul-server.default.svc:8501"))' | tee /dev/stderr)
-=======
-      yq '[.env[5].value] | any(contains("https://release-name-consul-server.default.svc:8501"))' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -586,19 +552,15 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[4].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[5].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-<<<<<<< HEAD
       yq '[.env[3].value] | any(contains("https://release-name-consul-server.default.svc:8501"))' | tee /dev/stderr)
-=======
-      yq '[.env[5].value] | any(contains("https://release-name-consul-server.default.svc:8501"))' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
       echo $actual
   [ "${actual}" = "true" ]
 
@@ -823,11 +785,7 @@ key2: value2' \
 
   exp='consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
  -consul-api-timeout=5s \
-<<<<<<< HEAD
  -gateway-kind="mesh-gateway" \
-=======
- -gateway -gateway-kind="mesh-gateway" \
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
  -consul-node-name="k8s-service-mesh" \
  -proxy-id-file=/consul/service/proxy-id \
  -service-name=mesh-gateway \
@@ -849,11 +807,7 @@ key2: value2' \
 
   exp='consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
  -consul-api-timeout=5s \
-<<<<<<< HEAD
  -gateway-kind="mesh-gateway" \
-=======
- -gateway -gateway-kind="mesh-gateway" \
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
  -consul-node-name="k8s-service-mesh" \
  -proxy-id-file=/consul/service/proxy-id \
  -acl-token-sink=/consul/service/acl-token \
@@ -880,11 +834,7 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8888" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "NodeIP" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
@@ -904,11 +854,7 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "NodeIP" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
@@ -928,11 +874,7 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "NodeName" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
@@ -967,38 +909,14 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "Static" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-static"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
-    [ "${actual}" = "Static" ]
-
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "example.com" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "443" ]
-<<<<<<< HEAD
-=======
-}
-
-@test "meshGateway/Deployment: mesh-gateway-init init container wanAddress.source=Service fails if service.enable is false" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.wanAddress.source=Service' \
-      --set 'meshGateway.service.enabled=false' \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "if meshGateway.wanAddress.source=Service then meshGateway.service.enabled must be set to true" ]]
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
 }
 
 @test "meshGateway/Deployment: mesh-gateway-init init container wanAddress.source=Service, type=LoadBalancer" {
@@ -1016,11 +934,7 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "Service" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
@@ -1042,11 +956,7 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "Service" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
@@ -1082,11 +992,7 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-<<<<<<< HEAD
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
-=======
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-source"]' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
     [ "${actual}" = "Service" ]
 
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
@@ -1105,11 +1011,7 @@ key2: value2' \
 
   exp='consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
  -consul-api-timeout=5s \
-<<<<<<< HEAD
  -gateway-kind="mesh-gateway" \
-=======
- -gateway -gateway-kind="mesh-gateway" \
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
  -consul-node-name="k8s-service-mesh" \
  -proxy-id-file=/consul/service/proxy-id \
  -service-name=new-name \
@@ -1338,11 +1240,7 @@ key2: value2' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-<<<<<<< HEAD
       yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-kind") | del(."consul.hashicorp.com/mesh-gateway-wan-address-source") | del(."consul.hashicorp.com/mesh-gateway-container-port") | del(."consul.hashicorp.com/mesh-gateway-wan-address-static") | del(."consul.hashicorp.com/mesh-gateway-wan-port") | del(."consul.hashicorp.com/mesh-gateway-consul-service-name")' | tee /dev/stderr)
-=======
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-kind") | del(."consul.hashicorp.com/mesh-gateway-source") | del(."consul.hashicorp.com/mesh-gateway-container-port") | del(."consul.hashicorp.com/mesh-gateway-wan-address") | del(."consul.hashicorp.com/mesh-gateway-wan-port")' | tee /dev/stderr)
->>>>>>> 410f3117 (Register mesh-gateways using the endpoints controller.)
   [ "${actual}" = "{}" ]
 }
 

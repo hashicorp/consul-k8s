@@ -19,10 +19,6 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -73,16 +69,6 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-consul-node-name", "bar",
 			},
 			expErr: "unknown log level: invalid",
-		},
-		{
-			flags: []string{
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-service-account-name", "foo",
-				"-gateway",
-				"-consul-node-name", "bar",
-			},
-			expErr: "-gateway-kind must be set if -gateway is set",
 		},
 	}
 	for _, c := range cases {
@@ -650,100 +636,6 @@ func TestRun_ConnectServices_Errors(t *testing.T) {
 			}
 			flags := []string{
 				"-http-addr", server.HTTPAddr,
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-proxy-id-file", proxyFile,
-				"-consul-api-timeout", "5s",
-				"-consul-node-name", connectinject.ConsulNodeName,
-			}
-
-			code := cmd.Run(flags)
-			require.Equal(t, 1, code)
-		})
-	}
-}
-
-// TestRun_Gateways_Errors tests that when registered services could not be found,
-// we error out.
-func TestRun_Gateways_Errors(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		services []api.AgentServiceRegistration
-	}{
-		{
-			name: "gateway without pod-name or k8s-namespace meta",
-			services: []api.AgentServiceRegistration{
-				{
-					ID:      "mesh-gateway",
-					Name:    "mesh-gateway",
-					Kind:    "mesh-gateway",
-					Port:    9999,
-					Address: "127.0.0.1",
-				},
-			},
-		},
-		{
-			name: "gateway with pod-name meta but without k8s-namespace meta",
-			services: []api.AgentServiceRegistration{
-				{
-					ID:      "mesh-gateway",
-					Name:    "mesh-gateway",
-					Kind:    "mesh-gateway",
-					Port:    9999,
-					Address: "127.0.0.1",
-					Meta: map[string]string{
-						metaKeyPodName: "mesh-gateway",
-					},
-				},
-			},
-		},
-		{
-			name: "service and proxy with k8s-namespace meta but pod-name meta",
-			services: []api.AgentServiceRegistration{
-				{
-					ID:      "mesh-gateway",
-					Name:    "mesh-gateway",
-					Kind:    "mesh-gateway",
-					Port:    9999,
-					Address: "127.0.0.1",
-					Meta: map[string]string{
-						metaKeyKubeNS: "default-ns",
-					},
-				},
-			}},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
-			t.Cleanup(func() {
-				os.Remove(proxyFile)
-			})
-
-			// Start Consul server.
-			server, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer server.Stop()
-			server.WaitForLeader(t)
-			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
-			require.NoError(t, err)
-
-			// Register Consul services.
-			for _, svc := range c.services {
-				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
-			}
-
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:                                 ui,
-				serviceRegistrationPollingAttempts: 1,
-			}
-			flags := []string{
-				"-http-addr", server.HTTPAddr,
-				"-gateway",
-				"-gateway-kind", "mesh-gateway",
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,

@@ -62,8 +62,6 @@ type MeshWebhook struct {
 	// If not set, will use HTTP.
 	ConsulCACert string
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	// TLSEnabled indicates whether we should use TLS for communicating to Consul.
 	TLSEnabled bool
 
@@ -73,8 +71,6 @@ type MeshWebhook struct {
 	// ConsulGRPCPort is the gRPC port we should use to talk to Consul.
 	ConsulGRPCPort string
 
-=======
->>>>>>> 3c0daa9e (Enable connect-injector to talk to external servers. (#1323))
 	// ConsulAddress is the address of the Consul server. This should be only the
 	// host (i.e. not including port or protocol).
 	ConsulAddress string
@@ -83,13 +79,6 @@ type MeshWebhook struct {
 	// over TLS.
 	ConsulTLSServerName string
 
-<<<<<<< HEAD
-=======
-	ConsulAddress string
-
->>>>>>> e26b5af0 (Initial support for agentless (#1267))
-=======
->>>>>>> 8fb8b43a (agentless: initial integration with consul-dataplane (#1470))
 	// ConsulPartition is the name of the Admin Partition that the controller
 	// is deployed in. It is an enterprise feature requiring Consul Enterprise 1.11+.
 	// Its value is an empty string if partitions aren't enabled.
