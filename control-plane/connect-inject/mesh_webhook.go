@@ -273,7 +273,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
-		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		pod.Spec.Containers = injectSidecar(pod, pod.Spec.Containers, envoySidecar)
 	} else {
 		// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
 		// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
@@ -334,7 +334,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
-			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+			pod.Spec.Containers = injectSidecar(pod, pod.Spec.Containers, envoySidecar)
 		}
 	}
 
@@ -417,6 +417,14 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// Return a Patched response along with the patches we intend on applying to the
 	// Pod received by the meshWebhook.
 	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)
+}
+
+func injectSidecar(pod corev1.Pod, containers []corev1.Container, sidecar corev1.Container) []corev1.Container {
+	hold, err := strconv.ParseBool(pod.Annotations[annotationSidecarProxyHoldApplicationUntilProxyStarts])
+	if err != nil || hold != true {
+		return append(containers, sidecar)
+	}
+	return append([]corev1.Container{sidecar}, containers...)
 }
 
 // shouldOverwriteProbes returns true if we need to overwrite readiness/liveness probes for this pod.

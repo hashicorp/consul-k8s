@@ -62,9 +62,23 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 
 
 	probe, err := w.envoySidecarHealthProbe(pod)
-	if err == nil {
+	if err == nil && probe != nil {
 		container.LivenessProbe = probe
 	}
+
+	var lifecycle corev1.Lifecycle
+
+	preStop, err := w.envoySidecarGracefulShutdown(pod)
+	if err == nil && preStop != nil {
+		lifecycle.PreStop = preStop
+	}
+
+	postStart, err := w.envoySidecarHoldApplicationUntilProxyStarts(pod)
+	if err == nil && postStart != nil {
+		lifecycle.PostStart = postStart
+	}
+
+	container.Lifecycle = &lifecycle
 
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
@@ -156,17 +170,9 @@ func (w *MeshWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcNam
 	return cmd, nil
 }
 
-func shouldConfigureProbe(pod corev1.Pod) (bool, error) {
-	if raw, ok := pod.Annotations[annotationSidecarProxyConfigureProbes]; ok {
-		return strconv.ParseBool(raw)
-	}
-
-	return false, nil
-}
-
 func (w *MeshWebhook) envoySidecarHealthProbe(pod corev1.Pod) (*corev1.Probe, error) {
 
-	configureProbe, err := shouldConfigureProbe(pod)
+	configureProbe, err := strconv.ParseBool(pod.Annotations[annotationSidecarProxyConfigureProbes])
 	if err != nil || configureProbe != true {
 		return nil, err
 	}
@@ -176,8 +182,56 @@ func (w *MeshWebhook) envoySidecarHealthProbe(pod corev1.Pod) (*corev1.Probe, er
 				Port: intstr.FromInt(20200),
 			},
 		},
+		InitialDelaySeconds: 30,
+		TimeoutSeconds: 3,
 	}
 	return probe, nil
+
+}
+
+func (w *MeshWebhook) envoySidecarGracefulShutdown(pod corev1.Pod) (*corev1.Handler, error) {
+
+	grace, err := strconv.ParseBool(pod.Annotations[annotationSidecarProxyGracefulShutdown])
+
+	if err != nil || grace != true {
+		return nil, err
+	}
+
+		preStop := &corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/sh",
+					"-c",
+					"while [ $(netstat -plunt | grep tcp | grep -v envoy | wc -l | xargs) -ne 0 ]; do sleep 1; done",
+				},
+			},
+		}
+
+	return preStop, nil
+}
+
+func (w *MeshWebhook) envoySidecarHoldApplicationUntilProxyStarts(pod corev1.Pod) (*corev1.Handler, error) {
+
+	hold, err := strconv.ParseBool(pod.Annotations[annotationSidecarProxyHoldApplicationUntilProxyStarts])
+
+	if err != nil || hold != true {
+		return nil, err
+	}
+		postStart := &corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/sh",
+					"-c",
+					`total_time=0; until wget --spider localhost:19000;` +
+					`do echo Waiting for Sidecar;`+
+					`sleep 3; total_time=$(($total_time + 3)); echo $total_time;`+
+					`if [ $total_time -gt 120 ]; then echo Sidecar not running, timeout reached. Exiting....; exit 1; fi; done;`+
+					`echo Sidecar available`,
+				},
+			},
+		}
+
+	return postStart, err
 
 }
 
