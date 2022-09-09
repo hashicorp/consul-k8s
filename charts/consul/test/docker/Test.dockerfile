@@ -6,7 +6,7 @@
 # a script to configure kubectl, potentially install Helm, and run the tests
 # manually. This image only has the dependencies pre-installed.
 
-FROM circleci/golang:1.18
+FROM cimg/go:1.18
 
 # change the user to root so we can install stuff
 USER root
@@ -35,7 +35,7 @@ RUN curl -sSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terr
     && mv ./terraform /usr/local/bin/terraform
 
 # kubectl
-RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && \
+RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.23.7/bin/linux/amd64/kubectl && \
     chmod +x ./kubectl && \
     mv ./kubectl /usr/local/bin/kubectl
 
