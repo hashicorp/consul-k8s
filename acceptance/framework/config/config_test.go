@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -107,6 +106,16 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				"connectInject.transparentProxy.defaultEnabled": "true",
 			},
 		},
+		{
+			"sets connectInject.cni.enabled helm value to true when -enable-cni is set",
+			TestConfig{
+				EnableCNI: true,
+			},
+			map[string]string{
+				"connectInject.cni.enabled":                     "true",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -146,15 +155,14 @@ func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.consulImage, func(t *testing.T) {
-
 			// Write values.yaml to a temp dir which will then get parsed.
 			valuesYAML := fmt.Sprintf(`global:
   image: %s
 `, tt.consulImage)
-			tmp, err := ioutil.TempDir("", "")
+			tmp, err := os.MkdirTemp("", "")
 			require.NoError(t, err)
 			defer os.RemoveAll(tmp)
-			require.NoError(t, ioutil.WriteFile(filepath.Join(tmp, "values.yaml"), []byte(valuesYAML), 0644))
+			require.NoError(t, os.WriteFile(filepath.Join(tmp, "values.yaml"), []byte(valuesYAML), 0644))
 
 			cfg := TestConfig{
 				EnableEnterprise: true,

@@ -3,6 +3,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +86,7 @@ func NewHelmCluster(
 		KubectlOptions: ctx.KubectlOptions(t),
 		Logger:         logger,
 		ExtraArgs:      extraArgs,
+		Version:        cfg.HelmChartVersion,
 	}
 	return &HelmCluster{
 		ctx:                ctx,
@@ -109,7 +111,18 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Fail if there are any existing installations of the Helm chart.
 	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
 
-	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
+	chartName := config.HelmChartPath
+	if h.helmOptions.Version != config.HelmChartPath {
+		chartName = "hashicorp/consul"
+		helm.AddRepo(t, h.helmOptions, "hashicorp", "https://helm.releases.hashicorp.com")
+		// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
+		// asserting a chart version on Install which would fail in an obvious way should this not succeed.
+		_, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+		if err != nil {
+			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
+		}
+	}
+	helm.Install(t, h.helmOptions, chartName, h.releaseName)
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -270,7 +283,11 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
 	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
-	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
+	chartName := "hashicorp/consul"
+	if h.helmOptions.Version == config.HelmChartPath {
+		chartName = config.HelmChartPath
+	}
+	helm.Upgrade(t, h.helmOptions, chartName, h.releaseName)
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
@@ -297,12 +314,51 @@ func (h *HelmCluster) CreatePortForwardTunnelToResourcePort(t *testing.T, resour
 		require.NoError(r, tunnel.ForwardPortE(t))
 	})
 
+	doneChan := make(chan bool)
+
 	t.Cleanup(func() {
-		tunnel.Close()
+		close(doneChan)
 	})
 
-	return fmt.Sprintf("127.0.0.1:%d", localPort)
+	go h.monitorPortForwardedServer(t, localPort, tunnel, doneChan, resourceName, remotePort)
 
+	return fmt.Sprintf("127.0.0.1:%d", localPort)
+}
+
+func (h *HelmCluster) monitorPortForwardedServer(t *testing.T, port int, tunnel *terratestk8s.Tunnel, doneChan chan bool, resourceName string, remotePort int) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-doneChan:
+			logger.Log(t, "stopping monitor of the port-forwarded server")
+			tunnel.Close()
+			return
+		case <-ticker.C:
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			if err != nil {
+				logger.Log(t, "lost connection to port-forwarded server; restarting port-forwarding", "port", port)
+				tunnel.Close()
+				tunnel = terratestk8s.NewTunnelWithLogger(
+					h.helmOptions.KubectlOptions,
+					terratestk8s.ResourceTypePod,
+					resourceName,
+					port,
+					remotePort,
+					h.logger)
+				err = tunnel.ForwardPortE(t)
+				if err != nil {
+					// If we couldn't establish a port forwarding channel, continue, so we can try again.
+					continue
+				}
+			}
+			if conn != nil {
+				// Ignore error because we don't care if connection is closed successfully or not.
+				_ = conn.Close()
+			}
+		}
+	}
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strings"
@@ -134,7 +133,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	configFile, err := ioutil.ReadFile(c.flagConfigFile)
+	configFile, err := os.ReadFile(c.flagConfigFile)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error reading config file from %s: %s", c.flagConfigFile, err))
 		return 1

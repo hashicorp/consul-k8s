@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 
 	"github.com/posener/complete"
@@ -34,7 +33,7 @@ func NewSets() *Sets {
 	// Errors and usage are expected to be controlled externally by
 	// checking on the result of Parse.
 	unionSet.Usage = func() {}
-	unionSet.SetOutput(ioutil.Discard)
+	unionSet.SetOutput(io.Discard)
 
 	return &Sets{
 		unionSet:    unionSet,

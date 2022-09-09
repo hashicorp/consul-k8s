@@ -3,7 +3,6 @@ package common
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -108,7 +107,7 @@ type LoginParams struct {
 // The logic of this is taken from the `consul login` command.
 func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (string, error) {
 	// Read the bearerTokenFile.
-	data, err := ioutil.ReadFile(params.BearerTokenFile)
+	data, err := os.ReadFile(params.BearerTokenFile)
 	if err != nil {
 		return "", fmt.Errorf("unable to read bearer token file: %v, err: %v", params.BearerTokenFile, err)
 	}
@@ -198,7 +197,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 	return token.SecretID, nil
 }
 
-// WriteFileWithPerms will write payload as the contents of the outputFile and set permissions after writing the contents. This function is necessary since using ioutil.WriteFile() alone will create the new file with the requested permissions prior to actually writing the file, so you can't set read-only permissions.
+// WriteFileWithPerms will write payload as the contents of the outputFile and set permissions after writing the contents. This function is necessary since using os.WriteFile() alone will create the new file with the requested permissions prior to actually writing the file, so you can't set read-only permissions.
 func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 	// os.WriteFile truncates existing files and overwrites them, but only if they are writable.
 	// If the file exists it will already likely be read-only. Remove it first.
@@ -207,7 +206,7 @@ func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 			return fmt.Errorf("unable to delete existing file: %s", err)
 		}
 	}
-	if err := ioutil.WriteFile(outputFile, []byte(payload), os.ModePerm); err != nil {
+	if err := os.WriteFile(outputFile, []byte(payload), os.ModePerm); err != nil {
 		return fmt.Errorf("unable to write file: %s", err)
 	}
 	return os.Chmod(outputFile, mode)

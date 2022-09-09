@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 )
 
 func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -105,10 +106,10 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 			}
 		}
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:              pointerToInt64(envoyUserAndGroupID),
-			RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
-			RunAsNonRoot:           pointerToBool(true),
-			ReadOnlyRootFilesystem: pointerToBool(true),
+			RunAsUser:              pointer.Int64(envoyUserAndGroupID),
+			RunAsGroup:             pointer.Int64(envoyUserAndGroupID),
+			RunAsNonRoot:           pointer.Bool(true),
+			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}
 	}
 

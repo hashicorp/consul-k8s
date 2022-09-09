@@ -4,12 +4,15 @@
 </h1>
 
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
+ 
+> **Warning**  
+> Please read the following issue to learn more about upcoming breaking changes that will be implemented by Q4 2022 for the default deployment of Consul on Kubernetes: [Enabling of service mesh by default and disabling of node-level client agents from Consul Service Mesh on Kubernetes and Catalog Sync](https://github.com/hashicorp/consul-k8s/issues/1438)
 
 ## Overview
 
 The `consul-k8s-control-plane` binary includes first-class integrations between Consul and
 Kubernetes. The project encapsulates multiple use cases such as syncing
-services, injecting Connect sidecars, and more.
+services, injecting Consul sidecars, and more.
 The Kubernetes integrations with Consul are
 [documented directly on the Consul website](https://www.consul.io/docs/platform/k8s/index.html).
 
@@ -20,14 +23,15 @@ for each feature will be noted below. By versioning this project separately,
 we can iterate on Kubernetes integrations more quickly and release new versions
 without forcing Consul users to do a full Consul upgrade.
 
-> :warning: **Please note**: We take Consul's security and our users' trust very seriously. If
+> **Note**  
+> We take Consul's security and our users' trust very seriously. If
 you believe you have found a security issue in Consul K8s, _please responsibly disclose_
 by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
 ## Features
     
-  * [**Consul Service Mesh (Connect)**](https://www.consul.io/docs/k8s/connect):
-    Run Consul Service Mesh (aka Consul Connect) on Kubernetes. This feature
+  * [**Consul Service Mesh**](https://www.consul.io/docs/k8s/connect):
+    Run Consul Service Mesh on Kubernetes. This feature
     injects Envoy sidecars and registers your Pods with Consul.
     
   * [**Catalog Sync**](https://www.consul.io/docs/k8s/service-sync):
@@ -63,7 +67,7 @@ use Consul with Kubernetes, please see the
 
 ### Prerequisites
   * **Helm 3.2+** (Helm 2 is not supported)
-  * **Kubernetes 1.19+** - This is the earliest version of Kubernetes tested.
+  * **Kubernetes 1.21-1.24** - This is the earliest version of Kubernetes tested.
     It is possible that this chart works with earlier versions, but it is
     untested.
 

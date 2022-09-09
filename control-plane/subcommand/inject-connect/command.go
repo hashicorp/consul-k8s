@@ -5,8 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -96,11 +96,14 @@ type Command struct {
 
 	// Server address flags.
 	flagReadServerExposeService bool
-	flagServerAddresses         []string
+	flagTokenServerAddresses    []string
 
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
+
+	// CNI flag.
+	flagEnableCNI bool
 
 	// Peering flags.
 	flagEnablePeering bool
@@ -178,6 +181,8 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableTransparentProxy, "default-enable-transparent-proxy", true,
 		"Enable transparent proxy mode for all Consul service mesh applications by default.")
+	c.flagSet.BoolVar(&c.flagEnableCNI, "enable-cni", false,
+		"Enable CNI traffic redirection for all Consul service mesh applications.")
 	c.flagSet.BoolVar(&c.flagTransparentProxyDefaultOverwriteProbes, "transparent-proxy-default-overwrite-probes", true,
 		"Overwrite Kubernetes probes to point to Envoy by default when in Transparent Proxy mode.")
 	c.flagSet.BoolVar(&c.flagEnableConsulDNS, "enable-consul-dns", false,
@@ -195,8 +200,8 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagReadServerExposeService, "read-server-expose-service", false,
 		"Enables polling the Consul servers' external service for its IP(s).")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"An address of the Consul server(s), formatted host:port, where host may be an IP or DNS name and port must be a gRPC port. May be specified multiple times for multiple addresses.")
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagTokenServerAddresses), "token-server-address",
+		"An address of the Consul server(s) as saved in the peering token, formatted host:port, where host may be an IP or DNS name and port must be a gRPC port. May be specified multiple times for multiple addresses.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -345,7 +350,7 @@ func (c *Command) Run(args []string) int {
 	var consulCACert []byte
 	if cfg.TLSConfig.CAFile != "" {
 		var err error
-		consulCACert, err = ioutil.ReadFile(cfg.TLSConfig.CAFile)
+		consulCACert, err = os.ReadFile(cfg.TLSConfig.CAFile)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
 			return 1
@@ -452,7 +457,7 @@ func (c *Command) Run(args []string) int {
 			ConsulClient:              c.consulClient,
 			ExposeServersServiceName:  c.flagResourcePrefix + "-expose-servers",
 			ReadServerExternalService: c.flagReadServerExposeService,
-			TokenServerAddresses:      c.flagServerAddresses,
+			TokenServerAddresses:      c.flagTokenServerAddresses,
 			ReleaseNamespace:          c.flagReleaseNamespace,
 			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),
 			Scheme:                    mgr.GetScheme(),
@@ -516,6 +521,7 @@ func (c *Command) Run(args []string) int {
 			K8SNSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:       c.flagCrossNamespaceACLPolicy,
 			EnableTransparentProxy:        c.flagDefaultEnableTransparentProxy,
+			EnableCNI:                     c.flagEnableCNI,
 			TProxyOverwriteProbes:         c.flagTransparentProxyDefaultOverwriteProbes,
 			EnableConsulDNS:               c.flagEnableConsulDNS,
 			ResourcePrefix:                c.flagResourcePrefix,
@@ -545,7 +551,7 @@ func (c *Command) Run(args []string) int {
 func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 	webhookConfigName := fmt.Sprintf("%s-connect-injector", c.flagResourcePrefix)
 	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, WebhookCAFilename)
-	caCert, err := ioutil.ReadFile(caPath)
+	caCert, err := os.ReadFile(caPath)
 	if err != nil {
 		return err
 	}

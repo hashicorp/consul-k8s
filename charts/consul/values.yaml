@@ -40,7 +40,7 @@ global:
         #
         # "" is the default source. If servers are enabled, it will check if `server.exposeService` is enabled, and read
         # the addresses from that service to use as the peering token server addresses. If using admin partitions and
-        # only Consul client agents are enabled, the addresses in externalServers.hosts and externalServers.grpcPort
+        # only Consul client agents are enabled, the addresses in `externalServers.hosts` and `externalServers.grpcPort`
         # will be used.
         #
         # "consul" will use the Consul advertise addresses in the peering token.
@@ -129,7 +129,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: hashicorp/consul-k8s-control-plane:0.47.1
+  imageK8S: hashicorp/consul-k8s-control-plane:0.48.0
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -271,16 +271,16 @@ global:
         authMethodPath: "kubernetes"
 
         # The path to a PKI secrets engine for the root certificate.
-        # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
+        # For more details, please refer to [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault#rootpkipath).
         rootPKIPath: ""
 
         # The path to a PKI secrets engine for the generated intermediate certificate.
-        # Please see https://www.consul.io/docs/connect/ca/vault#intermediatepkipath.
+        # For more details, please refer to [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault#intermediatepkipath).
         intermediatePKIPath: ""
 
         # Additional Connect CA configuration in JSON format.
-        # Please see https://www.consul.io/docs/connect/ca/vault#common-ca-config-options
-        # for additional configuration options.
+        # Please refer to [Vault Connect CA configuration](https://www.consul.io/docs/connect/ca/vault#configuration)
+        # for all configuration options available for that provider.
         #
         # Example:
         #
@@ -289,6 +289,7 @@ global:
         #   {
         #     "connect": [{
         #       "ca_config": [{
+        #            "namespace": "my-vault-ns",
         #            "leaf_cert_ttl": "36h"
         #         }]
         #     }]
@@ -550,8 +551,7 @@ global:
     # `<helm-release-name>-consul-federation`.
     createFederationSecret: false
 
-    # The name of the primary datacenter.  This should only be set for datacenters
-    # that are not the primary datacenter.
+    # The name of the primary datacenter.
     # @type: string
     primaryDatacenter: null
 
@@ -629,7 +629,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
   # @default: envoyproxy/envoy-alpine:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.22.4"
+  imageEnvoy: "envoyproxy/envoy:v1.23.1"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -1931,6 +1931,74 @@ connectInject:
     # command because of a limitation in the Helm templating language.
     # @type: integer
     maxUnavailable: null
+
+  # Configures consul-cni plugin for Consul Service mesh services
+  cni:
+    # If true, then all traffic redirection setup will use the consul-cni plugin. 
+    # Requires connectInject.enabled to also be true.
+    # @type: boolean
+    enabled: false
+
+    # Log level for the installer and plugin. Overrides global.logLevel
+    # @type: string
+    logLevel: null 
+    
+    # Location on the kubernetes node where the CNI plugin is installed. Shoud be the absolute path and start with a '/'
+    # Example on GKE:
+    #
+    # ```yaml
+    # cniBinDir: "/home/kubernetes/bin"
+    # ```
+    # @type: string
+    cniBinDir: "/opt/cni/bin"
+
+    # Location on the kubernetes node of all CNI configuration. Should be the absolute path and start with a '/'
+    # @type: string
+    cniNetDir: "/etc/cni/net.d"
+ 
+    # The resource settings for CNI installer daemonset.
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "75Mi"
+        cpu: "75m"
+      limits:
+        memory: "100Mi"
+        cpu: "100m"
+
+    # Resource quotas for running the daemonset as system critical pods
+    resourceQuota:
+      pods: 5000
+
+    # The security context for the CNI installer daemonset. This should be a YAML map corresponding to a
+    # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
+    # By default, servers will run as root, with user ID `0` and group ID `0`.
+    # Note: if running on OpenShift, this setting is ignored because the user and group are set automatically
+    # by the OpenShift platform.
+    # @type: map
+    # @recurse: false
+    securityContext:
+      runAsNonRoot: false
+      runAsGroup: 0
+      runAsUser: 0
+
+    # updateStrategy for the CNI installer DaemonSet.
+    # See https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
+    # This should be a multi-line string mapping directly to the updateStrategy
+    #
+    # Example:
+    #
+    # ```yaml
+    # updateStrategy: |
+    #   rollingUpdate:
+    #     maxUnavailable: 5
+    #   type: RollingUpdate
+    # ```
+    #
+    # @type: string
+    updateStrategy: null
+
 
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.

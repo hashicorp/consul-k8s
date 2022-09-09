@@ -25,11 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-var (
-	// kubeSystemNamespaces is a set of namespaces that are considered
-	// "system" level namespaces and are always skipped (never injected).
-	kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
-)
+// kubeSystemNamespaces is a set of namespaces that are considered
+// "system" level namespaces and are always skipped (never injected).
+var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
 
 // Webhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
@@ -135,6 +133,11 @@ type MeshWebhook struct {
 	// This means that the injected init container will apply traffic redirection rules
 	// so that all traffic will go through the Envoy proxy.
 	EnableTransparentProxy bool
+
+	// EnableCNI enables the CNI plugin and prevents the connect-inject init container
+	// from running the consul redirect-traffic command as the CNI plugin handles traffic
+	// redirection
+	EnableCNI bool
 
 	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
 	// to point them to the Envoy proxy.
@@ -292,22 +295,31 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Info(fmt.Sprintf("service: %s", svc))
 			if w.AuthMethod != "" {
 				if svc != "" && pod.Spec.ServiceAccountName != svc {
+					secretName := ""
 					sa, err := w.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
 					if err != nil {
 						w.Log.Error(err, "couldn't get service accounts")
 						return admission.Errored(http.StatusInternalServerError, err)
 					}
 					if len(sa.Secrets) == 0 {
+						// Check to see if there is a secret with the same name as the ServiceAccount for Kube-1.24+.
 						w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
-						return admission.Errored(http.StatusInternalServerError, fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
+						sec, err := w.Clientset.CoreV1().Secrets(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
+						if err != nil {
+							w.Log.Error(err, "couldn't get Secret associated with Service Account")
+							return admission.Errored(http.StatusInternalServerError, err)
+						}
+						secretName = sec.Name
+						w.Log.Info(fmt.Sprintf("fetched secret: %s", secretName))
+					} else {
+						secretName = sa.Secrets[0].Name
 					}
-					saSecret := sa.Secrets[0].Name
-					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
+					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", secretName)
 					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 						Name: fmt.Sprintf("%s-service-account", svc),
 						VolumeSource: corev1.VolumeSource{
 							Secret: &corev1.SecretVolumeSource{
-								SecretName: saSecret,
+								SecretName: secretName,
 							},
 						},
 					})
@@ -362,6 +374,18 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[keyInjectStatus] = injected
 
+	tproxyEnabled, err := transparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
+	if err != nil {
+		w.Log.Error(err, "error determining if transparent proxy is enabled", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if transparent proxy is enabled: %s", err))
+	}
+
+	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
+	// to determine if it should traffic redirect or not
+	if tproxyEnabled {
+		pod.Annotations[keyTransparentProxyStatus] = enabled
+	}
+
 	// Add annotations for metrics.
 	if err = w.prometheusAnnotations(&pod); err != nil {
 		w.Log.Error(err, "error configuring prometheus annotations", "request name", req.Name)
@@ -387,6 +411,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if err != nil {
 		w.Log.Error(err, "error overwriting readiness or liveness probes", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
+	}
+
+	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
+	// plugin can apply redirect traffic rules on the pod.
+	if w.EnableCNI && tproxyEnabled {
+		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+			// todo: update this error message
+			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
+		}
 	}
 
 	// Marshall the pod into JSON after it has the desired envs, annotations, labels,

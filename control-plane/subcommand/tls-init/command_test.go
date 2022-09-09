@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -89,16 +88,16 @@ func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 			k8s := fake.NewSimpleClientset()
 			cmd.clientset = k8s
 
-			ca, err := ioutil.TempFile("", "")
+			ca, err := os.CreateTemp("", "")
 			require.NoError(t, err)
 			defer os.RemoveAll(ca.Name())
-			err = ioutil.WriteFile(ca.Name(), []byte(c.caCert), 0644)
+			err = os.WriteFile(ca.Name(), []byte(c.caCert), 0644)
 			require.NoError(t, err)
 
-			key, err := ioutil.TempFile("", "")
+			key, err := os.CreateTemp("", "")
 			require.NoError(t, err)
 			defer os.RemoveAll(key.Name())
-			err = ioutil.WriteFile(key.Name(), []byte(c.caKey), 0644)
+			err = os.WriteFile(key.Name(), []byte(c.caKey), 0644)
 			require.NoError(t, err)
 
 			flags := []string{"-name-prefix", "consul", "-ca", ca.Name(), "-key", key.Name()}
@@ -152,16 +151,16 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	ca, err := ioutil.TempFile("", "")
+	ca, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(ca.Name())
-	err = ioutil.WriteFile(ca.Name(), []byte(caCertEC), 0644)
+	err = os.WriteFile(ca.Name(), []byte(caCertEC), 0644)
 	require.NoError(t, err)
 
-	key, err := ioutil.TempFile("", "")
+	key, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(key.Name())
-	err = ioutil.WriteFile(key.Name(), []byte(caKeyEC), 0644)
+	err = os.WriteFile(key.Name(), []byte(caKeyEC), 0644)
 	require.NoError(t, err)
 
 	flags := []string{"-name-prefix", "consul", "-ca", ca.Name(), "-key", key.Name(), "-additional-dnsname", "test.dns.name"}

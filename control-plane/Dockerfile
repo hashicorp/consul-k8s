@@ -20,6 +20,7 @@ FROM alpine:3.16 AS dev
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
+ARG CNI_BIN_NAME=consul-cni
 ARG VERSION
 ARG TARGETARCH
 ARG TARGETOS
@@ -43,6 +44,7 @@ RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
 COPY pkg/bin/linux_${TARGETARCH}/${BIN_NAME} /bin
+COPY cni/pkg/bin/linux_${TARGETARCH}/${CNI_BIN_NAME} /bin
 
 USER 100
 CMD /bin/${BIN_NAME}
@@ -66,22 +68,21 @@ CMD /bin/${BIN_NAME}
 # reproducible currently.
 FROM alpine:3.16 AS release-default
 
-# NAME and VERSION are the name of the software in releases.hashicorp.com
-# and the version to download. Example: NAME=consul VERSION=1.2.3.
 ARG BIN_NAME=consul-k8s-control-plane
-ARG VERSION
+ARG CNI_BIN_NAME=consul-cni
+ARG PRODUCT_VERSION
 
 LABEL name=${BIN_NAME} \
       maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
       vendor="HashiCorp" \
-      version=${VERSION} \
-      release=${VERSION} \
+      version=${PRODUCT_VERSION} \
+      release=${PRODUCT_VERSION} \
       summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
       description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes."
 
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
 ENV BIN_NAME=${BIN_NAME}
-ENV VERSION=${VERSION}
+ENV VERSION=${PRODUCT_VERSION}
 
 RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
 
@@ -92,7 +93,9 @@ ARG TARGETARCH
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
+
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
+COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
@@ -114,6 +117,8 @@ ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
 ARG PRODUCT_REVISION
 ARG BIN_NAME
+ARG CNI_BIN_NAME=consul-cni
+ARG VERSION
 
 # PRODUCT_NAME and PRODUCT_VERSION are the name of the software on releases.hashicorp.com
 # and the version to download. Example: PRODUCT_NAME=consul PRODUCT_VERSION=1.2.3.
@@ -132,7 +137,7 @@ LABEL name=$PRODUCT_NAME \
 
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
 ENV NAME=${BIN_NAME}
-ENV VERSION=${VERSION}
+ENV VERSION=${PRODUCT_VERSION}
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -151,6 +156,7 @@ RUN groupadd --gid 1000 ${BIN_NAME} && \
     usermod -a -G root ${BIN_NAME}
 
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
+COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}

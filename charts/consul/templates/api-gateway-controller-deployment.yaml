@@ -204,7 +204,12 @@ spec:
         - |
           consul-k8s-control-plane acl-init \
             -component-name=api-gateway-controller \
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+            -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            {{- else }}
             -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}

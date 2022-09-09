@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,9 +28,18 @@ import (
 // a command line arg or an environment variable.
 func TestSnapshotAgent_Vault(t *testing.T) {
 	cfg := suite.Config()
+	if cfg.EnableCNI {
+		t.Skipf("skipping because -enable-cni is set and snapshot agent is already tested with regular tproxy")
+	}
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
 	ns := kubectlOptions.Namespace
+
+	ver, err := version.NewVersion("1.12.0")
+	require.NoError(t, err)
+	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+		t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
+	}
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()

@@ -3,7 +3,8 @@ package consulsidecar
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
+
 	"net"
 	"net/http"
 	"os"
@@ -224,7 +225,7 @@ type mockEnvoyMetricsGetter struct {
 func (em *mockEnvoyMetricsGetter) Get(_ string) (resp *http.Response, err error) {
 	response := &http.Response{}
 	response.StatusCode = em.respStatusCode
-	response.Body = ioutil.NopCloser(bytes.NewReader([]byte("envoy metrics\n")))
+	response.Body = io.NopCloser(bytes.NewReader([]byte("envoy metrics\n")))
 	return response, nil
 }
 
@@ -242,7 +243,7 @@ func (sm *mockServiceMetricsGetter) Get(url string) (resp *http.Response, err er
 	sm.reqURL = url
 
 	response := &http.Response{}
-	response.Body = ioutil.NopCloser(bytes.NewReader([]byte("service metrics\n")))
+	response.Body = io.NopCloser(bytes.NewReader([]byte("service metrics\n")))
 	response.StatusCode = sm.respStatusCode
 
 	return response, nil
@@ -329,7 +330,7 @@ func TestMergedMetricsServer(t *testing.T) {
 			retry.Run(t, func(r *retry.R) {
 				resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/stats/prometheus", randomPorts[0]))
 				require.NoError(r, err)
-				bytes, err := ioutil.ReadAll(resp.Body)
+				bytes, err := io.ReadAll(resp.Body)
 				require.NoError(r, err)
 				require.Equal(r, c.expectedOutput, string(bytes))
 				// Verify the correct service metrics url was used. The service
@@ -613,11 +614,11 @@ func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 // createServicesTmpFile creates a temp directory
 // and writes servicesRegistration as an HCL file there.
 func createServicesTmpFile(t *testing.T, serviceHCL string) (string, string) {
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 
 	configFile := filepath.Join(tmpDir, "svc.hcl")
-	err = ioutil.WriteFile(configFile, []byte(serviceHCL), 0600)
+	err = os.WriteFile(configFile, []byte(serviceHCL), 0600)
 	require.NoError(t, err)
 
 	return tmpDir, configFile

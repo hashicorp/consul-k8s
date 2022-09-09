@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -99,7 +98,7 @@ func main() {
 	}
 
 	// Parse the values.yaml file.
-	inputBytes, err := ioutil.ReadFile("../../charts/consul/values.yaml")
+	inputBytes, err := os.ReadFile("../../charts/consul/values.yaml")
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -118,7 +117,7 @@ func main() {
 
 	// Otherwise we'll go on to write the changes to the helm docs.
 	helmReferenceFile := filepath.Join(consulRepoPath, "website/content/docs/k8s/helm.mdx")
-	helmReferenceBytes, err := ioutil.ReadFile(helmReferenceFile)
+	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -140,7 +139,7 @@ func main() {
 	}
 
 	newMdx := helmReferenceContents[0:start+len(startStr)] + out + helmReferenceContents[end:]
-	err = ioutil.WriteFile(helmReferenceFile, []byte(newMdx), 0644)
+	err = os.WriteFile(helmReferenceFile, []byte(newMdx), 0644)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

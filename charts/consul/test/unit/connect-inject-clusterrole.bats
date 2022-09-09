@@ -32,7 +32,7 @@ load _helpers
 #--------------------------------------------------------------------
 # rules
 
-@test "connectInject/ClusterRole: sets get, list, and watch access to pods, endpoints, services, and namespaces in all api groups" {
+@test "connectInject/ClusterRole: sets get, list, and watch access to endpoints, services, namespaces and nodes in all api groups" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -42,9 +42,6 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.rules[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("pods")' | tee /dev/stderr)
-  [ "${actual}" != null ]
-
   local actual=$(echo $object | yq -r '.resources[| index("endpoints")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
@@ -52,6 +49,9 @@ load _helpers
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.resources[| index("namespaces")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.resources[| index("nodes")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
@@ -67,7 +67,7 @@ load _helpers
   [ "${actual}" != null ]
 }
 
-@test "connectInject/ClusterRole: sets create, get, list, and update access to leases in the coordination.k8s.io api group" {
+@test "connectInject/ClusterRole: sets get, list, watch and update access to pods in all api groups" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -76,6 +76,35 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.rules[1]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.resources[| index("pods")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("watch")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("update")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+}
+
+@test "connectInject/ClusterRole: sets create, get, list, and update access to leases in the coordination.k8s.io api group" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'global.enabled=false' \
+      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[2]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("leases")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -96,7 +125,7 @@ load _helpers
   [ "${actual}" != null ]
 }
 
-@test "connectInject/ClusterRole: sets get access to serviceaccounts when manageSystemACLSis true" {
+@test "connectInject/ClusterRole: sets get access to serviceaccounts and secrets when manageSystemACLSis true" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -108,6 +137,9 @@ load _helpers
       yq -r '.rules[0]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("serviceaccounts")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.resources[| index("secrets")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
@@ -166,7 +198,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       . | tee /dev/stderr |
-      yq -r '.rules[2]' | tee /dev/stderr)
+      yq -r '.rules[3]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
   [ "${actual}" = "mutatingwebhookconfigurations" ]

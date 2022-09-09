@@ -209,6 +209,9 @@ func TestFetchPods(t *testing.T) {
 			c := setupCommand(new(bytes.Buffer))
 			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
 			c.flagNamespace = tc.namespace
+			if tc.namespace == "" {
+				c.flagAllNamespaces = true
+			}
 
 			pods, err := c.fetchPods()
 
@@ -305,6 +308,35 @@ func TestListCommandOutput(t *testing.T) {
 	}
 	for _, expression := range notExpected {
 		require.NotRegexp(t, expression, actual)
+	}
+}
+
+func TestNoPodsFound(t *testing.T) {
+	cases := map[string]struct {
+		args     []string
+		expected string
+	}{
+		"Default namespace": {
+			[]string{"-n", "default"},
+			"No proxies found in default namespace.",
+		},
+		"All namespaces": {
+			[]string{"-A"},
+			"No proxies found across all namespaces.",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := setupCommand(buf)
+			c.kubernetes = fake.NewSimpleClientset()
+
+			exitCode := c.Run(tc.args)
+			require.Equal(t, 0, exitCode)
+
+			require.Contains(t, buf.String(), tc.expected)
+		})
 	}
 }
 

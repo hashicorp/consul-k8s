@@ -13,17 +13,24 @@ metadata:
 rules:
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources:
-  - serviceaccounts
+  resources: ["serviceaccounts", "secrets"]
   verbs:
   - get
 {{- end }}
 - apiGroups: [ "" ]
-  resources: [ "pods", "endpoints", "services", "namespaces", "nodes" ]
+  resources: [ "endpoints", "services", "namespaces", "nodes" ]
   verbs:
   - "get"
   - "list"
   - "watch"
+- apiGroups: [ "" ]
+  resources:
+  - pods
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "update"
 - apiGroups:
   - coordination.k8s.io
   resources:
