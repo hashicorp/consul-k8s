@@ -607,10 +607,10 @@ jobs:
               echo "Deleting $cluster GKE cluster"
               gcloud container clusters delete $cluster --zone us-central1-a --project ${CLOUDSDK_CORE_PROJECT} --quiet
             done
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "GKE cleanup failed"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "GKE cleanup failed"
 
   cleanup-azure-resources:
     docker:
@@ -625,10 +625,10 @@ jobs:
               echo "Deleting $group resource group"
               az group delete -n $group --yes
             done
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "AKS cleanup failed"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "AKS cleanup failed"
 
   cleanup-eks-resources:
     docker:
@@ -645,10 +645,10 @@ jobs:
             export AWS_SESSION_TOKEN="$(jq -r .Credentials.SessionToken assume-role.json)"
 
             make ci.aws-acceptance-test-cleanup
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "EKS cleanup failed"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "EKS cleanup failed"
 
   ########################
   # ACCEPTANCE TESTS
@@ -716,10 +716,10 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-gke-cni-1-23:
     parallelism: 2
@@ -784,10 +784,10 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "GKE CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "GKE CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-1-22:
     parallelism: 3
@@ -841,10 +841,10 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-cni-1-22:
     parallelism: 3
@@ -897,10 +897,10 @@ jobs:
           command: |
             terraform destroy -auto-approve
           when: always
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-1-21:
     parallelism: 3
@@ -960,10 +960,10 @@ jobs:
             terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-cni-1-21:
     parallelism: 3
@@ -1023,10 +1023,10 @@ jobs:
             terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "EKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "EKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-openshift:
     environment:
@@ -1077,10 +1077,10 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-11:
     environment:
@@ -1115,10 +1115,10 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-12:
     environment:
@@ -1153,10 +1153,10 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-nightly-1-13:
     environment:
@@ -1191,48 +1191,48 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      # - slack/status:
-      #     channel: *slack-channel
-      #     fail_only: true
-      #     failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          channel: *slack-channel
+          fail_only: true
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
 workflows:
   version: 2
-  # test-and-build:
-  #   jobs:
-  #     # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
-  #     # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
-  #     # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
-  #     # be moved
-  #     - build-distro:
-  #         OS: "linux"
-  #         ARCH: "amd64 arm64"
-  #         name: build-distros-linux
-  #     - dev-upload-docker:
-  #         context: consul-ci
-  #         requires:
-  #           - build-distros-linux
-  #     # Run acceptance tests using the docker image built for the control plane
-  #     - acceptance:
-  #         context: consul-ci
-  #         requires:
-  #           - dev-upload-docker
-  #     - acceptance-tproxy-cni:
-  #         context: consul-ci
-  #         requires:
-  #           - dev-upload-docker
-  #     - acceptance-tproxy:
-  #         context: consul-ci
-  #         requires:
-  #           - dev-upload-docker
+  test-and-build:
+    jobs:
+      # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
+      # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
+      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
+      # be moved
+      - build-distro:
+          OS: "linux"
+          ARCH: "amd64 arm64"
+          name: build-distros-linux
+      - dev-upload-docker:
+          context: consul-ci
+          requires:
+            - build-distros-linux
+      # Run acceptance tests using the docker image built for the control plane
+      - acceptance:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy-cni:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
   nightly-acceptance-tests:
-    # triggers:
-    #   - schedule:
-    #       cron: "0 0 * * *"
-    #       filters:
-    #         branches:
-    #           only:
-    #             - main
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1274,13 +1274,13 @@ workflows:
             - dev-upload-docker
 
   nightly-acceptance-tests-consul:
-    # triggers:
-    #   - schedule:
-    #       cron: "0 0 * * *"
-    #       filters:
-    #         branches:
-    #           only:
-    #             - main
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
     jobs:
       - acceptance-kind-1-23-consul-nightly-1-11
       - acceptance-kind-1-23-consul-nightly-1-12
