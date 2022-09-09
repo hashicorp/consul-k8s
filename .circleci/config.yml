@@ -145,7 +145,8 @@ commands:
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -enable-multi-cluster \
                       -debug-directory="$TEST_RESULTS/debug" \
-                      -consul-k8s-image=<< parameters.consul-k8s-image >>
+                      -consul-k8s-image=<< parameters.consul-k8s-image >> \
+                      -run ^TestConnectInject$
 
 jobs:
   go-fmt-and-vet-control-plane:
