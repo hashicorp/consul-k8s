@@ -113,7 +113,8 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -consul-k8s-image=<< parameters.consul-k8s-image >>
+                          -consul-k8s-image=<< parameters.consul-k8s-image >> \
+                          -run ^TestConnectInject$
                     then
                       echo "Tests in ${pkg} failed, aborting early"
                       exit_code=1
@@ -650,257 +651,257 @@ jobs:
           fail_only: true
           failure_message: "EKS cleanup failed"
 
-  ########################
-  # ACCEPTANCE TESTS
-  ########################
-  acceptance-gke-1-23:
-    parallelism: 2
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+  # ########################
+  # # ACCEPTANCE TESTS
+  # ########################
+  # acceptance-gke-1-23:
+  #   parallelism: 2
+  #   environment:
+  #     - TEST_RESULTS: /tmp/test-results
+  #   docker:
+  #     # This image is built from test/docker/Test.dockerfile
+  #     - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
-    steps:
-      - run:
-          name: Exit if forked PR
-          command: |
-            if [ -n "$CIRCLE_PR_NUMBER" ]; then
-                echo "Skipping acceptance tests for forked PRs; marking step successful."
-                circleci step halt
-            fi
+  #   steps:
+  #     - run:
+  #         name: Exit if forked PR
+  #         command: |
+  #           if [ -n "$CIRCLE_PR_NUMBER" ]; then
+  #               echo "Skipping acceptance tests for forked PRs; marking step successful."
+  #               circleci step halt
+  #           fi
 
-      - checkout
+  #     - checkout
 
-      - run:
-          name: terraform init & apply
-          working_directory: *gke-terraform-path
-          command: |
-            terraform init
-            echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
+  #     - run:
+  #         name: terraform init & apply
+  #         working_directory: *gke-terraform-path
+  #         command: |
+  #           terraform init
+  #           echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
 
-            # On GKE, we're setting the build number instead of build URL because label values
-            # cannot contain '/'.
-            terraform apply \
-              -var project=${CLOUDSDK_CORE_PROJECT} \
-              -var init_cli=true \
-              -var cluster_count=2 \
-              -var labels="{\"build_number\": \"$CIRCLE_BUILD_NUM\"}" \
-              -auto-approve
+  #           # On GKE, we're setting the build number instead of build URL because label values
+  #           # cannot contain '/'.
+  #           terraform apply \
+  #             -var project=${CLOUDSDK_CORE_PROJECT} \
+  #             -var init_cli=true \
+  #             -var cluster_count=2 \
+  #             -var labels="{\"build_number\": \"$CIRCLE_BUILD_NUM\"}" \
+  #             -auto-approve
 
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+  #           primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+  #           secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+  #           echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+  #           echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     # Restore go module cache if there is one
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
-      - run: mkdir -p $TEST_RESULTS
+  #     - run: mkdir -p $TEST_RESULTS
 
-      - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
+  #     - run-acceptance-tests:
+  #         additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
 
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
 
-      - run:
-          name: terraform destroy
-          working_directory: *gke-terraform-path
-          command: |
-            terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
-          when: always
+  #     - run:
+  #         name: terraform destroy
+  #         working_directory: *gke-terraform-path
+  #         command: |
+  #           terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
+  #         when: always
 
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-gke-cni-1-23:
-    parallelism: 2
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+  # acceptance-gke-cni-1-23:
+  #   parallelism: 2
+  #   environment:
+  #     - TEST_RESULTS: /tmp/test-results
+  #   docker:
+  #     # This image is built from test/docker/Test.dockerfile
+  #     - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
-    steps:
-      - run:
-          name: Exit if forked PR
-          command: |
-            if [ -n "$CIRCLE_PR_NUMBER" ]; then
-                echo "Skipping acceptance tests for forked PRs; marking step successful."
-                circleci step halt
-            fi
+  #   steps:
+  #     - run:
+  #         name: Exit if forked PR
+  #         command: |
+  #           if [ -n "$CIRCLE_PR_NUMBER" ]; then
+  #               echo "Skipping acceptance tests for forked PRs; marking step successful."
+  #               circleci step halt
+  #           fi
 
-      - checkout
+  #     - checkout
 
-      - run:
-          name: terraform init & apply
-          working_directory: *gke-terraform-path
-          command: |
-            terraform init
-            echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
+  #     - run:
+  #         name: terraform init & apply
+  #         working_directory: *gke-terraform-path
+  #         command: |
+  #           terraform init
+  #           echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
 
-            # On GKE, we're setting the build number instead of build URL because label values
-            # cannot contain '/'.
-            terraform apply \
-              -var project=${CLOUDSDK_CORE_PROJECT} \
-              -var init_cli=true \
-              -var cluster_count=2 \
-              -var labels="{\"build_number\": \"$CIRCLE_BUILD_NUM\"}" \
-              -auto-approve
+  #           # On GKE, we're setting the build number instead of build URL because label values
+  #           # cannot contain '/'.
+  #           terraform apply \
+  #             -var project=${CLOUDSDK_CORE_PROJECT} \
+  #             -var init_cli=true \
+  #             -var cluster_count=2 \
+  #             -var labels="{\"build_number\": \"$CIRCLE_BUILD_NUM\"}" \
+  #             -auto-approve
 
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+  #           primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+  #           secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+  #           echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+  #           echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     # Restore go module cache if there is one
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
-      - run: mkdir -p $TEST_RESULTS
+  #     - run: mkdir -p $TEST_RESULTS
 
-      - run-acceptance-tests:
-          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni
+  #     - run-acceptance-tests:
+  #         additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni
 
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
 
-      - run:
-          name: terraform destroy
-          working_directory: *gke-terraform-path
-          command: |
-            terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
-          when: always
+  #     - run:
+  #         name: terraform destroy
+  #         working_directory: *gke-terraform-path
+  #         command: |
+  #           terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
+  #         when: always
 
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "GKE CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "GKE CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-22:
-    parallelism: 3
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+  # acceptance-aks-1-22:
+  #   parallelism: 3
+  #   environment:
+  #     - TEST_RESULTS: /tmp/test-results
+  #   docker:
+  #     # This image is built from test/docker/Test.dockerfile
+  #     - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
-    steps:
-      - checkout
+  #   steps:
+  #     - checkout
 
-      - run:
-          name: terraform init & apply
-          working_directory: *aks-terraform-path
-          command: |
-            terraform init
+  #     - run:
+  #         name: terraform init & apply
+  #         working_directory: *aks-terraform-path
+  #         command: |
+  #           terraform init
 
-            terraform apply \
-              -var client_id="$ARM_CLIENT_ID" \
-              -var client_secret="$ARM_CLIENT_SECRET" \
-              -var cluster_count=2 \
-              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
-              -auto-approve
+  #           terraform apply \
+  #             -var client_id="$ARM_CLIENT_ID" \
+  #             -var client_secret="$ARM_CLIENT_SECRET" \
+  #             -var cluster_count=2 \
+  #             -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
+  #             -auto-approve
 
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+  #           primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+  #           secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+  #           echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+  #           echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     # Restore go module cache if there is one
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
-      - run: mkdir -p $TEST_RESULTS
+  #     - run: mkdir -p $TEST_RESULTS
 
-      - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
+  #     - run-acceptance-tests:
+  #         additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
 
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
 
-      - run:
-          name: terraform destroy
-          working_directory: *aks-terraform-path
-          command: |
-            terraform destroy -auto-approve
-          when: always
+  #     - run:
+  #         name: terraform destroy
+  #         working_directory: *aks-terraform-path
+  #         command: |
+  #           terraform destroy -auto-approve
+  #         when: always
 
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-cni-1-22:
-    parallelism: 3
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+  # acceptance-aks-cni-1-22:
+  #   parallelism: 3
+  #   environment:
+  #     - TEST_RESULTS: /tmp/test-results
+  #   docker:
+  #     # This image is built from test/docker/Test.dockerfile
+  #     - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
-    steps:
-      - checkout
+  #   steps:
+  #     - checkout
 
-      - run:
-          name: terraform init & apply
-          working_directory: *aks-terraform-path
-          command: |
-            terraform init
+  #     - run:
+  #         name: terraform init & apply
+  #         working_directory: *aks-terraform-path
+  #         command: |
+  #           terraform init
 
-            terraform apply \
-              -var client_id="$ARM_CLIENT_ID" \
-              -var client_secret="$ARM_CLIENT_SECRET" \
-              -var cluster_count=2 \
-              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
-              -auto-approve
+  #           terraform apply \
+  #             -var client_id="$ARM_CLIENT_ID" \
+  #             -var client_secret="$ARM_CLIENT_SECRET" \
+  #             -var cluster_count=2 \
+  #             -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
+  #             -auto-approve
 
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+  #           primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+  #           secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+  #           echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+  #           echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     # Restore go module cache if there is one
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
-      - run: mkdir -p $TEST_RESULTS
+  #     - run: mkdir -p $TEST_RESULTS
 
-      - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+  #     - run-acceptance-tests:
+  #         additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
 
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
 
-      - run:
-          name: terraform destroy
-          working_directory: *aks-terraform-path
-          command: |
-            terraform destroy -auto-approve
-          when: always
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  #     - run:
+  #         name: terraform destroy
+  #         working_directory: *aks-terraform-path
+  #         command: |
+  #           terraform destroy -auto-approve
+  #         when: always
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-1-21:
     parallelism: 3
@@ -960,10 +961,10 @@ jobs:
             terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      # - slack/status:
+      #     channel: *slack-channel
+      #     fail_only: true
+      #     failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-cni-1-21:
     parallelism: 3
@@ -1023,216 +1024,216 @@ jobs:
             terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "EKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      # - slack/status:
+      #     channel: *slack-channel
+      #     fail_only: true
+      #     failure_message: "EKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-openshift:
-    environment:
-      TEST_RESULTS: /tmp/test-results
-    parallelism: 1
-    docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+  # acceptance-openshift:
+  #   environment:
+  #     TEST_RESULTS: /tmp/test-results
+  #   parallelism: 1
+  #   docker:
+  #     # This image is built from test/docker/Test.dockerfile
+  #     - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
 
-    steps:
-      - checkout
-      - run:
-          name: terraform init & apply
-          working_directory: *openshift-terraform-path
-          command: |
-            terraform init
-            az login --service-principal -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" --tenant "$ARM_TENANT_ID" > /dev/null
-            terraform apply \
-              -var cluster_count=2 \
-              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
-              -auto-approve
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: terraform init & apply
+  #         working_directory: *openshift-terraform-path
+  #         command: |
+  #           terraform init
+  #           az login --service-principal -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" --tenant "$ARM_TENANT_ID" > /dev/null
+  #           terraform apply \
+  #             -var cluster_count=2 \
+  #             -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
+  #             -auto-approve
 
-            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
-            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+  #           primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+  #           secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
 
-            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
-            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+  #           echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+  #           echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-      # Restore go module cache if there is one
-      - restore_cache:
-          keys:
-            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     # Restore go module cache if there is one
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
-      - run: mkdir -p $TEST_RESULTS
+  #     - run: mkdir -p $TEST_RESULTS
 
-      - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy
+  #     - run-acceptance-tests:
+  #         additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy
 
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
 
-      - run:
-          name: terraform destroy
-          working_directory: *openshift-terraform-path
-          command: |
-            terraform destroy -auto-approve
-          when: always
+  #     - run:
+  #         name: terraform destroy
+  #         working_directory: *openshift-terraform-path
+  #         command: |
+  #           terraform destroy -auto-approve
+  #         when: always
 
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-11:
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
-      - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-      - HELM_CHART_VERSION: "0.48.0"
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: xlarge
-    steps:
-      - checkout
-      - install-prereqs
-      - create-kind-clusters:
-          version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      - run:
-          name: go mod download
-          working_directory: *acceptance-mod-path
-          command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
-      - run: mkdir -p $TEST_RESULTS
-      - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  # acceptance-kind-1-23-consul-nightly-1-11:
+  #   environment:
+  #     - TEST_RESULTS: /tmp/test-results
+  #     - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
+  #     - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
+  #     - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
+  #     - HELM_CHART_VERSION: "0.48.0"
+  #   machine:
+  #     image: ubuntu-2004:202010-01
+  #   resource_class: xlarge
+  #   steps:
+  #     - checkout
+  #     - install-prereqs
+  #     - create-kind-clusters:
+  #         version: "v1.23.0"
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     - run:
+  #         name: go mod download
+  #         working_directory: *acceptance-mod-path
+  #         command: go mod download
+  #     - save_cache:
+  #         key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #         paths:
+  #           - ~/.go_workspace/pkg/mod
+  #     - run: mkdir -p $TEST_RESULTS
+  #     - run-acceptance-tests:
+  #         additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-12:
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
-      - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
-      - HELM_CHART_VERSION: "0.48.0"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: xlarge
-    steps:
-      - checkout
-      - install-prereqs
-      - create-kind-clusters:
-          version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      - run:
-          name: go mod download
-          working_directory: *acceptance-mod-path
-          command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
-      - run: mkdir -p $TEST_RESULTS
-      - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  # acceptance-kind-1-23-consul-nightly-1-12:
+  #   environment:
+  #     - TEST_RESULTS: /tmp/test-results
+  #     - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
+  #     - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
+  #     - HELM_CHART_VERSION: "0.48.0"
+  #     - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
+  #   machine:
+  #     image: ubuntu-2004:202010-01
+  #   resource_class: xlarge
+  #   steps:
+  #     - checkout
+  #     - install-prereqs
+  #     - create-kind-clusters:
+  #         version: "v1.23.0"
+  #     - restore_cache:
+  #         keys:
+  #           - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #     - run:
+  #         name: go mod download
+  #         working_directory: *acceptance-mod-path
+  #         command: go mod download
+  #     - save_cache:
+  #         key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+  #         paths:
+  #           - ~/.go_workspace/pkg/mod
+  #     - run: mkdir -p $TEST_RESULTS
+  #     - run-acceptance-tests:
+  #         additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+  #     - store_test_results:
+  #         path: /tmp/test-results
+  #     - store_artifacts:
+  #         path: /tmp/test-results
+  #     - slack/status:
+  #         channel: *slack-channel
+  #         fail_only: true
+  #         failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-13:
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
-      - ENVOY_IMAGE: "envoyproxy/envoy:v1.23.1"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-      - HELM_CHART_VERSION: "0.48.0"
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: xlarge
-    steps:
-      - checkout
-      - install-prereqs
-      - create-kind-clusters:
-          version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      - run:
-          name: go mod download
-          working_directory: *acceptance-mod-path
-          command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
-      - run: mkdir -p $TEST_RESULTS
-      - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+  # acceptance-kind-1-23-consul-nightly-1-13:
+    # environment:
+    #   - TEST_RESULTS: /tmp/test-results
+    #   - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
+    #   - ENVOY_IMAGE: "envoyproxy/envoy:v1.23.1"
+    #   - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
+    #   - HELM_CHART_VERSION: "0.48.0"
+    # machine:
+    #   image: ubuntu-2004:202010-01
+    # resource_class: xlarge
+    # steps:
+    #   - checkout
+    #   - install-prereqs
+    #   - create-kind-clusters:
+    #       version: "v1.23.0"
+    #   - restore_cache:
+    #       keys:
+    #         - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+    #   - run:
+    #       name: go mod download
+    #       working_directory: *acceptance-mod-path
+    #       command: go mod download
+    #   - save_cache:
+    #       key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+    #       paths:
+    #         - ~/.go_workspace/pkg/mod
+    #   - run: mkdir -p $TEST_RESULTS
+    #   - run-acceptance-tests:
+    #       additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+    #   - store_test_results:
+    #       path: /tmp/test-results
+    #   - store_artifacts:
+    #       path: /tmp/test-results
+    #   - slack/status:
+    #       channel: *slack-channel
+    #       fail_only: true
+    #       failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
 workflows:
   version: 2
-  test-and-build:
-    jobs:
-      # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
-      # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
-      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
-      # be moved
-      - build-distro:
-          OS: "linux"
-          ARCH: "amd64 arm64"
-          name: build-distros-linux
-      - dev-upload-docker:
-          context: consul-ci
-          requires:
-            - build-distros-linux
-      # Run acceptance tests using the docker image built for the control plane
-      - acceptance:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
-      - acceptance-tproxy-cni:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
-      - acceptance-tproxy:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
+  # test-and-build:
+  #   jobs:
+  #     # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
+  #     # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
+  #     # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
+  #     # be moved
+  #     - build-distro:
+  #         OS: "linux"
+  #         ARCH: "amd64 arm64"
+  #         name: build-distros-linux
+  #     - dev-upload-docker:
+  #         context: consul-ci
+  #         requires:
+  #           - build-distros-linux
+  #     # Run acceptance tests using the docker image built for the control plane
+  #     - acceptance:
+  #         context: consul-ci
+  #         requires:
+  #           - dev-upload-docker
+  #     - acceptance-tproxy-cni:
+  #         context: consul-ci
+  #         requires:
+  #           - dev-upload-docker
+  #     - acceptance-tproxy:
+  #         context: consul-ci
+  #         requires:
+  #           - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1248,14 +1249,14 @@ workflows:
       # - acceptance-openshift:
       #    requires:
       #      - cleanup-azure-resources
-      - acceptance-gke-1-23:
-          requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
-      - acceptance-gke-cni-1-23:
-          requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
+      # - acceptance-gke-1-23:
+      #     requires:
+      #       - cleanup-gcp-resources
+      #       - dev-upload-docker
+      # - acceptance-gke-cni-1-23:
+      #     requires:
+      #       - cleanup-gcp-resources
+      #       - dev-upload-docker
       - acceptance-eks-1-21:
           requires:
             - cleanup-eks-resources
@@ -1264,24 +1265,24 @@ workflows:
           requires:
             - cleanup-eks-resources
             - dev-upload-docker
-      - acceptance-aks-1-22:
-          requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
-      - acceptance-aks-cni-1-22:
-          requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
+      # - acceptance-aks-1-22:
+      #     requires:
+      #       - cleanup-azure-resources
+      #       - dev-upload-docker
+      # - acceptance-aks-cni-1-22:
+      #     requires:
+      #       - cleanup-azure-resources
+      #       - dev-upload-docker
 
-  nightly-acceptance-tests-consul:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
-    jobs:
-      - acceptance-kind-1-23-consul-nightly-1-11
-      - acceptance-kind-1-23-consul-nightly-1-12
-      - acceptance-kind-1-23-consul-nightly-1-13
+  # nightly-acceptance-tests-consul:
+  #   triggers:
+  #     - schedule:
+  #         cron: "0 0 * * *"
+  #         filters:
+  #           branches:
+  #             only:
+  #               - main
+  #   jobs:
+  #     - acceptance-kind-1-23-consul-nightly-1-11
+  #     - acceptance-kind-1-23-consul-nightly-1-12
+  #     - acceptance-kind-1-23-consul-nightly-1-13
