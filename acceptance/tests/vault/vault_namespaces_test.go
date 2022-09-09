@@ -26,9 +26,8 @@ func TestVault_VaultNamespace(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
 
-	if suite.Config().UseKind {
-		fmt.Println("Skipping vault namespace tests because they are currently flaky on kind")
-		os.Exit(0)
+	if cfg.UseKind {
+		t.Skipf("skipping this test because vault namespaces are currently flaky on Kind")
 	}
 
 	ver, err := version.NewVersion("1.12.0")
