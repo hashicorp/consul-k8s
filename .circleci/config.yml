@@ -1254,24 +1254,21 @@ workflows:
             - dev-upload-docker
       - acceptance-gke-cni-1-23:
           requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
+            - acceptance-gke-1-23
       - acceptance-eks-1-21:
           requires:
             - cleanup-eks-resources
             - dev-upload-docker
       - acceptance-eks-cni-1-21:
           requires:
-            - cleanup-eks-resources
-            - dev-upload-docker
+            - acceptance-eks-1-21
       - acceptance-aks-1-22:
           requires:
             - cleanup-azure-resources
             - dev-upload-docker
       - acceptance-aks-cni-1-22:
           requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
+            - acceptance-aks-1-22
 
   nightly-acceptance-tests-consul:
     triggers:
