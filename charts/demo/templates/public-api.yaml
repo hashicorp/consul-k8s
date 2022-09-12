@@ -1,0 +1,79 @@
+# WARNING: The HashiCups files have been copied directly from
+# https://github.com/hashicorp/learn-consul-kubernetes/tree/main/layer7-observability/hashicups
+# Any modifications begin with the comment # BEGIN CONSUL-K8S MODIFICATION
+# and end with the comment # BEGIN CONSUL-K8S MODIFICATION.
+# If keeping these files manually up to date with their upstream source,
+# the files will need to be copied from the above repo and transferred here.
+# Once transferred, all modifications will need to be reapplied.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-api
+  labels:
+    app: public-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: public-api
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: public-api
+automountServiceAccountToken: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: public-api
+spec:
+  protocol: "http"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: public-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: public-api
+      app: public-api
+  template:
+    metadata:
+      labels:
+        service: public-api
+        app: public-api
+      # BEGIN CONSUL-K8S MODIFICATION
+      annotations:
+        'consul.hashicorp.com/connect-inject': 'true'
+      # END CONSUL-K8S MODIFICATION
+    spec:
+      serviceAccountName: public-api
+      containers:
+        - name: public-api
+          image: hashicorpdemoapp/public-api:v0.0.3
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BIND_ADDRESS
+              value: ":8080"
+            - name: PRODUCT_API_URI
+              # BEGIN CONSUL-K8S MODIFICATION
+              value: "http://product-api.{{ .Release.Namespace }}.svc.cluster.local:9090"
+              # END CONSUL-K8S MODIFICATION
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: public-api-to-product-api
+spec:
+  destination:
+    name: product-api
+  sources:
+    - name: public-api
+      action: allow

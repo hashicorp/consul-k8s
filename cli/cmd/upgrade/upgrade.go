@@ -3,6 +3,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -50,12 +51,21 @@ const (
 
 	flagNameContext    = "context"
 	flagNameKubeconfig = "kubeconfig"
+
+	flagHCPResourceID = "hcp-resource-id"
+
+	envHCPClientID     = "HCP_CLIENT_ID"
+	envHCPClientSecret = "HCP_CLIENT_SECRET"
 )
 
 type Command struct {
 	*common.BaseCommand
 
+	helmActionsRunner helm.HelmActionsRunner
+
 	kubernetes kubernetes.Interface
+
+	httpClient *http.Client
 
 	set *flag.Sets
 
@@ -70,6 +80,7 @@ type Command struct {
 	timeoutDuration     time.Duration
 	flagVerbose         bool
 	flagWait            bool
+	flagHCPResourceID   string
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -155,6 +166,12 @@ func (c *Command) init() {
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
 	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagHCPResourceID,
+		Target:  &c.flagHCPResourceID,
+		Default: "",
+		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
+	})
 
 	c.help = c.set.Help()
 }
@@ -164,6 +181,10 @@ func (c *Command) Run(args []string) int {
 	c.Log.ResetNamed("upgrade")
 
 	defer common.CloseWithError(c.BaseCommand)
+
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
 
 	err := c.validateFlags(args)
 	if err != nil {
@@ -212,8 +233,12 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Checking if Consul can be upgraded", terminal.WithHeaderStyle())
 	uiLogger := c.createUILogger()
-	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
-	if err != nil {
+	found, name, namespace, err := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    settings,
+		ReleaseName: common.DefaultReleaseName,
+		DebugLog:    uiLogger,
+	})
+	if !found {
 		c.UI.Output("Cannot upgrade Consul. Existing Consul installation not found. Use the command `consul-k8s install` to install Consul.", terminal.WithErrorStyle())
 		return 1
 	}
@@ -360,6 +385,20 @@ func (c *Command) validateFlags(args []string) error {
 		}
 	}
 
+	if c.flagPreset == preset.PresetCloud {
+		clientID := os.Getenv(envHCPClientID)
+		clientSecret := os.Getenv(envHCPClientSecret)
+		if clientID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientID)
+		} else if clientSecret == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientSecret)
+		} else if c.flagHCPResourceID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagHCPResourceID)
+		}
+	} else if c.flagHCPResourceID != "" {
+		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagHCPResourceID, preset.PresetCloud)
+	}
+
 	return nil
 }
 
@@ -453,6 +492,11 @@ func (c *Command) printDiff(old, new map[string]interface{}) error {
 // implements the Preset interface.  If the string is not recognized an error is
 // returned.
 func (c *Command) getPreset(name string, namespace string) (preset.Preset, error) {
+	hcpConfig := &preset.HCPConfig{
+		ResourceID:   c.flagHCPResourceID,
+		ClientID:     os.Getenv(envHCPClientID),
+		ClientSecret: os.Getenv(envHCPClientSecret),
+	}
 	getPresetConfig := &preset.GetPresetConfig{
 		Name: name,
 		CloudPreset: &preset.CloudPreset{
@@ -460,6 +504,9 @@ func (c *Command) getPreset(name string, namespace string) (preset.Preset, error
 			KubernetesNamespace: namespace,
 			SkipSavingSecrets:   true,
 			UI:                  c.UI,
+			HTTPClient:          c.httpClient,
+			HCPConfig:           hcpConfig,
+			Context:             c.Ctx,
 		},
 	}
 	return preset.GetPreset(getPresetConfig)

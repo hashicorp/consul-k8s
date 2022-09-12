@@ -19,24 +19,17 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestCheckForPreviousPVCs(t *testing.T) {
 	c := getInitializedCommand(t)
 	c.kubernetes = fake.NewSimpleClientset()
-	pvc := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "consul-server-test1",
-		},
-	}
-	pvc2 := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "consul-server-test2",
-		},
-	}
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc, metav1.CreateOptions{})
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc2, metav1.CreateOptions{})
+
+	createPVC(t, "consul-server-test1", "default", c.kubernetes)
+	createPVC(t, "consul-server-test2", "default", c.kubernetes)
+
 	err := c.checkForPreviousPVCs()
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "found persistent volume claims from previous installations, delete before reinstalling: default/consul-server-test1,default/consul-server-test2")
@@ -47,12 +40,7 @@ func TestCheckForPreviousPVCs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add a new irrelevant PVC and make sure the check continues to pass.
-	pvc = &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "irrelevant-pvc",
-		},
-	}
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc, metav1.CreateOptions{})
+	createPVC(t, "irrelevant-pvc", "default", c.kubernetes)
 	err = c.checkForPreviousPVCs()
 	require.NoError(t, err)
 }
@@ -241,7 +229,7 @@ func TestCheckValidEnterprise(t *testing.T) {
 	}
 
 	// Enterprise secret is valid.
-	c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), secret, metav1.CreateOptions{})
+	createSecret(t, secret, "consul", c.kubernetes)
 	err := c.checkValidEnterprise(secret.Name)
 	require.NoError(t, err)
 
@@ -388,8 +376,8 @@ func TestGetPreset(t *testing.T) {
 			preset.PresetCloud,
 		},
 		{
-			"'demo' should return a DemoPreset'.",
-			preset.PresetDemo,
+			"'quickstart' should return a QuickstartPreset'.",
+			preset.PresetQuickstart,
 		},
 		{
 			"'secure' should return a SecurePreset'.",
@@ -405,11 +393,163 @@ func TestGetPreset(t *testing.T) {
 			switch p.(type) {
 			case *preset.CloudPreset:
 				require.Equal(t, preset.PresetCloud, tc.presetName)
-			case *preset.DemoPreset:
-				require.Equal(t, preset.PresetDemo, tc.presetName)
+			case *preset.QuickstartPreset:
+				require.Equal(t, preset.PresetQuickstart, tc.presetName)
 			case *preset.SecurePreset:
 				require.Equal(t, preset.PresetSecure, tc.presetName)
 			}
 		})
 	}
+}
+
+func TestInstall(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	returnCode := c.Run([]string{
+		"--auto-approve",
+	})
+	require.Equal(t, 0, returnCode)
+}
+
+func TestInstall_alreadyInstalled(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{
+		CheckForInstallationsReponse: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+			return true, "consul", "consul", nil
+		},
+	}
+	returnCode := c.Run([]string{
+		"--auto-approve",
+	})
+	require.Equal(t, 1, returnCode)
+}
+
+func TestInstall_existingPVCs(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	createPVC(t, "consul-server-test1", "default", c.kubernetes)
+
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	returnCode := c.Run([]string{
+		"--auto-approve",
+	})
+	require.Equal(t, 1, returnCode)
+}
+
+func TestInstall_existingSecrets(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "consul-secret",
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+		},
+	}
+	createSecret(t, secret, "consul", c.kubernetes)
+	returnCode := c.Run([]string{
+		"--auto-approve",
+	})
+	require.Equal(t, 1, returnCode)
+}
+
+func TestInstall_enterpriseInstallWithSecret(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	secretName := "consul-license"
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+	}
+	createSecret(t, secret, "consul", c.kubernetes)
+	returnCode := c.Run([]string{
+		"--auto-approve",
+		"--set", fmt.Sprintf("global.enterpriseLicense.secretName=%s", secretName),
+	})
+
+	require.Equal(t, 0, returnCode)
+}
+
+func TestInstall_enterpriseInstallWithoutSecretSecret(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	secretName := "consul-license"
+	returnCode := c.Run([]string{
+		"--auto-approve",
+		"--set", fmt.Sprintf("global.enterpriseLicense.secretName=%s", secretName),
+	})
+	require.Equal(t, 1, returnCode)
+}
+
+func TestInstall_DemoFlag(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	returnCode := c.Run([]string{
+		"-demo", "--auto-approve",
+	})
+	require.Equal(t, 0, returnCode)
+}
+
+func TestInstall_DemoFlagWhenDemoAlreadyInstalled(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{
+		CheckForInstallationsReponse: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+			if options.ReleaseName == "consul-demo" {
+				return true, "consul", "consul", nil
+			} else {
+				return true, "", "", nil
+			}
+		},
+	}
+	returnCode := c.Run([]string{
+		"-demo", "--auto-approve",
+	})
+	require.Equal(t, 1, returnCode)
+}
+
+func TestInstall_SecurePreset(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	returnCode := c.Run([]string{
+		"-preset", "quickstart",
+		"--auto-approve",
+	})
+	require.Equal(t, 0, returnCode)
+}
+
+func TestInstall_QuickstartPreset(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	returnCode := c.Run([]string{
+		"-preset", "quickstart",
+		"--auto-approve",
+	})
+	require.Equal(t, 0, returnCode)
+}
+
+func createPVC(t *testing.T, name string, namespace string, k8s kubernetes.Interface) {
+	t.Helper()
+
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	_, err := k8s.CoreV1().PersistentVolumeClaims(namespace).Create(context.Background(), pvc, metav1.CreateOptions{})
+	require.NoError(t, err)
+}
+
+func createSecret(t *testing.T, secret *v1.Secret, namespace string, k8s kubernetes.Interface) {
+	t.Helper()
+	_, err := k8s.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
 }

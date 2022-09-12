@@ -5,14 +5,14 @@ import (
 )
 
 const (
-	PresetSecure = "secure"
-	PresetDemo   = "demo"
-	PresetCloud  = "cloud"
+	PresetSecure     = "secure"
+	PresetQuickstart = "quickstart"
+	PresetCloud      = "cloud"
 )
 
 // Presets is a list of all the available presets for use with CLI's install
 // and uninstall commands.
-var Presets = []string{PresetCloud, PresetDemo, PresetSecure}
+var Presets = []string{PresetCloud, PresetQuickstart, PresetSecure}
 
 // Preset is the interface that each instance must implement.  For demo and
 // secure presets, they merely return a pre-configred value map.  For cloud,
@@ -35,8 +35,8 @@ func GetPreset(config *GetPresetConfig) (Preset, error) {
 	switch config.Name {
 	case PresetCloud:
 		return config.CloudPreset, nil
-	case PresetDemo:
-		return &DemoPreset{}, nil
+	case PresetQuickstart:
+		return &QuickstartPreset{}, nil
 	case PresetSecure:
 		return &SecurePreset{}, nil
 	}

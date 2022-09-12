@@ -16,6 +16,10 @@ IMPROVEMENTS:
 
 ## 0.48.0 (September 01, 2022)
 
+## 0.48.0 (September 01, 2022)
+
+## 0.48.0 (September 01, 2022)
+
 FEATURES:
 * MaxInboundConnections in service-defaults CRD
   * Add support for MaxInboundConnections on the Service Defaults CRD. [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1437)]

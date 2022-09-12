@@ -1,6 +1,7 @@
 package install
 
 import (
+	"embed"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,6 +20,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/consul-k8s/cli/validation"
 	"github.com/posener/complete"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -66,12 +69,17 @@ const (
 	envHCPClientSecret = "HCP_CLIENT_SECRET"
 	envHCPAuthURL      = "HCP_AUTH_URL"
 	envHCPAPIHost      = "HCP_API_HOST"
+
+	flagNameDemo = "demo"
+	defaultDemo  = false
 )
 
 type Command struct {
 	*common.BaseCommand
 
 	kubernetes kubernetes.Interface
+
+	helmActionsRunner helm.HelmActionsRunner
 
 	httpClient *http.Client
 
@@ -89,6 +97,7 @@ type Command struct {
 	timeoutDuration     time.Duration
 	flagVerbose         bool
 	flagWait            bool
+	flagDemo            bool
 	flagHCPResourceID   string
 
 	flagKubeConfig  string
@@ -166,6 +175,19 @@ func (c *Command) init() {
 		Default: defaultWait,
 		Usage:   "Wait for Kubernetes resources in installation to be ready before exiting command.",
 	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameDemo,
+		Target:  &c.flagDemo,
+		Default: defaultDemo,
+		Usage: fmt.Sprintf("Install %s immediately after installing %s.",
+			common.ReleaseTypeConsulDemo, common.ReleaseTypeConsul),
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagHCPResourceID,
+		Target:  &c.flagHCPResourceID,
+		Default: "",
+		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
+	})
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
@@ -194,6 +216,9 @@ func (c *Command) init() {
 // Run installs Consul into a Kubernetes cluster.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
 
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("install")
@@ -256,7 +281,11 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Checking if Consul can be installed", terminal.WithHeaderStyle())
 
 	// Ensure there is not an existing Consul installation which would cause a conflict.
-	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err == nil {
+	if found, name, ns, _ := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    settings,
+		ReleaseName: common.DefaultReleaseName,
+		DebugLog:    uiLogger,
+	}); found {
 		c.UI.Output("Cannot install Consul. A Consul cluster is already installed in namespace %s with name %s.", ns, name, terminal.WithErrorStyle())
 		c.UI.Output("Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.", terminal.WithInfoStyle())
 		return 1
@@ -271,7 +300,7 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("No existing Consul persistent volume claims found", terminal.WithSuccessStyle())
 
 	release := release.Release{
-		Name:      "consul",
+		Name:      common.DefaultReleaseName,
 		Namespace: c.flagNamespace,
 	}
 
@@ -281,6 +310,26 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	c.UI.Output(msg, terminal.WithSuccessStyle())
+
+	if c.flagDemo {
+		c.UI.Output("Checking if %s can be installed",
+			cases.Title(language.English).String(common.ReleaseTypeConsulDemo),
+			terminal.WithHeaderStyle())
+
+		// Ensure there is not an existing Consul demo installation which would cause a conflict.
+		if found, name, ns, _ := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+			Settings:    settings,
+			ReleaseName: common.ConsulDemoAppReleaseName,
+			DebugLog:    uiLogger,
+		}); found {
+			c.UI.Output("Cannot install %s. A %s cluster is already installed in namespace %s with name %s.",
+				common.ReleaseTypeConsulDemo, common.ReleaseTypeConsulDemo, ns, name, terminal.WithErrorStyle())
+			c.UI.Output("Use the command `consul-k8s uninstall` to uninstall the %s from the cluster.",
+				common.ReleaseTypeConsulDemo, terminal.WithInfoStyle())
+			return 1
+		}
+		c.UI.Output("No existing %s installations found.", common.ReleaseTypeConsulDemo, terminal.WithSuccessStyle())
+	}
 
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
@@ -311,18 +360,37 @@ func (c *Command) Run(args []string) int {
 		}
 		c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
 	}
+	err = c.installConsul(valuesYaml, vals, settings, uiLogger)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
 
-	// Print out the installation summary.
-	if !c.flagAutoApprove {
-		c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
-
-		if len(vals) == 0 {
-			c.UI.Output("\nNo overrides provided, using the default Helm values.", terminal.WithInfoStyle())
-		} else {
-			c.UI.Output("\nHelm value overrides\n-------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
+	if c.flagDemo {
+		err = c.installDemoApp(settings, uiLogger)
+		if err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
 		}
+	}
+
+	if c.flagDryRun {
+		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
+			"Installation can proceed with this configuration.", terminal.WithInfoStyle())
+	}
+
+	return 0
+}
+func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) error {
+	// Print out the installation summary.
+	c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
+	c.UI.Output("Name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
+	c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
+
+	if len(vals) == 0 {
+		c.UI.Output("\nNo overrides provided, using the default Helm values.", terminal.WithInfoStyle())
+	} else {
+		c.UI.Output("\nHelm value overrides\n-------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
 	}
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
@@ -330,10 +398,54 @@ func (c *Command) Run(args []string) int {
 	// aren't double prefixed with "consul-consul-...".
 	vals = common.MergeMaps(config.ConvertToMap(config.GlobalNameConsul), vals)
 
+	err := c.installHelmRelease(common.DefaultReleaseName, vals,
+		common.ReleaseTypeConsul, settings, &consulChart.ConsulHelmChart,
+		common.TopLevelChartDirName, uiLogger)
+	if err != nil {
+		return err
+	}
+
+	c.UI.Output("Consul installed in namespace %q.", c.flagNamespace, terminal.WithSuccessStyle())
+	return nil
+}
+
+// installDemoApp will perform the following actions
+// - Print out the installation summary.
+// - Setup action configuration for Helm Go SDK function calls.
+// - Setup the installation action.
+// - Load the Helm chart.
+// - Run the install.
+func (c *Command) installDemoApp(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) error {
+	const consulDemoChartPath = "demo"
+	c.UI.Output(fmt.Sprintf("%s Installation Summary",
+		cases.Title(language.English).String(common.ReleaseTypeConsulDemo)),
+		terminal.WithHeaderStyle())
+	c.UI.Output("Name: %s", common.ConsulDemoAppReleaseName, terminal.WithInfoStyle())
+	c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
+	c.UI.Output("\n", terminal.WithInfoStyle())
+
+	err := c.installHelmRelease(common.ConsulDemoAppReleaseName, make(map[string]interface{}), common.ReleaseTypeConsulDemo,
+		settings, &consulChart.DemoHelmChart, consulDemoChartPath, uiLogger)
+	if err != nil {
+		return err
+	}
+
+	c.UI.Output("Accessing %s UI", cases.Title(language.English).String(common.ReleaseTypeConsulDemo), terminal.WithHeaderStyle())
+	port := "8080"
+	portForwardCmd := fmt.Sprintf("kubectl port-forward deploy/frontend %s:80", port)
+	if c.flagNamespace != "default" {
+		portForwardCmd += fmt.Sprintf(" --namespace %s", c.flagNamespace)
+	}
+	c.UI.Output(portForwardCmd, terminal.WithInfoStyle())
+	c.UI.Output("Browse to http://localhost:%s.", port, terminal.WithInfoStyle())
+	return nil
+}
+
+func (c *Command) installHelmRelease(releaseName string, vals map[string]interface{},
+	releaseType string, settings *helmCLI.EnvSettings, embeddedChart *embed.FS,
+	chartDirName string, uiLogger action.DebugLog) error {
 	if c.flagDryRun {
-		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
-			"Installation can proceed with this configuration.", terminal.WithInfoStyle())
-		return 0
+		return nil
 	}
 
 	if !c.flagAutoApprove {
@@ -344,50 +456,49 @@ func (c *Command) Run(args []string) int {
 		})
 
 		if err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
-			return 1
+			return err
 		}
 		if common.Abort(confirmation) {
 			c.UI.Output("Install aborted. Use the command `consul-k8s install -help` to learn how to customize your installation.",
 				terminal.WithInfoStyle())
-			return 1
+			return err
 		}
 	}
 
-	c.UI.Output("Installing Consul", terminal.WithHeaderStyle())
+	c.UI.Output("Installing %s", releaseType, terminal.WithHeaderStyle())
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err := helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+		return err
 	}
 
 	// Setup the installation action.
 	install := action.NewInstall(actionConfig)
-	install.ReleaseName = common.DefaultReleaseName
+	install.ReleaseName = releaseName
 	install.Namespace = c.flagNamespace
 	install.CreateNamespace = true
 	install.Wait = c.flagWait
 	install.Timeout = c.timeoutDuration
 
 	// Load the Helm chart.
-	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	chart, err := helm.LoadChart(*embeddedChart, chartDirName)
 	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+		return err
 	}
 	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
 
 	// Run the install.
-	if _, err = install.Run(chart, vals); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
+	if _, err = c.helmActionsRunner.Install(install, chart, vals); err != nil {
+		return err
 	}
 
-	c.UI.Output("Consul installed in namespace %q.", c.flagNamespace, terminal.WithSuccessStyle())
-	return 0
+	c.UI.Output("%s installed in namespace %q.", releaseType, c.flagNamespace, terminal.WithSuccessStyle())
+	return nil
 }
 
 // Help returns a description of the command and how it is used.
