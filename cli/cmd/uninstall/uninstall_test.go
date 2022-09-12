@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
@@ -400,4 +401,28 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	cmd := getInitializedCommand(t)
 	c := cmd.AutocompleteArgs()
 	assert.Equal(t, complete.PredictNothing, c)
+}
+
+func TestUninstall(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{
+		CheckForInstallationsReponse: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+			return true, "consul", "consul", nil
+		},
+	}
+	returnCode := c.Run([]string{
+		"--auto-approve",
+	})
+	require.Equal(t, 0, returnCode)
+}
+
+func TestUninstall_noExistingConsul(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	c.helmActionsRunner = &helm.MockActionRunner{}
+	returnCode := c.Run([]string{
+		"--auto-approve",
+	})
+	require.Equal(t, 1, returnCode)
 }

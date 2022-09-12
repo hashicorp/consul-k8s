@@ -1,0 +1,76 @@
+# WARNING: The HashiCups files have been copied directly from
+# https://github.com/hashicorp/learn-consul-kubernetes/tree/main/layer7-observability/hashicups
+# Any modifications begin with the comment # BEGIN CONSUL-K8S MODIFICATION
+# and end with the comment # BEGIN CONSUL-K8S MODIFICATION.
+# If keeping these files manually up to date with their upstream source,
+# the files will need to be copied from the above repo and transferred here.
+# Once transferred, all modifications will need to be reapplied.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres
+automountServiceAccountToken: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: postgres
+spec:
+  protocol: tcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: postgres
+      app: postgres
+  template:
+    metadata:
+      labels:
+        service: postgres
+        app: postgres
+      # BEGIN CONSUL-K8S MODIFICATION
+      annotations:
+        'consul.hashicorp.com/connect-inject': 'true'
+      # END CONSUL-K8S MODIFICATION
+    spec:
+      serviceAccountName: postgres
+      containers:
+        - name: postgres
+          image: hashicorpdemoapp/product-api-db:v0.0.11
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: products
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: password
+          # only listen on loopback so only access is via connect proxy
+          args: ["-c", "listen_addresses=127.0.0.1"]
+          volumeMounts:
+            - mountPath: "/var/lib/postgresql/data"
+              name: "pgdata"
+      volumes:
+        - name: pgdata
+          emptyDir: {}
