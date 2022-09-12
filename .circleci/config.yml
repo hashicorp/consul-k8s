@@ -10,7 +10,7 @@ executors:
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
-slack-channel: &slack-channel CBXF3CGAF
+slack-channel: &slack-channel C0421KHNAV9 #feed-consul-k8s-ci channel ID
 control-plane-path: &control-plane-path control-plane
 cli-path: &cli-path cli
 acceptance-mod-path: &acceptance-mod-path acceptance
