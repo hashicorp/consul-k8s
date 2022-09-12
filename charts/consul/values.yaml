@@ -741,13 +741,18 @@ server:
 
   # The StorageClass to use for the servers' StatefulSet storage. It must be
   # able to be dynamically provisioned if you want the storage
-  # to be automatically created. For example, to use local
-  # (https://kubernetes.io/docs/concepts/storage/storage-classes/#local)
+  # to be automatically created. For example, to use 
+  # local(https://kubernetes.io/docs/concepts/storage/storage-classes/#local)
   # storage classes, the PersistentVolumeClaims would need to be manually created.
   # A `null` value will use the Kubernetes cluster's default StorageClass. If a default
   # StorageClass does not exist, you will need to create one.
-  # See https://www.consul.io/docs/install/performance#read-write-tuning for considerations around choosing a
-  # performant storage class.
+  # Refer to the [Read/Write Tuning](https://www.consul.io/docs/install/performance#read-write-tuning) 
+  # section of the Server Performance Requirements documentation for considerations 
+  # around choosing a performant storage class.
+  #
+  # ~> **Note:** The [Reference Architecture](https://learn.hashicorp.com/tutorials/consul/reference-architecture#hardware-sizing-for-consul-servers)
+  # contains best practices and recommendations for selecting suitable
+  # hardware sizes for your Consul servers.
   # @type: string
   storageClass: null
 
