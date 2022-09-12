@@ -636,3 +636,25 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 		})
 	}
 }
+
+func TestHandlerEnvoySidecar_NamedPorts(t *testing.T) {
+	require := require.New(t)
+	w := MeshWebhook{
+		MetricsConfig: MetricsConfig{
+			DefaultPrometheusScrapePort: "1234",
+		},
+	}
+	pod := corev1.Pod{}
+
+	container, err := w.envoySidecar(testNS, pod, multiPortInfo{})
+	require.NoError(err)
+
+	require.Equal(container.Ports, []corev1.ContainerPort{
+		corev1.ContainerPort{
+			Name:          "envoy-metrics",
+			ContainerPort: 1234,
+			Protocol:      corev1.ProtocolTCP,
+		},
+	})
+
+}
