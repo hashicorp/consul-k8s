@@ -1,9 +1,12 @@
 package install
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -17,6 +20,9 @@ import (
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
+	helmRelease "helm.sh/helm/v3/pkg/release"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -24,7 +30,7 @@ import (
 )
 
 func TestCheckForPreviousPVCs(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 
 	createPVC(t, "consul-server-test1", "default", c.kubernetes)
@@ -136,7 +142,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			c := getInitializedCommand(t)
+			c := getInitializedCommand(t, nil)
 			c.kubernetes = fake.NewSimpleClientset()
 
 			c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), tc.secret, metav1.CreateOptions{})
@@ -184,7 +190,7 @@ func TestValidateFlags(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		c := getInitializedCommand(t)
+		c := getInitializedCommand(t, nil)
 		t.Run(testCase.description, func(t *testing.T) {
 			if err := c.validateFlags(testCase.input); err == nil {
 				t.Errorf("Test case should have failed.")
@@ -194,17 +200,22 @@ func TestValidateFlags(t *testing.T) {
 }
 
 // getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) *Command {
+func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
 	t.Helper()
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "cli",
 		Level:  hclog.Info,
 		Output: os.Stdout,
 	})
-
+	var ui terminal.UI
+	if buf != nil {
+		ui = terminal.NewUI(context.Background(), buf)
+	} else {
+		ui = terminal.NewBasicUI(context.Background())
+	}
 	baseCommand := &common.BaseCommand{
 		Log: log,
-		UI:  terminal.NewBasicUI(context.TODO()),
+		UI:  ui,
 	}
 
 	c := &Command{
@@ -215,7 +226,7 @@ func getInitializedCommand(t *testing.T) *Command {
 }
 
 func TestCheckValidEnterprise(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -353,7 +364,7 @@ func TestValidateCloudPresets(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase.preProcessingFunc()
-		c := getInitializedCommand(t)
+		c := getInitializedCommand(t, nil)
 		t.Run(testCase.description, func(t *testing.T) {
 			err := c.validateFlags(testCase.input)
 			if testCase.expectError {
@@ -386,7 +397,7 @@ func TestGetPreset(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		c := getInitializedCommand(t)
+		c := getInitializedCommand(t, nil)
 		t.Run(tc.description, func(t *testing.T) {
 			p, err := c.getPreset(tc.presetName)
 			require.NoError(t, err)
@@ -403,137 +414,288 @@ func TestGetPreset(t *testing.T) {
 }
 
 func TestInstall(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	returnCode := c.Run([]string{
-		"--auto-approve",
-	})
-	require.Equal(t, 0, returnCode)
-}
-
-func TestInstall_alreadyInstalled(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{
-		CheckForInstallationsReponse: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
-			return true, "consul", "consul", nil
+	var k8s kubernetes.Interface
+	licenseSecretName := "consul-license"
+	cases := map[string]struct {
+		input                                   []string
+		messages                                []string
+		helmActionsRunner                       *helm.MockActionRunner
+		preProcessingFunc                       func()
+		expectedReturnCode                      int
+		expectCheckedForConsulInstallations     bool
+		expectCheckedForConsulDemoInstallations bool
+		expectConsulInstalled                   bool
+		expectConsulDemoInstalled               bool
+	}{
+		"install with no arguments returns success": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
+			},
+			helmActionsRunner:                       &helm.MockActionRunner{},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   true,
+			expectConsulDemoInstalled:               false,
+		},
+		"install when consul installation errors returns error": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ! Helm returned an error.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				InstallFunc: func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*helmRelease.Release, error) {
+					return nil, errors.New("Helm returned an error.")
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
+		},
+		"install with no arguments when consul installation already exists returns error": {
+			input: []string{
+				"--auto-approve",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ! Cannot install Consul. A Consul cluster is already installed in namespace consul with name consul.\n    Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					return true, "consul", "consul", nil
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
+		},
+		"install with no arguments when PVCs exist returns error": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ! found persistent volume claims from previous installations, delete before reinstalling: consul/consul-server-test1\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{},
+			preProcessingFunc: func() {
+				createPVC(t, "consul-server-test1", "consul", k8s)
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
+		},
+		"install with no arguments when secrets exist returns error": {
+			input: []string{
+				"--auto-approve",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ! Found Consul secrets, possibly from a previous installation.\nDelete existing Consul secrets from Kubernetes:\n\nkubectl delete secret consul-secret --namespace consul\n\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{},
+			preProcessingFunc: func() {
+				secret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "consul-secret",
+						Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+					},
+				}
+				createSecret(t, secret, "consul", k8s)
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
+		},
+		"enterprise install when license secret exists returns success": {
+			input: []string{
+				"--set", fmt.Sprintf("global.enterpriseLicense.secretName=%s", licenseSecretName),
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n ✓ Valid enterprise Consul secret found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    -------------------\n    global:\n      enterpriseLicense:\n        secretName: consul-license\n    \n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{},
+			preProcessingFunc: func() {
+				secret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: licenseSecretName,
+					},
+				}
+				createSecret(t, secret, "consul", k8s)
+			},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   true,
+			expectConsulDemoInstalled:               false,
+		},
+		"enterprise install when license secret does not exist returns error": {
+			input: []string{
+				"--set", fmt.Sprintf("global.enterpriseLicense.secretName=%s", licenseSecretName),
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n ! enterprise license secret \"consul-license\" is not found in the \"consul\" namespace; please make sure that the secret exists in the \"consul\" namespace\n"},
+			helmActionsRunner:                       &helm.MockActionRunner{},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
+		},
+		"install for quickstart preset returns success": {
+			input: []string{
+				"-preset", "quickstart",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    -------------------\n    connectInject:\n      enabled: true\n      metrics:\n        defaultEnableMerging: true\n        defaultEnabled: true\n        enableGatewayMetrics: true\n    controller:\n      enabled: true\n    global:\n      metrics:\n        enableAgentMetrics: true\n        enabled: true\n      name: consul\n    prometheus:\n      enabled: true\n    server:\n      replicas: 1\n    ui:\n      enabled: true\n      service:\n        enabled: true\n    \n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
+			},
+			helmActionsRunner:                       &helm.MockActionRunner{},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   true,
+			expectConsulDemoInstalled:               false,
+		},
+		"install for secure preset returns success": {
+			input: []string{
+				"-preset", "secure",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    -------------------\n    connectInject:\n      enabled: true\n    controller:\n      enabled: true\n    global:\n      acls:\n        manageSystemACLs: true\n      gossipEncryption:\n        autoGenerate: true\n      name: consul\n      tls:\n        enableAutoEncrypt: true\n        enabled: true\n    server:\n      replicas: 1\n    \n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
+			},
+			helmActionsRunner:                       &helm.MockActionRunner{},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   true,
+			expectConsulDemoInstalled:               false,
+		},
+		"install with demo flag returns success": {
+			input: []string{
+				"-demo",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Checking if Consul Demo Application can be installed\n ✓ No existing Consul demo application installations found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
+				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: consul\n    \n    \n",
+				"\n==> Installing Consul demo application\n ✓ Downloaded charts.\n ✓ Consul demo application installed in namespace \"consul\".\n",
+				"\n==> Accessing Consul Demo Application UI\n    kubectl port-forward deploy/frontend 8080:80 --namespace consul\n    Browse to http://localhost:8080.\n",
+			},
+			helmActionsRunner:                       &helm.MockActionRunner{},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulInstalled:                   true,
+			expectConsulDemoInstalled:               true,
+		},
+		"install with demo flag when consul demo installation errors returns error": {
+			input: []string{
+				"-demo",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Checking if Consul Demo Application can be installed\n ✓ No existing Consul demo application installations found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n ✓ Consul installed in namespace \"consul\".\n",
+				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: consul\n    \n    \n",
+				"\n==> Installing Consul demo application\n ✓ Downloaded charts.\n ! Helm returned an error.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				InstallFunc: func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*helmRelease.Release, error) {
+					if install.ReleaseName == "consul" {
+						return &helmRelease.Release{Name: install.ReleaseName}, nil
+					}
+					return nil, errors.New("Helm returned an error.")
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulInstalled:                   true,
+			expectConsulDemoInstalled:               false,
+		},
+		"install with demo flag when demo is already installed returns error and does not install consul or the demo": {
+			input: []string{
+				"-demo",
+			},
+			messages: []string{
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Checking if Consul Demo Application can be installed\n ! Cannot install Consul demo application. A Consul demo application cluster is already installed in namespace consul-demo with name consul-demo.\n    Use the command `consul-k8s uninstall` to uninstall the Consul demo application from the cluster.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return false, "", "", nil
+					} else {
+						return true, "consul-demo", "consul-demo", nil
+					}
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
+		},
+		"install with --dry-run flag returns success": {
+			input: []string{
+				"--dry-run",
+			},
+			messages: []string{
+				"\n==> Performing dry run install. No changes will be made to the cluster.\n",
+				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n ✓ Consul installed in namespace \"consul\".\n    Dry run complete. No changes were made to the Kubernetes cluster.\n    Installation can proceed with this configuration.\n",
+			},
+			helmActionsRunner:                       &helm.MockActionRunner{},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: false,
+			expectConsulInstalled:                   false,
+			expectConsulDemoInstalled:               false,
 		},
 	}
-	returnCode := c.Run([]string{
-		"--auto-approve",
-	})
-	require.Equal(t, 1, returnCode)
-}
-
-func TestInstall_existingPVCs(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	createPVC(t, "consul-server-test1", "default", c.kubernetes)
-
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	returnCode := c.Run([]string{
-		"--auto-approve",
-	})
-	require.Equal(t, 1, returnCode)
-}
-
-func TestInstall_existingSecrets(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "consul-secret",
-			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
-		},
-	}
-	createSecret(t, secret, "consul", c.kubernetes)
-	returnCode := c.Run([]string{
-		"--auto-approve",
-	})
-	require.Equal(t, 1, returnCode)
-}
-
-func TestInstall_enterpriseInstallWithSecret(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	secretName := "consul-license"
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
-		},
-	}
-	createSecret(t, secret, "consul", c.kubernetes)
-	returnCode := c.Run([]string{
-		"--auto-approve",
-		"--set", fmt.Sprintf("global.enterpriseLicense.secretName=%s", secretName),
-	})
-
-	require.Equal(t, 0, returnCode)
-}
-
-func TestInstall_enterpriseInstallWithoutSecretSecret(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	secretName := "consul-license"
-	returnCode := c.Run([]string{
-		"--auto-approve",
-		"--set", fmt.Sprintf("global.enterpriseLicense.secretName=%s", secretName),
-	})
-	require.Equal(t, 1, returnCode)
-}
-
-func TestInstall_DemoFlag(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	returnCode := c.Run([]string{
-		"-demo", "--auto-approve",
-	})
-	require.Equal(t, 0, returnCode)
-}
-
-func TestInstall_DemoFlagWhenDemoAlreadyInstalled(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{
-		CheckForInstallationsReponse: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
-			if options.ReleaseName == "consul-demo" {
-				return true, "consul", "consul", nil
-			} else {
-				return true, "", "", nil
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := getInitializedCommand(t, buf)
+			k8s = fake.NewSimpleClientset()
+			c.kubernetes = k8s
+			mock := tc.helmActionsRunner
+			c.helmActionsRunner = mock
+			if tc.preProcessingFunc != nil {
+				tc.preProcessingFunc()
 			}
-		},
+			input := append([]string{
+				"--auto-approve",
+			}, tc.input...)
+			returnCode := c.Run(input)
+			require.Equal(t, tc.expectedReturnCode, returnCode)
+			require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
+			require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
+			require.Equal(t, tc.expectConsulInstalled, mock.ConsulInstalled)
+			require.Equal(t, tc.expectConsulDemoInstalled, mock.ConsulDemoInstalled)
+			output := buf.String()
+			for _, msg := range tc.messages {
+				require.Contains(t, output, msg)
+			}
+		})
 	}
-	returnCode := c.Run([]string{
-		"-demo", "--auto-approve",
-	})
-	require.Equal(t, 1, returnCode)
-}
-
-func TestInstall_SecurePreset(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	returnCode := c.Run([]string{
-		"-preset", "quickstart",
-		"--auto-approve",
-	})
-	require.Equal(t, 0, returnCode)
-}
-
-func TestInstall_QuickstartPreset(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.kubernetes = fake.NewSimpleClientset()
-	c.helmActionsRunner = &helm.MockActionRunner{}
-	returnCode := c.Run([]string{
-		"-preset", "quickstart",
-		"--auto-approve",
-	})
-	require.Equal(t, 0, returnCode)
 }
 
 func createPVC(t *testing.T, name string, namespace string, k8s kubernetes.Interface) {
