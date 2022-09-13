@@ -193,7 +193,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
-							EnforcingConsecutive5xx: uint32Pointer(100),
+							EnforcingConsecutive5xx: pointer.Uint32(100),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
