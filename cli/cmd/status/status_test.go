@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +22,7 @@ import (
 
 // TestCheckConsulServers creates a fake stateful set and tests the checkConsulServers function.
 func TestCheckConsulServers(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 
 	// First check that no stateful sets causes an error.
@@ -100,7 +102,7 @@ func TestCheckConsulServers(t *testing.T) {
 
 // TestCheckConsulClients is very similar to TestCheckConsulServers() in structure.
 func TestCheckConsulClients(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 
 	// No client daemon set should cause an error.
@@ -170,16 +172,22 @@ func TestCheckConsulClients(t *testing.T) {
 }
 
 // getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) *Command {
+func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
 	t.Helper()
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "cli",
 		Level:  hclog.Info,
 		Output: os.Stdout,
 	})
-
+	var ui terminal.UI
+	if buf != nil {
+		ui = terminal.NewUI(context.Background(), buf)
+	} else {
+		ui = terminal.NewBasicUI(context.Background())
+	}
 	baseCommand := &common.BaseCommand{
 		Log: log,
+		UI:  ui,
 	}
 
 	c := &Command{
