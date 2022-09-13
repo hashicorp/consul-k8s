@@ -174,7 +174,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 	}
 
 	statuser := action.NewStatus(statusConfig)
-	rel, err := statuser.Run(releaseName)
+	rel, err := c.helmActionsRunner.GetStatus(statuser, releaseName)
 	if err != nil {
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}
