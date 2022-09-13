@@ -203,12 +203,6 @@ func (c *Command) init() {
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
 	})
-	f.StringVar(&flag.StringVar{
-		Name:    flagHCPResourceID,
-		Target:  &c.flagHCPResourceID,
-		Default: "",
-		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
-	})
 
 	c.help = c.set.Help()
 }
