@@ -194,7 +194,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
-							EnforcingConsecutive5xx: uint32(100),
+							EnforcingConsecutive5xx: uint32Pointer(100),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -217,7 +217,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: *uint32Pointer(60),
+								EnforcingConsecutive5xx: uint32Pointer(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -239,7 +239,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: uint32(60),
+								EnforcingConsecutive5xx: uint32Pointer(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -446,8 +446,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							MaxConcurrentRequests: intPointer(10),
 						},
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
-							Interval:    2 * time.Second,
-							MaxFailures: uint32(20),
+							Interval:                2 * time.Second,
+							MaxFailures:             uint32(20),
+							EnforcingConsecutive5xx: uint32Pointer(100),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -469,7 +470,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: *uint32Pointer(60),
+								EnforcingConsecutive5xx: uint32Pointer(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -490,7 +491,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: uint32(60),
+								EnforcingConsecutive5xx: uint32Pointer(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
