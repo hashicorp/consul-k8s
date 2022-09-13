@@ -83,7 +83,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									Duration: 2 * time.Second,
 								},
 								MaxFailures:             uint32(20),
-								EnforcingConsecutive5xx: uint32Pointer(100),
+								EnforcingConsecutive5xx: pointer.Uint32(100),
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -108,7 +108,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: uint32Pointer(60),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -132,7 +132,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: uint32Pointer(60),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -216,7 +216,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: uint32Pointer(60),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -238,7 +238,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: uint32Pointer(60),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -342,7 +342,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									Duration: 2 * time.Second,
 								},
 								MaxFailures:             uint32(20),
-								EnforcingConsecutive5xx: uint32Pointer(100),
+								EnforcingConsecutive5xx: pointer.Uint32(100),
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -366,7 +366,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: uint32Pointer(60),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -389,7 +389,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: uint32Pointer(60),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -447,7 +447,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
-							EnforcingConsecutive5xx: uint32Pointer(100),
+							EnforcingConsecutive5xx: pointer.Uint32(100),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -469,7 +469,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: uint32Pointer(60),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -490,7 +490,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: uint32Pointer(60),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -1037,9 +1037,5 @@ func TestServiceDefaults_ObjectMeta(t *testing.T) {
 }
 
 func intPointer(i int) *int {
-	return &i
-}
-
-func uint32Pointer(i uint32) *uint32 {
 	return &i
 }
