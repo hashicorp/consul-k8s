@@ -108,23 +108,17 @@ helm install consul --create-namespace -n consul -f ./values.dev.yaml ./charts/c
 
 ### Building and running the `consul-k8s` CLI
 
-Change directory into the `cli` folder where the golang code resides.
+Compile the `consul-k8s` CLI binary for your local machine:
 
 ```shell
-cd cli
+make cli-dev
 ```
+This will compile the `consul-k8s` binary into `cli/bin/consul-k8s` as well as your `$GOPATH`.
 
-Build the CLI binary using the following command
-
-```shell
-go build -o bin/consul-k8s
-```
-
-Run the CLI as follows
+Run the CLI as follows:
 
 ```shell
-./bin/consul-k8s version
-consul-k8s 0.36.0-dev
+consul-k8s version
 ```
 
 ### Making changes to consul-k8s
