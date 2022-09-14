@@ -1,11 +1,16 @@
 package upgrade
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
+	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/go-hclog"
+	"github.com/posener/complete"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestValidateFlags tests the validate flags function.
@@ -65,4 +70,34 @@ func getInitializedCommand(t *testing.T) *Command {
 	}
 	c.init()
 	return c
+}
+
+func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
+	t.Parallel()
+	cmd := getInitializedCommand(t)
+
+	predictor := cmd.AutocompleteFlags()
+
+	// Test that we get the expected number of predictions
+	args := complete.Args{Last: "-"}
+	res := predictor.Predict(args)
+
+	// Grab the list of flags from the Flag object
+	flags := make([]string, 0)
+	cmd.set.VisitSets(func(name string, set *cmnFlag.Set) {
+		set.VisitAll(func(flag *flag.Flag) {
+			flags = append(flags, fmt.Sprintf("-%s", flag.Name))
+		})
+	})
+
+	// Verify that there is a prediction for each flag associated with the command
+	assert.Equal(t, len(flags), len(res))
+	assert.ElementsMatch(t, flags, res, "flags and predictions didn't match, make sure to add "+
+		"new flags to the command AutoCompleteFlags function")
+}
+
+func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
+	cmd := getInitializedCommand(t)
+	c := cmd.AutocompleteArgs()
+	assert.Equal(t, complete.PredictNothing, c)
 }
