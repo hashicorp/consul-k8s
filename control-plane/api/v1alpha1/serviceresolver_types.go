@@ -503,12 +503,16 @@ func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) fiel
 	return errs
 }
 
+func (in *ServiceResolverFailover) isEmpty() bool {
+	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0
+}
+
 func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
-	if in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 {
+	if in.isEmpty() {
 		// NOTE: We're passing "{}" here as our value because we know that the
 		// error is we have an empty object.
 		return field.Invalid(path, "{}",
-			"service, serviceSubset, namespace and datacenters cannot all be empty at once")
+			"service, serviceSubset, namespace, datacenters, and targets cannot all be empty at once")
 	}
 	return nil
 }

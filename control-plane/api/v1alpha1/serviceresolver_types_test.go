@@ -595,8 +595,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once",
-				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once",
+				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, and targets cannot all be empty at once",
+				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, and targets cannot all be empty at once",
 			},
 		},
 		"hashPolicy.field invalid": {
