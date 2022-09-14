@@ -13,7 +13,7 @@ type ProxyCommand struct {
 }
 
 // Run prints out information about the subcommands.
-func (c *ProxyCommand) Run(args []string) int {
+func (c *ProxyCommand) Run([]string) int {
 	return cli.RunResultHelp
 }
 

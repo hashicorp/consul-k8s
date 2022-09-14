@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/posener/complete"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -44,6 +45,9 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
+
+	flagNameContext    = "context"
+	flagNameKubeconfig = "kubeconfig"
 )
 
 type Command struct {
@@ -143,14 +147,14 @@ func (c *Command) init() {
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagNameKubeconfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "context",
+		Name:    flagNameContext,
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
@@ -306,6 +310,33 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Consul upgraded in namespace %q.", namespace, terminal.WithSuccessStyle())
 	return 0
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *Command) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNamePreset):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameConfigFile):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameSetStringValues): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameSetValues):       complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameFileValues):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameDryRun):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameAutoApprove):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameTimeout):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameVerbose):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameWait):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictFiles("*"),
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *Command) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 // validateFlags checks that the user's provided flags are valid.
