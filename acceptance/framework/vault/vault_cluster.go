@@ -25,7 +25,7 @@ import (
 
 const (
 	releaseLabel                 = "app.kubernetes.io/instance="
-	defaultVaultHelmChartVersion = "v0.17.0"
+	defaultVaultHelmChartVersion = "v0.21.0"
 )
 
 // VaultCluster represents a vault installation.
