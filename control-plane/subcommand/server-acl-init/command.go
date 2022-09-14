@@ -594,7 +594,8 @@ func (c *Command) Run(args []string) int {
 		serviceAccountName := c.withPrefix("api-gateway-controller")
 
 		// API gateways require a global policy/token because they must
-		// discover services in other datacenters.
+		// create config-entry resources in the primary, even when deployed
+		// to a secondary datacenter
 		authMethodName := localComponentAuthMethodName
 		if !primary {
 			authMethodName = globalComponentAuthMethodName
