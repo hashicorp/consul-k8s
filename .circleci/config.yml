@@ -1198,41 +1198,41 @@ jobs:
 
 workflows:
   version: 2
-  test-and-build:
-    jobs:
-      # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
-      # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
-      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
-      # be moved
-      - build-distro:
-          OS: "linux"
-          ARCH: "amd64 arm64"
-          name: build-distros-linux
-      - dev-upload-docker:
-          context: consul-ci
-          requires:
-            - build-distros-linux
-      # Run acceptance tests using the docker image built for the control plane
-      - acceptance:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
-      - acceptance-tproxy-cni:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
-      - acceptance-tproxy:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
+  # test-and-build:
+  #   jobs:
+  #     # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
+  #     # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
+  #     # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
+  #     # be moved
+  #     - build-distro:
+  #         OS: "linux"
+  #         ARCH: "amd64 arm64"
+  #         name: build-distros-linux
+  #     - dev-upload-docker:
+  #         context: consul-ci
+  #         requires:
+  #           - build-distros-linux
+  #     # Run acceptance tests using the docker image built for the control plane
+  #     - acceptance:
+  #         context: consul-ci
+  #         requires:
+  #           - dev-upload-docker
+  #     - acceptance-tproxy-cni:
+  #         context: consul-ci
+  #         requires:
+  #           - dev-upload-docker
+  #     - acceptance-tproxy:
+  #         context: consul-ci
+  #         requires:
+  #           - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1271,13 +1271,13 @@ workflows:
             - acceptance-aks-1-22
 
   nightly-acceptance-tests-consul:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - acceptance-kind-1-23-consul-nightly-1-11
       - acceptance-kind-1-23-consul-nightly-1-12

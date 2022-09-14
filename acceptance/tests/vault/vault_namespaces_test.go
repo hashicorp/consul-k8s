@@ -22,6 +22,7 @@ import (
 // It then configures Consul to use vault as the backend and checks that it works
 // with the vault namespace.
 func TestVault_VaultNamespace(t *testing.T) {
+	t.Skip("skipping while we investigate why this causes ephemeral storage errors")
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
