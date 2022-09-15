@@ -48,6 +48,7 @@ IMPROVEMENTS:
   * Expand the set of Envoy Listener Filters that may be parsed and output to the Listeners table. [[GH-1442](https://github.com/hashicorp/consul-k8s/pull/1442)]
 * Helm:
   * The default Envoy proxy image is now `envoyproxy/envoy:v1.23.1`. [[GH-1473](https://github.com/hashicorp/consul-k8s/pull/1473)]
+  * API Gateway: Allow API Gateway to run when using `externalServers` without agents on the local node [[GH-1509](https://github.com/hashicorp/consul-k8s/pull/1509)]
 
 BUG FIXES:
 * Helm
