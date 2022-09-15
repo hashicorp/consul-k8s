@@ -2,7 +2,7 @@
 
 BUG FIXES:
 * Control plane
-  * Create global ACL auth method for API Gateway in secondary datacenter [[GH-1481](https://github.com/hashicorp/consul-k8s/pull/1481)]
+  * Use global ACL auth method to provision ACL tokens for API Gateway in secondary datacenter [[GH-1481](https://github.com/hashicorp/consul-k8s/pull/1481)]
 
 ## 0.48.0 (September 01, 2022)
 
