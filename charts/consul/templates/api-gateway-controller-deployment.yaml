@@ -67,10 +67,18 @@ spec:
           value: "/consul/login/acl-token"
         {{- end }}
         - name: CONSUL_HTTP_ADDR
+          {{- if (and .Values.externalServers.enabled (not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)))) }}
+          {{- if .Values.global.tls.enabled }}
+          value: https://{{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
+          {{- else }}
+          value: http://{{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
+          {{- end }}
+          {{- else }}
           {{- if .Values.global.tls.enabled }}
           value: https://$(HOST_IP):8501
           {{- else }}
           value: http://$(HOST_IP):8500
+          {{- end }}
           {{- end }}
         command:
         - "/bin/sh"

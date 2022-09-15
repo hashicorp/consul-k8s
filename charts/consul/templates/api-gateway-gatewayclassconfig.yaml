@@ -11,6 +11,9 @@ metadata:
     component: api-gateway
 spec:
   consul:
+    {{- if (and .Values.externalServers.enabled (not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)))) }}
+    address: {{ first .Values.externalServers.hosts }}
+    {{- end }}
     authentication:
       {{- if .Values.global.acls.manageSystemACLs }}
       managed: true
@@ -22,12 +25,21 @@ spec:
     scheme: http
     {{- end }}
     ports:
-      grpc: 8502
-    {{- if .Values.global.tls.enabled }}
-      http: 8501
+    {{- if (and .Values.externalServers.enabled (not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)))) }}
+      grpc: {{ .Values.externalServers.grpcPort }}
+      {{- if .Values.global.tls.enabled }}
+      http: {{ .Values.externalServers.httpsPort }}
+      {{- else }}
+      http: {{ .Values.externalServers.httpPort }}
+      {{- end }}
     {{- else }}
+      grpc: 8502
+      {{- if .Values.global.tls.enabled }}
+      http: 8501
+      {{- else }}
       http: 8500
-    {{- end }}
+      {{- end }}
+    {{- end}}
   {{- with .Values.apiGateway.managedGatewayClass.deployment }}
   deployment:
     {{- toYaml . | nindent 4 }}

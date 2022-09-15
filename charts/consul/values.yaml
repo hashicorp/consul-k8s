@@ -1089,6 +1089,9 @@ externalServers:
   # @type: array<string>
   hosts: []
 
+  # The HTTP port of the Consul servers.
+  httpPort: 8500
+
   # The HTTPS port of the Consul servers.
   httpsPort: 8501
 
