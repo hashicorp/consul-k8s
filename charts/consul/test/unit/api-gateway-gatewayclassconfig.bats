@@ -96,7 +96,7 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.enabled=true' \
-      --set 'client.enabled=false' \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.consul | has("address") | not' | tee /dev/stderr)
   [ "${actual}" = "true" ]
