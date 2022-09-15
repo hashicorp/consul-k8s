@@ -878,3 +878,69 @@ load _helpers
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
 }
+
+#--------------------------------------------------------------------
+# externalServers
+
+@test "apiGateway/Deployment: externalServers set and clients disabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/api-gateway-controller-deployment.yaml  \
+    --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo'
+    --set 'server.enabled=false' \
+    --set 'externalServers.hosts[0]=external-consul.host' \
+    --set 'externalServers.enabled=true' \
+    --set 'client.enabled=false' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://external-consul.host:8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: non-tls externalServers set and clients disabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/api-gateway-controller-deployment.yaml  \
+    --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
+    --set 'externalServers.hosts[0]=external-consul.host' \
+    --set 'externalServers.enabled=true' \
+    --set 'server.enabled=false' \
+    --set 'client.enabled=false' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("http://external-consul.host:8500"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: externalServers set and clients enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/api-gateway-controller-deployment.yaml  \
+    --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo'
+    --set 'server.enabled=false' \
+    --set 'externalServers.hosts[0]=external-consul.host' \
+    --set 'externalServers.enabled=true' \
+    --set 'client.enabled=false' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+}

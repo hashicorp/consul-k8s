@@ -66,3 +66,38 @@ load _helpers
       yq '.spec.deployment.minInstances == 3' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# externalServers
+
+@test "apiGateway/GatewayClassConfig: externalServers set and clients disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-gatewayclassconfig.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.consul.address == "external-consul.host"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/GatewayClassConfig: externalServers set and clients enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-gatewayclassconfig.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.consul | has("address") | not' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
