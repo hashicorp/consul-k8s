@@ -18,4 +18,4 @@ jobs:
         env:
           BACKPORT_LABEL_REGEXP: "backport/(?P<target>\\d+\\.\\d+\\.x)"
           BACKPORT_TARGET_TEMPLATE: "release/{{.target}}"
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
