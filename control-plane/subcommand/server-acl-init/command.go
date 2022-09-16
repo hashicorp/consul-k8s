@@ -592,7 +592,16 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		serviceAccountName := c.withPrefix("api-gateway-controller")
-		if err := c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
+
+		// API gateways require a global policy/token because they must
+		// create config-entry resources in the primary, even when deployed
+		// to a secondary datacenter
+		authMethodName := localComponentAuthMethodName
+		if !primary {
+			authMethodName = globalComponentAuthMethodName
+		}
+		err = c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
+		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

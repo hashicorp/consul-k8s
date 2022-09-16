@@ -2291,7 +2291,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			TokenFlags:       []string{"-api-gateway-controller"},
 			PolicyNames:      []string{"api-gateway-controller-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-" + secondaryDatacenter},
-			GlobalAuthMethod: false,
+			GlobalAuthMethod: true,
 		},
 		{
 			TestName:         "Snapshot Agent",
@@ -2599,8 +2599,8 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			ComponentName:    "api-gateway-controller",
 			TokenFlags:       []string{"-api-gateway-controller"},
 			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
-			GlobalAuthMethod: false,
-			GlobalToken:      false,
+			GlobalAuthMethod: true,
+			GlobalToken:      true,
 		},
 		{
 			ComponentName:    "snapshot-agent",
