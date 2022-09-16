@@ -3,14 +3,18 @@ package read
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
+	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-hclog"
+	"github.com/posener/complete"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -258,4 +262,36 @@ func setupCommand(buf io.Writer) *ReadCommand {
 	command.init()
 
 	return command
+}
+
+func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	cmd := setupCommand(buf)
+
+	predictor := cmd.AutocompleteFlags()
+
+	// Test that we get the expected number of predictions
+	args := complete.Args{Last: "-"}
+	res := predictor.Predict(args)
+
+	// Grab the list of flags from the Flag object
+	flags := make([]string, 0)
+	cmd.set.VisitSets(func(name string, set *cmnFlag.Set) {
+		set.VisitAll(func(flag *flag.Flag) {
+			flags = append(flags, fmt.Sprintf("-%s", flag.Name))
+		})
+	})
+
+	// Verify that there is a prediction for each flag associated with the command
+	assert.Equal(t, len(flags), len(res))
+	assert.ElementsMatch(t, flags, res, "flags and predictions didn't match, make sure to add "+
+		"new flags to the command AutoCompleteFlags function")
+}
+
+func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
+	buf := new(bytes.Buffer)
+	cmd := setupCommand(buf)
+	c := cmd.AutocompleteArgs()
+	assert.Equal(t, complete.PredictNothing, c)
 }
