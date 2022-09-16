@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,19 @@ const (
 	Table = "table"
 	JSON  = "json"
 	Raw   = "raw"
+
+	flagNameNamespace   = "namespace"
+	flagNameOutput      = "output"
+	flagNameClusters    = "clusters"
+	flagNameListeners   = "listeners"
+	flagNameRoutes      = "routes"
+	flagNameEndpoints   = "endpoints"
+	flagNameSecrets     = "secrets"
+	flagNameFQDN        = "fqdn"
+	flagNameAddress     = "address"
+	flagNamePort        = "port"
+	flagNameKubeConfig  = "kubeconfig"
+	flagNameKubeContext = "context"
 )
 
 type ReadCommand struct {
@@ -69,13 +83,13 @@ func (c *ReadCommand) init() {
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "namespace",
+		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
 		Usage:   "The namespace where the target Pod can be found.",
 		Aliases: []string{"n"},
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "output",
+		Name:    flagNameOutput,
 		Target:  &c.flagOutput,
 		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
 		Default: Table,
@@ -84,42 +98,42 @@ func (c *ReadCommand) init() {
 
 	f = c.set.NewSet("Output Filtering Options")
 	f.BoolVar(&flag.BoolVar{
-		Name:   "clusters",
+		Name:   flagNameClusters,
 		Target: &c.flagClusters,
 		Usage:  "Filter output to only show clusters.",
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:   "listeners",
+		Name:   flagNameListeners,
 		Target: &c.flagListeners,
 		Usage:  "Filter output to only show listeners.",
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:   "routes",
+		Name:   flagNameRoutes,
 		Target: &c.flagRoutes,
 		Usage:  "Filter output to only show routes.",
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:   "endpoints",
+		Name:   flagNameEndpoints,
 		Target: &c.flagEndpoints,
 		Usage:  "Filter output to only show endpoints.",
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:   "secrets",
+		Name:   flagNameSecrets,
 		Target: &c.flagSecrets,
 		Usage:  "Filter output to only show secrets.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:   "fqdn",
+		Name:   flagNameFQDN,
 		Target: &c.flagFQDN,
 		Usage:  "Filter cluster output to clusters with a fully qualified domain name which contains the given value. May be combined with -address and -port.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:   "address",
+		Name:   flagNameAddress,
 		Target: &c.flagAddress,
 		Usage:  "Filter clusters, endpoints, and listeners output to those with addresses which contain the given value. May be combined with -fqdn and -port",
 	})
 	f.IntVar(&flag.IntVar{
-		Name:    "port",
+		Name:    flagNamePort,
 		Target:  &c.flagPort,
 		Usage:   "Filter endpoints and listeners output to addresses with the given port number. May be combined with -fqdn and -address.",
 		Default: -1,
@@ -127,13 +141,13 @@ func (c *ReadCommand) init() {
 
 	f = c.set.NewSet("GlobalOptions")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagNameKubeConfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:   "context",
+		Name:   flagNameKubeContext,
 		Target: &c.flagKubeContext,
 		Usage:  "Set the Kubernetes context to use.",
 	})
@@ -191,6 +205,33 @@ func (c *ReadCommand) Help() string {
 
 func (c *ReadCommand) Synopsis() string {
 	return "Inspect the Envoy configuration for a given Pod."
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *ReadCommand) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNameNamespace):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameOutput):      complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameClusters):    complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameListeners):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameRoutes):      complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameEndpoints):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameSecrets):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameFQDN):        complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameAddress):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNamePort):        complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameKubeConfig):  complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameKubeContext): complete.PredictNothing,
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *ReadCommand) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 func (c *ReadCommand) parseFlags(args []string) error {

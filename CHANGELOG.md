@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+FEATURES:
+* CLI:
+  * Add support for tab autocompletion [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1501)]
+
 BUG FIXES:
 * Control plane
   * Use global ACL auth method to provision ACL tokens for API Gateway in secondary datacenter [[GH-1481](https://github.com/hashicorp/consul-k8s/pull/1481)]

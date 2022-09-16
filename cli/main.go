@@ -15,6 +15,9 @@ func main() {
 	c := cli.NewCLI("consul-k8s", version.GetHumanVersion())
 	c.Args = os.Args[1:]
 
+	// Enable CLI autocomplete
+	c.Autocomplete = true
+
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "cli",
 		Level:  hclog.Info,
