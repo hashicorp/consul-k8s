@@ -26,10 +26,11 @@ func TestDefaultCNIConfigFile_NoFiles(t *testing.T) {
 // TestDefaultCNIConfigFile tests finding the correct config file in the cniNetDir directory.
 func TestDefaultCNIConfigFile(t *testing.T) {
 	cases := []struct {
-		name        string
-		cfgFile     string
-		dir         func(string) string
-		expectedErr error
+		name         string
+		cfgFile      string
+		dir          func(string) string
+		expectedFile string
+		expectedErr  error
 	}{
 		{
 			name:    "valid .conflist file found",
@@ -42,7 +43,8 @@ func TestDefaultCNIConfigFile(t *testing.T) {
 				}
 				return tempDir
 			},
-			expectedErr: nil,
+			expectedFile: "10-kindnet.conflist",
+			expectedErr:  nil,
 		},
 		{
 			name:    "several files, should choose .conflist file",
@@ -60,7 +62,8 @@ func TestDefaultCNIConfigFile(t *testing.T) {
 
 				return tempDir
 			},
-			expectedErr: nil,
+			expectedFile: "10-kindnet.conflist",
+			expectedErr:  nil,
 		},
 	}
 	for _, c := range cases {
@@ -68,12 +71,36 @@ func TestDefaultCNIConfigFile(t *testing.T) {
 			tempDir := c.dir(c.cfgFile)
 			actual, err := defaultCNIConfigFile(tempDir)
 
-			filename := filepath.Base(c.cfgFile)
-			filepath := filepath.Join(tempDir, filename)
+			filepath := filepath.Join(tempDir, c.expectedFile)
 			require.Equal(t, filepath, actual)
 			require.Equal(t, c.expectedErr, err)
 		})
 	}
+}
+
+func TestConfListFromConfFile(t *testing.T) {
+
+	cfgFile := "testdata/00-single-plugin.conf"
+	expectedCfgFile := "testdata/00-chained-plugins.conflist"
+
+	tempDir := t.TempDir()
+	err := copyFile(cfgFile, tempDir)
+	require.NoError(t, err)
+
+	filename := filepath.Base(cfgFile)
+	tempCfgFile := filepath.Join(tempDir, filename)
+
+	actualFile, err := confListFileFromConfFile(tempCfgFile)
+	require.NoError(t, err)
+
+	actual, err := ioutil.ReadFile(actualFile)
+	require.NoError(t, err)
+
+	expected, err := ioutil.ReadFile(expectedCfgFile)
+	require.NoError(t, err)
+
+	require.Equal(t, string(expected), string(actual))
+
 }
 
 // TestCreateCNIConfigFile tests the writing of the config file.
@@ -111,6 +138,20 @@ func TestAppendCNIConfig(t *testing.T) {
 			},
 			cfgFile:    "testdata/10-calico.conflist",
 			goldenFile: "testdata/10-calico.conflist.golden",
+		},
+		{
+			name: "chained plugin file",
+			consulConfig: &config.CNIConfig{
+				Name:       config.DefaultPluginName,
+				Type:       config.DefaultPluginType,
+				CNIBinDir:  "/var/lib/cni/bin",
+				CNINetDir:  "/etc/kubernetes/cni/net.d",
+				Kubeconfig: config.DefaultKubeconfig,
+				LogLevel:   config.DefaultLogLevel,
+				Multus:     config.DefaultMultus,
+			},
+			cfgFile:    "testdata/00-chained-plugins.conflist",
+			goldenFile: "testdata/00-chained-plugins.conflist.golden",
 		},
 	}
 	for _, c := range cases {
