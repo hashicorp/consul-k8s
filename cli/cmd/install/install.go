@@ -86,7 +86,7 @@ type Command struct {
 }
 
 func (c *Command) init() {
-	// Store all the possible preset values in 'presetList'. Printed in the help message.
+	// Store all the possible preset values in 'presetList'. Printed in the help message. This is a change.
 	var presetList []string
 	for name := range config.Presets {
 		presetList = append(presetList, name)
