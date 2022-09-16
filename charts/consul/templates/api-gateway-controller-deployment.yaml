@@ -90,6 +90,9 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            {{- end }}
             -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
         volumeMounts:
