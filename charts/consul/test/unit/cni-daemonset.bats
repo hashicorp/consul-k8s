@@ -63,6 +63,7 @@ load _helpers
       --set 'connectInject.cni.logLevel=bar' \
       --set 'connectInject.cni.cniBinDir=baz' \
       --set 'connectInject.cni.cniNetDir=foo' \
+      --set 'connectInject.cni.multus=false' \
       bar \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -85,6 +86,10 @@ load _helpers
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("cni-net-dir=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("multus=false"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

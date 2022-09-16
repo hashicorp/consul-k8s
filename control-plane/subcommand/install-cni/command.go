@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -117,7 +118,7 @@ func (c *Command) Run(args []string) int {
 	defer cancel()
 
 	// Generate the kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
-	c.logger.Debug("Creating kubeconfig", "file", cfg.Kubeconfig)
+	c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
 	err := createKubeConfig(cfg.CNINetDir, cfg.Kubeconfig)
 	if err != nil {
 		c.logger.Error("could not create kube config", "error", err)
@@ -125,7 +126,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Copy the consul-cni binary from the installer container to the host.
-	c.logger.Debug("Copying consul-cni binary", "destination", cfg.CNIBinDir)
+	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
 	err = copyFile(srcFile, cfg.CNIBinDir)
 	if err != nil {
@@ -134,32 +135,50 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Get the config file that is on the host.
-	c.logger.Debug("Getting default config file from", "destination", cfg.CNINetDir)
+	c.logger.Info("Getting default config file from", "destination", cfg.CNINetDir)
 	cfgFile, err := defaultCNIConfigFile(cfg.CNINetDir)
 	if err != nil {
 		c.logger.Error("could not get default CNI config file", "error", err)
 		return 1
 	}
 
-	// The config file does not exist and it probably means that the consul-cni plugin was installed or scheduled
-	// before other cni plugins on the node. We will add a directory watcher and wait for another plugin to
-	// be installed.
-	if cfgFile == "" {
-		c.logger.Info("CNI config file not found. Consul-cni is a chained plugin and another plugin must be installed first. Waiting...", "directory", cfg.CNINetDir)
-	} else {
-		// Check if there is valid config in the config file. It is invalid if no consul-cni config exists,
-		// the consul-cni config is not the last in the plugin chain or the consul-cni config is different from
-		// what is passed into helm (it could happen in a helm upgrade).
-		err := validConfig(cfg, cfgFile)
-		if err != nil {
-			// The invalid config is not critical and we can recover from it.
-			c.logger.Info("Installing plugin", "reason", err)
-			err = appendCNIConfig(cfg, cfgFile)
+	// Install as a chained plugin.
+	if !cfg.Multus {
+		if strings.HasSuffix(cfgFile, ".conf") {
+			c.logger.Info("Converting .conf file to .conflist file", "file", cfgFile)
+			cfgFile, err = confListFileFromConfFile(cfgFile)
 			if err != nil {
-				c.logger.Error("could not append configuration to config file", "error", err)
+				c.logger.Error("could convert .conf file to .conflist file", "error", err)
 				return 1
 			}
 		}
+
+		// The config file does not exist and it probably means that the consul-cni plugin was installed or scheduled
+		// before other cni plugins on the node. We will add a directory watcher and wait for another plugin to
+		// be installed.
+		if cfgFile == "" {
+			c.logger.Info("CNI config file not found. Consul-cni is a chained plugin and another plugin must be installed first. Waiting...", "directory", cfg.CNINetDir)
+		} else {
+			// Check if there is valid config in the config file. It is invalid if no consul-cni config exists,
+			// the consul-cni config is not the last in the plugin chain or the consul-cni config is different from
+			// what is passed into helm (it could happen in a helm upgrade).
+			c.logger.Info("Using config file", "file", cfgFile)
+			err := validConfig(cfg, cfgFile)
+			if err != nil {
+				// The invalid config is not critical and we can recover from it.
+				c.logger.Info("Installing plugin", "reason", err)
+				err = appendCNIConfig(cfg, cfgFile)
+				if err != nil {
+					c.logger.Error("could not append configuration to config file", "error", err)
+					return 1
+				}
+			}
+		}
+	} else {
+		// When multus is enabled, the plugin configuration is set in a NetworkAttachementDefinition CRD and multus
+		// handles the configuration and running of the consul-cni plugin. Also, we add a `k8s.v1.cni.cncf.io/networks: consul-cni`
+		// annotation during connect inject so that multus knows to run the consul-cni plugin.
+		c.logger.Info("Multus enabled, using multus NetworkAttachementDefinition for configuration")
 	}
 
 	// Watch for changes in the cniNetDir directory and fix/install the config file if need be.
@@ -220,32 +239,44 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			// config file is available, do nothing. This can happen if the consul-cni daemonset was
 			// created before other CNI plugins were installed.
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
-				c.logger.Info("Modified event", "event", event)
-				// Always get the config file that is on the host as we do not know if it was deleted
-				// or not.
-				cfgFile, err = defaultCNIConfigFile(dir)
-				if err != nil {
-					c.logger.Error("Unable get default config file", "error", err)
-					break
-				}
-				if cfgFile != "" {
-					c.logger.Info("Using config file", "file", cfgFile)
-
-					err = validConfig(cfg, cfgFile)
+				// Only repair things if this is a non-multus setup. Multus config is handled differently
+				// than chained plugins
+				if !cfg.Multus {
+					c.logger.Info("Modified event", "event", event)
+					// Always get the config file that is on the host as we do not know if it was deleted
+					// or not.
+					cfgFile, err = defaultCNIConfigFile(dir)
 					if err != nil {
-						// The invalid config is not critical and we can recover from it.
-						c.logger.Info("Installing plugin", "reason", err)
-						err = appendCNIConfig(cfg, cfgFile)
-						if err != nil {
-							c.logger.Error("Unable to install consul-cni config", "error", err)
-							return err
-						}
-					} else {
-						c.logger.Info("Valid config file detected, nothing to do")
+						c.logger.Error("Unable get default config file", "error", err)
 						break
 					}
-				}
 
+					if strings.HasSuffix(cfgFile, ".conf") {
+						cfgFile, err = confListFileFromConfFile(cfgFile)
+						if err != nil {
+							c.logger.Error("could convert .conf file to .conflist file", "error", err)
+							break
+						}
+					}
+
+					if cfgFile != "" {
+						c.logger.Info("Using config file", "file", cfgFile)
+
+						err = validConfig(cfg, cfgFile)
+						if err != nil {
+							// The invalid config is not critical and we can recover from it.
+							c.logger.Info("Installing plugin", "reason", err)
+							err = appendCNIConfig(cfg, cfgFile)
+							if err != nil {
+								c.logger.Error("Unable to install consul-cni config", "error", err)
+								return err
+							}
+						} else {
+							c.logger.Info("Valid config file detected, nothing to do")
+							break
+						}
+					}
+				}
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
