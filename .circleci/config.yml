@@ -38,7 +38,7 @@ commands:
             sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
             rm gotestsum_1.6.4_linux_amd64.tar.gz
 
-            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.14.0/kind-linux-amd64
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.15.0/kind-linux-amd64
             chmod +x ./kind
             sudo mv ./kind /usr/local/bin/kind
 
@@ -46,8 +46,8 @@ commands:
             chmod +x ./kubectl
             sudo mv ./kubectl /usr/local/bin/kubectl
 
-            wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
-            tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
+            wget https://get.helm.sh/helm-v3.9.4-linux-amd64.tar.gz
+            tar -zxvf helm-v3.9.4-linux-amd64.tar.gz
             sudo mv linux-amd64/helm /usr/local/bin/helm
   create-kind-clusters:
     parameters:
@@ -506,7 +506,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.0"
+          version: "v1.24.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -538,7 +538,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.0"
+          version: "v1.24.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -570,7 +570,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.0"
+          version: "v1.24.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
