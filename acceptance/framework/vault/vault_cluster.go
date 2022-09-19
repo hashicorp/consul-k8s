@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	releaseLabel = "app.kubernetes.io/instance="
+	releaseLabel                 = "app.kubernetes.io/instance="
+	defaultVaultHelmChartVersion = "v0.21.0"
 )
 
 // VaultCluster represents a vault installation.
@@ -61,6 +62,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		SetValues:      values,
 		KubectlOptions: kopts,
 		Logger:         logger,
+		Version:        defaultVaultHelmChartVersion,
 	}
 
 	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")

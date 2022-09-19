@@ -9,11 +9,19 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	flagNameNamespace     = "namespace"
+	flagNameAllNamespaces = "all-namespaces"
+	flagNameKubeConfig    = "kubeconfig"
+	flagNameKubeContext   = "context"
 )
 
 // ListCommand is the command struct for the proxy list command.
@@ -40,13 +48,13 @@ func (c *ListCommand) init() {
 
 	f := c.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "namespace",
+		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
 		Usage:   "The namespace to list proxies in.",
 		Aliases: []string{"n"},
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:    "all-namespaces",
+		Name:    flagNameAllNamespaces,
 		Target:  &c.flagAllNamespaces,
 		Default: false,
 		Usage:   "List pods in all namespaces.",
@@ -55,14 +63,14 @@ func (c *ListCommand) init() {
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagNameKubeConfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "context",
+		Name:    flagNameKubeContext,
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
@@ -117,6 +125,25 @@ func (c *ListCommand) Synopsis() string {
 	return "List all Pods running proxies managed by Consul."
 }
 
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *ListCommand) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNameNamespace):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameAllNamespaces): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameKubeConfig):    complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameKubeContext):   complete.PredictNothing,
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *ListCommand) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
+}
+
 // validateFlags ensures that the flags passed in by the can be used.
 func (c *ListCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
@@ -125,6 +152,7 @@ func (c *ListCommand) validateFlags() error {
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
+
 	return nil
 }
 

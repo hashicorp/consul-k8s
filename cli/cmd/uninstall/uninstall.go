@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/posener/complete"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,9 @@ const (
 
 	flagTimeout    = "timeout"
 	defaultTimeout = "10m"
+
+	flagContext    = "context"
+	flagKubeconfig = "kubeconfig"
 )
 
 type Command struct {
@@ -91,14 +95,14 @@ func (c *Command) init() {
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagKubeconfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "context",
+		Name:    flagContext,
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Kubernetes context to use.",
@@ -277,7 +281,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err := c.deleteSecrets(foundReleaseName, foundReleaseNamespace); err != nil {
+	if err := c.deleteSecrets(foundReleaseNamespace); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
@@ -323,6 +327,28 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Uninstall Consul deployment."
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *Command) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagAutoApprove): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNamespace):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagReleaseName): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagWipeData):    complete.PredictNothing,
+		fmt.Sprintf("-%s", flagTimeout):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagContext):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagKubeconfig):  complete.PredictFiles("*"),
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *Command) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 func (c *Command) findExistingInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (bool, string, string, error) {
@@ -378,7 +404,7 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 }
 
 // deleteSecrets deletes any secrets that have the label "managed-by" set to "consul-k8s".
-func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) error {
+func (c *Command) deleteSecrets(foundReleaseNamespace string) error {
 	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue,
 	})
