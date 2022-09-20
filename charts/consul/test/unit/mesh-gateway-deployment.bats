@@ -477,7 +477,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[4].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -509,7 +509,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[5].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -552,11 +552,11 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[4].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[5].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
