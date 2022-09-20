@@ -93,7 +93,7 @@ func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
 
 func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
 	t.Parallel()
-	cmd := getInitializedCommand(t)
+	cmd := getInitializedCommand(t, nil)
 
 	predictor := cmd.AutocompleteFlags()
 
@@ -116,7 +116,7 @@ func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
 }
 
 func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
-	cmd := getInitializedCommand(t)
+	cmd := getInitializedCommand(t, nil)
 	c := cmd.AutocompleteArgs()
 	assert.Equal(t, complete.PredictNothing, c)
 }

@@ -62,7 +62,7 @@ const (
 	flagNameContext    = "context"
 	flagNameKubeconfig = "kubeconfig"
 
-	flagHCPResourceID = "hcp-resource-id"
+	flagNameHCPResourceID = "hcp-resource-id"
 
 	envHCPClientID     = "HCP_CLIENT_ID"
 	envHCPClientSecret = "HCP_CLIENT_SECRET"
@@ -84,20 +84,20 @@ type Command struct {
 
 	set *flag.Sets
 
-	flagPreset          string
-	flagNamespace       string
-	flagDryRun          bool
-	flagAutoApprove     bool
-	flagValueFiles      []string
-	flagSetStringValues []string
-	flagSetValues       []string
-	flagFileValues      []string
-	flagTimeout         string
-	timeoutDuration     time.Duration
-	flagVerbose         bool
-	flagWait            bool
-	flagDemo            bool
-	flagHCPResourceID   string
+	flagPreset            string
+	flagNamespace         string
+	flagDryRun            bool
+	flagAutoApprove       bool
+	flagValueFiles        []string
+	flagSetStringValues   []string
+	flagSetValues         []string
+	flagFileValues        []string
+	flagTimeout           string
+	timeoutDuration       time.Duration
+	flagVerbose           bool
+	flagWait              bool
+	flagDemo              bool
+	flagNameHCPResourceID string
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -182,8 +182,8 @@ func (c *Command) init() {
 			common.ReleaseTypeConsulDemo, common.ReleaseTypeConsul),
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    flagHCPResourceID,
-		Target:  &c.flagHCPResourceID,
+		Name:    flagNameHCPResourceID,
+		Target:  &c.flagNameHCPResourceID,
 		Default: "",
 		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
 	})
@@ -343,7 +343,16 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	release.Configuration = values
+	release.Configuration = helmVals
+
+	// If an enterprise license secret was provided, check that the secret exists and that the enterprise Consul image is set.
+	if helmVals.Global.EnterpriseLicense.SecretName != "" {
+		if err := c.checkValidEnterprise(release.Configuration.Global.EnterpriseLicense.SecretName); err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
+		}
+		c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
+	}
 
 	err = c.installConsul(valuesYaml, vals, settings, uiLogger)
 	if err != nil {
@@ -431,7 +440,7 @@ func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, 
 		return err
 	}
 
-	c.UI.Output("%s installed in namespace %q.", releaseType, c.flagNamespace, terminal.WithSuccessStyle())
+	c.UI.Output("%s installed in namespace %q.", common.ReleaseTypeConsul, c.flagNamespace, terminal.WithSuccessStyle())
 	return nil
 }
 
@@ -464,6 +473,8 @@ func (c *Command) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameWait):            complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameDemo):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameHCPResourceID):   complete.PredictNothing,
 	}
 }
 
@@ -598,11 +609,11 @@ func (c *Command) validateFlags(args []string) error {
 			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientID)
 		} else if clientSecret == "" {
 			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientSecret)
-		} else if c.flagHCPResourceID == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagHCPResourceID)
+		} else if c.flagNameHCPResourceID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
 		}
-	} else if c.flagHCPResourceID != "" {
-		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagHCPResourceID, preset.PresetCloud)
+	} else if c.flagNameHCPResourceID != "" {
+		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
 	}
 
 	duration, err := time.ParseDuration(c.flagTimeout)
@@ -639,7 +650,7 @@ func (c *Command) checkValidEnterprise(secretName string) error {
 // returned.
 func (c *Command) getPreset(name string) (preset.Preset, error) {
 	hcpConfig := &preset.HCPConfig{
-		ResourceID:   c.flagHCPResourceID,
+		ResourceID:   c.flagNameHCPResourceID,
 		ClientID:     os.Getenv(envHCPClientID),
 		ClientSecret: os.Getenv(envHCPClientSecret),
 		AuthURL:      os.Getenv(envHCPAuthURL),
