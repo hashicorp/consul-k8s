@@ -55,7 +55,7 @@ const (
 	flagNameDemo = "demo"
 	defaultDemo  = false
 
-	flagHCPResourceID = "hcp-resource-id"
+	flagNameHCPResourceID = "hcp-resource-id"
 
 	envHCPClientID     = "HCP_CLIENT_ID"
 	envHCPClientSecret = "HCP_CLIENT_SECRET"
@@ -74,19 +74,19 @@ type Command struct {
 
 	set *flag.Sets
 
-	flagPreset          string
-	flagDryRun          bool
-	flagAutoApprove     bool
-	flagValueFiles      []string
-	flagSetStringValues []string
-	flagSetValues       []string
-	flagFileValues      []string
-	flagTimeout         string
-	timeoutDuration     time.Duration
-	flagVerbose         bool
-	flagWait            bool
-	flagHCPResourceID   string
-	flagDemo            bool
+	flagPreset            string
+	flagDryRun            bool
+	flagAutoApprove       bool
+	flagValueFiles        []string
+	flagSetStringValues   []string
+	flagSetValues         []string
+	flagFileValues        []string
+	flagTimeout           string
+	timeoutDuration       time.Duration
+	flagVerbose           bool
+	flagWait              bool
+	flagNameHCPResourceID string
+	flagDemo              bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -173,8 +173,8 @@ func (c *Command) init() {
 		Usage:   "Set the Kubernetes context to use.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    flagHCPResourceID,
-		Target:  &c.flagHCPResourceID,
+		Name:    flagNameHCPResourceID,
+		Target:  &c.flagNameHCPResourceID,
 		Default: "",
 		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
 	})
@@ -404,6 +404,8 @@ func (c *Command) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameWait):            complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameDemo):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameHCPResourceID):   complete.PredictNothing,
 	}
 }
 
@@ -446,11 +448,11 @@ func (c *Command) validateFlags(args []string) error {
 			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientID)
 		} else if clientSecret == "" {
 			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientSecret)
-		} else if c.flagHCPResourceID == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagHCPResourceID)
+		} else if c.flagNameHCPResourceID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
 		}
-	} else if c.flagHCPResourceID != "" {
-		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagHCPResourceID, preset.PresetCloud)
+	} else if c.flagNameHCPResourceID != "" {
+		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
 	}
 
 	return nil
@@ -525,7 +527,7 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 // returned.
 func (c *Command) getPreset(name string, namespace string) (preset.Preset, error) {
 	hcpConfig := &preset.HCPConfig{
-		ResourceID:   c.flagHCPResourceID,
+		ResourceID:   c.flagNameHCPResourceID,
 		ClientID:     os.Getenv(envHCPClientID),
 		ClientSecret: os.Getenv(envHCPClientSecret),
 	}
