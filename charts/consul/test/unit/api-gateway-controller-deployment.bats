@@ -915,7 +915,7 @@ load _helpers
 
 @test "apiGateway/Deployment: externalServers set and clients enabled" {
   cd `chart_dir`
-  local object=$(helm template \
+  local actual=$(helm template \
     -s templates/api-gateway-controller-deployment.yaml  \
     --set 'apiGateway.enabled=true' \
     --set 'apiGateway.image=foo' \
@@ -924,10 +924,6 @@ load _helpers
     --set 'externalServers.enabled=true' \
     --set 'client.enabled=true' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
-
-  local actual=$(echo $object |
       yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
-      echo $actual
   [ "${actual}" = "true" ]
 }
