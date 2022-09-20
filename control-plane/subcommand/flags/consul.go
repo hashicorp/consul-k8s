@@ -224,7 +224,11 @@ func (f *ConsulFlags) ConsulAPIClientConfig() *api.Config {
 
 	if f.UseTLS {
 		cfg.Scheme = "https"
-		cfg.TLSConfig.CAFile = f.CACertFile
+		if f.CACertFile != "" {
+			cfg.TLSConfig.CAFile = f.CACertFile
+		} else {
+			cfg.TLSConfig.CAPem = []byte(f.CACertPEM)
+		}
 
 		// Infer TLS server name from addresses.
 		if f.TLSServerName == "" && !strings.HasPrefix(f.Addresses, "exec=") {

@@ -28,6 +28,7 @@ type TestServerClient struct {
 	APIClient  *api.Client
 	Cfg        *consul.Config
 	Watcher    *discovery.Watcher
+	ServerCfg  *testutil.TestServerConfig
 }
 
 func TestServerWithConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCallback) *TestServerClient {
@@ -58,7 +59,8 @@ func TestServerWithConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCa
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.Cleanup(cancelFunc)
-	watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "exec=echo 127.0.0.1", GRPCPort: cfg.Ports.GRPC}, hclog.NewNullLogger())
+	hcLog := hclog.New(&hclog.LoggerOptions{Level: hclog.Debug})
+	watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "exec=echo 127.0.0.1", GRPCPort: cfg.Ports.GRPC}, hcLog)
 	require.NoError(t, err)
 	t.Cleanup(watcher.Stop)
 	go watcher.Run()
@@ -68,6 +70,7 @@ func TestServerWithConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCa
 		APIClient:  client,
 		Cfg:        consulConfig,
 		Watcher:    watcher,
+		ServerCfg:  cfg,
 	}
 }
 

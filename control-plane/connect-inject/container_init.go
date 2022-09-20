@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
@@ -24,9 +23,9 @@ const (
 )
 
 type initContainerCommandData struct {
+	AuthMethod         string
 	ServiceName        string
 	ServiceAccountName string
-	AuthMethod         string
 	// ConsulPartition is the Consul admin partition to register the service
 	// and proxy in. An empty string indicates partitions are not
 	// enabled in Consul (necessary for OSS).
@@ -34,12 +33,7 @@ type initContainerCommandData struct {
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
-	ConsulNamespace           string
-	NamespaceMirroringEnabled bool
-
-	// ConsulCACert is the PEM-encoded CA certificate to use when
-	// communicating with Consul.
-	ConsulCACert string
+	ConsulNamespace string
 
 	// ConsulNodeName is the node name in Consul where services are registered.
 	ConsulNodeName string
@@ -78,14 +72,6 @@ type initContainerCommandData struct {
 	// MultiPort determines whether this is a multi port Pod, which configures the init container to be specific to one
 	// of the services on the multi port Pod.
 	MultiPort bool
-
-	// BearerTokenFile configures where the service account token can be found. This will be unique per service in a
-	// multi port Pod.
-	BearerTokenFile string
-
-	// ConsulAPITimeout is the duration that the consul API client will
-	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout time.Duration
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -149,8 +135,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		AuthMethod:                 w.AuthMethod,
 		ConsulPartition:            w.ConsulPartition,
 		ConsulNamespace:            w.consulNamespace(namespace.Name),
-		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
-		ConsulCACert:               w.ConsulCACert,
 		ConsulNodeName:             ConsulNodeName,
 		EnableTransparentProxy:     tproxyEnabled,
 		EnableCNI:                  w.EnableCNI,
@@ -161,7 +145,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		ConsulDNSClusterIP:         consulDNSClusterIP,
 		EnvoyUID:                   sidecarUserAndGroupID,
 		MultiPort:                  multiPort,
-		ConsulAPITimeout:           w.ConsulAPITimeout,
 	}
 
 	// Create expected volume mounts
@@ -177,6 +160,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	} else {
 		data.ServiceName = pod.Annotations[annotationService]
 	}
+	var bearerTokenFile string
 	if w.AuthMethod != "" {
 		if multiPort {
 			// If multi port then we require that the service account name
@@ -186,11 +170,11 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			data.ServiceAccountName = pod.Spec.ServiceAccountName
 		}
 		// Extract the service account token's volume mount
-		saTokenVolumeMount, bearerTokenFile, err := findServiceAccountVolumeMount(pod, multiPort, mpi.serviceName)
+		var saTokenVolumeMount corev1.VolumeMount
+		saTokenVolumeMount, bearerTokenFile, err = findServiceAccountVolumeMount(pod, multiPort, mpi.serviceName)
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		data.BearerTokenFile = bearerTokenFile
 
 		// Append to volume mounts
 		volMounts = append(volMounts, saTokenVolumeMount)
@@ -270,12 +254,20 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				},
 			},
 			{
-				Name:  "CONSUL_HTTP_ADDR",
-				Value: fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulConfig.HTTPPort),
+				Name:  "CONSUL_ADDRESSES",
+				Value: w.ConsulAddress,
 			},
 			{
-				Name:  "CONSUL_GRPC_ADDR",
-				Value: fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulGRPCPort),
+				Name:  "CONSUL_GRPC_PORT",
+				Value: strconv.Itoa(w.ConsulGRPCPort),
+			},
+			{
+				Name:  "CONSUL_HTTP_PORT",
+				Value: strconv.Itoa(w.ConsulConfig.HTTPPort),
+			},
+			{
+				Name:  "CONSUL_API_TIMEOUT",
+				Value: w.ConsulAPITimeout.String(),
 			},
 		},
 		Resources:    w.InitContainerResources,
@@ -284,16 +276,70 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 
 	if w.TLSEnabled {
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "CONSUL_HTTP_SSL",
-			Value: "true",
-		})
-		if w.ConsulCACert != "" {
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  "CONSUL_CACERT",
-				Value: "/consul/connect-inject/consul-ca.pem",
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "USE_TLS",
+				Value: "true",
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_CACERT_PEM",
+				Value: w.ConsulCACert,
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_TLS_SERVER_NAME",
+				Value: w.ConsulTLSServerName,
 			})
+	}
+
+	if w.AuthMethod != "" {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_LOGIN_AUTH_METHOD",
+				Value: w.AuthMethod,
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+				Value: bearerTokenFile,
+			})
+
+		if w.EnableNamespaces {
+			if w.EnableK8SNSMirroring {
+				container.Env = append(container.Env,
+					corev1.EnvVar{
+						Name:  "CONSUL_LOGIN_NAMESPACE",
+						Value: "default",
+					})
+			} else {
+				container.Env = append(container.Env,
+					corev1.EnvVar{
+						Name:  "CONSUL_LOGIN_NAMESPACE",
+						Value: w.consulNamespace(namespace.Name),
+					})
+			}
 		}
+
+		if w.ConsulPartition != "" {
+			container.Env = append(container.Env,
+				corev1.EnvVar{
+					Name:  "CONSUL_LOGIN_PARTITION",
+					Value: w.ConsulPartition,
+				})
+		}
+	}
+	if w.EnableNamespaces {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_NAMESPACE",
+				Value: w.consulNamespace(namespace.Name),
+			})
+	}
+
+	if w.ConsulPartition != "" {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_PARTITION",
+				Value: w.ConsulPartition,
+			})
 	}
 
 	if tproxyEnabled {
@@ -381,30 +427,13 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
-{{- if .ConsulCACert }}
-cat <<EOF >/consul/connect-inject/consul-ca.pem
-{{ .ConsulCACert }}
-EOF
-{{- end }}
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout={{ .ConsulAPITimeout }} \
   -consul-node-name={{ .ConsulNodeName }} \
   {{- if .AuthMethod }}
-  -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
-  -bearer-token-file={{ .BearerTokenFile }} \
   {{- if .MultiPort }}
   -acl-token-sink=/consul/connect-inject/acl-token-{{ .ServiceName }} \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  {{- if .NamespaceMirroringEnabled }}
-  {{- /* If namespace mirroring is enabled, the auth method is
-         defined in the default namespace */}}
-  -auth-method-namespace="default" \
-  {{- else }}
-  -auth-method-namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
   {{- end }}
   {{- end }}
   {{- if .MultiPort }}
@@ -413,12 +442,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
   {{- end }}
-  {{- end }}
-  {{- if .ConsulPartition }}
-  -partition="{{ .ConsulPartition }}" \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  -consul-service-namespace="{{ .ConsulNamespace }}" \
   {{- end }}
 
 {{- if .EnableTransparentProxy }}
