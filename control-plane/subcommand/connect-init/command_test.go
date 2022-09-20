@@ -457,7 +457,7 @@ func TestRun_Gateways(t *testing.T) {
 
 			if tt.aclsEnabled {
 				// Validate the ACL token was written.
-				tokenData, err := ioutil.ReadFile(tokenFile)
+				tokenData, err := os.ReadFile(tokenFile)
 				require.NoError(t, err)
 				require.NotEmpty(t, tokenData)
 
@@ -470,7 +470,7 @@ func TestRun_Gateways(t *testing.T) {
 			}
 
 			// Validate contents of proxyFile.
-			data, err := ioutil.ReadFile(proxyFile)
+			data, err := os.ReadFile(proxyFile)
 			require.NoError(t, err)
 			require.Contains(t, string(data), tt.gatewayKind)
 		})
