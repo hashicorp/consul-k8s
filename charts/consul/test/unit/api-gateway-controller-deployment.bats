@@ -927,7 +927,7 @@ load _helpers
       yq -r '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
+      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
       echo $actual
   [ "${actual}" = "true" ]
 }
