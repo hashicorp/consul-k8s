@@ -14,7 +14,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -358,13 +357,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Create Consul API config object.
-	apiClientConfig := c.consul.ConsulAPIClientConfig()
-	consulConfig := &consul.Config{
-		APIClientConfig: apiClientConfig,
-		HTTPPort:        c.consul.HTTPPort,
-		GRPCPort:        c.consul.GRPCPort,
-		APITimeout:      c.consul.APITimeout,
-	}
+	consulConfig := c.consul.ConsulClientConfig()
 
 	var caCertPem []byte
 	if c.consul.CACertFile != "" {
@@ -533,7 +526,6 @@ func (c *Command) Run(args []string) int {
 			Log:                           ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                      c.flagLogLevel,
 			LogJSON:                       c.flagLogJSON,
-			ConsulAPITimeout:              c.consul.APITimeout,
 		}})
 
 	if c.flagEnableWebhookCAUpdate {
