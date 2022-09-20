@@ -35,6 +35,7 @@ const (
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
 	sidecarContainer           = "consul-dataplane"
+	wildcardNamespace          = "*"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
@@ -617,10 +618,15 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 		return nil, err
 	}
 
+	meshGatewayServiceName, ok := pod.Annotations[annotationMeshGatewayConsulServiceName]
+	if !ok {
+		return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationMeshGatewayConsulServiceName, pod.Namespace, pod.Name)
+	}
+
 	service := &api.AgentService{
 		Kind:    api.ServiceKindMeshGateway,
 		ID:      pod.Name,
-		Service: "mesh-gateway",
+		Service: meshGatewayServiceName,
 		Port:    port,
 		Address: pod.Status.PodIP,
 		Meta:    meta,
@@ -685,6 +691,9 @@ func (r *EndpointsController) getWanData(pod corev1.Pod, endpoints corev1.Endpoi
 		case corev1.ServiceTypeClusterIP:
 			wanAddr = svc.Spec.ClusterIP
 		case corev1.ServiceTypeLoadBalancer:
+			if len(svc.Status.LoadBalancer.Ingress) == 0 {
+				return "", 0, fmt.Errorf("failed to read ingress config for loadbalancer for service %s in namespace %s", endpoints.Name, endpoints.Namespace)
+			}
 			for _, ingr := range svc.Status.LoadBalancer.Ingress {
 				if ingr.IP != "" {
 					wanAddr = ingr.IP
@@ -753,9 +762,6 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
 func (r *EndpointsController) deregisterService(k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
-	// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
-	consulNamespace := r.consulNamespace(k8sSvcNamespace)
-
 	// Get services matching metadata.
 	svcs, err := r.serviceInstancesForK8SServiceNameAndNamespace(k8sSvcName, k8sSvcNamespace)
 	if err != nil {
@@ -765,6 +771,7 @@ func (r *EndpointsController) deregisterService(k8sSvcName, k8sSvcNamespace stri
 
 	// Deregister each service instance that matches the metadata.
 	for _, svc := range svcs.Services {
+		// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
 		// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
 		// every service instance.
 		var serviceDeregistered bool
@@ -775,7 +782,7 @@ func (r *EndpointsController) deregisterService(k8sSvcName, k8sSvcNamespace stri
 				_, err = r.ConsulClient.Catalog().Deregister(&api.CatalogDeregistration{
 					Node:      ConsulNodeName,
 					ServiceID: svc.ID,
-					Namespace: consulNamespace,
+					Namespace: svc.Namespace,
 				}, nil)
 				if err != nil {
 					r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
@@ -788,7 +795,7 @@ func (r *EndpointsController) deregisterService(k8sSvcName, k8sSvcNamespace stri
 			if _, err = r.ConsulClient.Catalog().Deregister(&api.CatalogDeregistration{
 				Node:      ConsulNodeName,
 				ServiceID: svc.ID,
-				Namespace: consulNamespace,
+				Namespace: svc.Namespace,
 			}, nil); err != nil {
 				r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
 				return err
@@ -798,7 +805,7 @@ func (r *EndpointsController) deregisterService(k8sSvcName, k8sSvcNamespace stri
 
 		if r.AuthMethod != "" && serviceDeregistered {
 			r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-			err = r.deleteACLTokensForServiceInstance(svc.Service, k8sSvcNamespace, svc.Meta[MetaKeyPodName])
+			err = r.deleteACLTokensForServiceInstance(svc, k8sSvcNamespace, svc.Meta[MetaKeyPodName])
 			if err != nil {
 				r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
 				return err
@@ -812,15 +819,14 @@ func (r *EndpointsController) deregisterService(k8sSvcName, k8sSvcNamespace stri
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
 // has been configured with and will only delete tokens for the provided podName.
-func (r *EndpointsController) deleteACLTokensForServiceInstance(serviceName, k8sNS, podName string) error {
+func (r *EndpointsController) deleteACLTokensForServiceInstance(svc *api.AgentService, k8sNS, podName string) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
 	}
 
-	consulNS := r.consulNamespace(k8sNS)
 	tokens, _, err := r.ConsulClient.ACL().TokenList(&api.QueryOptions{
-		Namespace: consulNS,
+		Namespace: svc.Namespace,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
@@ -829,10 +835,10 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(serviceName, k8s
 	for _, token := range tokens {
 		// Only delete tokens that:
 		// * have been created with the auth method configured for this endpoints controller
-		// * have a single service identity whose service name is the same as 'serviceName'
+		// * have a single service identity whose service name is the same as 'svc.Service'
 		if token.AuthMethod == r.AuthMethod &&
 			len(token.ServiceIdentities) == 1 &&
-			token.ServiceIdentities[0].ServiceName == serviceName {
+			token.ServiceIdentities[0].ServiceName == svc.Service {
 			tokenMeta, err := getTokenMetaFromDescription(token.Description)
 			if err != nil {
 				return fmt.Errorf("failed to parse token metadata: %s", err)
@@ -843,16 +849,12 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(serviceName, k8s
 			// If we can't find token's pod, delete it.
 			if tokenPodName == podName {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
-				_, err = r.ConsulClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: consulNS})
-				if err != nil {
+				if _, err := r.ConsulClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: svc.Namespace}); err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
 				}
-			} else if err != nil {
-				return err
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -934,10 +936,17 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 // serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list
 // of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
 func (r *EndpointsController) serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNamespace string) (*api.CatalogNodeServiceList, error) {
+	var (
+		serviceList *api.CatalogNodeServiceList
+		err         error
+	)
 	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
 		MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, managedByValue)
-
-	serviceList, _, err := r.ConsulClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: r.consulNamespace(k8sServiceNamespace)})
+	if r.EnableConsulNamespaces {
+		serviceList, _, err = r.ConsulClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: wildcardNamespace})
+	} else {
+		serviceList, _, err = r.ConsulClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter})
+	}
 	return serviceList, err
 }
 
@@ -1142,10 +1151,8 @@ func hasBeenInjected(pod corev1.Pod) bool {
 
 // isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
 func isGateway(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[annotationGatewayKind]; ok && anno != "" {
-		return true
-	}
-	return false
+	anno, ok := pod.Annotations[annotationGatewayKind]
+	return ok && anno != ""
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.

@@ -1,4 +1,4 @@
-{{- if and .Values.meshGateway.enabled .Values.meshGateway.service.enabled }}
+{{- if and .Values.meshGateway.enabled }}
 apiVersion: v1
 kind: Service
 metadata:

@@ -1192,11 +1192,12 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "mesh-gateway",
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
-					annotationMeshGatewaySource:        "Static",
-					annotationMeshGatewayWANAddress:    "2.3.4.5",
-					annotationMeshGatewayWANPort:       "443",
-					annotationMeshGatewayContainerPort: "8443",
-					annotationGatewayKind:              "mesh"})
+					annotationMeshGatewayConsulServiceName: "mesh-gateway",
+					annotationMeshGatewaySource:            "Static",
+					annotationMeshGatewayWANAddress:        "2.3.4.5",
+					annotationMeshGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort:     "8443",
+					annotationGatewayKind:                  "mesh"})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "mesh-gateway",
@@ -1258,11 +1259,12 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "mesh-gateway",
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
-					annotationMeshGatewaySource:        "Static",
-					annotationMeshGatewayWANAddress:    "2.3.4.5",
-					annotationMeshGatewayWANPort:       "443",
-					annotationMeshGatewayContainerPort: "8443",
-					annotationGatewayKind:              "mesh"})
+					annotationMeshGatewayConsulServiceName: "mesh-gateway",
+					annotationMeshGatewaySource:            "Static",
+					annotationMeshGatewayWANAddress:        "2.3.4.5",
+					annotationMeshGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort:     "8443",
+					annotationGatewayKind:                  "mesh"})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "mesh-gateway",
@@ -3313,6 +3315,67 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			},
 			enableACLs: true,
 		},
+		{
+			name:                      "Mesh Gateway",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "mesh-gateway",
+					Kind:    api.ServiceKindMeshGateway,
+					Service: "mesh-gateway",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "mesh-gateway",
+					},
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    80,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8080,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                      "When ACLs are enabled, the mesh-gateway token should be deleted",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "mesh-gateway",
+					Kind:    api.ServiceKindMeshGateway,
+					Service: "mesh-gateway",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "mesh-gateway",
+					},
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    80,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8080,
+						},
+					},
+				},
+			},
+			enableACLs: true,
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3354,7 +3417,18 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				// Create a token for it if ACLs are enabled.
 				if tt.enableACLs {
 					test.SetupK8sAuthMethod(t, consulClient, svc.Service, "default")
-					if svc.Kind != api.ServiceKindConnectProxy {
+					switch svc.Kind {
+					case api.ServiceKindMeshGateway:
+						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
+							AuthMethod:  test.AuthMethod,
+							BearerToken: test.ServiceAccountJWTToken,
+							Meta: map[string]string{
+								"pod":       fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+								"component": tt.consulSvcName,
+							},
+						}, nil)
+						require.NoError(t, err)
+					case api.ServiceKindTypical:
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -3362,7 +3436,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 								"pod": fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
 							},
 						}, nil)
-
 						require.NoError(t, err)
 					}
 				}
@@ -5587,7 +5660,7 @@ func Test_GetWANData(t *testing.T) {
 			},
 			wanAddr: "test-loadbalancer-hostname",
 			wanPort: 1234,
-			expErr:  "failed to read annotation consul.hashicorp.com/mesh-gateway-source",
+			expErr:  "failed to read annotation consul.hashicorp.com/mesh-gateway-wan-address-source",
 		},
 		"no Service with Source=Service": {
 			gatewayPod: corev1.Pod{
@@ -5665,6 +5738,51 @@ func Test_GetWANData(t *testing.T) {
 			wanAddr: "test-loadbalancer-hostname",
 			wanPort: 1234,
 			expErr:  "failed to parse WAN port from value not-a-valid-port",
+		},
+		"source=Service, serviceType=LoadBalancer no Ingress configured": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-loadbalancer-hostname",
+			wanPort: 1234,
+			expErr:  "failed to read ingress config for loadbalancer for service gateway in namespace default",
 		},
 	}
 

@@ -25,6 +25,8 @@ const StaticClientNamespace = "ns2"
 
 // Test that Connect works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
 func TestPartitions_Connect(t *testing.T) {
+	t.Skipf("currently unsupported in agentless")
+
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -92,7 +94,6 @@ func TestPartitions_Connect(t *testing.T) {
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
-				"global.image":                   "thisisnotashwin/consul@sha256:477091fe84cde79a68a37cc9cc69fb7a5ab35e647a0f5f2632451ace5ecc5e7c",
 				"global.enableConsulNamespaces":  "true",
 
 				"global.tls.enabled":   "true",

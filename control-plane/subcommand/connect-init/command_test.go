@@ -70,16 +70,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "unknown log level: invalid",
 		},
-		{
-			flags: []string{
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-service-account-name", "foo",
-				"-gateway",
-				"-consul-node-name", "bar",
-			},
-			expErr: "-gateway-kind must be set if -gateway is set",
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -434,7 +424,6 @@ func TestRun_Gateways(t *testing.T) {
 			// CONSUL_HTTP_ADDR when it processes the command template.
 			flags := []string{"-pod-name", testGatewayName,
 				"-pod-namespace", testPodNamespace,
-				"-gateway",
 				"-gateway-kind", tt.gatewayKind,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-proxy-id-file", proxyFile,
@@ -466,7 +455,7 @@ func TestRun_Gateways(t *testing.T) {
 				require.NoError(t, err)
 				token, _, err := consulClient.ACL().TokenReadSelf(nil)
 				require.NoError(t, err)
-				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s"}`, tt.gatewayKind), token.Description)
+				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s","pod":"%s/%s"}`, tt.gatewayKind, testPodNamespace, testGatewayName), token.Description)
 			}
 
 			// Validate contents of proxyFile.
@@ -739,7 +728,6 @@ func TestRun_Gateways_Errors(t *testing.T) {
 			}
 			flags := []string{
 				"-http-addr", server.HTTPAddr,
-				"-gateway",
 				"-gateway-kind", "mesh-gateway",
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,

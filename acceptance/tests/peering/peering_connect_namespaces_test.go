@@ -27,6 +27,8 @@ const staticClientNamespace = "ns2"
 
 // Test that Connect works in installations for X-Peers networking.
 func TestPeering_ConnectNamespaces(t *testing.T) {
+	t.Skipf("currently unsupported in agentless")
+
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -99,9 +101,9 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
-				"global.image":                  "thisisnotashwin/consul@sha256:477091fe84cde79a68a37cc9cc69fb7a5ab35e647a0f5f2632451ace5ecc5e7c",
-				"global.tls.enabled":            "true",
-				"global.tls.httpsOnly":          strconv.FormatBool(c.ACLsEnabled),
+
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 

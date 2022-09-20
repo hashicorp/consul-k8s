@@ -39,7 +39,6 @@ type Command struct {
 	flagConsulServiceNamespace string // Consul destination namespace for the service.
 	flagServiceAccountName     string // Service account name.
 	flagServiceName            string // Service name.
-	flagGateway                bool
 	flagGatewayKind            string
 	flagLogLevel               string
 	flagLogJSON                bool
@@ -76,8 +75,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagACLTokenSink, "acl-token-sink", defaultTokenSinkFile, "File name where where ACL token should be saved.")
 	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
-	c.flagSet.BoolVar(&c.flagGateway, "gateway", false, "If the pod is a Consul gateway pod.")
-	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Name of the gateway that is being registered.")
+	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of Consul gateway that is being registered.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -128,8 +126,8 @@ func (c *Command) Run(args []string) int {
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		var loginMeta map[string]string
-		if c.flagGateway {
-			loginMeta = map[string]string{"component": c.flagGatewayKind}
+		if c.flagGatewayKind != "" {
+			loginMeta = map[string]string{"component": c.flagGatewayKind, "pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
 		} else {
 			loginMeta = map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
 		}
@@ -163,7 +161,7 @@ func (c *Command) Run(args []string) int {
 		c.logger.Error("Unable to update client connection", "error", err)
 		return 1
 	}
-	if c.flagGateway {
+	if c.flagGatewayKind != "" {
 		err = backoff.Retry(c.getGatewayRegistration(consulClient), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 		if err != nil {
 			c.logger.Error("Timed out waiting for gateway registration", "error", err)
@@ -324,14 +322,11 @@ func (c *Command) validateFlags() error {
 	if c.flagPodNamespace == "" {
 		return errors.New("-pod-namespace must be set")
 	}
-	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" && !c.flagGateway {
+	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" && c.flagGatewayKind == "" {
 		return errors.New("-service-account-name must be set when ACLs are enabled")
 	}
 	if c.flagConsulNodeName == "" {
 		return errors.New("-consul-node-name must be set")
-	}
-	if c.flagGateway && c.flagGatewayKind == "" {
-		return errors.New("-gateway-kind must be set if -gateway is set")
 	}
 
 	if c.http.ConsulAPITimeout() <= 0 {
