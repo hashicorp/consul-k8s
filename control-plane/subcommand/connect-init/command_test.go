@@ -56,16 +56,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "unknown log level: invalid",
 		},
-		{
-			flags: []string{
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-service-account-name", "foo",
-				"-gateway",
-				"-consul-node-name", "bar",
-			},
-			expErr: "-gateway-kind must be set if -gateway is set",
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
