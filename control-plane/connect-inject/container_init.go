@@ -23,9 +23,9 @@ const (
 )
 
 type initContainerCommandData struct {
+	AuthMethod         string
 	ServiceName        string
 	ServiceAccountName string
-	AuthMethod         string
 	// ConsulPartition is the Consul admin partition to register the service
 	// and proxy in. An empty string indicates partitions are not
 	// enabled in Consul (necessary for OSS).

@@ -608,7 +608,6 @@ func TestRun_Gateways_Errors(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
-				"-consul-api-timeout", "5s",
 				"-consul-node-name", connectinject.ConsulNodeName,
 			}
 

@@ -46,7 +46,6 @@ type Command struct {
 	flagMultiPort   bool
 
 	serviceRegistrationPollingAttempts uint64 // Number of times to poll for this service to be registered.
-	loginAttempts                      uint64 // Number of times to retry login call; only used in tests.
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
