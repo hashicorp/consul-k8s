@@ -25,14 +25,14 @@ func TestWANFederation(t *testing.T) {
 		name   string
 		secure bool
 	}{
-		//{
-		//	name:   "secure",
-		//	secure: true,
-		//},
 		{
-			name:   "default",
-			secure: false,
+			name:   "secure",
+			secure: true,
 		},
+		//{
+		//	name:   "default",
+		//	secure: false,
+		//},
 	}
 
 	for _, c := range cases {
