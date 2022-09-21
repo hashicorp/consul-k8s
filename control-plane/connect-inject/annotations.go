@@ -20,6 +20,33 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
+	// annotationGatewayKind is the key of the annotation that indicates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// value that is either "mesh", "ingress" or "terminating".
+	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"
+
+	// annotationMeshGatewayConsulServiceName is the key of the annotation whose value
+	// is the service name with which the mesh gateway is registered.
+	annotationMeshGatewayConsulServiceName = "consul.hashicorp.com/mesh-gateway-consul-service-name"
+
+	// annotationMeshGatewayContainerPort is the key of the annotation whose value is
+	// used as the port and also registered as the LAN port when the mesh-gateway
+	// service is registered.
+	annotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
+
+	// annotationMeshGatewaySource is the key of the annotation that determines which
+	// source to use to determine the wan address and wan port for the mesh-gateway
+	// service registration.
+	annotationMeshGatewaySource = "consul.hashicorp.com/mesh-gateway-wan-address-source"
+
+	// annotationMeshGatewayWANAddress is the key of the annotation that when the source
+	// of the mesh-gateway is 'Static', is the value of the WAN address for the gateway.
+	annotationMeshGatewayWANAddress = "consul.hashicorp.com/mesh-gateway-wan-address-static"
+
+	// annotationMeshGatewayWANPort is the key of the annotation whose value is the
+	// WAN port for the mesh-gateway service registration.
+	annotationMeshGatewayWANPort = "consul.hashicorp.com/mesh-gateway-wan-port"
+
 	// annotationInjectMountVolumes is the key of the annotation that controls whether
 	// the data volume that connect inject uses to store data including the Consul ACL token
 	// is mounted to other containers in the pod. It is a comma-separated list of container names

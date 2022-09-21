@@ -2,7 +2,7 @@ package installcni
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -127,10 +127,10 @@ func TestAppendCNIConfig(t *testing.T) {
 			err = appendCNIConfig(c.consulConfig, tempDestFile)
 			require.NoError(t, err)
 
-			actual, err := ioutil.ReadFile(tempDestFile)
+			actual, err := os.ReadFile(tempDestFile)
 			require.NoError(t, err)
 
-			expected, err := ioutil.ReadFile(c.goldenFile)
+			expected, err := os.ReadFile(c.goldenFile)
 			require.NoError(t, err)
 
 			require.Equal(t, string(expected), string(actual))
@@ -257,10 +257,10 @@ func TestRemoveCNIConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			actual, err := ioutil.ReadFile(tempDestFile)
+			actual, err := os.ReadFile(tempDestFile)
 			require.NoError(t, err)
 
-			expected, err := ioutil.ReadFile(c.cfgFile)
+			expected, err := os.ReadFile(c.cfgFile)
 			require.NoError(t, err)
 
 			require.Equal(t, string(expected), string(actual))
