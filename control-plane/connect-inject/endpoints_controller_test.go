@@ -3722,9 +3722,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 				_, err = consulClient.Catalog().Register(catalogRegistration, nil)
 				require.NoError(t, err)
 			}
-			ep := EndpointsController{
-				//ConsulClient: consulClient,
-			}
+			ep := EndpointsController{}
 
 			svcs, err := ep.serviceInstancesForK8SServiceNameAndNamespace(consulClient, k8sSvc, k8sNS)
 			require.NoError(t, err)

@@ -3,7 +3,6 @@ package flags
 import (
 	"crypto/tls"
 	"flag"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -201,7 +200,7 @@ func (f *ConsulFlags) ConsulServerConnMgrConfig() (discovery.Config, error) {
 		cfg.Credentials.Login.Datacenter = f.ConsulLogin.Datacenter
 		cfg.Credentials.Login.Meta = f.ConsulLogin.Meta
 
-		bearerToken, err := ioutil.ReadFile(f.ConsulLogin.BearerTokenFile)
+		bearerToken, err := os.ReadFile(f.ConsulLogin.BearerTokenFile)
 		if err != nil {
 			return discovery.Config{}, err
 		}

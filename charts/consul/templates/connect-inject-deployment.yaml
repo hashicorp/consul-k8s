@@ -106,7 +106,7 @@ spec:
               value: {{ .Values.global.datacenter }}
               {{- end }}
             - name: CONSUL_LOGIN_META
-              value: "component=connect-injector,pod=$(POD_NAME)"
+              value: "component=connect-injector,pod=$(NAMESPACE)/$(POD_NAME)"
             {{- end }}
             {{- if (and .Values.connectInject.aclInjectToken.secretName .Values.connectInject.aclInjectToken.secretKey) }}
             - name: CONSUL_ACL_TOKEN

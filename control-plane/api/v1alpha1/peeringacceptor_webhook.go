@@ -17,7 +17,6 @@ type PeeringAcceptorWebhook struct {
 	client.Client
 	Logger  logr.Logger
 	decoder *admission.Decoder
-	//ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

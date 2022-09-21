@@ -71,9 +71,6 @@ type MeshWebhook struct {
 	// TLSEnabled indicates whether we should use TLS for communicating to Consul.
 	TLSEnabled bool
 
-	// ConsulGRPCPort is the gRPC port we should use to talk to Consul.
-	ConsulGRPCPort int
-
 	// ConsulAddress is the address of the Consul server. This should be only the
 	// host (i.e. not including port or protocol).
 	ConsulAddress string

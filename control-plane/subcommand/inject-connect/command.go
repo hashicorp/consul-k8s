@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -362,13 +362,14 @@ func (c *Command) Run(args []string) int {
 	consulConfig := &consul.Config{
 		APIClientConfig: apiClientConfig,
 		HTTPPort:        c.consul.HTTPPort,
+		GRPCPort:        c.consul.GRPCPort,
 		APITimeout:      c.consul.APITimeout,
 	}
 
 	var caCertPem []byte
 	if c.consul.CACertFile != "" {
 		var err error
-		caCertPem, err = ioutil.ReadFile(c.consul.CACertFile)
+		caCertPem, err = os.ReadFile(c.consul.CACertFile)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q", c.consul.CACertFile))
 			return 1
@@ -467,11 +468,12 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		if err = (&connectinject.PeeringDialerController{
-			Client:             mgr.GetClient(),
-			ConsulClientConfig: consulConfig,
-			Log:                ctrl.Log.WithName("controller").WithName("peering-dialer"),
-			Scheme:             mgr.GetScheme(),
-			Context:            ctx,
+			Client:              mgr.GetClient(),
+			ConsulClientConfig:  consulConfig,
+			ConsulServerConnMgr: watcher,
+			Log:                 ctrl.Log.WithName("controller").WithName("peering-dialer"),
+			Scheme:              mgr.GetScheme(),
+			Context:             ctx,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "peering-dialer")
 			return 1
@@ -504,7 +506,6 @@ func (c *Command) Run(args []string) int {
 			AuthMethod:                    c.flagACLAuthMethod,
 			ConsulCACert:                  string(caCertPem),
 			TLSEnabled:                    c.consul.UseTLS,
-			ConsulGRPCPort:                c.consul.GRPCPort,
 			ConsulAddress:                 c.consul.Addresses,
 			ConsulTLSServerName:           c.consul.TLSServerName,
 			DefaultProxyCPURequest:        sidecarProxyCPURequest,
@@ -554,7 +555,7 @@ func (c *Command) Run(args []string) int {
 func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 	webhookConfigName := fmt.Sprintf("%s-connect-injector", c.flagResourcePrefix)
 	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, WebhookCAFilename)
-	caCert, err := ioutil.ReadFile(caPath)
+	caCert, err := os.ReadFile(caPath)
 	if err != nil {
 		return err
 	}

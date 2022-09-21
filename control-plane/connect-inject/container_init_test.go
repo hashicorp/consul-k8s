@@ -62,9 +62,8 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:  "10.0.0.0",
-				ConsulConfig:   &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort: 8502,
+				ConsulAddress: "10.0.0.0",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -91,8 +90,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				AuthMethod:       "an-auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
-				ConsulConfig:     &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:   8502,
+				ConsulConfig:     &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -117,7 +115,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				require.Equal(t, "CONSUL_HTTP_ADDR", container.Env[2].Name)
 				require.Equal(t, fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulConfig.HTTPPort), container.Env[2].Value)
 				require.Equal(t, "CONSUL_GRPC_ADDR", container.Env[3].Name)
-				require.Equal(t, fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulGRPCPort), container.Env[3].Value)
+				require.Equal(t, fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulConfig.GRPCPort), container.Env[3].Value)
 				actual := strings.Join(container.Command, " ")
 				require.Contains(t, actual, tt.Cmd)
 				if tt.CmdNot != "" {
@@ -517,8 +515,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulPartition:            "",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -538,8 +535,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "default",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -560,8 +556,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -581,8 +576,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "non-default-part",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -604,8 +598,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "default",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -633,8 +626,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				ConsulPartition:            "non-default",
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -661,8 +653,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -689,8 +680,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -722,8 +712,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableTransparentProxy:     true,
 				ConsulAPITimeout:           5 * time.Second,
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:             8502,
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			`/bin/sh -ec 
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -817,8 +806,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			MeshWebhook{
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
-				ConsulConfig:     &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:   8502,
+				ConsulConfig:     &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			2,
 			[]multiPortInfo{
@@ -857,8 +845,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				AuthMethod:       "auth-method",
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
-				ConsulConfig:     &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort:   8502,
+				ConsulConfig:     &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			2,
 			[]multiPortInfo{
@@ -964,8 +951,7 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 				ConsulAPITimeout: 5 * time.Second,
 				ConsulAddress:    "10.0.0.0",
 				TLSEnabled:       true,
-				ConsulConfig:     &consul.Config{HTTPPort: 443},
-				ConsulGRPCPort:   8503,
+				ConsulConfig:     &consul.Config{HTTPPort: 443, GRPCPort: 8503},
 			}
 			if caProvided {
 				w.ConsulCACert = "consul-ca-cert"
@@ -990,7 +976,7 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 			require.Equal(t, "CONSUL_HTTP_ADDR", container.Env[2].Name)
 			require.Equal(t, fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulConfig.HTTPPort), container.Env[2].Value)
 			require.Equal(t, "CONSUL_GRPC_ADDR", container.Env[3].Name)
-			require.Equal(t, fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulGRPCPort), container.Env[3].Value)
+			require.Equal(t, fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulConfig.GRPCPort), container.Env[3].Value)
 			if w.TLSEnabled {
 				require.Equal(t, "CONSUL_HTTP_SSL", container.Env[4].Name)
 				require.Equal(t, "true", container.Env[4].Value)

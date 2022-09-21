@@ -2,7 +2,6 @@ package flags
 
 import (
 	"crypto/tls"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -196,7 +195,7 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			if c.flags.ConsulLogin.AuthMethod != "" {
-				tokenFile, err := ioutil.TempFile("", "")
+				tokenFile, err := os.CreateTemp("", "")
 				require.NoError(t, err)
 				t.Cleanup(func() {
 					_ = os.Remove(tokenFile.Name())
@@ -213,7 +212,7 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 }
 
 func TestConsulFlags_ConsulServerConnMgrConfig_TLS(t *testing.T) {
-	caFile, err := ioutil.TempFile("", "")
+	caFile, err := os.CreateTemp("", "")
 	t.Cleanup(func() {
 		_ = os.Remove(caFile.Name())
 	})

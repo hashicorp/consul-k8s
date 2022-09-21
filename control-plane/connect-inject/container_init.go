@@ -275,7 +275,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			},
 			{
 				Name:  "CONSUL_GRPC_ADDR",
-				Value: fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulGRPCPort),
+				Value: fmt.Sprintf("%s:%d", w.ConsulAddress, w.ConsulConfig.GRPCPort),
 			},
 		},
 		Resources:    w.InitContainerResources,

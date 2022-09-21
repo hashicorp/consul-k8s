@@ -54,6 +54,7 @@ func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Clien
 type Config struct {
 	APIClientConfig *capi.Config
 	HTTPPort        int
+	GRPCPort        int
 	APITimeout      time.Duration
 }
 
