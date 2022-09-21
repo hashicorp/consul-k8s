@@ -87,7 +87,7 @@ func TestHasBeenInjected(t *testing.T) {
 		{
 			name: "Pod with injected annotation",
 			pod: func() corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				return *pod1
 			},
 			expected: true,
@@ -95,7 +95,7 @@ func TestHasBeenInjected(t *testing.T) {
 		{
 			name: "Pod without injected annotation",
 			pod: func() corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", false, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", false, true)
 				return *pod1
 			},
 			expected: false,
@@ -125,7 +125,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc only",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc:1234"
 				return pod1
 			},
@@ -142,7 +142,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc and dc",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.dc1.dc:1234"
 				return pod1
 			},
@@ -160,7 +160,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc and peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.peer1.peer:1234"
 				return pod1
 			},
@@ -178,7 +178,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc and peer, needs ns before peer if namespaces enabled",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.peer1.peer:1234"
 				return pod1
 			},
@@ -189,7 +189,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc, ns, and peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
@@ -208,7 +208,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc, ns, and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.ap:1234"
 				return pod1
 			},
@@ -227,7 +227,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream with svc, ns, and dc",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.dc1.dc:1234"
 				return pod1
 			},
@@ -246,7 +246,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "multiple annotated upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.dc1.dc:1234, upstream2.svc:2234, upstream3.svc.ns1.ns:3234, upstream4.svc.ns1.ns.peer1.peer:4234"
 				return pod1
 			},
@@ -283,7 +283,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: invalid partition/dc/peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.err:1234"
 				return pod1
 			},
@@ -294,7 +294,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: invalid namespace",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.err:1234"
 				return pod1
 			},
@@ -305,7 +305,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: invalid number of pieces in the address",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.err:1234"
 				return pod1
 			},
@@ -316,7 +316,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: invalid peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.peer1.err:1234"
 				return pod1
 			},
@@ -327,7 +327,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: invalid number of pieces in the address without namespaces and partitions",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.err:1234"
 				return pod1
 			},
@@ -338,7 +338,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "upstream with datacenter without ProxyDefaults",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -349,7 +349,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "upstream with datacenter with ProxyDefaults whose mesh gateway mode is not local or remote",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -366,7 +366,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: both peer and partition provided",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.partition.peer1.peer:1234"
 				return pod1
 			},
@@ -377,7 +377,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: both peer and dc provided",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.peer1.peer.dc1.dc:1234"
 				return pod1
 			},
@@ -388,7 +388,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "annotated upstream error: both dc and partition provided",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234"
 				return pod1
 			},
@@ -399,7 +399,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway is in local mode",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -423,7 +423,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway in remote mode",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -447,7 +447,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "when consul is unavailable, we don't return an error",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -473,7 +473,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "single upstream",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream:1234"
 				return pod1
 			},
@@ -490,7 +490,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "single upstream with namespace",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream.foo:1234"
 				return pod1
 			},
@@ -508,7 +508,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "single upstream with namespace and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream.foo.bar:1234"
 				return pod1
 			},
@@ -527,7 +527,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "multiple upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2:2234"
 				return pod1
 			},
@@ -549,7 +549,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "multiple upstreams with consul namespaces, partitions and datacenters",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2.bar:2234, upstream3.foo.baz:3234:dc2"
 				return pod1
 			},
@@ -585,7 +585,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "multiple upstreams with consul namespaces and datacenters",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2.bar:2234, upstream3.foo:3234:dc2"
 				return pod1
 			},
@@ -619,7 +619,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "prepared query upstream",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234"
 				return pod1
 			},
@@ -636,7 +636,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "prepared query and non-query upstreams and annotated non-query upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234, upstream1:2234, prepared_query:6687bd19-5654-76be-d764:8202, upstream2.svc:3234"
 				return pod1
 			},
@@ -725,7 +725,7 @@ func TestGetServiceName(t *testing.T) {
 		{
 			name: "single port, with annotation",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationService] = "web"
 				return pod1
 			},
@@ -740,7 +740,7 @@ func TestGetServiceName(t *testing.T) {
 		{
 			name: "single port, without annotation",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				return pod1
 			},
 			endpoint: &corev1.Endpoints{
@@ -754,7 +754,7 @@ func TestGetServiceName(t *testing.T) {
 		{
 			name: "multi port, with annotation",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationService] = "web,web-admin"
 				return pod1
 			},
@@ -793,7 +793,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			name:          "Multiport service",
 			consulSvcName: "web,web-admin",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationPort] = "8080,9090"
 				pod1.Annotations[annotationService] = "web,web-admin"
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
@@ -1079,15 +1079,18 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name                       string
+		svcName                    string
 		consulSvcName              string
 		k8sObjects                 func() []runtime.Object
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedHealthChecks       []*api.HealthCheck
+		metricsEnabled             bool
 		expErr                     string
 	}{
 		{
 			name:          "Empty endpoints",
+			svcName:       "service-created",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
 				endpoint := &corev1.Endpoints{
@@ -1109,9 +1112,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		},
 		{
 			name:          "Basic endpoints",
+			svcName:       "service-created",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1142,6 +1146,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1182,11 +1187,151 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			},
 		},
 		{
+			name:          "Mesh Gateway",
+			svcName:       "mesh-gateway",
+			consulSvcName: "mesh-gateway",
+			k8sObjects: func() []runtime.Object {
+				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
+					annotationMeshGatewayConsulServiceName: "mesh-gateway",
+					annotationMeshGatewaySource:            "Static",
+					annotationMeshGatewayWANAddress:        "2.3.4.5",
+					annotationMeshGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort:     "8443",
+					annotationGatewayKind:                  "mesh"})
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mesh-gateway",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "mesh-gateway",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{gateway, endpoint}
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "mesh-gateway",
+					ServiceName:    "mesh-gateway",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    8443,
+					ServiceMeta:    map[string]string{MetaKeyPodName: "mesh-gateway", MetaKeyKubeServiceName: "mesh-gateway", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    8443,
+						},
+						"wan": {
+							Address: "2.3.4.5",
+							Port:    443,
+						},
+					},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+				},
+			},
+			expectedHealthChecks: []*api.HealthCheck{
+				{
+					CheckID:     "default/mesh-gateway",
+					ServiceName: "mesh-gateway",
+					ServiceID:   "mesh-gateway",
+					Name:        ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ConsulKubernetesCheckType,
+				},
+			},
+		},
+		{
+			name:          "Mesh Gateway with Metrics enabled",
+			svcName:       "mesh-gateway",
+			consulSvcName: "mesh-gateway",
+			k8sObjects: func() []runtime.Object {
+				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
+					annotationMeshGatewayConsulServiceName: "mesh-gateway",
+					annotationMeshGatewaySource:            "Static",
+					annotationMeshGatewayWANAddress:        "2.3.4.5",
+					annotationMeshGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort:     "8443",
+					annotationGatewayKind:                  "mesh"})
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mesh-gateway",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "mesh-gateway",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{gateway, endpoint}
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "mesh-gateway",
+					ServiceName:    "mesh-gateway",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    8443,
+					ServiceMeta:    map[string]string{MetaKeyPodName: "mesh-gateway", MetaKeyKubeServiceName: "mesh-gateway", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    8443,
+						},
+						"wan": {
+							Address: "2.3.4.5",
+							Port:    443,
+						},
+					},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]interface{}{
+							"envoy_prometheus_bind_addr": "1.2.3.4:20200",
+						},
+					},
+				},
+			},
+			expectedHealthChecks: []*api.HealthCheck{
+				{
+					CheckID:     "default/mesh-gateway",
+					ServiceName: "mesh-gateway",
+					ServiceID:   "mesh-gateway",
+					Name:        ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ConsulKubernetesCheckType,
+				},
+			},
+			metricsEnabled: true,
+		},
+		{
 			name:          "Endpoints with multiple addresses",
+			svcName:       "service-created",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod2 := createServicePod("pod2", "2.2.3.4", true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1225,6 +1370,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
 				{
 					ServiceID:      "pod2-service-created",
@@ -1233,6 +1379,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1309,10 +1456,11 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			// on the invalid address but continue and process the other addresses. We check for error specific to
 			// pod3 being non-existant at the end, and validate the other 2 addresses have service instances.
 			name:          "Endpoints with multiple addresses but one is invalid",
+			svcName:       "service-created",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod2 := createServicePod("pod2", "2.2.3.4", true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1361,6 +1509,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
 				{
 					ServiceID:      "pod2-service-created",
@@ -1369,6 +1518,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1434,9 +1584,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		},
 		{
 			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams, metrics",
+			svcName:       "service-created",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationPort] = "1234"
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				pod1.Annotations[fmt.Sprintf("%sname", annotationMeta)] = "abc"
@@ -1546,10 +1697,11 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		// register the mesh pods.
 		{
 			name:          "Some endpoints injected, some not.",
+			svcName:       "service-created",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.3.4.5", false, false)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod2 := createServicePod("pod2", "2.3.4.5", false, false)
 
 				// NOTE: the order of the addresses is important. The non-mesh pod must be first to correctly
 				// reproduce the bug where we were exiting the loop early if any pod was non-mesh.
@@ -1591,6 +1743,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1662,9 +1815,15 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
 			}
+			if tt.metricsEnabled {
+				ep.MetricsConfig = MetricsConfig{
+					DefaultEnableMetrics: true,
+					EnableGatewayMetrics: true,
+				}
+			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
-				Name:      "service-created",
+				Name:      tt.svcName,
 			}
 
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
@@ -1688,6 +1847,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceProxy, instance.ServiceProxy)
 			}
 			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
 			require.NoError(t, err)
@@ -1757,7 +1918,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has an updated address because health check changes from unhealthy to healthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1862,7 +2023,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has an updated address because health check changes from healthy to unhealthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1967,7 +2128,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has an updated address (pod IP change).",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "4.4.4.4", true, true)
+				pod1 := createServicePod("pod1", "4.4.4.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2046,7 +2207,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Different Consul service name: Endpoints has an updated address (pod IP change).",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "4.4.4.4", true, true)
+				pod1 := createServicePod("pod1", "4.4.4.4", true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2126,8 +2287,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has additional address not in Consul",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod2 := createServicePod("pod2", "2.2.3.4", true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2249,7 +2410,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2345,7 +2506,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Different Consul service name: Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2588,7 +2749,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "ACLs enabled: Endpoints has an updated address because the target pod changes",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod2 := createPod("pod2", "4.4.4.4", true, true)
+				pod2 := createServicePod("pod2", "4.4.4.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2680,7 +2841,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "ACLs enabled: Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2813,7 +2974,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "When a Deployment moves from mesh to non mesh its service instances should be deleted",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod2 := createPod("pod2", "2.3.4.5", false, false)
+				pod2 := createServicePod("pod2", "2.3.4.5", false, false)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -3153,6 +3314,67 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			},
 			enableACLs: true,
 		},
+		{
+			name:                      "Mesh Gateway",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "mesh-gateway",
+					Kind:    api.ServiceKindMeshGateway,
+					Service: "mesh-gateway",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "mesh-gateway",
+					},
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    80,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8080,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                      "When ACLs are enabled, the mesh-gateway token should be deleted",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "mesh-gateway",
+					Kind:    api.ServiceKindMeshGateway,
+					Service: "mesh-gateway",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "mesh-gateway",
+					},
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    80,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8080,
+						},
+					},
+				},
+			},
+			enableACLs: true,
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3194,7 +3416,18 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				// Create a token for it if ACLs are enabled.
 				if tt.enableACLs {
 					test.SetupK8sAuthMethod(t, consulClient, svc.Service, "default")
-					if svc.Kind != api.ServiceKindConnectProxy {
+					switch svc.Kind {
+					case api.ServiceKindMeshGateway:
+						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
+							AuthMethod:  test.AuthMethod,
+							BearerToken: test.ServiceAccountJWTToken,
+							Meta: map[string]string{
+								"pod":       fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+								"component": tt.consulSvcName,
+							},
+						}, nil)
+						require.NoError(t, err)
+					case api.ServiceKindTypical:
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -3202,7 +3435,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 								"pod": fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
 							},
 						}, nil)
-
 						require.NoError(t, err)
 					}
 				}
@@ -3318,7 +3550,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					},
 				},
 			}
-			pod1 := createPod("pod1", "1.2.3.4", true, true)
+			pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			k8sObjects := []runtime.Object{endpoint, pod1, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
@@ -3429,7 +3661,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 			},
 		},
 	}
-	pod1 := createPod("pod1", "1.2.3.4", true, true)
+	pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 	pod1.Annotations[annotationKubernetesService] = endpoint.Name
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, &ns}
@@ -4878,7 +5110,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			pod := createPod("test-pod-1", "1.2.3.4", true, true)
+			pod := createServicePod("test-pod-1", "1.2.3.4", true, true)
 			if c.podAnnotations != nil {
 				pod.Annotations = c.podAnnotations
 			}
@@ -5036,7 +5268,542 @@ func TestMapAddresses(t *testing.T) {
 	}
 }
 
-func createPod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
+func Test_GetWANData(t *testing.T) {
+	cases := map[string]struct {
+		gatewayPod      corev1.Pod
+		gatewayEndpoint corev1.Endpoints
+		k8sObjects      func() []runtime.Object
+		wanAddr         string
+		wanPort         int
+		expErr          string
+	}{
+		"source=NodeName": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "NodeName",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-nodename",
+			wanPort: 1234,
+		},
+		"source=HostIP": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "NodeIP",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-host-ip",
+			wanPort: 1234,
+		},
+		"source=Static": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Static",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-wan-address",
+			wanPort: 1234,
+		},
+		"source=Service, serviceType=NodePort": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeNodePort,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-host-ip",
+			wanPort: 1234,
+		},
+		"source=Service, serviceType=ClusterIP": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeClusterIP,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-cluster-ip",
+			wanPort: 1234,
+		},
+		"source=Service, serviceType=LoadBalancer,IP": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "test-loadbalancer-ip",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-loadbalancer-ip",
+			wanPort: 1234,
+		},
+		"source=Service, serviceType=LoadBalancer,Hostname": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "test-loadbalancer-hostname",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-loadbalancer-hostname",
+			wanPort: 1234,
+		},
+		"no Source annotation": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "test-loadbalancer-hostname",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-loadbalancer-hostname",
+			wanPort: 1234,
+			expErr:  "failed to read annotation consul.hashicorp.com/mesh-gateway-wan-address-source",
+		},
+		"no Service with Source=Service": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object { return nil },
+			wanAddr:    "test-loadbalancer-hostname",
+			wanPort:    1234,
+			expErr:     "failed to read service gateway in namespace default",
+		},
+		"WAN Port annotation misconfigured": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "not-a-valid-port",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "test-loadbalancer-hostname",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-loadbalancer-hostname",
+			wanPort: 1234,
+			expErr:  "failed to parse WAN port from value not-a-valid-port",
+		},
+		"source=Service, serviceType=LoadBalancer no Ingress configured": {
+			gatewayPod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gateway",
+					Annotations: map[string]string{
+						annotationMeshGatewaySource:     "Service",
+						annotationMeshGatewayWANAddress: "test-wan-address",
+						annotationMeshGatewayWANPort:    "1234",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-nodename",
+				},
+				Status: corev1.PodStatus{
+					HostIP: "test-host-ip",
+				},
+			},
+			gatewayEndpoint: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway",
+					Namespace: "default",
+				},
+			},
+			k8sObjects: func() []runtime.Object {
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeLoadBalancer,
+						ClusterIP: "test-cluster-ip",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{},
+						},
+					},
+				}
+				return []runtime.Object{service}
+			},
+			wanAddr: "test-loadbalancer-hostname",
+			wanPort: 1234,
+			expErr:  "failed to read ingress config for loadbalancer for service gateway in namespace default",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(c.k8sObjects()...).Build()
+			epCtrl := EndpointsController{
+				Client: fakeClient,
+			}
+			addr, port, err := epCtrl.getWanData(c.gatewayPod, c.gatewayEndpoint)
+			if c.expErr == "" {
+				require.NoError(t, err)
+				require.Equal(t, c.wanAddr, addr)
+				require.Equal(t, c.wanPort, port)
+			} else {
+				require.EqualError(t, err, c.expErr)
+			}
+		})
+	}
+}
+
+func createServicePod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -5060,6 +5827,27 @@ func createPod(name, ip string, inject bool, managedByEndpointsController bool) 
 	}
 	if managedByEndpointsController {
 		pod.Labels[keyManagedBy] = managedByValue
+	}
+	return pod
+}
+
+func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Pod {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   "default",
+			Labels:      map[string]string{keyManagedBy: managedByValue},
+			Annotations: annotations,
+		},
+		Status: corev1.PodStatus{
+			PodIP: ip,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
 	}
 	return pod
 }

@@ -110,6 +110,7 @@ commands:
                   do
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
+                          -enable-multi-cluster \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-image=hashicorppreview/consul-enterprise:1.14-dev \

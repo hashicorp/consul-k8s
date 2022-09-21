@@ -84,10 +84,10 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-// TestRun tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
+// TestRun_ConnectServices tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
 // auth method and using the obtained token find the services for the provided pod name
 // and namespace provided and write the proxy ID of the proxy service to a file.
-func TestRun(t *testing.T) {
+func TestRun_ConnectServices(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -252,9 +252,223 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// TestRun_ServicePollingErrors tests that when registered services could not be found,
+// TestRun_Gateways tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
+// auth method and using the obtained token find the service for the provided gateway
+// and namespace provided and write the proxy ID of the gateway service to a file.
+func TestRun_Gateways(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		gatewayKind  string
+		agentService api.AgentService
+		aclsEnabled  bool
+		serviceName  string
+		expFail      bool
+	}{
+		{
+			name:        "acls disabled; mesh-gateway",
+			gatewayKind: "mesh-gateway",
+			agentService: api.AgentService{
+				ID:      "mesh-gateway",
+				Service: "mesh-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "mesh-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
+		},
+		{
+			name:        "acls enabled; mesh-gateway",
+			gatewayKind: "mesh-gateway",
+			aclsEnabled: true,
+			agentService: api.AgentService{
+				ID:      "mesh-gateway",
+				Service: "mesh-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "mesh-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
+		},
+		{
+			name:        "acls disabled; ingress-gateway",
+			gatewayKind: "ingress-gateway",
+			agentService: api.AgentService{
+				ID:      "ingress-gateway",
+				Service: "ingress-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "ingress-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
+		},
+		{
+			name:        "acls enabled; ingress-gateway",
+			gatewayKind: "ingress-gateway",
+			aclsEnabled: true,
+			agentService: api.AgentService{
+				ID:      "ingress-gateway",
+				Service: "ingress-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "ingress-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
+		},
+		{
+			name:        "acls disabled; terminating-gateway",
+			gatewayKind: "terminating-gateway",
+			agentService: api.AgentService{
+				ID:      "terminating-gateway",
+				Service: "terminating-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "terminating-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
+		},
+		{
+			name:        "acls enabled; terminating-gateway",
+			gatewayKind: "terminating-gateway",
+			aclsEnabled: true,
+			agentService: api.AgentService{
+				ID:      "terminating-gateway",
+				Service: "terminating-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "terminating-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
+			tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
+			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
+			t.Cleanup(func() {
+				_ = os.Remove(proxyFile)
+				_ = os.Remove(tokenFile)
+			})
+
+			// Start Consul server with ACLs enabled and default deny policy.
+			initialMgmtToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				if tt.aclsEnabled {
+					c.ACL.Enabled = true
+					c.ACL.DefaultPolicy = "deny"
+					c.ACL.Tokens.InitialManagement = initialMgmtToken
+				}
+			})
+			require.NoError(t, err)
+			defer server.Stop()
+			server.WaitForLeader(t)
+			cfg := &api.Config{
+				Scheme:  "http",
+				Address: server.HTTPAddr,
+			}
+			if tt.aclsEnabled {
+				cfg.Token = initialMgmtToken
+			}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+
+			if tt.aclsEnabled {
+				test.SetupK8sAuthMethod(t, consulClient, testServiceAccountName, "default")
+			}
+
+			// Register Consul services.
+			testConsulServices := []api.AgentService{tt.agentService}
+			for _, svc := range testConsulServices {
+				serviceRegistration := &api.CatalogRegistration{
+					Node:    connectinject.ConsulNodeName,
+					Address: "127.0.0.1",
+					Service: &svc,
+				}
+				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				require.NoError(t, err)
+			}
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                                 ui,
+				serviceRegistrationPollingAttempts: 3,
+			}
+
+			// We build the http-addr because normally it's defined by the init container setting
+			// CONSUL_HTTP_ADDR when it processes the command template.
+			flags := []string{"-pod-name", testGatewayName,
+				"-pod-namespace", testPodNamespace,
+				"-gateway-kind", tt.gatewayKind,
+				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+				"-proxy-id-file", proxyFile,
+				"-consul-node-name", connectinject.ConsulNodeName,
+				"-consul-api-timeout=5s",
+			}
+			if tt.aclsEnabled {
+				flags = append(flags, "-acl-auth-method", test.AuthMethod,
+					"-bearer-token-file", bearerFile,
+					"-acl-token-sink", tokenFile)
+			}
+
+			// Run the command.
+			code := cmd.Run(flags)
+			if tt.expFail {
+				require.Equal(t, 1, code)
+				return
+			}
+			require.Equal(t, 0, code, ui.ErrorWriter.String())
+
+			if tt.aclsEnabled {
+				// Validate the ACL token was written.
+				tokenData, err := os.ReadFile(tokenFile)
+				require.NoError(t, err)
+				require.NotEmpty(t, tokenData)
+
+				// Check that the token has the metadata with pod name and pod namespace.
+				consulClient, err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
+				require.NoError(t, err)
+				token, _, err := consulClient.ACL().TokenReadSelf(nil)
+				require.NoError(t, err)
+				require.Equal(t, fmt.Sprintf(`token created via login: {"component":"%s","pod":"%s/%s"}`, tt.gatewayKind, testPodNamespace, testGatewayName), token.Description)
+			}
+
+			// Validate contents of proxyFile.
+			data, err := os.ReadFile(proxyFile)
+			require.NoError(t, err)
+			require.Contains(t, string(data), tt.gatewayKind)
+		})
+	}
+}
+
+// TestRun_ConnectServices_Errors tests that when registered services could not be found,
 // we error out.
-func TestRun_Errors(t *testing.T) {
+func TestRun_ConnectServices_Errors(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -422,6 +636,99 @@ func TestRun_Errors(t *testing.T) {
 			}
 			flags := []string{
 				"-http-addr", server.HTTPAddr,
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-proxy-id-file", proxyFile,
+				"-consul-api-timeout", "5s",
+				"-consul-node-name", connectinject.ConsulNodeName,
+			}
+
+			code := cmd.Run(flags)
+			require.Equal(t, 1, code)
+		})
+	}
+}
+
+// TestRun_Gateways_Errors tests that when registered services could not be found,
+// we error out.
+func TestRun_Gateways_Errors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		services []api.AgentServiceRegistration
+	}{
+		{
+			name: "gateway without pod-name or k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+				},
+			},
+		},
+		{
+			name: "gateway with pod-name meta but without k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "mesh-gateway",
+					},
+				},
+			},
+		},
+		{
+			name: "service and proxy with k8s-namespace meta but pod-name meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyKubeNS: "default-ns",
+					},
+				},
+			}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				os.Remove(proxyFile)
+			})
+
+			// Start Consul server.
+			server, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer server.Stop()
+			server.WaitForLeader(t)
+			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+			require.NoError(t, err)
+
+			// Register Consul services.
+			for _, svc := range c.services {
+				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+			}
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                                 ui,
+				serviceRegistrationPollingAttempts: 1,
+			}
+			flags := []string{
+				"-http-addr", server.HTTPAddr,
+				"-gateway-kind", "mesh-gateway",
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
@@ -694,6 +1001,7 @@ const (
 	metaKeyKubeServiceName = "k8s-service-name"
 	testPodNamespace       = "default-ns"
 	testPodName            = "counting-pod"
+	testGatewayName        = "gateway-pod"
 	testServiceAccountName = "counting"
 
 	// Sample response from https://consul.io/api-docs/acl#sample-response.

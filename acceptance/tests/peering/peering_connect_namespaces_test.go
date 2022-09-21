@@ -27,11 +27,17 @@ const staticClientNamespace = "ns2"
 
 // Test that Connect works in installations for X-Peers networking.
 func TestPeering_ConnectNamespaces(t *testing.T) {
+	t.Skipf("currently unsupported in agentless")
+
 	env := suite.Environment()
 	cfg := suite.Config()
 
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
+	if cfg.EnableTransparentProxy {
+		t.Skipf("skipping because no t-proxy support")
 	}
 
 	ver, err := version.NewVersion("1.13.0")
@@ -44,10 +50,10 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 	const staticClientPeer = "client"
 	const defaultNamespace = "default"
 	cases := []struct {
-		name                      string
-		destinationNamespace      string
-		mirrorK8S                 bool
-		ACLsAndAutoEncryptEnabled bool
+		name                 string
+		destinationNamespace string
+		mirrorK8S            bool
+		ACLsEnabled          bool
 	}{
 		{
 			"default destination namespace",
@@ -96,11 +102,10 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"global.peering.enabled":        "true",
 				"global.enableConsulNamespaces": "true",
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled": "true",
 
@@ -213,8 +218,8 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
-			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
+			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
+			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
 			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
@@ -296,7 +301,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				})
 			}
 
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", fmt.Sprintf("curl: (7) Failed to connect to static-server.%s port 80: Connection refused", c.destinationNamespace)}, "", fmt.Sprintf("http://static-server.virtual.%s.%s.consul", c.destinationNamespace, staticServerPeer))

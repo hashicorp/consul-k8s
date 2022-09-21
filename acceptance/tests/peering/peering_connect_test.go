@@ -22,6 +22,8 @@ import (
 
 // Test that Connect works in installations for X-Peers networking.
 func TestPeering_Connect(t *testing.T) {
+	t.Skipf("currently unsupported in agentless")
+
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -31,11 +33,15 @@ func TestPeering_Connect(t *testing.T) {
 		t.Skipf("skipping this test because peering is not supported in version %v", cfg.ConsulVersion.String())
 	}
 
+	if cfg.EnableTransparentProxy {
+		t.Skipf("skipping because no t-proxy support")
+	}
+
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
 	cases := []struct {
-		name                      string
-		ACLsAndAutoEncryptEnabled bool
+		name        string
+		ACLsEnabled bool
 	}{
 		{
 			"default installation",
@@ -55,11 +61,10 @@ func TestPeering_Connect(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled": "true",
 
@@ -168,8 +173,8 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
-			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
+			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
+			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways.
@@ -227,7 +232,7 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
 			})
 
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
