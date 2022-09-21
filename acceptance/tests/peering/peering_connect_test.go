@@ -22,8 +22,6 @@ import (
 
 // Test that Connect works in installations for X-Peers networking.
 func TestPeering_Connect(t *testing.T) {
-	t.Skipf("currently unsupported in agentless")
-
 	env := suite.Environment()
 	cfg := suite.Config()
 

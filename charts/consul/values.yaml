@@ -1098,7 +1098,7 @@ externalServers:
   httpsPort: 8501
 
   # The GRPC port of the Consul servers.
-  grpcPort: 8503
+  grpcPort: 8502
 
   # The server name to use as the SNI host header when connecting with HTTPS.
   # @type: string
