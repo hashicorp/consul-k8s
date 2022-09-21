@@ -245,6 +245,7 @@ func (f *ConsulFlags) ConsulClientConfig() *consul.Config {
 	return &consul.Config{
 		APIClientConfig: cfg,
 		HTTPPort:        f.HTTPPort,
+		GRPCPort:        f.GRPCPort,
 		APITimeout:      f.APITimeout,
 	}
 }

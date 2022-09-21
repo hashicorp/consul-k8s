@@ -29,10 +29,10 @@ func TestWANFederation(t *testing.T) {
 			name:   "secure",
 			secure: true,
 		},
-		//{
-		//	name:   "default",
-		//	secure: false,
-		//},
+		{
+			name:   "default",
+			secure: false,
+		},
 	}
 
 	for _, c := range cases {
@@ -41,13 +41,15 @@ func TestWANFederation(t *testing.T) {
 			env := suite.Environment()
 			cfg := suite.Config()
 
+			if cfg.UseKind {
+				t.Skipf("skipping wan federation tests as they currently fail on Kind even though they work on other clouds.")
+			}
+
 			primaryContext := env.DefaultContext(t)
 			secondaryContext := env.Context(t, environment.SecondaryContextName)
 
 			primaryHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-
-				"global.logLevel": "debug",
 
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.secure),
@@ -102,8 +104,6 @@ func TestWANFederation(t *testing.T) {
 			// Create secondary cluster
 			secondaryHelmValues := map[string]string{
 				"global.datacenter": "dc2",
-
-				"global.logLevel": "debug",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         "false",

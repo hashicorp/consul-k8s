@@ -59,10 +59,9 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:  "10.0.0.0",
-				ConsulConfig:   &consul.Config{HTTPPort: 8500},
-				ConsulGRPCPort: 8502,
-				LogLevel:       "info",
+				ConsulAddress: "10.0.0.0",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				LogLevel:      "info",
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -102,12 +101,11 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				AuthMethod:     "an-auth-method",
-				ConsulAddress:  "10.0.0.0",
-				ConsulConfig:   &consul.Config{HTTPPort: 8500, APITimeout: 5 * time.Second},
-				ConsulGRPCPort: 8502,
-				LogLevel:       "debug",
-				LogJSON:        true,
+				AuthMethod:    "an-auth-method",
+				ConsulAddress: "10.0.0.0",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+				LogLevel:      "debug",
+				LogJSON:       true,
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -546,7 +544,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -586,7 +584,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -630,7 +628,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -670,7 +668,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -715,7 +713,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "default",
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -783,7 +781,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				ConsulPartition:            "non-default",
 				ConsulAddress:              "10.0.0.0",
-				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -consul-node-name=k8s-service-mesh \
@@ -999,9 +997,9 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				LogLevel:       "info",
-				ConsulAddress:    "10.0.0.0",
-				ConsulConfig:     &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				LogLevel:      "info",
+				ConsulAddress: "10.0.0.0",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			},
 			2,
 			[]multiPortInfo{
@@ -1038,9 +1036,10 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				AuthMethod:       "auth-method",
-				ConsulAddress:    "10.0.0.0",
-				ConsulConfig:     &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				AuthMethod:    "auth-method",
+				ConsulAddress: "10.0.0.0",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+				LogLevel:      "info",
 			},
 			2,
 			[]multiPortInfo{
@@ -1110,9 +1109,9 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 		name := fmt.Sprintf("ca provided: %t", caProvided)
 		t.Run(name, func(t *testing.T) {
 			w := MeshWebhook{
-				ConsulAddress:    "10.0.0.0",
-				TLSEnabled:       true,
-				ConsulConfig:     &consul.Config{HTTPPort: 443, GRPCPort: 8503},
+				ConsulAddress: "10.0.0.0",
+				TLSEnabled:    true,
+				ConsulConfig:  &consul.Config{HTTPPort: 443, GRPCPort: 8503},
 			}
 			if caProvided {
 				w.ConsulCACert = "consul-ca-cert"

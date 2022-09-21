@@ -265,7 +265,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			},
 			{
 				Name:  "CONSUL_GRPC_PORT",
-				Value: strconv.Itoa(w.ConsulGRPCPort),
+				Value: strconv.Itoa(w.ConsulConfig.GRPCPort),
 			},
 			{
 				Name:  "CONSUL_HTTP_PORT",
