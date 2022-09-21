@@ -38,7 +38,6 @@ load _helpers
       -s templates/mesh-gateway-clusterrole.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'meshGateway.service.enabled=true' \
       --set 'meshGateway.service.type=LoadBalancer' \
       --set 'meshGateway.wanAddress.source=Service' \
       . | tee /dev/stderr |
@@ -66,7 +65,6 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
-      --set 'meshGateway.service.enabled=true' \
       --set 'meshGateway.service.type=LoadBalancer' \
       --set 'meshGateway.wanAddress.source=Service' \
       . | tee /dev/stderr |
