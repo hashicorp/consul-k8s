@@ -11,6 +11,7 @@ import (
 // MetricsConfig represents configuration common to connect-inject components related to metrics.
 type MetricsConfig struct {
 	DefaultEnableMetrics        bool
+	EnableGatewayMetrics        bool
 	DefaultEnableMetricsMerging bool
 	DefaultMergedMetricsPort    string
 	DefaultPrometheusScrapePort string

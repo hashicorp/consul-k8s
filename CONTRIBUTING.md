@@ -876,7 +876,7 @@ func TestExample(t *testing.T) {
 }
 ```
 
-Please see [mesh gateway tests](acceptance/tests/mesh-gateway/mesh_gateway_test.go)
+Please see [wan federation tests](acceptance/tests/wan-federation/wan_federation_test.go)
 for an example of how to use write a test that uses multiple contexts.
 
 #### Writing Assertions

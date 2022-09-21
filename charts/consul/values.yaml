@@ -2434,9 +2434,6 @@ meshGateway:
 
   # The service option configures the Service that fronts the Gateway Deployment.
   service:
-    # Whether to create a Service or not.
-    enabled: true
-
     # Type of service, ex. LoadBalancer, ClusterIP.
     type: LoadBalancer
 
@@ -2516,18 +2513,6 @@ meshGateway:
     limits:
       memory: "100Mi"
       cpu: "100m"
-
-  # The resource settings for the `copy-consul-bin` init container.
-  # @recurse: false
-  # @type: map
-  initCopyConsulContainer:
-    resources:
-      requests:
-        memory: "25Mi"
-        cpu: "50m"
-      limits:
-        memory: "150Mi"
-        cpu: "50m"
 
   # The resource settings for the `service-init` init container.
   # @recurse: false

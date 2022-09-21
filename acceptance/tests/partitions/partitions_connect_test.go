@@ -23,8 +23,10 @@ const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 const StaticClientNamespace = "ns2"
 
-// Test that Connect works in a default and ACLsAndAutoEncryptEnabled installations for X-Partition and in-partition networking.
+// Test that Connect works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
 func TestPartitions_Connect(t *testing.T) {
+	t.Skipf("currently unsupported in agentless")
+
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -32,14 +34,18 @@ func TestPartitions_Connect(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
+	if cfg.EnableTransparentProxy {
+		t.Skipf("skipping because no t-proxy support")
+	}
+
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
 	cases := []struct {
-		name                      string
-		destinationNamespace      string
-		mirrorK8S                 bool
-		ACLsAndAutoEncryptEnabled bool
+		name                 string
+		destinationNamespace string
+		mirrorK8S            bool
+		ACLsEnabled          bool
 	}{
 		{
 			"default destination namespace",
@@ -88,14 +94,12 @@ func TestPartitions_Connect(t *testing.T) {
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
+				"global.enableConsulNamespaces":  "true",
 
-				"global.enableConsulNamespaces": "true",
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled": "true",
 				// When mirroringK8S is set, this setting is ignored.
@@ -141,7 +145,7 @@ func TestPartitions_Connect(t *testing.T) {
 			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
 			k8s.CopySecret(t, serverClusterContext, clientClusterContext, caCertSecretName)
 
-			if !c.ACLsAndAutoEncryptEnabled {
+			if !c.ACLsEnabled {
 				// When auto-encrypt is disabled, we need both
 				// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
 				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
@@ -149,7 +153,7 @@ func TestPartitions_Connect(t *testing.T) {
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
 				k8s.CopySecret(t, serverClusterContext, clientClusterContext, partitionToken)
 			}
@@ -177,7 +181,7 @@ func TestPartitions_Connect(t *testing.T) {
 				"client.join[0]":           partitionSvcAddress,
 			}
 
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				// Setup partition token and auth method host if ACLs enabled.
 				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
 				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
@@ -244,7 +248,7 @@ func TestPartitions_Connect(t *testing.T) {
 				k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
 			})
 
-			consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
+			consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			serverQueryServerOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: defaultPartition}
 			clientQueryServerOpts := &api.QueryOptions{Namespace: StaticClientNamespace, Partition: defaultPartition}
@@ -260,12 +264,12 @@ func TestPartitions_Connect(t *testing.T) {
 			}
 
 			// Check that the ACL token is deleted.
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				// We need to register the cleanup function before we create the deployments
 				// because golang will execute them in reverse order i.e. the last registered
 				// cleanup function will be executed first.
 				t.Cleanup(func() {
-					if c.ACLsAndAutoEncryptEnabled {
+					if c.ACLsEnabled {
 						retry.Run(t, func(r *retry.R) {
 							tokens, _, err := consulClient.ACL().TokenList(serverQueryServerOpts)
 							require.NoError(r, err)
@@ -377,7 +381,7 @@ func TestPartitions_Connect(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, services, 1)
 
-				if c.ACLsAndAutoEncryptEnabled {
+				if c.ACLsEnabled {
 					logger.Log(t, "checking that the connection is not successful because there's no intention")
 					if cfg.EnableTransparentProxy {
 						k8s.CheckStaticServerConnectionFailing(t, serverClusterStaticClientOpts, StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
@@ -538,7 +542,7 @@ func TestPartitions_Connect(t *testing.T) {
 					})
 				}
 
-				if c.ACLsAndAutoEncryptEnabled {
+				if c.ACLsEnabled {
 					logger.Log(t, "checking that the connection is not successful because there's no intention")
 					if cfg.EnableTransparentProxy {
 						if !c.mirrorK8S {

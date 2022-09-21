@@ -1,4 +1,4 @@
-package meshgateway
+package wanfederation
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ func TestMain(m *testing.M) {
 	if suite.Config().EnableMultiCluster {
 		os.Exit(suite.Run())
 	} else {
-		fmt.Println("Skipping mesh gateway tests because -enable-multi-cluster is not set")
+		fmt.Println("Skipping wan federation tests because -enable-multi-cluster is not set")
 		os.Exit(0)
 	}
 }

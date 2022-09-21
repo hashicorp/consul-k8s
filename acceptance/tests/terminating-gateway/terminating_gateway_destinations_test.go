@@ -2,9 +2,6 @@ package terminatinggateway
 
 import (
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-version"
-	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
 
@@ -12,6 +9,9 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-version"
+	"github.com/stretchr/testify/require"
 )
 
 // Test that egress Destinations route through terminating gateways.

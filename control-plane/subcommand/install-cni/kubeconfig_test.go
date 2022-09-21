@@ -1,7 +1,7 @@
 package installcni
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -39,7 +39,7 @@ func TestKubeConfigYaml(t *testing.T) {
 			require.NoError(t, err)
 
 			golden := filepath.Join("testdata", c.goldenFile)
-			expected, err := ioutil.ReadFile(golden)
+			expected, err := os.ReadFile(golden)
 			require.NoError(t, err)
 
 			require.Equal(t, string(expected), string(actual))
