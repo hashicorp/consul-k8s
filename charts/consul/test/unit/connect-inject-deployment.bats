@@ -833,7 +833,7 @@ load _helpers
 
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_LOGIN_META").value' | tee /dev/stderr)
-  [ "${actual}" = 'component=connect-injector,pod=$(POD_NAME)' ]
+  [ "${actual}" = 'component=connect-injector,pod=$(NAMESPACE)/$(POD_NAME)' ]
 }
 
 @test "connectInject/Deployment: sets global auth method and primary datacenter when federation and acls and namespaces are enabled" {

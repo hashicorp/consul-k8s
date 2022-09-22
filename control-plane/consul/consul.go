@@ -58,7 +58,7 @@ type Config struct {
 	APITimeout      time.Duration
 }
 
-// NewClientFromConnMgrState create a new API client with an IP address from the state
+// NewClientFromConnMgrState creates a new API client with an IP address from the state
 // of the consul-server-connection-manager.
 func NewClientFromConnMgrState(config *Config, state discovery.State) (*capi.Client, error) {
 	ipAddress := state.Address.IP
