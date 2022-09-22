@@ -10,7 +10,7 @@ BUG FIXES:
 
 IMPROVEMENTS:
 * Helm:
-  * API Gateway: Configure primary-datacenter when deploying controller into secondary datacenter with federation enabled [[GH-1511](https://github.com/hashicorp/consul-k8s/pull/1511)]
+  * API Gateway: Set primary datacenter flag when deploying controller into secondary datacenter with federation enabled [[GH-1511](https://github.com/hashicorp/consul-k8s/pull/1511)]
 
 ## 0.48.0 (September 01, 2022)
 
