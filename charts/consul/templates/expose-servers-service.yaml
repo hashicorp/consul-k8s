@@ -52,7 +52,7 @@ spec:
       {{- end }}
     - name: grpc
       port: 8502
-      targetPort: 8503
+      targetPort: 8502
       {{ if (and (eq .Values.server.exposeService.type "NodePort") .Values.server.exposeService.nodePort.grpc) }}
       nodePort: {{ .Values.server.exposeService.nodePort.grpc }}
       {{- end }}
