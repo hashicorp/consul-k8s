@@ -250,21 +250,8 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			require.NoError(t, err)
 
 			// After reconciliation, Consul should have the service with the correct number of instances.
-			type serviceQuery struct {
-				Name      string
-				Namespace string
-			}
-			serviceQueries := []serviceQuery{} // Map service names to their namespaces.
-			for _, service := range setup.expectedConsulSvcInstances {
-				serviceQueries = append(serviceQueries, serviceQuery{Name: service.ServiceName, Namespace: service.Namespace})
-			}
-			var serviceInstances []*api.CatalogService
-			for _, serviceQuery := range serviceQueries {
-				instances, _, err := consulClient.Catalog().Service(serviceQuery.Name, "", &api.QueryOptions{Namespace: serviceQuery.Namespace})
-				require.NoError(t, err)
-				serviceInstances = append(serviceInstances, instances...)
-			}
-
+			serviceInstances, _, err := consulClient.Catalog().Service(setup.consulSvcName, "", &api.QueryOptions{Namespace: testCase.ExpConsulNS})
+			require.NoError(t, err)
 			require.Len(t, serviceInstances, len(setup.expectedConsulSvcInstances))
 			for i, instance := range serviceInstances {
 				require.Equal(t, setup.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
