@@ -1839,10 +1839,10 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"1.2.3.4:8503\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"1.2.3.4:8502\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"2.2.3.4:8503\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-token-server-address=\"2.2.3.4:8502\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

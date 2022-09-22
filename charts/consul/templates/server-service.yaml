@@ -40,8 +40,8 @@ spec:
       targetPort: 8501
     {{- end }}
     - name: grpc
-      port: 8503
-      targetPort: 8503
+      port: 8502
+      targetPort: 8502
     - name: serflan-tcp
       protocol: "TCP"
       port: 8301

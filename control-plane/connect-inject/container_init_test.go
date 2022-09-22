@@ -961,7 +961,7 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 				ConsulAddress:    "10.0.0.0",
 				TLSEnabled:       true,
 				ConsulHTTPPort:   "443",
-				ConsulGRPCPort:   "8503",
+				ConsulGRPCPort:   "8502",
 			}
 			if caProvided {
 				w.ConsulCACert = "consul-ca-cert"

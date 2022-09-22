@@ -92,7 +92,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 		{
 			name:                    "PeeringAcceptor generates a token with expose server addresses",
 			readServerExposeService: true,
-			expectedTokenAddresses:  []string{"1.1.1.1:8503"},
+			expectedTokenAddresses:  []string{"1.1.1.1:8502"},
 			k8sObjects: func() []runtime.Object {
 				service := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
@@ -158,8 +158,8 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 		},
 		{
 			name:                   "PeeringAcceptor generates a token with external addresses specified",
-			externalAddresses:      []string{"1.1.1.1:8503", "2.2.2.2:8503"},
-			expectedTokenAddresses: []string{"1.1.1.1:8503", "2.2.2.2:8503"},
+			externalAddresses:      []string{"1.1.1.1:8502", "2.2.2.2:8502"},
+			expectedTokenAddresses: []string{"1.1.1.1:8502", "2.2.2.2:8502"},
 			k8sObjects: func() []runtime.Object {
 				acceptor := &v1alpha1.PeeringAcceptor{
 					ObjectMeta: metav1.ObjectMeta{
