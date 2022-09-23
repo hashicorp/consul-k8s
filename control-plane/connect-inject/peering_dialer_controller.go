@@ -9,6 +9,8 @@ import (
 
 	"github.com/go-logr/logr"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,10 +31,14 @@ import (
 // PeeringDialerController reconciles a PeeringDialer object.
 type PeeringDialerController struct {
 	client.Client
-	// ConsulClient points at the agent local to the connect-inject deployment pod.
-	ConsulClient *api.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
+	// ConsulClientConfig is the config to create a Consul API client.
+	ConsulClientConfig *consul.Config
+	// ConsulServerConnMgr is the watcher for the Consul server addresses.
+	ConsulServerConnMgr *discovery.Watcher
+	// Log is the logger for this controller.
+	Log logr.Logger
+	// Scheme is the API scheme that this controller should have.
+	Scheme *runtime.Scheme
 	context.Context
 }
 
@@ -58,6 +64,18 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	// Create Consul client for this reconcile.
+	serverState, err := r.ConsulServerConnMgr.State()
+	if err != nil {
+		r.Log.Error(err, "failed to get Consul server state", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	apiClient, err := consul.NewClientFromConnMgrState(r.ConsulClientConfig, serverState)
+	if err != nil {
+		r.Log.Error(err, "failed to create Consul API client", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
 	// The DeletionTimestamp is zero when the object has not been marked for deletion. The finalizer is added
 	// in case it does not exist to all resources. If the DeletionTimestamp is non-zero, the object has been
 	// marked for deletion and goes into the deletion workflow.
@@ -71,7 +89,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 	} else {
 		if containsString(dialer.Finalizers, FinalizerName) {
 			r.Log.Info("PeeringDialer was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-			if err := r.deletePeering(ctx, req.Name); err != nil {
+			if err := r.deletePeering(ctx, apiClient, req.Name); err != nil {
 				return ctrl.Result{}, err
 			}
 			controllerutil.RemoveFinalizer(dialer, FinalizerName)
@@ -118,7 +136,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		// correct secret specified in the spec.
 		r.Log.Info("the secret in status.secretRef doesn't exist or wasn't set, establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 		peeringToken := specSecret.Data[dialer.Secret().Key]
-		if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+		if err := r.establishPeering(ctx, apiClient, dialer.Name, string(peeringToken)); err != nil {
 			r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 			return ctrl.Result{}, err
 		} else {
@@ -131,7 +149,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// Read the peering from Consul.
 		r.Log.Info("reading peering from Consul", "name", dialer.Name)
-		peering, _, err := r.ConsulClient.Peerings().Read(ctx, dialer.Name, nil)
+		peering, _, err := apiClient.Peerings().Read(ctx, dialer.Name, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
 			return ctrl.Result{}, err
@@ -141,7 +159,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		if peering == nil {
 			r.Log.Info("status.secret exists, but the peering doesn't exist in Consul; establishing peering with the existing spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
-			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+			if err := r.establishPeering(ctx, apiClient, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 				return ctrl.Result{}, err
 			} else {
@@ -155,7 +173,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		if r.specStatusSecretsDifferent(dialer, specSecret) {
 			r.Log.Info("the spec.peer.secret is different from the status secret, re-establishing peering", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
-			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+			if err := r.establishPeering(ctx, apiClient, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 				return ctrl.Result{}, err
 			} else {
@@ -167,7 +185,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 		if updated, err := r.versionAnnotationUpdated(dialer); err == nil && updated {
 			r.Log.Info("the version annotation was incremented; re-establishing peering with spec.peer.secret", "secret-name", dialer.Secret().Name, "secret-namespace", dialer.Namespace)
 			peeringToken := specSecret.Data[dialer.Secret().Key]
-			if err := r.establishPeering(ctx, dialer.Name, string(peeringToken)); err != nil {
+			if err := r.establishPeering(ctx, apiClient, dialer.Name, string(peeringToken)); err != nil {
 				r.updateStatusError(ctx, dialer, ConsulAgentError, err)
 				return ctrl.Result{}, err
 			} else {
@@ -258,12 +276,12 @@ func (r *PeeringDialerController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // establishPeering is a helper function that calls the Consul api to generate a token for the peer.
-func (r *PeeringDialerController) establishPeering(ctx context.Context, peerName string, peeringToken string) error {
+func (r *PeeringDialerController) establishPeering(ctx context.Context, apiClient *api.Client, peerName string, peeringToken string) error {
 	req := api.PeeringEstablishRequest{
 		PeerName:     peerName,
 		PeeringToken: peeringToken,
 	}
-	_, _, err := r.ConsulClient.Peerings().Establish(ctx, req, nil)
+	_, _, err := apiClient.Peerings().Establish(ctx, req, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to initiate peering", "err", err)
 		return err
@@ -272,8 +290,8 @@ func (r *PeeringDialerController) establishPeering(ctx context.Context, peerName
 }
 
 // deletePeering is a helper function that calls the Consul api to delete a peering.
-func (r *PeeringDialerController) deletePeering(ctx context.Context, peerName string) error {
-	_, err := r.ConsulClient.Peerings().Delete(ctx, peerName, nil)
+func (r *PeeringDialerController) deletePeering(ctx context.Context, apiClient *api.Client, peerName string) error {
+	_, err := apiClient.Peerings().Delete(ctx, peerName, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to delete Peering from Consul", "name", peerName)
 		return err
