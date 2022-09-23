@@ -1795,12 +1795,12 @@ syncCatalog:
 
   # Refers to a Kubernetes secret that you have created that contains
   # an ACL token for your Consul cluster which allows the sync process the correct
-  # permissions. This is only needed if ACLs are enabled on the Consul cluster.
+  # permissions. This is only needed if ACLs are managed manually within the Consul cluster, i.e. `global.acls.manageSystemACLs` is `false`.
   aclSyncToken:
-    # The name of the Vault secret that holds the acl sync token.
+    # The name of the Kubernetes secret that holds the acl sync token.
     # @type: string
     secretName: null
-    # The key within the Vault secret that holds the acl sync.
+    # The key within the Kubernetes secret that holds the acl sync token.
     # @type: string
     secretKey: null
 
