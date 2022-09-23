@@ -8,6 +8,10 @@ BUG FIXES:
 * Control plane
   * Use global ACL auth method to provision ACL tokens for API Gateway in secondary datacenter [[GH-1481](https://github.com/hashicorp/consul-k8s/pull/1481)]
 
+IMPROVEMENTS:
+* Helm:
+  * API Gateway: Set primary datacenter flag when deploying controller into secondary datacenter with federation enabled [[GH-1511](https://github.com/hashicorp/consul-k8s/pull/1511)]
+
 ## 0.48.0 (September 01, 2022)
 
 FEATURES:
