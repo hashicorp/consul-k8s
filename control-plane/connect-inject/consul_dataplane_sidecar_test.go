@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,7 +24,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 		},
 		"with custom gRPC port": {
 			webhookSetupFunc: func(w *MeshWebhook) {
-				w.ConsulGRPCPort = "8602"
+				w.ConsulConfig.GRPCPort = 8602
 			},
 		},
 		"with ACLs": {
@@ -91,10 +92,10 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			w := &MeshWebhook{
-				ConsulAddress:  "1.1.1.1",
-				ConsulGRPCPort: "8502",
-				LogLevel:       "info",
-				LogJSON:        false,
+				ConsulAddress: "1.1.1.1",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "info",
+				LogJSON:       false,
 			}
 			if c.webhookSetupFunc != nil {
 				c.webhookSetupFunc(w)
@@ -121,7 +122,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			// todo(agentless): test default concurrency
 			expCmd := []string{
 				"/bin/sh", "-ec",
-				"consul-dataplane -addresses=1.1.1.1 -grpc-port=" + w.ConsulGRPCPort +
+				"consul-dataplane -addresses=1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
 					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + c.additionalExpCmdArgs}
 			require.Equal(t, container.Command, expCmd)
@@ -219,9 +220,9 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 		name := fmt.Sprintf("acls enabled: %t", aclsEnabled)
 		t.Run(name, func(t *testing.T) {
 			w := MeshWebhook{
-				ConsulAddress:  "1.1.1.1",
-				ConsulGRPCPort: "8502",
-				LogLevel:       "info",
+				ConsulAddress: "1.1.1.1",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "info",
 			}
 			if aclsEnabled {
 				w.AuthMethod = "test-auth-method"
@@ -341,6 +342,7 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			w := MeshWebhook{
 				EnableTransparentProxy: c.tproxyEnabled,
 				EnableOpenShift:        c.openShiftEnabled,
+				ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -368,7 +370,9 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 // an error to the meshWebhook.
 func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
 	require := require.New(t)
-	w := MeshWebhook{}
+	w := MeshWebhook{
+		ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+	}
 	pod := corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -455,6 +459,7 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tc.webhook.ConsulConfig = &consul.Config{HTTPPort: 8500, GRPCPort: 8502}
 			_, err := tc.webhook.consulDataplaneSidecar(testNS, tc.pod, multiPortInfo{})
 			if tc.expErr {
 				require.EqualError(t, err, tc.expErrMessage)
@@ -613,6 +618,7 @@ func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 			h := MeshWebhook{
 				ImageConsul:          "hashicorp/consul:latest",
 				ImageConsulDataplane: "hashicorp/consul-k8s:latest",
+				ConsulConfig:         &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			}
 			c, err := h.consulDataplaneSidecar(testNS, tc.pod, multiPortInfo{})
 			if tc.expErr == "" {
@@ -779,6 +785,7 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
+			c.webhook.ConsulConfig = &consul.Config{HTTPPort: 8500, GRPCPort: 8502}
 			require := require.New(tt)
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

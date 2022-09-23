@@ -42,6 +42,11 @@ const (
 
 // Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
 func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
+	return NamedLogger(level, jsonLogging, "")
+}
+
+// NamedLogger Logger returns a named hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
+func NamedLogger(level string, jsonLogging bool, name string) (hclog.Logger, error) {
 	parsedLevel := hclog.LevelFromString(level)
 	if parsedLevel == hclog.NoLevel {
 		return nil, fmt.Errorf("unknown log level: %s", level)
@@ -50,7 +55,7 @@ func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
 		JSONFormat: jsonLogging,
 		Level:      parsedLevel,
 		Output:     os.Stderr,
-	}), nil
+	}).Named(name), nil
 }
 
 // ZapLogger returns a logr.Logger instance with log level set and JSON logging enabled/disabled, or an error if the level is invalid.

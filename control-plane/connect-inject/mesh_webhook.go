@@ -13,8 +13,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,8 +32,13 @@ var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.Name
 
 // MeshWebhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
-	ConsulClient *api.Client
-	Clientset    kubernetes.Interface
+	Clientset kubernetes.Interface
+
+	// ConsulClientConfig is the config to create a Consul API client.
+	ConsulConfig *consul.Config
+
+	// ConsulServerConnMgr is the watcher for the Consul server addresses.
+	ConsulServerConnMgr *discovery.Watcher
 
 	// ImageConsul is the container image for Consul to use.
 	// ImageConsulDataplane is the container image for Envoy to use.
@@ -64,12 +70,6 @@ type MeshWebhook struct {
 
 	// TLSEnabled indicates whether we should use TLS for communicating to Consul.
 	TLSEnabled bool
-
-	// ConsulHTTPPort is the HTTP or HTTPs port we should use to talk to Consul.
-	ConsulHTTPPort string
-
-	// ConsulGRPCPort is the gRPC port we should use to talk to Consul.
-	ConsulGRPCPort string
 
 	// ConsulAddress is the address of the Consul server. This should be only the
 	// host (i.e. not including port or protocol).
@@ -458,7 +458,19 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// all patches are created to guarantee no errors were encountered in
 	// that process before modifying the Consul cluster.
 	if w.EnableNamespaces {
-		if _, err := namespaces.EnsureExists(w.ConsulClient, w.consulNamespace(req.Namespace), w.CrossNamespaceACLPolicy); err != nil {
+		serverState, err := w.ConsulServerConnMgr.State()
+		if err != nil {
+			w.Log.Error(err, "error checking or creating namespace",
+				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
+		}
+		apiClient, err := consul.NewClientFromConnMgrState(w.ConsulConfig, serverState)
+		if err != nil {
+			w.Log.Error(err, "error checking or creating namespace",
+				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
+		}
+		if _, err := namespaces.EnsureExists(apiClient, w.consulNamespace(req.Namespace), w.CrossNamespaceACLPolicy); err != nil {
 			w.Log.Error(err, "error checking or creating namespace",
 				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))

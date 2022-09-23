@@ -336,34 +336,6 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
-			name: "upstream with datacenter without ProxyDefaults",
-			pod: func() *corev1.Pod {
-				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
-				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
-				return pod1
-			},
-			expErr:                  "upstream \"upstream1:1234:dc1\" is invalid: there is no ProxyDefaults config to set mesh gateway mode",
-			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
-		},
-		{
-			name: "upstream with datacenter with ProxyDefaults whose mesh gateway mode is not local or remote",
-			pod: func() *corev1.Pod {
-				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
-				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
-				return pod1
-			},
-			expErr: "upstream \"upstream1:1234:dc1\" is invalid: ProxyDefaults mesh gateway mode is neither \"local\" nor \"remote\"",
-			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
-				pd := ce.(*api.ProxyConfigEntry)
-				pd.MeshGateway.Mode = "bad-mode"
-				return pd
-			},
-			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
-		},
-		{
 			name: "annotated upstream error: both peer and partition provided",
 			pod: func() *corev1.Pod {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
@@ -395,54 +367,6 @@ func TestProcessUpstreams(t *testing.T) {
 			expErr:                  "upstream structured incorrectly: upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234",
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: true,
-		},
-		{
-			name: "upstream with datacenter with ProxyDefaults and mesh gateway is in local mode",
-			pod: func() *corev1.Pod {
-				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
-				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
-				return pod1
-			},
-			expected: []api.Upstream{
-				{
-					DestinationType: api.UpstreamDestTypeService,
-					DestinationName: "upstream1",
-					Datacenter:      "dc1",
-					LocalBindPort:   1234,
-				},
-			},
-			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
-				pd := ce.(*api.ProxyConfigEntry)
-				pd.MeshGateway.Mode = api.MeshGatewayModeLocal
-				return pd
-			},
-			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
-		},
-		{
-			name: "upstream with datacenter with ProxyDefaults and mesh gateway in remote mode",
-			pod: func() *corev1.Pod {
-				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
-				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
-				return pod1
-			},
-			expected: []api.Upstream{
-				{
-					DestinationType: api.UpstreamDestTypeService,
-					DestinationName: "upstream1",
-					Datacenter:      "dc1",
-					LocalBindPort:   1234,
-				},
-			},
-			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
-				pd := ce.(*api.ProxyConfigEntry)
-				pd.MeshGateway.Mode = api.MeshGatewayModeRemote
-				return pd
-			},
-			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "when consul is unavailable, we don't return an error",
@@ -668,28 +592,8 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			httpAddr := consul.HTTPAddr
-			if tt.consulUnavailable {
-				httpAddr = "hostname.does.not.exist:8500"
-			}
-			consulClient, err := api.NewClient(&api.Config{
-				Address: httpAddr,
-			})
-			require.NoError(t, err)
-
-			if tt.configEntry != nil {
-				consulClient.ConfigEntries().Set(tt.configEntry(), &api.WriteOptions{})
-			}
-
 			ep := &EndpointsController{
 				Log:                    logrtest.TestLogger{T: t},
-				ConsulClient:           consulClient,
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSetWith(),
 				EnableConsulNamespaces: tt.consulNamespacesEnabled,
@@ -967,16 +871,8 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
 
 			// Register service and proxy in consul.
 			for _, svc := range tt.initialConsulSvcs {
@@ -985,7 +881,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 					Address: ConsulNodeAddress,
 					Service: svc,
 				}
-				_, err = consulClient.Catalog().Register(catalogRegistration, nil)
+				_, err := consulClient.Catalog().Register(catalogRegistration, nil)
 				require.NoError(t, err)
 			}
 
@@ -993,7 +889,8 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
@@ -1793,26 +1690,19 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consul server
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
+			// Create test consulServer server
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
 
 			// Create the endpoints controller.
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
-				ReleaseName:           "consul",
+				ReleaseName:           "consulServer",
 				ReleaseNamespace:      "default",
 			}
 			if tt.metricsEnabled {
@@ -3048,31 +2938,22 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			k8sObjects := append(tt.k8sObjects(), &ns)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consul server.
+			// Create test consulServer server
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				if tt.enableACLs {
 					c.ACL.Enabled = tt.enableACLs
 					c.ACL.Tokens.InitialManagement = adminToken
 				}
 			})
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{Scheme: "http", Address: consul.HTTPAddr}
-			if tt.enableACLs {
-				cfg.Token = adminToken
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
+			consulClient := testClient.APIClient
 
 			// Holds token accessorID for each service ID.
 			tokensForServices := make(map[string]string)
 
 			// Register service and proxy in consul.
 			for _, svc := range tt.initialConsulSvcs {
-				_, err = consulClient.Catalog().Register(svc, nil)
+				_, err := consulClient.Catalog().Register(svc, nil)
 				require.NoError(t, err)
 
 				// Create a token for this service if ACLs are enabled.
@@ -3114,7 +2995,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
@@ -3383,24 +3265,15 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			// Create fake k8s client.
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&ns).Build()
 
-			// Create test consul server.
+			// Create test consulServer server
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				if tt.enableACLs {
-					c.ACL.Enabled = true
+					c.ACL.Enabled = tt.enableACLs
 					c.ACL.Tokens.InitialManagement = adminToken
 				}
 			})
-			require.NoError(t, err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			cfg := &api.Config{Address: consul.HTTPAddr}
-			if tt.enableACLs {
-				cfg.Token = adminToken
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
+			consulClient := testClient.APIClient
 
 			// Register service and proxy in consul
 			var token *api.ACLToken
@@ -3410,7 +3283,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Address: ConsulNodeAddress,
 					Service: svc,
 				}
-				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				_, err := consulClient.Catalog().Register(serviceRegistration, nil)
 				require.NoError(t, err)
 
 				// Create a token for it if ACLs are enabled.
@@ -3444,7 +3317,8 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
@@ -3555,14 +3429,9 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			k8sObjects := []runtime.Object{endpoint, pod1, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test Consul server.
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-			cfg := &api.Config{Address: consul.HTTPAddr}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
+			// Create test consulServer server
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
 
 			// Set up the initial Consul services.
 			if tt.svcInitiallyRegistered {
@@ -3582,7 +3451,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 						},
 					},
 				}
-				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				_, err := consulClient.Catalog().Register(serviceRegistration, nil)
 				require.NoError(t, err)
 				require.NoError(t, err)
 			}
@@ -3591,7 +3460,8 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
@@ -3667,20 +3537,16 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	k8sObjects := []runtime.Object{badEndpoint, endpoint, pod1, &ns}
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-	// Create test Consul server.
-	consul, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
-	defer consul.Stop()
-	consul.WaitForServiceIntentions(t)
-	cfg := &api.Config{Address: consul.HTTPAddr}
-	consulClient, err := api.NewClient(cfg)
-	require.NoError(t, err)
+	// Create test consulServer server
+	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	consulClient := testClient.APIClient
 
 	// Create the endpoints controller.
 	ep := &EndpointsController{
 		Client:                fakeClient,
 		Log:                   logrtest.TestLogger{T: t},
-		ConsulClient:          consulClient,
+		ConsulClientConfig:    testClient.Cfg,
+		ConsulServerConnMgr:   testClient.Watcher,
 		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 		DenyK8sNamespacesSet:  mapset.NewSetWith(),
 		ReleaseName:           "consul",
@@ -3690,7 +3556,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	svcName := badEndpoint.Name
 
 	// Initially register the pod with the bad endpoint
-	_, err = consulClient.Catalog().Register(&api.CatalogRegistration{
+	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
 		Node:    ConsulNodeName,
 		Address: ConsulNodeAddress,
 		Service: &api.AgentService{
@@ -3855,9 +3721,9 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 				_, err = consulClient.Catalog().Register(catalogRegistration, nil)
 				require.NoError(t, err)
 			}
-			ep := EndpointsController{ConsulClient: consulClient}
+			ep := EndpointsController{}
 
-			svcs, err := ep.serviceInstancesForK8SServiceNameAndNamespace(k8sSvc, k8sNS)
+			svcs, err := ep.serviceInstancesForK8SServiceNameAndNamespace(consulClient, k8sSvc, k8sNS)
 			require.NoError(t, err)
 			if len(svcs.Services) > 0 {
 				require.Len(t, svcs, 2)
@@ -5160,7 +5026,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				Log:                    logrtest.TestLogger{T: t},
 			}
 
-			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints, api.HealthPassing)
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(nil, *pod, *endpoints, api.HealthPassing)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {

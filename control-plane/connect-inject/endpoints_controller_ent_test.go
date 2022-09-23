@@ -257,26 +257,18 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			k8sObjects := append(setup.k8sObjects(), &ns)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create testCase Consul server.
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForLeader(t)
+			// Create test consulServer server
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
 
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
-
-			_, err = namespaces.EnsureExists(consulClient, testCase.ExpConsulNS, "")
+			_, err := namespaces.EnsureExists(testClient.APIClient, testCase.ExpConsulNS, "")
 			require.NoError(t, err)
 
 			// Create the endpoints controller.
 			ep := &EndpointsController{
 				Client:                     fakeClient,
 				Log:                        logrtest.TestLogger{T: t},
-				ConsulClient:               consulClient,
+				ConsulClientConfig:         testClient.Cfg,
+				ConsulServerConnMgr:        testClient.Watcher,
 				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:       mapset.NewSetWith(),
 				ReleaseName:                "consul",
@@ -297,8 +289,9 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
 
-			cfg.Namespace = testCase.ExpConsulNS
-			consulClient, err = api.NewClient(cfg)
+			consulConfig := testClient.Cfg
+			consulConfig.APIClientConfig.Namespace = testCase.ExpConsulNS
+			consulClient, err := api.NewClient(consulConfig.APIClientConfig)
 			require.NoError(t, err)
 			// After reconciliation, Consul should have the service with the correct number of instances.
 			serviceInstances, _, err := consulClient.Catalog().Service(setup.consulSvcName, "", &api.QueryOptions{Namespace: testCase.ExpConsulNS})
@@ -1228,29 +1221,18 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects := append(tt.k8sObjects(), &ns)
 				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
+				// Create test consulServer server
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
-				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
-						c.ACL.Enabled = true
+						c.ACL.Enabled = tt.enableACLs
 						c.ACL.Tokens.InitialManagement = adminToken
 					}
 				})
-				require.NoError(t, err)
-				defer consul.Stop()
-				consul.WaitForSerfCheck(t)
 
-				cfg := &api.Config{
-					Scheme:  "http",
-					Address: consul.HTTPAddr,
-				}
-				if tt.enableACLs {
-					cfg.Token = adminToken
-				}
+				consulClient := testClient.APIClient
 
-				consulClient, err := api.NewClient(cfg)
-				require.NoError(t, err)
-
-				_, err = namespaces.EnsureExists(consulClient, ts.ExpConsulNS, "")
+				_, err := namespaces.EnsureExists(consulClient, ts.ExpConsulNS, "")
 				require.NoError(t, err)
 
 				// Holds token accessorID for each service ID.
@@ -1307,7 +1289,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				ep := &EndpointsController{
 					Client:                     fakeClient,
 					Log:                        logrtest.TestLogger{T: t},
-					ConsulClient:               consulClient,
+					ConsulClientConfig:         testClient.Cfg,
+					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
 					DenyK8sNamespacesSet:       mapset.NewSetWith(),
 					ReleaseName:                "consul",
@@ -1332,8 +1315,9 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				require.False(t, resp.Requeue)
 
 				// Create new consul client with the expected consul ns so we can make calls for assertions.
-				cfg.Namespace = ts.ExpConsulNS
-				consulClient, err = api.NewClient(cfg)
+				consulConfig := testClient.Cfg
+				consulConfig.APIClientConfig.Namespace = ts.ExpConsulNS
+				consulClient, err = api.NewClient(consulConfig.APIClientConfig)
 				require.NoError(t, err)
 
 				// After reconciliation, Consul should have service-updated with the correct number of instances.
@@ -1602,28 +1586,17 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				// Create fake k8s client.
 				fakeClient := fake.NewClientBuilder().Build()
 
-				// Create test Consul server.
+				// Create test consulServer server
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
-				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
-						c.ACL.Enabled = true
+						c.ACL.Enabled = tt.enableACLs
 						c.ACL.Tokens.InitialManagement = adminToken
 					}
 				})
-				require.NoError(t, err)
-				defer consul.Stop()
+				consulClient := testClient.APIClient
 
-				consul.WaitForLeader(t)
-				cfg := &api.Config{
-					Address: consul.HTTPAddr,
-				}
-				if tt.enableACLs {
-					cfg.Token = adminToken
-				}
-				consulClient, err := api.NewClient(cfg)
-				require.NoError(t, err)
-
-				_, err = namespaces.EnsureExists(consulClient, ts.ExpConsulNS, "")
+				_, err := namespaces.EnsureExists(consulClient, ts.ExpConsulNS, "")
 				require.NoError(t, err)
 
 				// Register service and proxy in consul.
@@ -1677,7 +1650,8 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				ep := &EndpointsController{
 					Client:                     fakeClient,
 					Log:                        logrtest.TestLogger{T: t},
-					ConsulClient:               consulClient,
+					ConsulClientConfig:         testClient.Cfg,
+					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
 					DenyK8sNamespacesSet:       mapset.NewSetWith(),
 					ReleaseName:                "consul",
@@ -1702,8 +1676,9 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				require.NoError(t, err)
 				require.False(t, resp.Requeue)
 
-				cfg.Namespace = ts.ExpConsulNS
-				consulClient, err = api.NewClient(cfg)
+				consulConfig := testClient.Cfg
+				consulConfig.APIClientConfig.Namespace = ts.ExpConsulNS
+				consulClient, err = api.NewClient(consulConfig.APIClientConfig)
 				require.NoError(t, err)
 
 				// After reconciliation, Consul should not have any instances of service-deleted.
