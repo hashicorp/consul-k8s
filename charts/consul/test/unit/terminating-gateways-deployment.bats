@@ -199,11 +199,21 @@ load _helpers
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.tls.caCert.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+      . | yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr )
   [ "${actual}" != "" ]
+}
+
+@test "terminatingGateways/Deployment: CA cert volume omitted when TLS is enabled with external servers and use system roots" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | yq '.[0]spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr )
+  [ "${actual}" == "" ]
 }
 
 @test "terminatingGateways/Deployment: serviceAccountName is set properly" {
@@ -393,7 +403,7 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "terminatingGateways/Deployment: when global.metrics.enabled=false, does not set proxy setting" {
+@test "terminatingGateways/Deployment: when global.metrics.enabled=false, does not set prometheus annotations" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \

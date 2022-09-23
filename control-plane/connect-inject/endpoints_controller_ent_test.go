@@ -490,12 +490,13 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 
 // Tests updating an Endpoints object when Consul namespaces are enabled.
 //   - Tests updates via the register codepath:
-//     - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated in the correct Consul namespace.
-//     - When an address is added to an Endpoint, an additional service instance in Consul is registered in the correct Consul namespace.
+//   - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated in the correct Consul namespace.
+//   - When an address is added to an Endpoint, an additional service instance in Consul is registered in the correct Consul namespace.
 //   - Tests updates via the deregister codepath:
-//     - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
-//     - When an address is removed from an Endpoint *and there are no addresses left in the Endpoint*, the
+//   - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
+//   - When an address is removed from an Endpoint *and there are no addresses left in the Endpoint*, the
 //     corresponding service instance in Consul is deregistered.
+//
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 // This test covers EndpointsController.deregisterService when services should be selectively deregistered
@@ -1790,6 +1791,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 	t.Parallel()
 
+	consulSvcName := "service-deleted"
 	cases := map[string]struct {
 		ConsulNS string
 	}{
@@ -1803,13 +1805,11 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 	for name, ts := range cases {
 		cases := []struct {
 			name              string
-			consulSvcName     string
 			initialConsulSvcs []*api.AgentService
 			enableACLs        bool
 		}{
 			{
-				name:          "mesh-gateway",
-				consulSvcName: "service-deleted",
+				name: "mesh-gateway",
 				initialConsulSvcs: []*api.AgentService{
 					{
 						ID:      "mesh-gateway",
@@ -1839,8 +1839,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				enableACLs: false,
 			},
 			{
-				name:          "mesh-gateway with ACLs enabled",
-				consulSvcName: "service-deleted",
+				name: "mesh-gateway with ACLs enabled",
 				initialConsulSvcs: []*api.AgentService{
 					{
 						ID:      "mesh-gateway",
@@ -1870,8 +1869,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				enableACLs: true,
 			},
 			{
-				name:          "terminating-gateway",
-				consulSvcName: "service-deleted",
+				name: "terminating-gateway",
 				initialConsulSvcs: []*api.AgentService{
 					{
 						ID:      "terminating-gateway",
@@ -1891,8 +1889,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				enableACLs: false,
 			},
 			{
-				name:          "terminating-gateway with ACLs enabled",
-				consulSvcName: "service-deleted",
+				name: "terminating-gateway with ACLs enabled",
 				initialConsulSvcs: []*api.AgentService{
 					{
 						ID:      "terminating-gateway",
@@ -1951,38 +1948,27 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					}
 					_, err = consulClient.Catalog().Register(serviceRegistration, nil)
 					require.NoError(t, err)
+
 					// Create a token for it if ACLs are enabled.
 					if tt.enableACLs {
-						switch svc.Kind {
-						case api.ServiceKindMeshGateway:
-							var writeOpts api.WriteOptions
+						var writeOpts api.WriteOptions
+						if svc.Kind == api.ServiceKindMeshGateway {
 							writeOpts.Namespace = "default" // Mesh Gateways must always be registered in the "default" namespace.
-							test.SetupK8sAuthMethod(t, consulClient, svc.Service, svc.Meta[MetaKeyKubeNS])
-							token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
-								AuthMethod:  test.AuthMethod,
-								BearerToken: test.ServiceAccountJWTToken,
-								Meta: map[string]string{
-									TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
-									"component":         svc.ID,
-								},
-							}, &writeOpts)
-
-							require.NoError(t, err)
-						default:
-							var writeOpts api.WriteOptions
-							// When mirroring is enabled, the auth method will be created in the "default" Consul namespace.
+						} else {
 							writeOpts.Namespace = ts.ConsulNS
-							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[MetaKeyKubeNS], ts.ConsulNS, false, "")
-							token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
-								AuthMethod:  test.AuthMethod,
-								BearerToken: test.ServiceAccountJWTToken,
-								Meta: map[string]string{
-									TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
-								},
-							}, &writeOpts)
-
-							require.NoError(t, err)
 						}
+
+						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[MetaKeyKubeNS], writeOpts.Namespace, false, "")
+						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
+							AuthMethod:  test.AuthMethod,
+							BearerToken: test.ServiceAccountJWTToken,
+							Meta: map[string]string{
+								TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+								"component":         svc.ID,
+							},
+						}, &writeOpts)
+
+						require.NoError(t, err)
 					}
 				}
 
@@ -2017,18 +2003,9 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				require.NoError(t, err)
 
 				// After reconciliation, Consul should not have any instances of service-deleted.
-				if tt.consulSvcName == "mesh-gateway" {
-					gatewayInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", &api.QueryOptions{Namespace: "default"})
-					require.NoError(t, err)
-					require.Empty(t, gatewayInstances)
-				} else {
-					serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", &api.QueryOptions{Namespace: ts.ConsulNS})
-					require.NoError(t, err)
-					require.Empty(t, serviceInstances)
-					proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", &api.QueryOptions{Namespace: ts.ConsulNS})
-					require.NoError(t, err)
-					require.Empty(t, proxyServiceInstances)
-				}
+				serviceInstances, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{Namespace: ts.ConsulNS})
+				require.NoError(t, err)
+				require.Empty(t, serviceInstances)
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
@@ -2093,5 +2070,4 @@ func createGatewayWithNamespace(name, namespace, ip string, annotations map[stri
 		},
 	}
 	return pod
-
 }

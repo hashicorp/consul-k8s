@@ -198,9 +198,11 @@ spec:
             - name: consul-service
               mountPath: /consul/service
             {{- if $root.Values.global.tls.enabled }}
+            {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
             {{- end }}
           resources:
             requests:
@@ -217,9 +219,11 @@ spec:
               mountPath: /consul/service
               readOnly: true
             {{- if $root.Values.global.tls.enabled }}
+            {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
             {{- end }}
             {{- range (default $defaults.extraVolumes .extraVolumes) }}
             - name: userconfig-{{ .name }}
