@@ -1007,7 +1007,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # consul namespaces
 
-@test "terminatingGateways/Deployment: namespace command flag is not present by default" {
+@test "terminatingGateways/Deployment: namespace annotation is not present by default" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
