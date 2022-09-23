@@ -372,7 +372,7 @@ load _helpers
   [ "${actual}" = "/metrics" ]
 }
 
-@test "terminatingGateways/Deployment: when global.metrics.enableGatewayMetrics=false, does not set proxy setting" {
+@test "terminatingGateways/Deployment: when global.metrics.enableGatewayMetrics=false, does not set prometheus annotations" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
