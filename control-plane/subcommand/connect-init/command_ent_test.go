@@ -85,7 +85,7 @@ func TestRun_WithNamespaces(t *testing.T) {
 			// CONSUL_HTTP_ADDR when it processes the command template.
 			flags := []string{"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-addresses", "exec=echo 127.0.0.1",
+				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-namespace", c.consulServiceNamespace,

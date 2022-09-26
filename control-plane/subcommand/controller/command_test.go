@@ -27,12 +27,12 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-datacenter must be set",
 		},
 		{
-			flags:  []string{"-webhook-tls-cert-dir", "/foo", "-datacenter", "foo"},
-			expErr: "-consul-api-timeout must be set to a value greater than 0",
+			flags:  []string{"-webhook-tls-cert-dir", "/foo", "-datacenter", "foo", "-api-timeout=0s"},
+			expErr: "-api-timeout must be set to a value greater than 0",
 		},
 		{
 			flags: []string{"-webhook-tls-cert-dir", "/foo", "-datacenter", "foo",
-				"-consul-api-timeout", "5s", "-log-level", "invalid"},
+				"-log-level", "invalid"},
 			expErr: `unknown log level "invalid": unrecognized level: "invalid"`,
 		},
 	}

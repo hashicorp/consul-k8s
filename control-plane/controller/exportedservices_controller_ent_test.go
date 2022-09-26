@@ -12,8 +12,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,14 +94,9 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
 			ctx := context.Background()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
 
@@ -110,7 +105,8 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
 				ConfigEntryController: &controller.ConfigEntryController{
-					ConsulClient:               consulClient,
+					ConsulClientConfig:         testClient.Cfg,
+					ConsulServerConnMgr:        testClient.Watcher,
 					EnableConsulNamespaces:     true,
 					EnableNSMirroring:          c.Mirror,
 					NSMirroringPrefix:          c.MirrorPrefix,
@@ -214,15 +210,9 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
 			ctx := context.Background()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
-
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
 
 			controller := &controller.ExportedServicesController{
@@ -230,7 +220,8 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
 				ConfigEntryController: &controller.ConfigEntryController{
-					ConsulClient:               consulClient,
+					ConsulClientConfig:         testClient.Cfg,
+					ConsulServerConnMgr:        testClient.Watcher,
 					EnableConsulNamespaces:     true,
 					EnableNSMirroring:          c.Mirror,
 					NSMirroringPrefix:          c.MirrorPrefix,
@@ -259,7 +250,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 			// Now update it.
 			{
 				// First get it so we have the latest revision number.
-				err = fakeClient.Get(ctx, types.NamespacedName{
+				err := fakeClient.Get(ctx, types.NamespacedName{
 					Namespace: c.SourceKubeNS,
 					Name:      exportedServices.KubernetesName(),
 				}, exportedServices)
@@ -267,7 +258,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 
 				// Update the resource.
 				exportedServices.Spec.Services[0].Name = "backend"
-				err := fakeClient.Update(ctx, exportedServices)
+				err = fakeClient.Update(ctx, exportedServices)
 				req.NoError(err)
 
 				resp, err := controller.Reconcile(ctx, ctrl.Request{
@@ -356,14 +347,9 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
 
@@ -372,7 +358,8 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
 				ConfigEntryController: &controller.ConfigEntryController{
-					ConsulClient:               consulClient,
+					ConsulClientConfig:         testClient.Cfg,
+					ConsulServerConnMgr:        testClient.Watcher,
 					EnableConsulNamespaces:     true,
 					EnableNSMirroring:          c.Mirror,
 					NSMirroringPrefix:          c.MirrorPrefix,
