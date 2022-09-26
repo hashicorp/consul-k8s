@@ -61,6 +61,21 @@ load _helpers
   [[ "$output" =~ "global.acls.createReplicationToken must be true when global.acls.manageSystemACLs is true because the federation secret must include the replication token" ]]
 }
 
+@test "createFederationSecret/Job: disabled by updatepartition != 0" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      --set 'global.acls.createReplicationToken=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'server.updatePartition=1' \
+      .
+}
+
 @test "createFederationSecret/Job: mounts auto-created ca secrets by default" {
   cd `chart_dir`
   local volumes=$(helm template \
