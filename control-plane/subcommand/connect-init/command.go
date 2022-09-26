@@ -75,7 +75,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagACLTokenSink, "acl-token-sink", defaultTokenSinkFile, "File name where where ACL token should be saved.")
 	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
-	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of Consul gateway that is being registered.")
+	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of gateway that is being registered: ingress-gateway, terminating-gateway, or mesh-gateway.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -328,7 +328,6 @@ func (c *Command) validateFlags() error {
 	if c.flagConsulNodeName == "" {
 		return errors.New("-consul-node-name must be set")
 	}
-
 	if c.http.ConsulAPITimeout() <= 0 {
 		return errors.New("-consul-api-timeout must be set to a value greater than 0")
 	}
