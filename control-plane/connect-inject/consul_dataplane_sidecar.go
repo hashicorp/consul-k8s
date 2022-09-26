@@ -12,14 +12,26 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	resources, err := w.sidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
+	// Extract the service account token's volume mount.
+	var bearerTokenFile string
+	var saTokenVolumeMount corev1.VolumeMount
+	if w.AuthMethod != "" {
+		saTokenVolumeMount, bearerTokenFile, err = findServiceAccountVolumeMount(pod, mpi.serviceName)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+	}
+
 	multiPort := mpi.serviceName != ""
-	cmd, err := w.getContainerSidecarCommand(namespace, mpi)
+	cmd, err := w.getContainerSidecarCommand(namespace, mpi, bearerTokenFile, pod.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -61,14 +73,18 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		LivenessProbe:  probe,
 	}
 
+	if w.AuthMethod != "" {
+		container.VolumeMounts = append(container.VolumeMounts, saTokenVolumeMount)
+	}
+
 	// Add any extra VolumeMounts.
 	if _, ok := pod.Annotations[annotationConsulSidecarUserVolumeMount]; ok {
-		var volumeMount []corev1.VolumeMount
-		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolumeMount]), &volumeMount)
+		var volumeMounts []corev1.VolumeMount
+		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolumeMount]), &volumeMounts)
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		container.VolumeMounts = append(container.VolumeMounts, volumeMount...)
+		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
@@ -106,15 +122,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	return container, nil
 }
 
-func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi multiPortInfo) ([]string, error) {
+func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile, podName string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	if mpi.serviceName != "" {
 		proxyIDFileName = fmt.Sprintf("/consul/connect-inject/proxyid-%s", mpi.serviceName)
 	}
-	aclTokenFile := "/consul/connect-inject/acl-token"
-	if mpi.serviceName != "" {
-		aclTokenFile = fmt.Sprintf("/consul/connect-inject/acl-token-%s", mpi.serviceName)
-	}
+
 	cmd := []string{
 		"consul-dataplane",
 		"-addresses=" + w.ConsulAddress,
@@ -125,7 +138,22 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 	}
 	if w.AuthMethod != "" {
-		cmd = append(cmd, "-static-token="+fmt.Sprintf("$(cat %s)", aclTokenFile))
+		cmd = append(cmd,
+			"-credential-type=login",
+			"-login-method="+w.AuthMethod,
+			"-login-bearer-path="+bearerTokenFile,
+			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, podName),
+		)
+		if w.EnableNamespaces {
+			if w.EnableK8SNSMirroring {
+				cmd = append(cmd, "-login-namespace=default")
+			} else {
+				cmd = append(cmd, "-login-namespace="+w.consulNamespace(namespace.Name))
+			}
+		}
+		if w.ConsulPartition != "" {
+			cmd = append(cmd, "-login-partition="+w.ConsulPartition)
+		}
 	}
 	if w.EnableNamespaces {
 		cmd = append(cmd, "-service-namespace="+w.consulNamespace(namespace.Name))
@@ -134,10 +162,12 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, "-service-partition="+w.ConsulPartition)
 	}
 	if w.TLSEnabled {
-		cmd = append(cmd, "-tls-enabled", "-tls-server-name="+w.ConsulTLSServerName)
+		cmd = append(cmd, "-tls-server-name="+w.ConsulTLSServerName)
 		if w.ConsulCACert != "" {
-			cmd = append(cmd, "-tls-ca-certs-path=/consul/connect-inject/consul-ca.pem")
+			cmd = append(cmd, "-ca-certs="+ConsulCAFile)
 		}
+	} else {
+		cmd = append(cmd, "-tls-disabled")
 	}
 
 	if mpi.serviceName != "" {
