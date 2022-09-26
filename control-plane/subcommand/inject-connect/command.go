@@ -14,7 +14,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -358,13 +357,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Create Consul API config object.
-	apiClientConfig := c.consul.ConsulAPIClientConfig()
-	consulConfig := &consul.Config{
-		APIClientConfig: apiClientConfig,
-		HTTPPort:        c.consul.HTTPPort,
-		GRPCPort:        c.consul.GRPCPort,
-		APITimeout:      c.consul.APITimeout,
-	}
+	consulConfig := c.consul.ConsulClientConfig()
 
 	var caCertPem []byte
 	if c.consul.CACertFile != "" {
@@ -380,7 +373,7 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
 
-	// Start Consul server Connection manager
+	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
@@ -533,7 +526,6 @@ func (c *Command) Run(args []string) int {
 			Log:                           ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                      c.flagLogLevel,
 			LogJSON:                       c.flagLogJSON,
-			ConsulAPITimeout:              c.consul.APITimeout,
 		}})
 
 	if c.flagEnableWebhookCAUpdate {
@@ -577,7 +569,6 @@ func (c *Command) validateFlags() error {
 		return errors.New("-consul-dataplane-image must be set")
 	}
 
-	// todo: do we need enable-partitions?
 	if c.flagEnablePartitions && c.consul.Partition == "" {
 		return errors.New("-partition must set if -enable-partitions is set to 'true'")
 	}

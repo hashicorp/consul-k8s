@@ -86,23 +86,23 @@ spec:
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" . }}-mesh-gateway
       volumes:
-        - name: consul-service
-          emptyDir:
-            medium: "Memory"
-        {{- if .Values.global.tls.enabled }}
-        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-        - name: consul-ca-cert
-          secret:
-            {{- if .Values.global.tls.caCert.secretName }}
-            secretName: {{ .Values.global.tls.caCert.secretName }}
-            {{- else }}
-            secretName: {{ template "consul.fullname" . }}-ca-cert
-            {{- end }}
-            items:
-            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
-              path: tls.crt
-        {{- end }}
-        {{- end }}
+      - name: consul-service
+        emptyDir:
+          medium: "Memory"
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+          secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+            path: tls.crt
+      {{- end }}
+      {{- end }}
       {{- if .Values.meshGateway.hostNetwork }}
       hostNetwork: {{ .Values.meshGateway.hostNetwork }}
       {{- end }}
@@ -110,136 +110,156 @@ spec:
       dnsPolicy: {{ .Values.meshGateway.dnsPolicy }}
       {{- end }}
       initContainers:
-        - name: mesh-gateway-init
-          image: {{ .Values.global.imageK8S }}
-          env:
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          {{- if .Values.global.tls.enabled }}
-          - name: CONSUL_CACERT
-            value: /consul/tls/ca/tls.crt
+      - name: mesh-gateway-init
+        image: {{ .Values.global.imageK8S }}
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_AUTH_METHOD
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+          {{- else }}
+          value: {{ template "consul.fullname" . }}-k8s-component-auth-method
           {{- end }}
-          - name: CONSUL_HTTP_ADDR
-            {{- if .Values.global.tls.enabled }}
-            value: "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501"
-            {{- else }}
-            value: "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500"
-            {{- end }}
-          command:
-            - "/bin/sh"
-            - "-ec"
-            - |
-               consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-                -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
-                -gateway-kind="mesh-gateway" \
-                -consul-node-name="k8s-service-mesh" \
-                -proxy-id-file=/consul/service/proxy-id \
-                {{- if .Values.global.adminPartitions.enabled }}
-                -partition={{ .Values.global.adminPartitions.name }} \
-                {{- end }}
-                {{- if .Values.global.acls.manageSystemACLs }}
-                -acl-token-sink=/consul/service/acl-token \
-                {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-                -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-                -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
-                {{- else }}
-                -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
-                {{- end }}
-                {{- end }}
-                -service-name={{ .Values.meshGateway.consulServiceName }} \
-                -log-level={{ default .Values.global.logLevel }} \
-                -log-json={{ .Values.global.logJSON }}
-          volumeMounts:
-            - name: consul-service
-              mountPath: /consul/service
-            {{- if .Values.global.tls.enabled }}
-            - name: consul-ca-cert
-              mountPath: /consul/tls/ca
-              readOnly: true
-            {{- end }}
-          {{- if .Values.meshGateway.initServiceInitContainer.resources }}
-          resources: {{ toYaml .Values.meshGateway.initServiceInitContainer.resources | nindent 12 }}
+        - name: CONSUL_LOGIN_DATACENTER
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          value: {{ .Values.global.federation.primaryDatacenter }}
+          {{- else }}
+          value: {{ .Values.global.datacenter }}
           {{- end }}
+        - name: CONSUL_LOGIN_META
+          value: "component=mesh-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
+        {{- end }}
+        command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+           -gateway-kind="mesh-gateway" \
+           -consul-node-name="k8s-service-mesh" \
+           -proxy-id-file=/consul/service/proxy-id \
+           -service-name={{ .Values.meshGateway.consulServiceName }} \
+           -log-level={{ default .Values.global.logLevel }} \
+           -log-json={{ .Values.global.logJSON }}
+        volumeMounts:
+        - name: consul-service
+          mountPath: /consul/service
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        {{- if .Values.meshGateway.initServiceInitContainer.resources }}
+        resources: {{ toYaml .Values.meshGateway.initServiceInitContainer.resources | nindent 10 }}
+        {{- end }}
       containers:
-        - name: mesh-gateway
-          image: {{ .Values.global.imageConsulDataplane | quote }}
-          {{- if .Values.meshGateway.resources }}
-          resources:
+      - name: mesh-gateway
+        image: {{ .Values.global.imageConsulDataplane | quote }}
+        {{- if .Values.meshGateway.resources }}
+        resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
             {{ tpl .Values.meshGateway.resources . | nindent 12 | trim }}
             {{- else }}
             {{- toYaml .Values.meshGateway.resources | nindent 12 }}
             {{- end }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: /consul/service
+          name: consul-service
+          readOnly: true
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          consul-dataplane \
+            {{- if .Values.externalServers.enabled }}
+            -addresses={{ .Values.externalServers.hosts | first }} \
+            {{- else }}
+            -addresses="{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc" \
+            {{- end }}
+            {{- if .Values.externalServers.enabled }}
+            -grpc-port={{ .Values.externalServers.grpcPort }} \
+            {{- else }}
+            -grpc-port=8502 \
+            {{- end }}
+            -proxy-service-id=$POD_NAME \
+            -service-node-name="k8s-service-mesh" \
+            {{- if and .Values.global.tls.enabled }}
+            {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+            -ca-certs=/consul/tls/ca/tls.crt \
+            {{- end }}
+            {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+            -tls-server-name={{.Values.externalServers.tlsServerName }} \
+            {{- else }}
+            -tls-server-name=server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }} \
+            {{- end }}
+            {{- else }}
+            -tls-disabled \
+            {{- end }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            -credential-type=login \
+            -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
+            -login-meta=component=mesh-gateway \
+            -login-meta=pod=${NAMESPACE}/${POD_NAME} \
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            -login-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+            -login-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            {{- else }}
+            -login-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            -login-partition={{ .Values.global.adminPartitions.name }} \
+            {{- end }}
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            -service-partition={{ .Values.global.adminPartitions.name }} \
+            {{- end }}
+            -log-level={{ default .Values.global.logLevel }} \
+            -log-json={{ .Values.global.logJSON }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.meshGateway.containerPort }}
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.meshGateway.containerPort }}
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        ports:
+        - name: gateway
+          containerPort: {{ .Values.meshGateway.containerPort }}
+          {{- if .Values.meshGateway.hostPort }}
+          hostPort: {{ .Values.meshGateway.hostPort }}
           {{- end }}
-          volumeMounts:
-          - mountPath: /consul/service
-            name: consul-service
-            readOnly: true
-          {{- if .Values.global.tls.enabled }}
-          - name: consul-ca-cert
-            mountPath: /consul/tls/ca
-            readOnly: true
-          {{- end }}
-          env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-          command:
-            - /bin/sh
-            - -ec
-            - |
-              consul-dataplane -addresses="{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc" \
-              -grpc-port=8502 \
-              -proxy-service-id=$POD_NAME \
-              -service-node-name="k8s-service-mesh" \
-              {{- if .Values.global.tls.enabled }}
-              -tls-enabled \
-              -tls-ca-certs-path=/consul/tls/ca/tls.crt \
-              -tls-server-name="server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}" \
-              {{- end }}
-              {{- if .Values.global.acls.manageSystemACLs }}
-              -static-token="$(cat /consul/service/acl-token)" \
-              {{- end }}
-              {{- if .Values.global.adminPartitions.enabled }}
-              -service-partition={{ .Values.global.adminPartitions.name }} \
-              {{- end }}
-          livenessProbe:
-            tcpSocket:
-              port: {{ .Values.meshGateway.containerPort }}
-            failureThreshold: 3
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-          readinessProbe:
-            tcpSocket:
-              port: {{ .Values.meshGateway.containerPort }}
-            failureThreshold: 3
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-          ports:
-            - name: gateway
-              containerPort: {{ .Values.meshGateway.containerPort }}
-              {{- if .Values.meshGateway.hostPort }}
-              hostPort:  {{ .Values.meshGateway.hostPort }}
-              {{- end }}
       {{- if .Values.meshGateway.priorityClassName }}
       priorityClassName: {{ .Values.meshGateway.priorityClassName | quote }}
       {{- end }}

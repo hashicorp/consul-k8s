@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -173,13 +172,9 @@ type MeshWebhook struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
-	// ConsulAPITimeout is the duration that the consul API client will
-	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout time.Duration
-
 	// Log
 	Log logr.Logger
-	// Log settings for consul-dataplane
+	// Log settings for consul-dataplane and connect-init containers.
 	LogLevel string
 	LogJSON  bool
 
@@ -648,11 +643,11 @@ func portValue(pod corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
-func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcName string) (corev1.VolumeMount, string, error) {
+func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (corev1.VolumeMount, string, error) {
 	// In the case of a multiPort pod, there may be another service account
 	// token mounted as a different volume. Its name must be <svc>-serviceaccount.
 	// If not we'll fall back to the service account for the pod.
-	if multiPort {
+	if multiPortSvcName != "" {
 		for _, v := range pod.Spec.Volumes {
 			if v.Name == fmt.Sprintf("%s-service-account", multiPortSvcName) {
 				mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
