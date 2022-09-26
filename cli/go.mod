@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/go-hclog v0.16.2
-	github.com/hashicorp/hcp-sdk-go v0.0.0-00010101000000-000000000000
+	github.com/hashicorp/hcp-sdk-go v0.23.1-0.20220921131124-49168300a7dc
 	github.com/kr/text v0.2.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/cli v1.1.2
@@ -108,6 +108,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
@@ -133,6 +134,7 @@ require (
 	github.com/russross/blackfriday v1.5.2 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
@@ -169,11 +171,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
 
-replace (
-	// This replace directive is to avoid having to manually bump the version of the charts module upon changes to the Helm
-	// chart. When the CLI compiles, all changes to the local charts directory are picked up automatically. This directive
-	// works because of the monorepo setup, where the charts module and CLI module are in the same repository. Otherwise,
-	// this won't work.
-	github.com/hashicorp/consul-k8s/charts => ../charts
-	github.com/hashicorp/hcp-sdk-go => github.com/hashicorp/hcp-sdk-go-internal v0.0.0-20220810133347-f88d33e2d02b
-)
+// This replace directive is to avoid having to manually bump the version of the charts module upon changes to the Helm
+// chart. When the CLI compiles, all changes to the local charts directory are picked up automatically. This directive
+// works because of the monorepo setup, where the charts module and CLI module are in the same repository. Otherwise,
+// this won't work.
+replace github.com/hashicorp/consul-k8s/charts => ../charts
