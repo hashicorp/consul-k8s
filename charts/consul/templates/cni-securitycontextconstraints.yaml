@@ -15,9 +15,9 @@ metadata:
       to run consul-cni.
 allowHostDirVolumePlugin: true
 allowHostIPC: false
-allowHostNetwork: true
+allowHostNetwork: false
 allowHostPID: false
-allowHostPorts: true
+allowHostPorts: false
 allowPrivilegeEscalation: true
 allowPrivilegedContainer: true
 allowedCapabilities: null
