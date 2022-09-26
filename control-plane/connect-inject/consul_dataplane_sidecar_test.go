@@ -20,18 +20,47 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 		additionalExpCmdArgs string
 	}{
 		"default": {
-			webhookSetupFunc: nil,
+			webhookSetupFunc:     nil,
+			additionalExpCmdArgs: " -tls-disabled",
 		},
 		"with custom gRPC port": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulConfig.GRPCPort = 8602
 			},
+			additionalExpCmdArgs: " -tls-disabled",
 		},
 		"with ACLs": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.AuthMethod = "test-auth-method"
 			},
-			additionalExpCmdArgs: " -static-token=$(cat /consul/connect-inject/acl-token)",
+			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+				"-login-meta=pod=k8snamespace/test-pod -tls-disabled",
+		},
+		"with ACLs and namespace mirroring": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.AuthMethod = "test-auth-method"
+				w.EnableNamespaces = true
+				w.EnableK8SNSMirroring = true
+			},
+			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled",
+		},
+		"with ACLs and single destination namespace": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.AuthMethod = "test-auth-method"
+				w.EnableNamespaces = true
+				w.ConsulDestinationNamespace = "test-ns"
+			},
+			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled",
+		},
+		"with ACLs and partitions": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.AuthMethod = "test-auth-method"
+				w.ConsulPartition = "test-part"
+			},
+			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled",
 		},
 		"with TLS and CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -39,28 +68,28 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulTLSServerName = "server.dc1.consul"
 				w.ConsulCACert = "consul-ca-cert"
 			},
-			additionalExpCmdArgs: " -tls-enabled -tls-server-name=server.dc1.consul -tls-ca-certs-path=/consul/connect-inject/consul-ca.pem",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem",
 		},
 		"with TLS and no CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.TLSEnabled = true
 				w.ConsulTLSServerName = "server.dc1.consul"
 			},
-			additionalExpCmdArgs: " -tls-enabled -tls-server-name=server.dc1.consul",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul",
 		},
 		"with single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "consul-namespace"
 			},
-			additionalExpCmdArgs: " -service-namespace=consul-namespace",
+			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled",
 		},
 		"with namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -service-namespace=k8snamespace",
+			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled",
 		},
 		"with namespace mirroring prefix": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -68,24 +97,26 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 				w.K8SNSMirroringPrefix = "foo-"
 			},
-			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace",
+			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled",
 		},
 		"with partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulPartition = "partition-1"
 			},
-			additionalExpCmdArgs: " -service-partition=partition-1",
+			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled",
 		},
 		"with different log level": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 			},
+			additionalExpCmdArgs: " -tls-disabled",
 		},
 		"with different log level and log json": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 				w.LogJSON = true
 			},
+			additionalExpCmdArgs: " -tls-disabled",
 		},
 	}
 
@@ -113,7 +144,20 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 						{
 							Name: "web",
 						},
+						{
+							Name: "web-side",
+						},
+						{
+							Name: "auth-method-secret",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "service-account-secret",
+									MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+								},
+							},
+						},
 					},
+					ServiceAccountName: "web",
 				},
 			}
 
@@ -127,12 +171,26 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + c.additionalExpCmdArgs}
 			require.Equal(t, container.Command, expCmd)
 
-			require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
-				{
-					Name:      volumeName,
-					MountPath: "/consul/connect-inject",
-				},
-			})
+			if w.AuthMethod != "" {
+				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+					{
+						Name:      volumeName,
+						MountPath: "/consul/connect-inject",
+					},
+					{
+						Name:      "service-account-secret",
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+					},
+				})
+			} else {
+				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+					{
+						Name:      volumeName,
+						MountPath: "/consul/connect-inject",
+					},
+				})
+			}
+
 			expectedProbe := &corev1.Probe{
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
@@ -229,20 +287,42 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
 					Annotations: map[string]string{
 						annotationService: "web,web-admin",
 					},
 				},
 
 				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "web-admin-service-account",
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name: "web",
 						},
 						{
+							Name: "web-side",
+						},
+						{
 							Name: "web-admin",
 						},
+						{
+							Name: "web-admin-side",
+						},
+						{
+							Name: "auth-method-secret",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "service-account-secret",
+									MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+								},
+							},
+						},
 					},
+					ServiceAccountName: "web",
 				},
 			}
 			multiPortInfos := []multiPortInfo{
@@ -256,14 +336,31 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				},
 			}
 			expCommand := [][]string{
-				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-admin-bind-port=19000"},
-				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-admin-bind-port=19001"},
+				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
+					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -tls-disabled -envoy-admin-bind-port=19000"},
+				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
+					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -tls-disabled -envoy-admin-bind-port=19001"},
 			}
 			if aclsEnabled {
 				expCommand = [][]string{
-					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -static-token=$(cat /consul/connect-inject/acl-token-web) -envoy-admin-bind-port=19000"},
-					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) -service-node-name=k8s-service-mesh -log-level=info -log-json=false -static-token=$(cat /consul/connect-inject/acl-token-web-admin) -envoy-admin-bind-port=19001"},
+					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
+						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -credential-type=login -login-method=test-auth-method " +
+						"-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000"},
+					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
+						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -credential-type=login -login-method=test-auth-method " +
+						"-login-bearer-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001"},
 				}
+			}
+			expSAVolumeMounts := []corev1.VolumeMount{
+				{
+					Name:      "service-account-secret",
+					MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+				},
+				{
+					Name:      "web-admin-service-account",
+					MountPath: "/consul/serviceaccount-web-admin",
+					ReadOnly:  true,
+				},
 			}
 
 			for i, expCmd := range expCommand {
@@ -271,12 +368,22 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expCmd, container.Command)
 
-				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
-					{
-						Name:      volumeName,
-						MountPath: "/consul/connect-inject",
-					},
-				})
+				if w.AuthMethod != "" {
+					require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: "/consul/connect-inject",
+						},
+						expSAVolumeMounts[i],
+					})
+				} else {
+					require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: "/consul/connect-inject",
+						},
+					})
+				}
 
 				port := EnvoyInboundListenerPort + i
 				expectedProbe := &corev1.Probe{
