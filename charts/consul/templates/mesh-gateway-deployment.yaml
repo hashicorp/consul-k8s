@@ -34,7 +34,7 @@ spec:
         consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/gateway-kind": "mesh"
+        "consul.hashicorp.com/gateway-kind": "mesh-gateway"
         "consul.hashicorp.com/mesh-gateway-consul-service-name": "{{ .Values.meshGateway.consulServiceName }}"
         "consul.hashicorp.com/mesh-gateway-wan-address-source": "{{ .Values.meshGateway.wanAddress.source }}"
         "consul.hashicorp.com/mesh-gateway-container-port": "{{ .Values.meshGateway.containerPort }}"

@@ -47,6 +47,10 @@ const (
 	// WAN port for the mesh-gateway service registration.
 	annotationMeshGatewayWANPort = "consul.hashicorp.com/mesh-gateway-wan-port"
 
+	// annotationGatewayNamespace is the key of the annotation that indicates the
+	// Consul namespace where a Terminating or Ingress Gateway pod is deployed.
+	annotationGatewayNamespace = "consul.hashicorp.com/gateway-namespace"
+
 	// annotationInjectMountVolumes is the key of the annotation that controls whether
 	// the data volume that connect inject uses to store data including the Consul ACL token
 	// is mounted to other containers in the pod. It is a comma-separated list of container names

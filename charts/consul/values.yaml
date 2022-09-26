@@ -2799,18 +2799,6 @@ terminatingGateways:
         memory: "100Mi"
         cpu: "100m"
 
-    # The resource settings for the `copy-consul-bin` init container.
-    # @recurse: false
-    # @type: map
-    initCopyConsulContainer:
-      resources:
-        requests:
-          memory: "25Mi"
-          cpu: "50m"
-        limits:
-          memory: "150Mi"
-          cpu: "50m"
-
     # By default, we set an anti-affinity so that two of the same gateway pods
     # won't be on the same node. NOTE: Gateways require that Consul client agents are
     # also running on the nodes alongside each gateway pod.
