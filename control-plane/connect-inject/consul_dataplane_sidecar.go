@@ -12,13 +12,15 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	resources, err := w.sidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
-	// Extract the service account token's volume mount
+	// Extract the service account token's volume mount.
 	var bearerTokenFile string
 	var saTokenVolumeMount corev1.VolumeMount
 	if w.AuthMethod != "" {
@@ -162,7 +164,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 	if w.TLSEnabled {
 		cmd = append(cmd, "-tls-server-name="+w.ConsulTLSServerName)
 		if w.ConsulCACert != "" {
-			cmd = append(cmd, "-ca-certs=/consul/connect-inject/consul-ca.pem")
+			cmd = append(cmd, "-ca-certs="+ConsulCAFile)
 		}
 	} else {
 		cmd = append(cmd, "-tls-disabled")

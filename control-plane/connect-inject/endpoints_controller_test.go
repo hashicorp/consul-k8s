@@ -1849,7 +1849,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consulServer server
+			// Create test consulServer server.
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 

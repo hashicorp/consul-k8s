@@ -373,7 +373,7 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
 
-	// Start Consul server Connection manager
+	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))

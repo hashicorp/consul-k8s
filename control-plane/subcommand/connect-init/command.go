@@ -113,16 +113,16 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
 
-	// Start Consul server Connection manager
+	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
-	// Disable server watch because we don't we only need to get server IPs once.
+	// Disable server watch because we we only need to get server IPs once.
 	serverConnMgrCfg.ServerWatchDisabled = true
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
 		return 1
 	}
 	if c.watcher == nil {
-		c.watcher, err = discovery.NewWatcher(ctx, serverConnMgrCfg, c.logger.Named("consul-server-connection-manger"))
+		c.watcher, err = discovery.NewWatcher(ctx, serverConnMgrCfg, c.logger.Named("consul-server-connection-manager"))
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("unable to create Consul server watcher: %s", err))
 			return 1
@@ -172,7 +172,7 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
-		if err = common.WriteFileWithPerms("/consul/connect-inject/consul-ca.pem", c.consul.CACertPEM, 0444); err != nil {
+		if err = common.WriteFileWithPerms(connectinject.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
 			c.logger.Error("error writing CA cert file", "error", err)
 			return 1
 		}
