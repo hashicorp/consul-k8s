@@ -28,7 +28,8 @@ const (
 	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
 	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
 
-	ACLTokenEnvVar = "CONSUL_ACL_TOKEN"
+	ACLTokenEnvVar     = "CONSUL_ACL_TOKEN"
+	ACLTokenFileEnvVar = "CONSUL_ACL_TOKEN_FILE"
 
 	LoginAuthMethodEnvVar      = "CONSUL_LOGIN_AUTH_METHOD"
 	LoginBearerTokenFileEnvVar = "CONSUL_LOGIN_BEARER_TOKEN_FILE"
@@ -65,7 +66,8 @@ type ConsulTLSFlags struct {
 type ConsulACLFlags struct {
 	ConsulLogin ConsulLoginFlags
 
-	Token string
+	Token     string
+	TokenFile string
 }
 
 type ConsulLoginFlags struct {
@@ -117,7 +119,7 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 	fs.StringVar(&f.Addresses, "addresses", os.Getenv(AddressesEnvVar),
 		"Consul server addresses. Can also be provided via CONSUL_ADDRESSES environment variable. "+
 			"Value can be:\n"+
-			"1. DNS name (that resolves to servers or DNS name of a load-balancer front of Consul servers); OR\n"+
+			"1. DNS name (that resolves to servers or DNS name of a load-balancer front of Consul servers) or an IP address; OR\n"+
 			"2.'exec=<executable with optional args>'. The executable\n"+
 			"	a) on success - should exit 0 and print to stdout whitespace delimited IP (v4/v6) addresses\n"+
 			"	b) on failure - exit with a non-zero code and optionally print an error message of upto 1024 bytes to stderr.\n"+
@@ -143,6 +145,9 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 	fs.StringVar(&f.Token, "token", os.Getenv(ACLTokenEnvVar),
 		"ACL token to use for connection to Consul."+
 			"This can also be specified via the CONSUL_ACL_TOKEN environment variable.")
+	fs.StringVar(&f.TokenFile, "token-file", os.Getenv(ACLTokenFileEnvVar),
+		"ACL token file to use for connection to Consul."+
+			"This can also be specified via the CONSUL_ACL_TOKEN_FILE environment variable.")
 	fs.StringVar(&f.ConsulLogin.AuthMethod, "auth-method-name", os.Getenv(LoginAuthMethodEnvVar),
 		"Auth method name to use for login to Consul."+
 			"This can also be specified via the CONSUL_LOGIN_AUTH_METHOD environment variable.")
@@ -209,6 +214,13 @@ func (f *ConsulFlags) ConsulServerConnMgrConfig() (discovery.Config, error) {
 	} else if f.Token != "" {
 		cfg.Credentials.Type = discovery.CredentialsTypeStatic
 		cfg.Credentials.Static.Token = f.Token
+	} else if f.TokenFile != "" {
+		token, err := os.ReadFile(f.TokenFile)
+		if err != nil {
+			return discovery.Config{}, err
+		}
+		cfg.Credentials.Type = discovery.CredentialsTypeStatic
+		cfg.Credentials.Static.Token = string(token)
 	}
 
 	return cfg, nil
@@ -240,6 +252,8 @@ func (f *ConsulFlags) ConsulClientConfig() *consul.Config {
 
 	if f.Token != "" {
 		cfg.Token = f.Token
+	} else if f.TokenFile != "" {
+		cfg.TokenFile = f.TokenFile
 	}
 
 	return &consul.Config{

@@ -161,7 +161,7 @@ func TestRun_ConnectServices(t *testing.T) {
 			flags := []string{"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-service-name", tt.serviceName,
-				"-addresses", "exec=echo 127.0.0.1",
+				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
@@ -315,7 +315,7 @@ func TestRun_Gateways(t *testing.T) {
 			flags := []string{"-pod-name", testGatewayName,
 				"-pod-namespace", testPodNamespace,
 				"-gateway-kind", tt.gatewayKind,
-				"-addresses", "exec=echo 127.0.0.1",
+				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
@@ -510,7 +510,7 @@ func TestRun_ConnectServices_Errors(t *testing.T) {
 				serviceRegistrationPollingAttempts: 1,
 			}
 			flags := []string{
-				"-addresses", "exec=echo 127.0.0.1",
+				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-pod-name", testPodName,
@@ -665,7 +665,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
-		"-addresses", "exec=echo 127.0.0.1",
+		"-addresses", "127.0.0.1",
 		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", proxyFile,
@@ -718,7 +718,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
-		"-addresses", "exec=echo 127.0.0.1",
+		"-addresses", "127.0.0.1",
 		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", randFileName,
