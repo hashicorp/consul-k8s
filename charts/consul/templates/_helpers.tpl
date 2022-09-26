@@ -200,7 +200,7 @@ Add a special case for replicas=1, where it should default to 0 as well.
 {{- if eq (int .Values.connectInject.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.connectInject.disruptionBudget.maxUnavailable -}}
-{{ .Values.server.disruptionBudget.maxUnavailable -}}
+{{ .Values.connectInject.disruptionBudget.maxUnavailable -}}
 {{- else -}}
 {{- if eq (int .Values.connectInject.replicas) 3 -}}
 {{- 1 -}}
