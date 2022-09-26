@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-rootcerts"
@@ -213,7 +214,7 @@ func (f *ConsulFlags) ConsulServerConnMgrConfig() (discovery.Config, error) {
 	return cfg, nil
 }
 
-func (f *ConsulFlags) ConsulAPIClientConfig() *api.Config {
+func (f *ConsulFlags) ConsulClientConfig() *consul.Config {
 	cfg := &api.Config{
 		Namespace:  f.Namespace,
 		Partition:  f.Partition,
@@ -223,7 +224,11 @@ func (f *ConsulFlags) ConsulAPIClientConfig() *api.Config {
 
 	if f.UseTLS {
 		cfg.Scheme = "https"
-		cfg.TLSConfig.CAFile = f.CACertFile
+		if f.CACertFile != "" {
+			cfg.TLSConfig.CAFile = f.CACertFile
+		} else if f.CACertPEM != "" {
+			cfg.TLSConfig.CAPem = []byte(f.CACertPEM)
+		}
 
 		// Infer TLS server name from addresses.
 		if f.TLSServerName == "" && !strings.HasPrefix(f.Addresses, "exec=") {
@@ -237,5 +242,10 @@ func (f *ConsulFlags) ConsulAPIClientConfig() *api.Config {
 		cfg.Token = f.Token
 	}
 
-	return cfg
+	return &consul.Config{
+		APIClientConfig: cfg,
+		HTTPPort:        f.HTTPPort,
+		GRPCPort:        f.GRPCPort,
+		APITimeout:      f.APITimeout,
+	}
 }

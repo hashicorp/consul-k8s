@@ -41,6 +41,10 @@ func TestWANFederation(t *testing.T) {
 			env := suite.Environment()
 			cfg := suite.Config()
 
+			if cfg.UseKind {
+				t.Skipf("skipping wan federation tests as they currently fail on Kind even though they work on other clouds.")
+			}
+
 			primaryContext := env.DefaultContext(t)
 			secondaryContext := env.Context(t, environment.SecondaryContextName)
 
