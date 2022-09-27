@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 0.49.0 (September 29, 2022)
+
 FEATURES:
 * CLI:
   * Add support for tab autocompletion [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1501)]
