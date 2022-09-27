@@ -49,7 +49,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "terminatingGateways/Deployment: Connect init uses consulAPITimeout default." {
+@test "terminatingGateways/Deployment: CONSUL_API_TIMEOUT not set by default." {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \

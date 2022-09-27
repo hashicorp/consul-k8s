@@ -133,11 +133,15 @@ spec:
           {{- end }}
           {{- end }}
       {{- end }}
-      {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
-      {{- if $root.Values.global.tls.caCert.secretName }}
+      {{- if $root.Values.global.tls.enabled }}
+      {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert
         secret:
+          {{- if $root.Values.global.tls.caCert.secretName }}
           secretName: {{ $root.Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" $root }}-ca-cert
+          {{- end }}
           items:
           - key: {{ default "tls.crt" $root.Values.global.tls.caCert.secretKey }}
             path: tls.crt
