@@ -54,7 +54,7 @@ module "eks" {
   count = var.cluster_count
 
   source  = "terraform-aws-modules/eks/aws"
-  version = "18.29.1"
+  version = "17.24.0"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
   cluster_version = "1.21"
