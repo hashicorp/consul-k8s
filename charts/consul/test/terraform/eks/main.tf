@@ -51,11 +51,10 @@ module "vpc" {
 }
 
 module "eks" {
-  kubeconfig_api_version = "client.authentication.k8s.io/v1beta1"
   count = var.cluster_count
 
   source  = "terraform-aws-modules/eks/aws"
-  version = "17.20.0"
+  version = "18.29.1"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
   cluster_version = "1.21"
