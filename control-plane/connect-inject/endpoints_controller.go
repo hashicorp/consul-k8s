@@ -13,6 +13,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
@@ -1213,11 +1214,11 @@ func isLabeledIgnore(labels map[string]string) bool {
 func consulTags(pod corev1.Pod) []string {
 	var tags []string
 	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-		tags = strings.Split(raw, ",")
+		tags = append(tags, parsetags.ParseTags(raw)...)
 	}
 	// Get the tags from the deprecated tags annotation and combine.
 	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
-		tags = append(tags, strings.Split(raw, ",")...)
+		tags = append(tags, parsetags.ParseTags(raw)...)
 	}
 
 	var interpolatedTags []string
