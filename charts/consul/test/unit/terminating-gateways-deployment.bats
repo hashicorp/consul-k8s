@@ -26,39 +26,58 @@ load _helpers
   [ "${actual}" = "release-name-consul-terminating-gateway" ]
 }
 
-@test "terminatingGateways/Deployment: Adds consul service volumeMount to gateway container" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml  \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | yq '.spec.template.spec.containers[0].volumeMounts[0]' | tee /dev/stderr)
+# TODO env vars
+# @test "terminatingGateways/Deployment: terminating-gateway-init gets default environment variables." {
+#   cd `chart_dir`
+#   local env=$(helm template \
+#       -s templates/terminating-gateways-deployment.yaml  \
+#       --set 'terminatingGateways.enabled=true' \
+#       --set 'connectInject.enabled=true' \
+#       --set 'terminatingGateways.enabled=true' \
+#       . | yq '.spec.template.spec.initContainers[0].env' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "consul-service" ]
+#   local actual=$(echo $env | yq -r '.[0].name' | tee /dev/stderr)
+#   [ "${actual}" = "NAMESPACE" ]
 
-  local actual=$(echo $object |
-      yq -r '.mountPath' | tee /dev/stderr)
-  [ "${actual}" = "/consul/service" ]
+#   local actual=$(echo $env | yq -r '.[1].name' | tee /dev/stderr)
+#   [ "${actual}" = "POD_NAME" ]
 
-  local actual=$(echo $object |
-      yq -r '.readOnly' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
+#   local actual=$(echo $env | yq -r '.[2].name' | tee /dev/stderr)
+#   [ "${actual}" = "CONSUL_ADDRESS" ]
 
-@test "terminatingGateways/Deployment: CONSUL_API_TIMEOUT not set by default." {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml  \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'terminatingGateways.enabled=true' \
-      . | yq '.spec.template.spec.initContainers[0].command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
+#   local actual=$(echo $env | yq -r '.[2].value' | tee /dev/stderr)
+#   [ "${actual}" = "release-name-consul-server.default.svc" ]
+
+#   local actual=$(echo $env | yq -r '.[3].name' | tee /dev/stderr)
+#   [ "${actual}" = "CONSUL_GRPC_PORT" ]
+
+#   local actual=$(echo $env | yq -r '.[3].value' | tee /dev/stderr)
+#   [ "${actual}" = "8502" ]
+
+#   local actual=$(echo $env | yq -r '.[4].name' | tee /dev/stderr)
+#   [ "${actual}" = "CONSUL_HTTP_PORT" ]
+
+#   local actual=$(echo $env | yq -r '.[4].value' | tee /dev/stderr)
+#   [ "${actual}" = "8500" ]
+
+#   local actual=$(echo $env | yq -r '.[5].name' | tee /dev/stderr)
+#   [ "${actual}" = "CONSUL_DATACENTER" ]
+
+#   local actual=$(echo $env | yq -r '.[5].value' | tee /dev/stderr)
+#   [ "${actual}" = "dc1" ]
+
+#   local actual=$(echo $env | yq -r '.[6].name' | tee /dev/stderr)
+#   [ "${actual}" = "CONSUL_API_TIMEOUT" ]
+
+#   local actual=$(echo $env | yq -r '.[6].value' | tee /dev/stderr)
+#   [ "${actual}" = "5s" ]
+
+#   local actual=$(echo $env | yq -r '.[7].name' | tee /dev/stderr)
+#   [ "${actual}" = "CONSUL_HTTP_ADDR" ]
+
+#   local actual=$(echo $env | yq -r '.[7].value' | tee /dev/stderr)
+#   [ "${actual}" = "http://release-name-consul-server.default.svc:8500" ]
+# }
 
 #--------------------------------------------------------------------
 # prerequisites
@@ -105,26 +124,15 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# envoyImage
+# dataplaneImage
 
-@test "terminatingGateways/Deployment: envoy image has default global value" {
+@test "terminatingGateways/Deployment: dataplane image can be set using the global value" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [[ "${actual}" =~ "envoyproxy/envoy:v" ]]
-}
-
-@test "terminatingGateways/Deployment: envoy image can be set using the global value" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.imageEnvoy=new/image' \
+      --set 'global.imageConsulDataplane=new/image' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[0].image' | tee /dev/stderr)
   [ "${actual}" = "new/image" ]
