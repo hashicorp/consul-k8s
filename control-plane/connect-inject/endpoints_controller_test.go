@@ -1088,12 +1088,12 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "mesh-gateway",
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
-					annotationMeshGatewayConsulServiceName: "mesh-gateway",
-					annotationMeshGatewaySource:            "Static",
-					annotationMeshGatewayWANAddress:        "2.3.4.5",
-					annotationMeshGatewayWANPort:           "443",
-					annotationMeshGatewayContainerPort:     "8443",
-					annotationGatewayKind:                  MeshGateway})
+					annotationGatewayConsulServiceName: "mesh-gateway",
+					annotationGatewayWANSource:         "Static",
+					annotationGatewayWANAddress:        "2.3.4.5",
+					annotationGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort: "8443",
+					annotationGatewayKind:              MeshGateway})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "mesh-gateway",
@@ -1155,12 +1155,12 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			consulSvcName: "mesh-gateway",
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
-					annotationMeshGatewayConsulServiceName: "mesh-gateway",
-					annotationMeshGatewaySource:            "Static",
-					annotationMeshGatewayWANAddress:        "2.3.4.5",
-					annotationMeshGatewayWANPort:           "443",
-					annotationMeshGatewayContainerPort:     "8443",
-					annotationGatewayKind:                  MeshGateway})
+					annotationGatewayConsulServiceName: "mesh-gateway",
+					annotationGatewayWANSource:         "Static",
+					annotationGatewayWANAddress:        "2.3.4.5",
+					annotationGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort: "8443",
+					annotationGatewayKind:              MeshGateway})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "mesh-gateway",
@@ -1226,27 +1226,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			svcName:       "terminating-gateway",
 			consulSvcName: "terminating-gateway",
 			k8sObjects: func() []runtime.Object {
-				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "terminating-gateway",
-						Namespace: "default",
-						Labels: map[string]string{
-							keyManagedBy: managedByValue,
-						},
-						Annotations: map[string]string{
-							annotationGatewayKind: TerminatingGateway,
-						},
-					},
-					Status: corev1.PodStatus{
-						PodIP: "1.2.3.4",
-						Conditions: []corev1.PodCondition{
-							{
-								Type:   corev1.PodReady,
-								Status: corev1.ConditionTrue,
-							},
-						},
-					},
-				}
+				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{annotationGatewayKind: TerminatingGateway})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "terminating-gateway",
@@ -1267,7 +1247,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 				}
-				return []runtime.Object{pod, endpoint}
+				return []runtime.Object{gateway, endpoint}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -1285,7 +1265,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
 				},
 			},
-			expectedProxySvcInstances: []*api.CatalogService{},
 			expectedHealthChecks: []*api.HealthCheck{
 				{
 					CheckID:     "default/terminating-gateway",
@@ -1304,27 +1283,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			svcName:        "terminating-gateway",
 			consulSvcName:  "terminating-gateway",
 			k8sObjects: func() []runtime.Object {
-				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "terminating-gateway",
-						Namespace: "default",
-						Labels: map[string]string{
-							keyManagedBy: managedByValue,
-						},
-						Annotations: map[string]string{
-							annotationGatewayKind: TerminatingGateway,
-						},
-					},
-					Status: corev1.PodStatus{
-						PodIP: "1.2.3.4",
-						Conditions: []corev1.PodCondition{
-							{
-								Type:   corev1.PodReady,
-								Status: corev1.ConditionTrue,
-							},
-						},
-					},
-				}
+				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{annotationGatewayKind: TerminatingGateway})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "terminating-gateway",
@@ -1345,7 +1304,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 				}
-				return []runtime.Object{pod, endpoint}
+				return []runtime.Object{gateway, endpoint}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -1367,12 +1326,209 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedProxySvcInstances: []*api.CatalogService{},
 			expectedHealthChecks: []*api.HealthCheck{
 				{
 					CheckID:     "default/terminating-gateway",
 					ServiceName: "terminating-gateway",
 					ServiceID:   "terminating-gateway",
+					Name:        ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ConsulKubernetesCheckType,
+				},
+			},
+		},
+		{
+			name:          "Ingress Gateway",
+			svcName:       "ingress-gateway",
+			consulSvcName: "ingress-gateway",
+			k8sObjects: func() []runtime.Object {
+				gateway := createGatewayPod("ingress-gateway", "1.2.3.4", map[string]string{
+					annotationGatewayConsulServiceName: "ingress-gateway",
+					annotationGatewayKind:              IngressGateway,
+					annotationGatewayWANSource:         "Service",
+					annotationGatewayWANPort:           "8443",
+				})
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ingress-gateway",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "ingress-gateway",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ingress-gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "5.6.7.8",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{gateway, endpoint, svc}
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "ingress-gateway",
+					ServiceName:    "ingress-gateway",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    21000,
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:         "ingress-gateway",
+						MetaKeyKubeServiceName: "ingress-gateway",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+					},
+					ServiceTags: []string{},
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    21000,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8443,
+						},
+					},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]interface{}{
+							"envoy_gateway_no_default_bind": true,
+							"envoy_gateway_bind_addresses": map[string]interface{}{
+								"all-interfaces": map[string]interface{}{
+									"address": "0.0.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedHealthChecks: []*api.HealthCheck{
+				{
+					CheckID:     "default/ingress-gateway",
+					ServiceName: "ingress-gateway",
+					ServiceID:   "ingress-gateway",
+					Name:        ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ConsulKubernetesCheckType,
+				},
+			},
+		},
+		{
+			name:           "Ingress Gateway with Metrics enabled",
+			metricsEnabled: true,
+			svcName:        "ingress-gateway",
+			consulSvcName:  "ingress-gateway",
+			k8sObjects: func() []runtime.Object {
+				gateway := createGatewayPod("ingress-gateway", "1.2.3.4", map[string]string{
+					annotationGatewayConsulServiceName: "ingress-gateway",
+					annotationGatewayKind:              IngressGateway,
+					annotationGatewayWANSource:         "Service",
+					annotationGatewayWANPort:           "8443",
+				})
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ingress-gateway",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "ingress-gateway",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ingress-gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "5.6.7.8",
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{gateway, endpoint, svc}
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "ingress-gateway",
+					ServiceName:    "ingress-gateway",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    21000,
+					ServiceMeta: map[string]string{
+						MetaKeyPodName:         "ingress-gateway",
+						MetaKeyKubeServiceName: "ingress-gateway",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+					},
+					ServiceTags: []string{},
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    21000,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8443,
+						},
+					},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]interface{}{
+							"envoy_gateway_no_default_bind": true,
+							"envoy_gateway_bind_addresses": map[string]interface{}{
+								"all-interfaces": map[string]interface{}{
+									"address": "0.0.0.0",
+								},
+							},
+							"envoy_prometheus_bind_addr": "1.2.3.4:20200",
+						},
+					},
+				},
+			},
+			expectedHealthChecks: []*api.HealthCheck{
+				{
+					CheckID:     "default/ingress-gateway",
+					ServiceName: "ingress-gateway",
+					ServiceID:   "ingress-gateway",
 					Name:        ConsulKubernetesCheckName,
 					Status:      api.HealthPassing,
 					Output:      kubernetesSuccessReasonMsg,
@@ -1863,12 +2019,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consulServer",
 				ReleaseNamespace:      "default",
-			}
-			if tt.metricsEnabled {
-				ep.MetricsConfig = MetricsConfig{
-					DefaultEnableMetrics: true,
-					EnableGatewayMetrics: true,
-				}
 			}
 			if tt.metricsEnabled {
 				ep.MetricsConfig = MetricsConfig{
@@ -3412,6 +3562,67 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						"lan": {
 							Address: "1.2.3.4",
 							Port:    80,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8080,
+						},
+					},
+				},
+			},
+			enableACLs: true,
+		},
+		{
+			name:                      "Ingress Gateway",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "ingress-gateway",
+					Kind:    api.ServiceKindIngressGateway,
+					Service: "ingress-gateway",
+					Port:    21000,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "ingress-gateway",
+					},
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    21000,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8080,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                      "When ACLs are enabled, the ingress-gateway token should be deleted",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "ingress-gateway",
+					Kind:    api.ServiceKindIngressGateway,
+					Service: "ingress-gateway",
+					Port:    21000,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "ingress-gateway",
+					},
+					TaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    21000,
 						},
 						"wan": {
 							Address: "5.6.7.8",
@@ -5342,9 +5553,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "NodeName",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "NodeName",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5390,9 +5601,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "NodeIP",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "NodeIP",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5438,9 +5649,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Static",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Static",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5486,9 +5697,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5534,9 +5745,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5582,9 +5793,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5630,9 +5841,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5678,8 +5889,8 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5719,16 +5930,16 @@ func Test_GetWANData(t *testing.T) {
 			},
 			wanAddr: "test-loadbalancer-hostname",
 			wanPort: 1234,
-			expErr:  "failed to read annotation consul.hashicorp.com/mesh-gateway-wan-address-source",
+			expErr:  "failed to read annotation consul.hashicorp.com/gateway-wan-address-source",
 		},
 		"no Service with Source=Service": {
 			gatewayPod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5754,9 +5965,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "not-a-valid-port",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "not-a-valid-port",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5803,9 +6014,9 @@ func Test_GetWANData(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gateway",
 					Annotations: map[string]string{
-						annotationMeshGatewaySource:     "Service",
-						annotationMeshGatewayWANAddress: "test-wan-address",
-						annotationMeshGatewayWANPort:    "1234",
+						annotationGatewayWANSource:  "Service",
+						annotationGatewayWANAddress: "test-wan-address",
+						annotationGatewayWANPort:    "1234",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -5858,6 +6069,91 @@ func Test_GetWANData(t *testing.T) {
 				require.Equal(t, c.wanPort, port)
 			} else {
 				require.EqualError(t, err, c.expErr)
+			}
+		})
+	}
+}
+
+func TestCreateTerminatingGatewayRegistrations(t *testing.T) {
+	const (
+		podName          = "terminating-gateway"
+		serviceName      = "terminating-gateway"
+		serviceNamespace = "consul"
+	)
+
+	cases := map[string]struct {
+		annotations   map[string]string
+		service       *api.AgentService
+		metricsConfig MetricsConfig
+	}{
+		"Terminating Gateway Default": {
+			annotations: map[string]string{
+				annotationGatewayKind: TerminatingGateway,
+			},
+		},
+		"Terminating Gateway with Consul Namespace": {
+			annotations: map[string]string{
+				annotationGatewayKind:      TerminatingGateway,
+				annotationGatewayNamespace: "consul-namespace",
+			},
+		},
+		"Terminating Gateway with Metrics Enabled": {
+			annotations: map[string]string{
+				annotationGatewayKind: TerminatingGateway,
+			},
+			metricsConfig: MetricsConfig{
+				DefaultEnableMetrics: true,
+				EnableGatewayMetrics: true,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "consul",
+					Name:        podName,
+					Annotations: c.annotations,
+				},
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			}
+			serviceEndpoint := corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: serviceNamespace,
+					Name:      serviceName,
+				},
+			}
+
+			r := EndpointsController{
+				MetricsConfig: c.metricsConfig,
+			}
+
+			registration, err := r.createGatewayRegistrations(pod, serviceEndpoint, api.HealthPassing)
+			require.NoError(t, err)
+
+			require.Equal(t, api.ServiceKindTerminatingGateway, registration.Service.Kind)
+			require.Equal(t, "terminating-gateway", registration.Service.Service)
+			require.Equal(t, 8443, registration.Service.Port)
+
+			require.Equal(t, podName, registration.Service.ID)
+			require.Equal(t, "1.2.3.4", registration.Service.Address)
+			require.Equal(t, podName, registration.Service.Meta[MetaKeyPodName])
+			require.Equal(t, serviceName, registration.Service.Meta[MetaKeyKubeServiceName])
+			require.Equal(t, serviceNamespace, registration.Service.Meta[MetaKeyKubeNS])
+
+			require.Equal(t, fmt.Sprintf("%s/%s", "consul", podName), registration.Check.CheckID)
+			require.Equal(t, api.HealthPassing, registration.Check.Status)
+			require.Equal(t, podName, registration.Check.ServiceID)
+
+			if value, ok := c.annotations[annotationConsulNamespace]; ok {
+				require.Equal(t, value, registration.Service.Namespace)
+			}
+
+			if c.metricsConfig.DefaultEnableMetrics && c.metricsConfig.EnableGatewayMetrics {
+				require.Equal(t, "1.2.3.4:20200", registration.Service.Proxy.Config["envoy_prometheus_bind_addr"])
 			}
 		})
 	}

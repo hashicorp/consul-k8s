@@ -42,7 +42,6 @@ const (
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
 	sidecarContainer           = "consul-dataplane"
-	wildcardNamespace          = "*"
 	defaultNS                  = "default"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
@@ -312,6 +311,13 @@ func (r *EndpointsController) registerGateway(apiClient *api.Client, pod corev1.
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
+		}
+
+		if r.EnableConsulNamespaces {
+			if _, err := namespaces.EnsureExists(apiClient, serviceRegistration.Service.Namespace, r.CrossNSACLPolicy); err != nil {
+				r.Log.Error(err, "failed to ensure Consul namespace exists", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace, "consul ns", serviceRegistration.Service.Namespace)
+				return err
+			}
 		}
 
 		// Register the service instance with Consul.
@@ -635,7 +641,6 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 	switch pod.Annotations[annotationGatewayKind] {
 	case MeshGateway:
 		service.Kind = api.ServiceKindMeshGateway
-		service.Service = MeshGateway
 		if r.EnableConsulNamespaces {
 			service.Namespace = defaultNS
 			consulNS = defaultNS
@@ -651,11 +656,11 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 			meta[MetaKeyConsulWANFederation] = "1"
 		}
 
-		meshGatewayServiceName, ok := pod.Annotations[annotationMeshGatewayConsulServiceName]
+		gatewayServiceName, ok := pod.Annotations[annotationGatewayConsulServiceName]
 		if !ok {
-			return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationMeshGatewayConsulServiceName, pod.Namespace, pod.Name)
+			return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationGatewayConsulServiceName, pod.Namespace, pod.Name)
 		}
-		service.Service = meshGatewayServiceName
+		service.Service = gatewayServiceName
 
 		wanAddr, wanPort, err := r.getWanData(pod, serviceEndpoints)
 		if err != nil {
@@ -675,20 +680,62 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 		service.Kind = api.ServiceKindTerminatingGateway
 		service.Service = serviceEndpoints.Name
 		service.Port = 8443
+		if ns, ok := pod.Annotations[annotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
+			service.Namespace = ns
+			consulNS = ns
+		}
+	case IngressGateway:
+		service.Kind = api.ServiceKindIngressGateway
+		gatewayServiceName, ok := pod.Annotations[annotationGatewayConsulServiceName]
+		if !ok {
+			return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationGatewayConsulServiceName, pod.Namespace, pod.Name)
+		}
+		service.Service = gatewayServiceName
 
 		if ns, ok := pod.Annotations[annotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
 			service.Namespace = ns
 			consulNS = ns
 		}
+
+		wanAddr, wanPort, err := r.getWanData(pod, serviceEndpoints)
+		if err != nil {
+			return nil, err
+		}
+		service.Port = 21000
+		service.TaggedAddresses = map[string]api.ServiceAddress{
+			"lan": {
+				Address: pod.Status.PodIP,
+				Port:    21000,
+			},
+			"wan": {
+				Address: wanAddr,
+				Port:    wanPort,
+			},
+		}
+		service.Proxy = &api.AgentServiceConnectProxyConfig{
+			Config: map[string]interface{}{
+				"envoy_gateway_no_default_bind": true,
+				"envoy_gateway_bind_addresses": map[string]interface{}{
+					"all-interfaces": map[string]interface{}{
+						"address": "0.0.0.0",
+					},
+				},
+			},
+		}
+
 	default:
 		return nil, fmt.Errorf("%s must be one of %s, %s, or %s", annotationGatewayKind, MeshGateway, TerminatingGateway, IngressGateway)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		service.Proxy = &api.AgentServiceConnectProxyConfig{
-			Config: map[string]interface{}{
-				"envoy_prometheus_bind_addr": fmt.Sprintf("%s:20200", pod.Status.PodIP),
-			},
+		if pod.Annotations[annotationGatewayKind] == IngressGateway {
+			service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
+		} else {
+			service.Proxy = &api.AgentServiceConnectProxyConfig{
+				Config: map[string]interface{}{
+					"envoy_prometheus_bind_addr": fmt.Sprintf("%s:20200", pod.Status.PodIP),
+				},
+			}
 		}
 	}
 
@@ -713,10 +760,9 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 
 func (r *EndpointsController) getWanData(pod corev1.Pod, endpoints corev1.Endpoints) (string, int, error) {
 	var wanAddr string
-	var wanPort int
-	source, ok := pod.Annotations[annotationMeshGatewaySource]
+	source, ok := pod.Annotations[annotationGatewayWANSource]
 	if !ok {
-		return "", 0, fmt.Errorf("failed to read annotation %s", annotationMeshGatewaySource)
+		return "", 0, fmt.Errorf("failed to read annotation %s", annotationGatewayWANSource)
 	}
 	switch source {
 	case "NodeName":
@@ -724,7 +770,7 @@ func (r *EndpointsController) getWanData(pod corev1.Pod, endpoints corev1.Endpoi
 	case "NodeIP":
 		wanAddr = pod.Status.HostIP
 	case "Static":
-		wanAddr = pod.Annotations[annotationMeshGatewayWANAddress]
+		wanAddr = pod.Annotations[annotationGatewayWANAddress]
 	case "Service":
 		svc, err := r.getService(endpoints)
 		if err != nil {
@@ -751,9 +797,9 @@ func (r *EndpointsController) getWanData(pod corev1.Pod, endpoints corev1.Endpoi
 		}
 	}
 
-	wanPort, err := strconv.Atoi(pod.Annotations[annotationMeshGatewayWANPort])
+	wanPort, err := strconv.Atoi(pod.Annotations[annotationGatewayWANPort])
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to parse WAN port from value %s", pod.Annotations[annotationMeshGatewayWANPort])
+		return "", 0, fmt.Errorf("failed to parse WAN port from value %s", pod.Annotations[annotationGatewayWANPort])
 	}
 	return wanAddr, wanPort, nil
 }
@@ -988,7 +1034,7 @@ func (r *EndpointsController) serviceInstancesForK8SServiceNameAndNamespace(apiC
 	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
 		MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, managedByValue)
 	if r.EnableConsulNamespaces {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: wildcardNamespace})
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
 	} else {
 		serviceList, _, err = apiClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter})
 	}
