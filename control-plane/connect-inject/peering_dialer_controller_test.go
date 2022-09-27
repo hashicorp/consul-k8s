@@ -485,7 +485,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 
 			ctx, cancelFunc := context.WithCancel(context.Background())
 			t.Cleanup(cancelFunc)
-			watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "exec=echo 127.0.0.1", GRPCPort: testServerCfg.Ports.GRPC}, hclog.NewNullLogger())
+			watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "127.0.0.1", GRPCPort: testServerCfg.Ports.GRPC}, hclog.NewNullLogger())
 			require.NoError(t, err)
 			t.Cleanup(watcher.Stop)
 			go watcher.Run()

@@ -166,7 +166,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			// todo(agentless): test default concurrency
 			expCmd := []string{
 				"/bin/sh", "-ec",
-				"consul-dataplane -addresses=1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
+				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
 					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + c.additionalExpCmdArgs}
 			require.Equal(t, container.Command, expCmd)
@@ -336,17 +336,17 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				},
 			}
 			expCommand := [][]string{
-				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
+				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
 					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -tls-disabled -envoy-admin-bind-port=19000"},
-				{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
+				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
 					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -tls-disabled -envoy-admin-bind-port=19001"},
 			}
 			if aclsEnabled {
 				expCommand = [][]string{
-					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
+					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
 						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -credential-type=login -login-method=test-auth-method " +
 						"-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000"},
-					{"/bin/sh", "-ec", "consul-dataplane -addresses=1.1.1.1 -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
+					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
 						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -credential-type=login -login-method=test-auth-method " +
 						"-login-bearer-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001"},
 				}

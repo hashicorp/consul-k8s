@@ -6,17 +6,18 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	cmdCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,13 +35,12 @@ const WebhookCAFilename = "ca.crt"
 type Command struct {
 	UI cli.Ui
 
-	flagSet   *flag.FlagSet
-	httpFlags *flags.HTTPFlags
+	flagSet     *flag.FlagSet
+	consulFlags *flags.ConsulFlags
 
 	flagWebhookTLSCertDir     string
 	flagEnableLeaderElection  bool
 	flagEnableWebhooks        bool
-	flagDatacenter            string
 	flagLogLevel              string
 	flagLogJSON               bool
 	flagResourcePrefix        string
@@ -53,14 +53,8 @@ type Command struct {
 	flagNSMirroringPrefix          string
 	flagCrossNSACLPolicy           string
 
-	flagServerAddresses []string
-	flagServerPort      uint
-	flagUseHTTPS        bool
-
 	once sync.Once
 	help string
-
-	providers map[string]discover.Provider
 }
 
 var (
@@ -79,8 +73,6 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	c.flagSet.StringVar(&c.flagDatacenter, "datacenter", "",
-		"Name of the Consul datacenter the controller is operating in. This is added as metadata on managed custom resources.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables Consul Enterprise namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -106,15 +98,9 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
-			"At least one value is required.")
-	c.flagSet.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
-	c.flagSet.BoolVar(&c.flagUseHTTPS, "use-https", false,
-		"Toggle for using HTTPS for all API calls to Consul.")
 
-	c.httpFlags = &flags.HTTPFlags{}
-	flags.Merge(c.flagSet, c.httpFlags.Flags())
+	c.consulFlags = &flags.ConsulFlags{}
+	flags.Merge(c.flagSet, c.consulFlags.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -138,6 +124,37 @@ func (c *Command) Run(args []string) int {
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)
 
+	// TODO (agentless): find a way to integrate zap logger (via having a generic logger interface in connection manager).
+	hcLog, err := cmdCommon.NamedLogger(c.flagLogLevel, c.flagLogJSON, "consul-server-connection-manager")
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error setting up logging: %s", err.Error()))
+		return 1
+	}
+
+	// Create a context to be used by the processes started in this command.
+	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancelFunc()
+	// Start Consul server Connection manager
+	serverConnMgrCfg, err := c.consulFlags.ConsulServerConnMgrConfig()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
+		return 1
+	}
+	watcher, err := discovery.NewWatcher(ctx, serverConnMgrCfg, hcLog)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create Consul server watcher: %s", err))
+		return 1
+	}
+
+	go watcher.Run()
+	defer watcher.Stop()
+
+	_, err = watcher.State()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to get Consul server addresses from watcher: %s", err))
+		return 1
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		Port:             9443,
@@ -150,38 +167,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	cfg := api.DefaultConfig()
-	if c.flagUseHTTPS {
-		cfg.Scheme = "https"
-	}
-	if len(c.flagServerAddresses) > 0 {
-		// TODO (ishustava): eventually we will use go-netaddr library which doesn't use hclog,
-		// and so this additional logger will go away and we'll be able to use zap logger.
-		hclogger, err := cmdCommon.Logger(c.flagLogLevel, c.flagLogJSON)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to create logger: %s", err))
-			return 1
-		}
-		serverAddresses, err := cmdCommon.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, hclogger)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
-			return 1
-		}
-
-		serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-		cfg.Address = serverAddr
-	}
-	c.httpFlags.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg, c.httpFlags.ConsulAPITimeout())
-	if err != nil {
-		setupLog.Error(err, "connecting to Consul agent")
-		return 1
-	}
-
-	partitionsEnabled := c.httpFlags.Partition() != ""
+	partitionsEnabled := c.consulFlags.Partition != ""
 	consulMeta := common.ConsulMeta{
 		PartitionsEnabled:    partitionsEnabled,
-		Partition:            c.httpFlags.Partition(),
+		Partition:            c.consulFlags.Partition,
 		NamespacesEnabled:    c.flagEnableNamespaces,
 		DestinationNamespace: c.flagConsulDestinationNamespace,
 		Mirroring:            c.flagEnableNSMirroring,
@@ -189,8 +178,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	configEntryReconciler := &controller.ConfigEntryController{
-		ConsulClient:               consulClient,
-		DatacenterName:             c.flagDatacenter,
+		ConsulClientConfig:         c.consulFlags.ConsulClientConfig(),
+		ConsulServerConnMgr:        watcher,
+		DatacenterName:             c.consulFlags.Datacenter,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableNSMirroring:          c.flagEnableNSMirroring,
@@ -297,75 +287,70 @@ func (c *Command) Run(args []string) int {
 		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
 			&webhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
 			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
 			&webhook.Admission{Handler: &v1alpha1.MeshWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.Mesh),
+				Client: mgr.GetClient(),
+				Logger: ctrl.Log.WithName("webhooks").WithName(common.Mesh),
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
 			&webhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ExportedServices),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ExportedServices),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
 			&webhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceRouter),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ServiceRouter),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
 			&webhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceSplitter),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ServiceSplitter),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
 			&webhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
 			&webhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
 			&webhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
-				Client:       mgr.GetClient(),
-				ConsulClient: consulClient,
-				Logger:       ctrl.Log.WithName("webhooks").WithName(common.TerminatingGateway),
-				ConsulMeta:   consulMeta,
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.TerminatingGateway),
+				ConsulMeta: consulMeta,
 			}})
 	}
 	// +kubebuilder:scaffold:builder
+
+	if err = mgr.AddReadyzCheck("ready", connectinject.ReadinessCheck{CertDir: c.flagWebhookTLSCertDir}.Ready); err != nil {
+		setupLog.Error(err, "unable to create readiness check", "controller", connectinject.EndpointsController{})
+		return 1
+	}
 
 	if c.flagEnableWebhookCAUpdate {
 		err := c.updateWebhookCABundle()
@@ -414,12 +399,12 @@ func (c *Command) validateFlags() error {
 		return errors.New("Invalid arguments: should have no non-flag arguments")
 	}
 	if c.flagEnableWebhooks && c.flagWebhookTLSCertDir == "" {
-		return errors.New("Invalid arguments: -webhook-tls-cert-dir must be set")
+		return errors.New("invalid arguments: -webhook-tls-cert-dir must be set")
 	}
-	if c.flagDatacenter == "" {
+	if c.consulFlags.Datacenter == "" {
 		return errors.New("Invalid arguments: -datacenter must be set")
 	}
-	if c.httpFlags.ConsulAPITimeout() <= 0 {
+	if c.consulFlags.APITimeout <= 0 {
 		return errors.New("-consul-api-timeout must be set to a value greater than 0")
 	}
 

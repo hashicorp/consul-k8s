@@ -71,32 +71,45 @@ load _helpers
   [[ "$output" =~ "externalServers.enabled needs to be true and configured to create a non-default partition." ]]
 }
 
-@test "partitionInit/Job: command defaults" {
+@test "partitionInit/Job: consul env defaults" {
   cd `chart_dir`
-  local command=$(helm template \
-      -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+  local env=$(helm template \
+      -s templates/partition-init-job.yaml \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
+      --set 'server.enabled=false' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("consul-k8s-control-plane partition-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8502" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_DATACENTER").value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
+  [ "${actual}" = "5s" ]
 }
 
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "partitionInit/Job: sets TLS flags when global.tls.enabled" {
+@test "partitionInit/Job: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
-  local command=$(helm template \
+  local env=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
@@ -105,22 +118,24 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-use-https"))' | tee /dev/stderr)
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_USE_TLS").value' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-ca-file=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-port=8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
-@test "partitionInit/Job: does not set consul ca cert or server-port when .externalServers.useSystemRoots is true" {
+@test "partitionInit/Job: does not set consul ca cert when .externalServers.useSystemRoots is true" {
   cd `chart_dir`
-  local command=$(helm template \
+  local spec=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
@@ -130,11 +145,19 @@ load _helpers
       --set 'externalServers.hosts[0]=foo' \
       --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-ca-file=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  local actual=$(echo "$env" |
+    jq -r '.containers[0].env[] | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$env" |
+    jq -r '.volumes[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$env" |
+    jq -r '.spec.volumeMounts[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
 }
 
 @test "partitionInit/Job: can overwrite CA secret with the provided one" {
@@ -167,7 +190,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken
 
-@test "partitionInit/Job: HTTP_TOKEN is set when global.acls.bootstrapToken is provided" {
+@test "partitionInit/Job: CONSUL_ACL_TOKEN is set when global.acls.bootstrapToken is provided" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/partition-init-job.yaml  \
@@ -179,7 +202,7 @@ load _helpers
       --set 'global.acls.bootstrapToken.secretName=partition-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -280,7 +303,7 @@ reservedNameTest() {
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_HTTP_TOKEN_FILE").value')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # Check that no (secret) volumes are not attached
@@ -382,7 +405,7 @@ reservedNameTest() {
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_HTTP_TOKEN_FILE").value')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # Check that the consul-ca-cert volume is not attached

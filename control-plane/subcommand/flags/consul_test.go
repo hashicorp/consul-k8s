@@ -32,6 +32,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 				TLSServerNameEnvVar: "server.consul",
 
 				ACLTokenEnvVar:             "test-token",
+				ACLTokenFileEnvVar:         "/path/to/token",
 				LoginAuthMethodEnvVar:      "test-auth-method",
 				LoginBearerTokenFileEnvVar: "path/to/token",
 				LoginDatacenterEnvVar:      "other-test-dc",
@@ -54,7 +55,8 @@ func TestConsulFlags_Flags(t *testing.T) {
 					TLSServerName: "server.consul",
 				},
 				ConsulACLFlags: ConsulACLFlags{
-					Token: "test-token",
+					Token:     "test-token",
+					TokenFile: "/path/to/token",
 					ConsulLogin: ConsulLoginFlags{
 						AuthMethod:      "test-auth-method",
 						BearerTokenFile: "path/to/token",
@@ -190,6 +192,25 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 				},
 			},
 		},
+		"Static ACL token file": {
+			flags: ConsulFlags{
+				Addresses: "consul.address",
+				ConsulACLFlags: ConsulACLFlags{
+					// This is the content of the token that we will
+					// write to a temp file and expect the config to have this in its contents
+					TokenFile: "test-token",
+				},
+			},
+			expConfig: discovery.Config{
+				Addresses: "consul.address",
+				Credentials: discovery.Credentials{
+					Type: discovery.CredentialsTypeStatic,
+					Static: discovery.StaticTokenCredential{
+						Token: "test-token",
+					},
+				},
+			},
+		},
 	}
 
 	for name, c := range cases {
@@ -203,6 +224,15 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 				_, err = tokenFile.WriteString("bearer-token")
 				require.NoError(t, err)
 				c.flags.ConsulLogin.BearerTokenFile = tokenFile.Name()
+			} else if c.flags.TokenFile != "" {
+				tokenFile, err := os.CreateTemp("", "")
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					_ = os.Remove(tokenFile.Name())
+				})
+				_, err = tokenFile.WriteString(c.flags.TokenFile)
+				require.NoError(t, err)
+				c.flags.TokenFile = tokenFile.Name()
 			}
 			cfg, err := c.flags.ConsulServerConnMgrConfig()
 			require.NoError(t, err)
@@ -363,6 +393,17 @@ func TestConsulFlags_ConsulAPIClientConfig(t *testing.T) {
 			expConfig: &api.Config{
 				Scheme: "http",
 				Token:  "test-token",
+			},
+		},
+		"ACL token file provided": {
+			flags: ConsulFlags{
+				ConsulACLFlags: ConsulACLFlags{
+					TokenFile: "/path/to/token",
+				},
+			},
+			expConfig: &api.Config{
+				Scheme:    "http",
+				TokenFile: "/path/to/token",
 			},
 		},
 	}
