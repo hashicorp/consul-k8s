@@ -1960,7 +1960,20 @@ connectInject:
     # Location on the kubernetes node of all CNI configuration. Should be the absolute path and start with a '/'
     # @type: string
     cniNetDir: "/etc/cni/net.d"
- 
+
+    # If multus CNI plugin is enabled with consul-cni. When enabled, consul-cni will not be installed as a chained
+    # CNI plugin. Instead, a NetworkAttachementDefinition CustomResourceDefinition (CRD) will be created in the helm
+    # release namespace. Following multus plugin standards, an annotation is required in order for the consul-cni plugin
+    # to be executed and for your service to be added to the Consul Service Mesh. 
+    #
+    # Add the annotation `'k8s.v1.cni.cncf.io/networks': '[{ "name":"consul-cni","namespace": "consul" }]'` to your pod
+    # to use the default installed NetworkAttachementDefinition CRD.
+    #
+    # Please refer to the [Multus Quickstart Guide](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/quickstart.md)
+    # for more information about using multus. 
+    # @type: string
+    multus: false 
+
     # The resource settings for CNI installer daemonset.
     # @recurse: false
     # @type: map
