@@ -257,7 +257,7 @@ spec:
             {{- if and .Values.global.cloud.enabled .Values.global.cloud.secretName }}
             # These are mounted as secrets so that the consul server agent can use them.
             # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, 
-            #   and HCP_API_HOST.  so nothing more needs to be done.
+            #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
             # - HCP_RESOURCE_ID is created for use in the 
             #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
             - name: HCP_CLIENT_ID
