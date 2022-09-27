@@ -68,6 +68,7 @@ const (
 	envHCPClientSecret = "HCP_CLIENT_SECRET"
 	envHCPAuthURL      = "HCP_AUTH_URL"
 	envHCPAPIHost      = "HCP_API_HOST"
+	envHCPScadaAddress = "HCP_SCADA_ADDRESS"
 
 	flagNameDemo = "demo"
 	defaultDemo  = false
@@ -655,6 +656,7 @@ func (c *Command) getPreset(name string) (preset.Preset, error) {
 		ClientSecret: os.Getenv(envHCPClientSecret),
 		AuthURL:      os.Getenv(envHCPAuthURL),
 		APIHostname:  os.Getenv(envHCPAPIHost),
+		ScadaAddress: os.Getenv(envHCPScadaAddress),
 	}
 	getPresetConfig := &preset.GetPresetConfig{
 		Name: name,

@@ -31,6 +31,7 @@ const (
 	secretKeyHCPResourceID   = "resource-id"
 	secretKeyHCPAuthURL      = "auth-url"
 	secretKeyHCPAPIHostname  = "api-hostname"
+	secretKeyHCPScadaAddress = "scada-address"
 	secretKeyGossipKey       = "key"
 	secretKeyBootstrapToken  = "token"
 )
@@ -52,6 +53,7 @@ type HCPConfig struct {
 	ClientSecret string
 	AuthURL      string
 	APIHostname  string
+	ScadaAddress string
 }
 
 // ConsulConfig represents 'cluster.consul_config' in the response
@@ -302,6 +304,7 @@ func (i *CloudPreset) saveServerHCPConfigSecret(config *CloudBootstrapConfig) er
 		secretKeyHCPResourceID:   []byte(config.HCPConfig.ResourceID),
 		secretKeyHCPAuthURL:      []byte(config.HCPConfig.AuthURL),
 		secretKeyHCPAPIHostname:  []byte(config.HCPConfig.APIHostname),
+		secretKeyHCPScadaAddress: []byte(config.HCPConfig.ScadaAddress),
 	}
 	if err := i.saveSecret(secretNameHCPConfig, data, corev1.SecretTypeOpaque); err != nil {
 		return err
