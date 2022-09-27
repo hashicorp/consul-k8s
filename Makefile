@@ -143,13 +143,27 @@ prepare-release: ## Sets the versions, updates changelog to prepare this reposit
 ifndef RELEASE_VERSION
 	$(error RELEASE_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; set_release_mode $(CURDIR) $(RELEASE_VERSION) "$(shell date +"%B %d, %Y")" $(PRERELEASE_VERSION)
+ifndef RELEASE_DATE
+    $(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(PRERELEASE_VERSION)
 
+prepare-dev:
+ifndef RELEASE_VERSION
+	$(error RELEASE_VERSION is required)
+endif
+ifndef RELEASE_DATE
+    $(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+ifndef NEXT_RELEASE_VERSION
+	$(error NEXT_RELEASE_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(NEXT_RELEASE_VERSION) $(PRERELEASE_VERSION)
 
 # ===========> Makefile config
 
 .DEFAULT_GOAL := help
-.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version cli-dev
+.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
 SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
