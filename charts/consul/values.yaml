@@ -129,7 +129,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: hashicorp/consul-k8s-control-plane:1.0.0-dev
+  imageK8S: hashicorp/consul-k8s-control-plane:0.49.0
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -1968,15 +1968,15 @@ connectInject:
     # If multus CNI plugin is enabled with consul-cni. When enabled, consul-cni will not be installed as a chained
     # CNI plugin. Instead, a NetworkAttachementDefinition CustomResourceDefinition (CRD) will be created in the helm
     # release namespace. Following multus plugin standards, an annotation is required in order for the consul-cni plugin
-    # to be executed and for your service to be added to the Consul Service Mesh. 
+    # to be executed and for your service to be added to the Consul Service Mesh.
     #
     # Add the annotation `'k8s.v1.cni.cncf.io/networks': '[{ "name":"consul-cni","namespace": "consul" }]'` to your pod
     # to use the default installed NetworkAttachementDefinition CRD.
     #
     # Please refer to the [Multus Quickstart Guide](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/quickstart.md)
-    # for more information about using multus. 
+    # for more information about using multus.
     # @type: string
-    multus: false 
+    multus: false
 
     # The resource settings for CNI installer daemonset.
     # @recurse: false
