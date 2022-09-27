@@ -117,6 +117,8 @@ func TestGetValueMap(t *testing.T) {
 	require.NoError(t, err)
 	os.Setenv("HCP_AUTH_URL", hcpMockServer.URL)
 	os.Setenv("HCP_API_HOST", mockServerURL.Host)
+	os.Setenv("HCP_CLIENT_ID", "fGY34fkOxcQmpkcygQmGHQZkEcLDhBde")
+	os.Setenv("HCP_CLIENT_SECRET", "8EWngREObMe90HNDN6oQv3YKQlRtVkg-28AgZylz1en0DHwyiE2pYCbwi61oF8dr")
 	bsConfig := getDeepCopyOfValidBootstrapConfig()
 	bsConfig.HCPConfig.APIHostname = mockServerURL.Host
 	bsConfig.HCPConfig.AuthURL = hcpMockServer.URL
@@ -173,8 +175,10 @@ func TestGetValueMap(t *testing.T) {
 			tc.postProcessingFunc()
 		})
 	}
-	os.Setenv("HCP_AUTH_URL", "")
-	os.Setenv("HCP_API_HOST", "")
+	os.Unsetenv("HCP_AUTH_URL")
+	os.Unsetenv("HCP_API_HOST")
+	os.Unsetenv("HCP_CLIENT_ID")
+	os.Unsetenv("HCP_CLIENT_SECRET")
 }
 
 // TestParseBootstrapConfigResponse tests that response string from agent bootstrap
