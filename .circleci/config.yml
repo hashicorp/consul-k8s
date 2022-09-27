@@ -145,7 +145,8 @@ commands:
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -enable-multi-cluster \
                       -debug-directory="$TEST_RESULTS/debug" \
-                      -consul-k8s-image=<< parameters.consul-k8s-image >>
+                      -consul-k8s-image=<< parameters.consul-k8s-image >> \
+                      -run ^TestConnectInject$
 
 jobs:
   go-fmt-and-vet-control-plane:
@@ -1227,13 +1228,13 @@ workflows:
 #          requires:
 #            - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
@@ -1249,13 +1250,13 @@ workflows:
       # - acceptance-openshift:
       #    requires:
       #      - cleanup-azure-resources
-      - acceptance-gke-1-23:
-          requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
-      - acceptance-gke-cni-1-23:
-          requires:
-            - acceptance-gke-1-23
+      # - acceptance-gke-1-23:
+      #     requires:
+      #       - cleanup-gcp-resources
+      #       - dev-upload-docker
+      # - acceptance-gke-cni-1-23:
+      #     requires:
+      #       - acceptance-gke-1-23
       - acceptance-eks-1-21:
           requires:
             - cleanup-eks-resources
@@ -1263,13 +1264,13 @@ workflows:
       - acceptance-eks-cni-1-21:
           requires:
             - acceptance-eks-1-21
-      - acceptance-aks-1-22:
-          requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
-      - acceptance-aks-cni-1-22:
-          requires:
-            - acceptance-aks-1-22
+      # - acceptance-aks-1-22:
+      #     requires:
+      #       - cleanup-azure-resources
+      #       - dev-upload-docker
+      # - acceptance-aks-cni-1-22:
+      #     requires:
+      #       - acceptance-aks-1-22
 
   nightly-acceptance-tests-consul:
     triggers:
