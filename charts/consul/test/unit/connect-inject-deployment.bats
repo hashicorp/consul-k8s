@@ -830,16 +830,9 @@ load _helpers
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_LOGIN_DATACENTER").value' | tee /dev/stderr)
   [ "${actual}" = "dc1" ]
-
-@test "connectInject/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_META").value' | tee /dev/stderr)
+  [ "${actual}" = 'component=connect-injector,pod=$(NAMESPACE)/$(POD_NAME)' ]
 }
 
 @test "connectInject/Deployment: sets global auth method and primary datacenter when federation and acls and namespaces are enabled" {
@@ -2343,42 +2336,6 @@ reservedNameTest() {
 
 #--------------------------------------------------------------------
 # global.cloud
-
-@test "connectInject/Deployment: -tls-server-name is not specified on command of get-auto-encrypt-client-ca init container when tls and auto-encrypt is enabled but global.cloud.enabled is not set" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.datacenter=dc-foo' \
-      --set 'global.domain=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: -tls-server-name is specified on command of get-auto-encrypt-client-ca init container when tls and auto-encrypt is enabled and global.cloud.enabled is set" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.datacenter=dc-foo' \
-      --set 'global.domain=bar' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.secretName=consul-hcp-config' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-tls-server-name=server.dc-foo.bar"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
 
 @test "connectInject/Deployment: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
   cd `chart_dir`
