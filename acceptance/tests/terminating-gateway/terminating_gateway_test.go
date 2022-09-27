@@ -46,7 +46,11 @@ func TestTerminatingGateway(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.autoEncrypt":       strconv.FormatBool(c.autoEncrypt),
+
+				// TODO remove before merging!
+				"global.image":    "tecke/consul-dev:latest",
+				"global.imageK8S": "tecke/consul-k8s-control-plane-dev:latest",
+				// */
 			}
 
 			logger.Log(t, "creating consul cluster")
