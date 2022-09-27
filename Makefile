@@ -144,7 +144,7 @@ ifndef RELEASE_VERSION
 	$(error RELEASE_VERSION is required)
 endif
 ifndef RELEASE_DATE
-    $(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
 	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(PRERELEASE_VERSION)
 
@@ -153,7 +153,7 @@ ifndef RELEASE_VERSION
 	$(error RELEASE_VERSION is required)
 endif
 ifndef RELEASE_DATE
-    $(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
 ifndef NEXT_RELEASE_VERSION
 	$(error NEXT_RELEASE_VERSION is required)
