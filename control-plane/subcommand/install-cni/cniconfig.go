@@ -16,7 +16,7 @@ import (
 // defaultCNIConfigFile gets the the correct config file from the cni net dir.
 // Adapted from kubelet: https://github.com/kubernetes/kubernetes/blob/954996e231074dc7429f7be1256a579bedd8344c/pkg/kubelet/dockershim/network/cni/cni.go#L134.
 func defaultCNIConfigFile(dir string) (string, error) {
-	files, err := libcni.ConfFiles(dir, []string{".conf", ".conflist", ".json"})
+	files, err := libcni.ConfFiles(dir, []string{".conf", ".conflist"})
 	if err != nil {
 		return "", fmt.Errorf("error while trying to find files in %s: %w", dir, err)
 	}
@@ -58,11 +58,55 @@ func defaultCNIConfigFile(dir string) (string, error) {
 			// CNI config list has no networks, skipping".
 			continue
 		}
-
 		return confFile, nil
 	}
 	// There were files but none of them were valid
 	return "", fmt.Errorf("no valid config files found in %s", dir)
+}
+
+// confListFileFromConfFile converts a .conf file into a .conflist file. Chained plugins use .conflist files.
+func confListFileFromConfFile(cfgFile string) (string, error) {
+	if !strings.HasSuffix(cfgFile, ".conf") {
+		return "", fmt.Errorf("invalid conf file: %s", cfgFile)
+	}
+
+	// Convert the .conf file into a map so that we can remove pieces of it.
+	cfgMap, err := configFileToMap(cfgFile)
+	if err != nil {
+		return "", fmt.Errorf("could not convert .conf file to map: %w", err)
+	}
+
+	// Remove the cniVersion header from the conf map.
+	delete(cfgMap, "cniVersion")
+
+	// Create the new plugins: [] section and add the contents from cfgMap to it.
+	plugins := make([]map[string]interface{}, 1)
+	plugins[0] = cfgMap
+
+	listMap := map[string]interface{}{
+		"name":       "k8s-pod-network",
+		"cniVersion": "0.3.1",
+		"plugins":    plugins,
+	}
+
+	listFile := fmt.Sprintf("%s%s", cfgFile, "list")
+
+	// Marshal into a new json object.
+	listJSON, err := json.MarshalIndent(listMap, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("error marshalling conflist: %w", err)
+	}
+
+	// Libcni nuance/bug. If the newline is missing, the cni plugin will throw errors saying that it cannot get parse the config.
+	listJSON = append(listJSON, "\n"...)
+
+	// Write the .conflist file out.
+	err = os.WriteFile(listFile, listJSON, os.FileMode(0o644))
+	if err != nil {
+		return "", fmt.Errorf("error writing conflist file %s: %w", listFile, err)
+	}
+
+	return listFile, nil
 }
 
 // The format of the main cni config file is unstructured json consisting of a header and list of plugins

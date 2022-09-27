@@ -137,26 +137,28 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		Level: hclog.LevelFromString(cfg.LogLevel),
 	})
 
+	logger.Debug("consul-cni plugin config", "config", cfg)
+
+	// Only chained plugins have a previous result.
+	var result *current.Result
+
 	// Check to see if the plugin is a chained plugin.
 	if cfg.PrevResult == nil {
-		return fmt.Errorf("must be called as final chained plugin")
+		// The plugin is not chained (ie multus) so create a fake result
+		result = &current.Result{
+			CNIVersion: "0.3.1",
+		}
+	} else {
+		prevResult, err := current.GetResult(cfg.PrevResult)
+		if err != nil {
+			return fmt.Errorf("failed to convert prevResult: %w", err)
+		}
+		if len(prevResult.IPs) == 0 {
+			return fmt.Errorf("got no container IPs")
+		}
+		// Pass the prevResult through this plugin to the next one.
+		result = prevResult
 	}
-
-	logger.Debug("consul-cni plugin config", "config", cfg)
-	// Convert the PrevResult to a concrete Result type that can be modified. The CNI standard says
-	// that the previous result needs to be passed onto the next plugin.
-	prevResult, err := current.GetResult(cfg.PrevResult)
-	if err != nil {
-		return fmt.Errorf("failed to convert prevResult: %w", err)
-	}
-
-	if len(prevResult.IPs) == 0 {
-		return fmt.Errorf("got no container IPs")
-	}
-
-	// Pass the prevResult through this plugin to the next one.
-	result := prevResult
-	logger.Debug("consul-cni previous result", "result", result)
 
 	ctx := context.Background()
 	if c.client == nil {
@@ -186,7 +188,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	// We do not throw an error here because kubernetes will often throw a benign error where the pod has been
 	// updated in between the get and update of the annotation. Eventually kubernetes will update the annotation
-	ok := c.updateTransparentProxyStatusAnnotation(pod, podNamespace, waiting)
+	ok := c.updateTransparentProxyStatusAnnotation(podName, podNamespace, waiting)
 	if !ok {
 		logger.Info("unable to update %s pod annotation to waiting", keyTransparentProxyStatus)
 	}
@@ -213,7 +215,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	// We do not throw an error here because kubernetes will often throw a benign error where the pod has been
 	// updated in between the get and update of the annotation. Eventually kubernetes will update the annotation
-	ok = c.updateTransparentProxyStatusAnnotation(pod, podNamespace, complete)
+	ok = c.updateTransparentProxyStatusAnnotation(podName, podNamespace, complete)
 	if !ok {
 		logger.Info("unable to update %s pod annotation to complete", keyTransparentProxyStatus)
 	}
@@ -270,8 +272,13 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 
 // updateTransparentProxyStatusAnnotation updates the transparent-proxy-status annotation. We use it as a simple inicator of
 // CNI status on the pod.  Failing is not fatal.
-func (c *Command) updateTransparentProxyStatusAnnotation(pod *corev1.Pod, namespace, status string) bool {
+func (c *Command) updateTransparentProxyStatusAnnotation(podName, namespace, status string) bool {
+	// Refresh the pod so that we can update it without problems
+	pod, err := c.client.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
 	pod.Annotations[keyTransparentProxyStatus] = status
-	_, err := c.client.CoreV1().Pods(namespace).Update(context.Background(), pod, metav1.UpdateOptions{})
+	_, err = c.client.CoreV1().Pods(namespace).Update(context.Background(), pod, metav1.UpdateOptions{})
 	return err == nil
 }

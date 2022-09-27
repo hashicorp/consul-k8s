@@ -5,6 +5,8 @@
 FEATURES:
 * CLI:
   * Add support for tab autocompletion [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1501)]
+* Consul CNI Plugin
+  * Support for OpenShift and Multus CNI plugin [[GH-1527](https://github.com/hashicorp/consul-k8s/pull/1527)]
 
 BUG FIXES:
 * Control plane
