@@ -3,6 +3,7 @@
 {{- template "consul.reservedNamesFailer" (list .Values.global.adminPartitions.name "global.adminPartitions.name") }}
 {{- if and (not .Values.externalServers.enabled) (ne .Values.global.adminPartitions.name "default") }}{{ fail "externalServers.enabled needs to be true and configured to create a non-default partition." }}{{ end -}}
 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.adminPartitionsRole) }}{{ fail "global.secretsBackend.vault.adminPartitionsRole is required when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true." }}{{ end -}}
+{{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -75,22 +76,19 @@ spec:
         - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
           env:
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
-            {{- if .Values.global.secretsBackend.vault.enabled }}
-            - name: CONSUL_HTTP_TOKEN_FILE
-              value: /vault/secrets/bootstrap-token
-            {{- else }}
-            - name: CONSUL_HTTP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.acls.bootstrapToken.secretName }}
-                  key: {{ .Values.global.acls.bootstrapToken.secretKey }}
-            {{- end }}
-            {{- end }}
+          {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
+          {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          - name: CONSUL_ACL_TOKEN_FILE
+            value: /vault/secrets/bootstrap-token
+          {{- else }}
+          - name: CONSUL_ACL_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.global.acls.bootstrapToken.secretName }}
+                key: {{ .Values.global.acls.bootstrapToken.secretKey }}
+          {{- end }}
+          {{- end }}
           {{- if .Values.global.tls.enabled  }}
           {{- if not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled) }}
           volumeMounts:
@@ -104,30 +102,8 @@ spec:
             - "-ec"
             - |
               consul-k8s-control-plane partition-init \
-                -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
                 -log-level={{ .Values.global.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
-
-                {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
-                {{- range .Values.externalServers.hosts }}
-                -server-address={{ quote . }} \
-                {{- end }}
-                -server-port={{ .Values.externalServers.httpsPort }} \
-
-                {{- if .Values.global.tls.enabled }}
-                -use-https \
-                {{- if not .Values.externalServers.useSystemRoots }}
-                {{- if .Values.global.secretsBackend.vault.enabled }}
-                -ca-file=/vault/secrets/serverca.crt \
-                {{- else }}
-                -ca-file=/consul/tls/ca/tls.crt \
-                {{- end }}
-                {{- end }}
-                {{- if .Values.externalServers.tlsServerName }}
-                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
-                {{- end }}
-                {{- end }}
-                -partition-name={{ .Values.global.adminPartitions.name }}
           resources:
             requests:
               memory: "50Mi"

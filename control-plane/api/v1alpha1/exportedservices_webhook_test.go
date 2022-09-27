@@ -176,11 +176,10 @@ func TestValidateExportedServices(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &ExportedServicesWebhook{
-				Client:       client,
-				ConsulClient: nil,
-				Logger:       logrtest.TestLogger{T: t},
-				decoder:      decoder,
-				ConsulMeta:   c.consulMeta,
+				Client:     client,
+				Logger:     logrtest.TestLogger{T: t},
+				decoder:    decoder,
+				ConsulMeta: c.consulMeta,
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{

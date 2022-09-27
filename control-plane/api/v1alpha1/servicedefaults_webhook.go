@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	capi "github.com/hashicorp/consul/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -14,8 +13,7 @@ import (
 // +kubebuilder:object:generate=false
 
 type ServiceDefaultsWebhook struct {
-	ConsulClient *capi.Client
-	Logger       logr.Logger
+	Logger logr.Logger
 
 	// ConsulMeta contains metadata specific to the Consul installation.
 	ConsulMeta common.ConsulMeta

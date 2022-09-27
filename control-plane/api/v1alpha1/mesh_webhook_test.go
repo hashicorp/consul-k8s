@@ -76,10 +76,9 @@ func TestValidateMesh(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &MeshWebhook{
-				Client:       client,
-				ConsulClient: nil,
-				Logger:       logrtest.TestLogger{T: t},
-				decoder:      decoder,
+				Client:  client,
+				Logger:  logrtest.TestLogger{T: t},
+				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
