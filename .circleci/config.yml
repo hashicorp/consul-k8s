@@ -795,6 +795,7 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - KUBERNETES_EXEC_INFO: '{"apiVersion":"client.authentication.k8s.io/v1beta1"}'
     docker:
       # This image is built from test/docker/Test.dockerfile
       - image: jmurrethc/test-dockerfile
@@ -852,6 +853,7 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - KUBERNETES_EXEC_INFO: '{"apiVersion":"client.authentication.k8s.io/v1beta1"}'
     docker:
       # This image is built from test/docker/Test.dockerfile
       - image: jmurrethc/test-dockerfile
