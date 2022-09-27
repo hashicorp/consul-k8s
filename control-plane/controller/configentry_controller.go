@@ -9,7 +9,9 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
 	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
@@ -50,7 +52,11 @@ type Controller interface {
 // all config entry types, e.g. ServiceDefaults, ServiceResolver, etc, since
 // they share the same reconcile behaviour.
 type ConfigEntryController struct {
-	ConsulClient *capi.Client
+	// ConsulClientConfig is the config for the Consul API client.
+	ConsulClientConfig *consul.Config
+
+	// ConsulServerConnMgr is the watcher for the Consul server addresses.
+	ConsulServerConnMgr *discovery.Watcher
 
 	// DatacenterName indicates the Consul Datacenter name the controller is
 	// operating in. Adds this value as metadata on managed resources.
@@ -97,6 +103,18 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		return ctrl.Result{}, err
 	}
 
+	// Create Consul client for this reconcile.
+	serverState, err := r.ConsulServerConnMgr.State()
+	if err != nil {
+		logger.Error(err, "failed to get Consul server state", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	consulClient, err := consul.NewClientFromConnMgrState(r.ConsulClientConfig, serverState)
+	if err != nil {
+		logger.Error(err, "failed to create Consul API client", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
 
 	if configEntry.GetDeletionTimestamp().IsZero() {
@@ -114,7 +132,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		if containsString(configEntry.GetFinalizers(), FinalizerName) {
 			logger.Info("deletion event")
 			// Check to see if consul has config entry with the same name
-			entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
+			entry, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
 				Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 			})
 
@@ -125,7 +143,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			} else if err == nil {
 				// Only delete the resource from Consul if it is owned by our datacenter.
 				if entry.GetMeta()[common.DatacenterKey] == r.DatacenterName {
-					_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.WriteOptions{
+					_, err := consulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.WriteOptions{
 						Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 					})
 					if err != nil {
@@ -150,7 +168,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	// Check to see if consul has config entry with the same name
-	entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
+	entry, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
 		Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 	})
 	// If a config entry with this name does not exist
@@ -161,7 +179,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// destination consul namespace first.
 		if r.EnableConsulNamespaces {
 			consulNS := r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())
-			created, err := namespaces.EnsureExists(r.ConsulClient, consulNS, r.CrossNSACLPolicy)
+			created, err := namespaces.EnsureExists(consulClient, consulNS, r.CrossNSACLPolicy)
 			if err != nil {
 				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 					fmt.Errorf("creating consul namespace %q: %w", consulNS, err))
@@ -172,7 +190,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 
 		// Create the config entry
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
+		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
 			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 		})
 		if err != nil {
@@ -220,7 +238,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 
 		logger.Info("config entry does not match consul", "modify-index", entry.GetModifyIndex())
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
+		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
 			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 		})
 		if err != nil {
@@ -234,7 +252,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// matches the entry in Kubernetes. We just need to update the metadata
 		// of the entry in Consul to say that it's now managed by Kubernetes.
 		logger.Info("migrating config entry to be managed by Kubernetes")
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
+		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
 			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 		})
 		if err != nil {

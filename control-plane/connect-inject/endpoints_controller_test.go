@@ -1690,7 +1690,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						MetaKeyKubeNS:          "default",
 						MetaKeyManagedBy:       managedByValue,
 					},
-					ServiceTags: []string{"abc,123", "pod1", "def,456", "pod1"},
+					ServiceTags:  []string{"abc,123", "pod1", "def,456", "pod1"},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{

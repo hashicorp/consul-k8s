@@ -59,7 +59,7 @@ func TestServerWithConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCa
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.Cleanup(cancelFunc)
 	hcLog := hclog.New(&hclog.LoggerOptions{Level: hclog.Debug})
-	watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "exec=echo 127.0.0.1", GRPCPort: cfg.Ports.GRPC}, hcLog)
+	watcher, err := discovery.NewWatcher(ctx, discovery.Config{Addresses: "127.0.0.1", GRPCPort: cfg.Ports.GRPC}, hcLog)
 	require.NoError(t, err)
 	t.Cleanup(watcher.Stop)
 	go watcher.Run()

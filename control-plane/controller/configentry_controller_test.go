@@ -12,8 +12,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +41,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		consulKind          string
 		consulPrereqs       []capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
-		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
+		reconciler          func(client.Client, *consul.Config, *discovery.Watcher, logr.Logger) testReconciler
 		compare             func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
@@ -55,13 +57,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					MaxInboundConnections: 100,
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -86,13 +89,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -116,13 +120,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ProxyDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -146,13 +151,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &MeshController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -189,13 +195,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceRouterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -228,13 +235,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceSplitterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -306,13 +314,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceIntentionsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -354,13 +363,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &IngressGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -393,13 +403,14 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -425,22 +436,17 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
 			for _, configEntry := range c.consulPrereqs {
 				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
 				req.NoError(err)
 				req.True(written)
 			}
 
-			r := c.reconciler(fakeClient, consulClient, logrtest.TestLogger{T: t})
+			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
@@ -476,7 +482,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		consulKind          string
 		consulPrereqs       []capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
-		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
+		reconciler          func(client.Client, *consul.Config, *discovery.Watcher, logr.Logger) testReconciler
 		updateF             func(common.ConfigEntryResource)
 		compare             func(t *testing.T, consul capi.ConfigEntry)
 	}{
@@ -492,13 +498,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -526,13 +533,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -560,13 +568,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ProxyDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -594,13 +603,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &MeshController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -642,13 +652,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceSplitterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -699,13 +710,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceRouterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -772,13 +784,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceIntentionsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -819,13 +832,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &IngressGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -862,13 +876,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -898,15 +913,9 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
 			// Create any prereqs.
 			for _, configEntry := range c.consulPrereqs {
@@ -930,14 +939,14 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Name:      c.configEntryResource.KubernetesName(),
 				}
 				// First get it so we have the latest revision number.
-				err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
+				err := fakeClient.Get(ctx, namespacedName, c.configEntryResource)
 				req.NoError(err)
 
 				// Update the entry in Kube and run reconcile.
 				c.updateF(c.configEntryResource)
-				err := fakeClient.Update(ctx, c.configEntryResource)
+				err = fakeClient.Update(ctx, c.configEntryResource)
 				req.NoError(err)
-				r := c.reconciler(fakeClient, consulClient, logrtest.TestLogger{T: t})
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
 				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -963,7 +972,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		consulKind                      string
 		consulPrereq                    []capi.ConfigEntry
 		configEntryResourceWithDeletion common.ConfigEntryResource
-		reconciler                      func(client.Client, *capi.Client, logr.Logger) testReconciler
+		reconciler                      func(client.Client, *consul.Config, *discovery.Watcher, logr.Logger) testReconciler
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
@@ -979,13 +988,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1006,13 +1016,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1033,13 +1044,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ProxyDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1060,13 +1072,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &MeshController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1101,13 +1114,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				},
 			},
 
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceRouterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1137,13 +1151,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceSplitterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1203,13 +1218,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &ServiceIntentionsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1241,13 +1257,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &IngressGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1274,13 +1291,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+			reconciler: func(client client.Client, cfg *consul.Config, watcher *discovery.Watcher, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -1295,15 +1313,9 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
 			// Create any prereqs.
 			for _, configEntry := range c.consulPrereq {
@@ -1326,7 +1338,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
-				r := c.reconciler(fakeClient, consulClient, logrtest.TestLogger{T: t})
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
 				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -1362,18 +1374,22 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
-	// Construct a Consul client that will error by giving it
-	// an unresolvable address.
-	consulClient, err := capi.NewClient(&capi.Config{
-		Address: "incorrect-address",
-	})
-	req.NoError(err)
+	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	testClient.TestServer.WaitForServiceIntentions(t)
+
+	// Get watcher state to make sure we can get a healthy address.
+	_, err := testClient.Watcher.State()
+	require.NoError(t, err)
+	// Stop the server before calling reconcile imitating a server that's not running.
+	_ = testClient.TestServer.Stop()
+
 	reconciler := &ServiceDefaultsController{
 		Client: fakeClient,
 		Log:    logrtest.TestLogger{T: t},
 		ConfigEntryController: &ConfigEntryController{
-			ConsulClient:   consulClient,
-			DatacenterName: datacenterName,
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			DatacenterName:      datacenterName,
 		},
 	}
 
@@ -1387,7 +1403,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	})
 	req.Error(err)
 
-	expErr := fmt.Sprintf("Get \"http://incorrect-address/v1/config/%s/%s\": dial tcp: lookup incorrect-address", capi.ServiceDefaults, svcDefaults.ConsulName())
+	expErr := fmt.Sprintf("Get \"http://127.0.0.1:%d/v1/config/%s/%s\": dial tcp 127.0.0.1:%d: connect: connection refused",
+		testClient.Cfg.HTTPPort, capi.ServiceDefaults, svcDefaults.ConsulName(), testClient.Cfg.HTTPPort)
 	req.Contains(err.Error(), expErr)
 	req.False(resp.Requeue)
 
@@ -1430,27 +1447,22 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	// The config entry exists in kube but its status will be nil.
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
-	consul, err := testutil.NewTestServerConfigT(t, nil)
-	req.NoError(err)
-	defer consul.Stop()
-
-	consul.WaitForServiceIntentions(t)
-	consulClient, err := capi.NewClient(&capi.Config{
-		Address: consul.HTTPAddr,
-	})
-	req.NoError(err)
+	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	testClient.TestServer.WaitForServiceIntentions(t)
+	consulClient := testClient.APIClient
 	reconciler := &ServiceDefaultsController{
 		Client: fakeClient,
 		Log:    logrtest.TestLogger{T: t},
 		ConfigEntryController: &ConfigEntryController{
-			ConsulClient:   consulClient,
-			DatacenterName: datacenterName,
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			DatacenterName:      datacenterName,
 		},
 	}
 
 	// Create the resource in Consul to mimic that it was created
 	// successfully (but its status hasn't been updated).
-	_, _, err = consulClient.ConfigEntries().Set(svcDefaults.ToConsul(datacenterName), nil)
+	_, _, err := consulClient.ConfigEntries().Set(svcDefaults.ToConsul(datacenterName), nil)
 	require.NoError(t, err)
 
 	namespacedName := types.NamespacedName{
@@ -1507,15 +1519,9 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
 			// We haven't run reconcile yet. We must create the config entry
 			// in Consul ourselves in a different datacenter.
@@ -1532,7 +1538,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Name:      svcDefaults.KubernetesName(),
 				}
 				// First get it so we have the latest revision number.
-				err = fakeClient.Get(ctx, namespacedName, svcDefaults)
+				err := fakeClient.Get(ctx, namespacedName, svcDefaults)
 				req.NoError(err)
 
 				// Attempt to create the entry in Kube and run reconcile.
@@ -1540,8 +1546,9 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Client: fakeClient,
 					Log:    logrtest.TestLogger{T: t},
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient:   consulClient,
-						DatacenterName: datacenterName,
+						ConsulClientConfig:  testClient.Cfg,
+						ConsulServerConnMgr: testClient.Watcher,
+						DatacenterName:      datacenterName,
 					},
 				}
 				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
@@ -1596,21 +1603,16 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaultsWithDeletion)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaultsWithDeletion).Build()
 
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			req.NoError(err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			req.NoError(err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 			reconciler := &ServiceDefaultsController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				ConfigEntryController: &ConfigEntryController{
-					ConsulClient:   consulClient,
-					DatacenterName: datacenterName,
+					ConsulClientConfig:  testClient.Cfg,
+					ConsulServerConnMgr: testClient.Watcher,
+					DatacenterName:      datacenterName,
 				},
 			}
 
@@ -1683,15 +1685,8 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(defaults, splitter).Build()
 
-	consul, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
-	defer consul.Stop()
-
-	consul.WaitForServiceIntentions(t)
-	consulClient, err := capi.NewClient(&capi.Config{
-		Address: consul.HTTPAddr,
-	})
-	require.NoError(t, err)
+	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	testClient.TestServer.WaitForServiceIntentions(t)
 
 	logger := logrtest.TestLogger{T: t}
 
@@ -1699,16 +1694,18 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 		Client: fakeClient,
 		Log:    logger,
 		ConfigEntryController: &ConfigEntryController{
-			ConsulClient:   consulClient,
-			DatacenterName: datacenterName,
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			DatacenterName:      datacenterName,
 		},
 	}
 	svcSplitterReconciler := ServiceSplitterController{
 		Client: fakeClient,
 		Log:    logger,
 		ConfigEntryController: &ConfigEntryController{
-			ConsulClient:   consulClient,
-			DatacenterName: datacenterName,
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			DatacenterName:      datacenterName,
 		},
 	}
 
@@ -1819,15 +1816,9 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
 
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.KubeResource).Build()
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(t, err)
-			defer consul.Stop()
-
-			consul.WaitForServiceIntentions(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			require.NoError(t, err)
+			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
 
 			// Create the service-defaults in Consul.
 			success, _, err := consulClient.ConfigEntries().Set(&c.ConsulResource, nil)
@@ -1840,8 +1831,9 @@ func TestConfigEntryController_Migration(t *testing.T) {
 				Client: fakeClient,
 				Log:    logger,
 				ConfigEntryController: &ConfigEntryController{
-					ConsulClient:   consulClient,
-					DatacenterName: datacenterName,
+					ConsulClientConfig:  testClient.Cfg,
+					ConsulServerConnMgr: testClient.Watcher,
+					DatacenterName:      datacenterName,
 				},
 			}
 

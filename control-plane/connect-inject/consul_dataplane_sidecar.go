@@ -130,7 +130,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 
 	cmd := []string{
 		"consul-dataplane",
-		"-addresses=" + w.ConsulAddress,
+		fmt.Sprintf("-addresses=%q", w.ConsulAddress),
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id=" + fmt.Sprintf("$(cat %s)", proxyIDFileName),
 		"-service-node-name=" + ConsulNodeName,
