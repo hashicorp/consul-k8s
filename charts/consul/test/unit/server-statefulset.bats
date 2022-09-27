@@ -1952,7 +1952,7 @@ load _helpers
   [ "${envvar}" = "" ]
 }
 
-@test "server/StatefulSet: does not create HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is not set" {
+@test "server/StatefulSet: does not create HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, HCP_SCADA_ADDRESS, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is not set" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/server-statefulset.yaml \
@@ -1982,6 +1982,10 @@ load _helpers
     yq -r '.env[] | select(.name == "HCP_API_HOSTNAME")' | tee /dev/stderr)
   [ "${envvar}" = "" ]
 
+  envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_SCADA_ADDRESS")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
 }
 
 @test "server/StatefulSet: cloud config is set in command when global.cloud.enabled is set" {
@@ -1998,7 +2002,7 @@ load _helpers
 }
 
 
-@test "server/StatefulSet: creates HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is set" {
+@test "server/StatefulSet: creates HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, HCP_SCADA_ADDRESS, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is set" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/server-statefulset.yaml \
@@ -2068,6 +2072,18 @@ load _helpers
   actual=$(echo "$envvar" |
   yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
   [ "${actual}" = "api-hostname" ]
+
+  # HCP_SCADA_ADDRESS
+  envvar=$(echo "$container" |
+  yq -r '.env[] | select(.name == "HCP_SCADA_ADDRESS")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "scada-address" ]
 }
 
 @test "server/StatefulSet: cloud config is set in command global.cloud.enabled is not set" {

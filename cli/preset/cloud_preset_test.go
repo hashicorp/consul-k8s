@@ -76,6 +76,7 @@ var hcpConfig *HCPConfig = &HCPConfig{
 	ClientSecret: hcpClientSecret,
 	AuthURL:      "https://foobar",
 	APIHostname:  "https://foo.bar",
+	ScadaAddress: "10.10.10.10",
 }
 
 var validBootstrapConfig *CloudBootstrapConfig = &CloudBootstrapConfig{
@@ -398,6 +399,7 @@ func checkSecretsWereSaved(t require.TestingT, k8s kubernetes.Interface, expecte
 	require.Equal(t, expectedConfig.HCPConfig.ClientSecret, string(hcpConfigSecret.Data[secretKeyHCPClientSecret]))
 	require.Equal(t, expectedConfig.HCPConfig.ResourceID, string(hcpConfigSecret.Data[secretKeyHCPResourceID]))
 	require.Equal(t, expectedConfig.HCPConfig.AuthURL, string(hcpConfigSecret.Data[secretKeyHCPAuthURL]))
+	require.Equal(t, expectedConfig.HCPConfig.ScadaAddress, string(hcpConfigSecret.Data[secretKeyHCPScadaAddress]))
 	require.Equal(t, expectedConfig.HCPConfig.APIHostname, string(hcpConfigSecret.Data[secretKeyHCPAPIHostname]))
 	require.Equal(t, corev1.SecretTypeOpaque, hcpConfigSecret.Type)
 	require.Equal(t, common.CLILabelValue, hcpConfigSecret.Labels[common.CLILabelKey])

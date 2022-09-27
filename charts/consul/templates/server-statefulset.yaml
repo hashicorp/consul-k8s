@@ -286,6 +286,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.global.cloud.secretName }}
                   key: api-hostname            
+            - name: HCP_SCADA_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: scada-address            
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
