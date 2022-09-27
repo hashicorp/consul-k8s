@@ -93,10 +93,10 @@ func TestConfListFromConfFile(t *testing.T) {
 	actualFile, err := confListFileFromConfFile(tempCfgFile)
 	require.NoError(t, err)
 
-	actual, err := ioutil.ReadFile(actualFile)
+	actual, err := os.ReadFile(actualFile)
 	require.NoError(t, err)
 
-	expected, err := ioutil.ReadFile(expectedCfgFile)
+	expected, err := os.ReadFile(expectedCfgFile)
 	require.NoError(t, err)
 
 	require.Equal(t, string(expected), string(actual))
