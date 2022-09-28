@@ -66,7 +66,7 @@ use Consul with Kubernetes, please see the
 [Consul and Kubernetes documentation](https://www.consul.io/docs/platform/k8s/index.html).
 
 ### Prerequisites
-  * **Helm 3.2+** (Helm 2 is not supported)
+  * **Helm 3.6+** 
   * **Kubernetes 1.21-1.24** - This is the earliest version of Kubernetes tested.
     It is possible that this chart works with earlier versions, but it is
     untested.

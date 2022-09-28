@@ -30,7 +30,7 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
     non-Kubernetes nodes to easily discover and access Kubernetes services.
 
 ### Prerequisites
-  * **Helm 3.2+** (Helm 2 is not supported)
+  * **Helm 3.6+** 
   * **Kubernetes 1.21-1.24** - This is the earliest version of Kubernetes tested.
     It is possible that this chart works with earlier versions but it is
     untested.
