@@ -118,7 +118,7 @@ load _helpers
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq .bootstrap_expect | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "server/ConfigMap: bootstrap_expect can be set by server.bootstrapExpect" {

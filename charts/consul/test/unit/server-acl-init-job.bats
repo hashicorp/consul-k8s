@@ -133,12 +133,6 @@ load _helpers
   local actual
   actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
