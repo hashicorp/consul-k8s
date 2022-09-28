@@ -46,8 +46,8 @@ commands:
             chmod +x ./kubectl
             sudo mv ./kubectl /usr/local/bin/kubectl
 
-            wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
-            tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
+            wget https://get.helm.sh/helm-v3.9.4-linux-amd64.tar.gz
+            tar -zxvf helm-v3.9.4-linux-amd64.tar.gz
             sudo mv linux-amd64/helm /usr/local/bin/helm
   create-kind-clusters:
     parameters:
@@ -486,7 +486,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - checkout
@@ -597,7 +597,7 @@ jobs:
   ##########################
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -615,7 +615,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -633,7 +633,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
     steps:
       - checkout
       - run:
@@ -660,7 +660,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - run:
@@ -728,7 +728,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - run:
@@ -796,7 +796,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - checkout
@@ -853,7 +853,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - checkout
@@ -909,7 +909,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - checkout
@@ -972,7 +972,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - checkout
@@ -1035,7 +1035,7 @@ jobs:
     parallelism: 1
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.13.0
 
     steps:
       - checkout
