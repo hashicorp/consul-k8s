@@ -14,6 +14,7 @@ import (
 	"github.com/cenkalti/backoff"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -115,7 +116,7 @@ func (c *Command) Run(args []string) int {
 
 	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
-	// Disable server watch because we we only need to get server IPs once.
+	// Disable server watch because we only need to get server IPs once.
 	serverConnMgrCfg.ServerWatchDisabled = true
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
@@ -261,10 +262,15 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 	registrationRetryCount := 0
 	return func() error {
 		registrationRetryCount++
+		var gatewayList *api.CatalogNodeServiceList
+		var err error
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
 			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
-
-		gatewayList, _, err := client.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter})
+		if c.consul.Namespace != "" {
+			gatewayList, _, err = client.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+		} else {
+			gatewayList, _, err = client.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter})
+		}
 		if err != nil {
 			c.logger.Error("Unable to get gateway", "error", err)
 			return err

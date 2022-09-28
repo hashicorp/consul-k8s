@@ -25,27 +25,27 @@ const (
 	// value that is either "mesh", "ingress" or "terminating".
 	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"
 
-	// annotationMeshGatewayConsulServiceName is the key of the annotation whose value
+	// annotationGatewayConsulServiceName is the key of the annotation whose value
 	// is the service name with which the mesh gateway is registered.
-	annotationMeshGatewayConsulServiceName = "consul.hashicorp.com/mesh-gateway-consul-service-name"
+	annotationGatewayConsulServiceName = "consul.hashicorp.com/gateway-consul-service-name"
 
 	// annotationMeshGatewayContainerPort is the key of the annotation whose value is
 	// used as the port and also registered as the LAN port when the mesh-gateway
 	// service is registered.
 	annotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
 
-	// annotationMeshGatewaySource is the key of the annotation that determines which
+	// annotationGatewayWANSource is the key of the annotation that determines which
 	// source to use to determine the wan address and wan port for the mesh-gateway
 	// service registration.
-	annotationMeshGatewaySource = "consul.hashicorp.com/mesh-gateway-wan-address-source"
+	annotationGatewayWANSource = "consul.hashicorp.com/gateway-wan-address-source"
 
-	// annotationMeshGatewayWANAddress is the key of the annotation that when the source
+	// annotationGatewayWANAddress is the key of the annotation that when the source
 	// of the mesh-gateway is 'Static', is the value of the WAN address for the gateway.
-	annotationMeshGatewayWANAddress = "consul.hashicorp.com/mesh-gateway-wan-address-static"
+	annotationGatewayWANAddress = "consul.hashicorp.com/gateway-wan-address-static"
 
-	// annotationMeshGatewayWANPort is the key of the annotation whose value is the
+	// annotationGatewayWANPort is the key of the annotation whose value is the
 	// WAN port for the mesh-gateway service registration.
-	annotationMeshGatewayWANPort = "consul.hashicorp.com/mesh-gateway-wan-port"
+	annotationGatewayWANPort = "consul.hashicorp.com/gateway-wan-port"
 
 	// annotationGatewayNamespace is the key of the annotation that indicates the
 	// Consul namespace where a Terminating or Ingress Gateway pod is deployed.

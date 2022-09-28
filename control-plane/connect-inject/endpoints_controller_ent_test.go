@@ -11,6 +11,8 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -20,9 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
@@ -315,15 +314,39 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 		}{
 			k8sObjects: func() []runtime.Object {
 				meshGateway := createGatewayWithNamespace("mesh-gateway", "default", "3.3.3.3", map[string]string{
-					annotationMeshGatewaySource:            "Static",
-					annotationMeshGatewayWANAddress:        "2.3.4.5",
-					annotationMeshGatewayWANPort:           "443",
-					annotationMeshGatewayContainerPort:     "8443",
-					annotationGatewayKind:                  MeshGateway,
-					annotationMeshGatewayConsulServiceName: "mesh-gateway"})
+					annotationGatewayWANSource:         "Static",
+					annotationGatewayWANAddress:        "2.3.4.5",
+					annotationGatewayWANPort:           "443",
+					annotationMeshGatewayContainerPort: "8443",
+					annotationGatewayKind:              MeshGateway,
+					annotationGatewayConsulServiceName: "mesh-gateway"})
 				terminatingGateway := createGatewayWithNamespace("terminating-gateway", "default", "4.4.4.4", map[string]string{
 					annotationGatewayKind:      TerminatingGateway,
 					annotationGatewayNamespace: testCase.ConsulNS})
+				ingressGateway := createGatewayWithNamespace("ingress-gateway", "default", "5.5.5.5", map[string]string{
+					annotationGatewayWANSource:         "Service",
+					annotationGatewayWANPort:           "8443",
+					annotationGatewayNamespace:         testCase.ConsulNS,
+					annotationGatewayKind:              IngressGateway,
+					annotationGatewayConsulServiceName: "ingress-gateway"})
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "gateway",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "5.6.7.8",
+								},
+							},
+						},
+					},
+				}
 				endpoints := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "gateway",
@@ -348,11 +371,19 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 										Namespace: "default",
 									},
 								},
+								{
+									IP: "5.5.5.5",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "ingress-gateway",
+										Namespace: "default",
+									},
+								},
 							},
 						},
 					},
 				}
-				return []runtime.Object{meshGateway, terminatingGateway, endpoints}
+				return []runtime.Object{meshGateway, terminatingGateway, ingressGateway, svc, endpoints}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -383,6 +414,25 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 					ServicePort:    8443,
 					Namespace:      testCase.ConsulNS,
 				},
+				{
+					ServiceID:      "ingress-gateway",
+					ServiceName:    "ingress-gateway",
+					ServiceAddress: "5.5.5.5",
+					ServiceMeta:    map[string]string{MetaKeyPodName: "ingress-gateway", MetaKeyKubeServiceName: "gateway", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+					ServicePort:    21000,
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "5.5.5.5",
+							Port:    21000,
+						},
+						"wan": {
+							Address: "5.6.7.8",
+							Port:    8443,
+						},
+					},
+					Namespace: testCase.ConsulNS,
+				},
 			},
 			expectedHealthChecks: []*api.HealthCheck{
 				{
@@ -399,6 +449,16 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 					CheckID:     "default/terminating-gateway",
 					ServiceName: "gateway",
 					ServiceID:   "terminating-gateway",
+					Name:        ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ConsulKubernetesCheckType,
+					Namespace:   testCase.ConsulNS,
+				},
+				{
+					CheckID:     "default/ingress-gateway",
+					ServiceName: "ingress-gateway",
+					ServiceID:   "ingress-gateway",
 					Name:        ConsulKubernetesCheckName,
 					Status:      api.HealthPassing,
 					Output:      kubernetesSuccessReasonMsg,
@@ -1869,6 +1929,66 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 							MetaKeyKubeNS:          "default",
 							MetaKeyManagedBy:       managedByValue,
 							MetaKeyPodName:         "terminating-gateway",
+						},
+						Namespace: ts.ConsulNS,
+					},
+				},
+				enableACLs: true,
+			},
+			{
+				name: "ingress-gateway",
+				initialConsulSvcs: []*api.AgentService{
+					{
+						ID:      "ingress-gateway",
+						Kind:    api.ServiceKindIngressGateway,
+						Service: "ingress-gateway",
+						Port:    80,
+						Address: "1.2.3.4",
+						Meta: map[string]string{
+							MetaKeyKubeServiceName: "gateway",
+							MetaKeyKubeNS:          "default",
+							MetaKeyManagedBy:       managedByValue,
+							MetaKeyPodName:         "ingress-gateway",
+						},
+						TaggedAddresses: map[string]api.ServiceAddress{
+							"lan": {
+								Address: "1.2.3.4",
+								Port:    80,
+							},
+							"wan": {
+								Address: "5.6.7.8",
+								Port:    8080,
+							},
+						},
+						Namespace: ts.ConsulNS,
+					},
+				},
+				enableACLs: false,
+			},
+			{
+				name: "ingress-gateway with ACLs enabled",
+				initialConsulSvcs: []*api.AgentService{
+					{
+						ID:      "ingress-gateway",
+						Kind:    api.ServiceKindIngressGateway,
+						Service: "ingress-gateway",
+						Port:    80,
+						Address: "1.2.3.4",
+						Meta: map[string]string{
+							MetaKeyKubeServiceName: "service-deleted",
+							MetaKeyKubeNS:          "default",
+							MetaKeyManagedBy:       managedByValue,
+							MetaKeyPodName:         "ingress-gateway",
+						},
+						TaggedAddresses: map[string]api.ServiceAddress{
+							"lan": {
+								Address: "1.2.3.4",
+								Port:    80,
+							},
+							"wan": {
+								Address: "5.6.7.8",
+								Port:    8080,
+							},
 						},
 						Namespace: ts.ConsulNS,
 					},

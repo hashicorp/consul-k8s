@@ -948,10 +948,10 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8888" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "NodeIP" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "9999" ]
 }
 
@@ -968,10 +968,10 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "NodeIP" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "443" ]
 }
 
@@ -988,10 +988,10 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "NodeName" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "443" ]
 }
 
@@ -1023,13 +1023,13 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "Static" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-static"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-static"]' | tee /dev/stderr)
     [ "${actual}" = "example.com" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "443" ]
 }
 
@@ -1048,10 +1048,10 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "Service" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "443" ]
 }
 
@@ -1070,10 +1070,10 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "Service" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "9999" ]
 }
 
@@ -1106,10 +1106,10 @@ key2: value2' \
     local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-container-port"]' | tee /dev/stderr)
     [ "${actual}" = "8443" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-address-source"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]' | tee /dev/stderr)
     [ "${actual}" = "Service" ]
 
-    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/mesh-gateway-wan-port"]' | tee /dev/stderr)
+    local actual=$(echo $annotations | yq -r '.["consul.hashicorp.com/gateway-wan-port"]' | tee /dev/stderr)
     [ "${actual}" = "443" ]
 }
 
@@ -1381,7 +1381,7 @@ key2: value2' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-kind") | del(."consul.hashicorp.com/mesh-gateway-wan-address-source") | del(."consul.hashicorp.com/mesh-gateway-container-port") | del(."consul.hashicorp.com/mesh-gateway-wan-address-static") | del(."consul.hashicorp.com/mesh-gateway-wan-port") | del(."consul.hashicorp.com/mesh-gateway-consul-service-name")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-kind") | del(."consul.hashicorp.com/gateway-wan-address-source") | del(."consul.hashicorp.com/mesh-gateway-container-port") | del(."consul.hashicorp.com/gateway-wan-address-static") | del(."consul.hashicorp.com/gateway-wan-port") | del(."consul.hashicorp.com/gateway-consul-service-name")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
