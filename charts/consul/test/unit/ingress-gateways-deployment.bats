@@ -100,7 +100,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "ingressGateways/Deployment: sets flags when global.tls.enabled is flags" {
+@test "ingressGateways/Deployment: sets flags when global.tls.enabled is false" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -176,21 +176,8 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
-  [ "${actual}" = "8501" ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_TLS_SERVER_NAME") | .value' | tee /dev/stderr)
-  [ "${actual}" = "server.dc1.consul" ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
-  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_AUTH_METHOD") | .value' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-k8s-component-auth-method" ]
@@ -202,40 +189,7 @@ load _helpers
   [ "${actual}" = 'component=ingress-gateway,pod=$(NAMESPACE)/$(POD_NAME)' ]
 }
 
-@test "ingressGateways/Deployment: Adds consul envvars CONSUL_HTTP_ADDR on ingress-gateway-init init container when ACLs are enabled and tls is not enabled" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
-  [ "${actual}" = "8500" ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_AUTH_METHOD") | .value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-k8s-component-auth-method" ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_DATACENTER") | .value' | tee /dev/stderr)
-  [ "${actual}" = "dc1" ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_META") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'component=ingress-gateway,pod=$(NAMESPACE)/$(POD_NAME)' ]
-
-    local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
-    [ "${actual}" = "" ]
-
-    local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_TLS_SERVER_NAME") | .value' | tee /dev/stderr)
-    [ "${actual}" = "" ]
-
-    local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
-    [ "${actual}" = "" ]
-}
-
-@test "ingressGateways/Deployment: ACL flags is not set when acls are disabled" {
+@test "ingressGateways/Deployment: ACL flags are not set when acls are disabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -258,7 +212,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "ingressGateways/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
+@test "ingressGateways/Deployment: command flags are set when acls are enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -868,29 +822,6 @@ key2: value2' \
 
   local actual=$(echo $object | yq -r '.key2' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
-}
-
-#--------------------------------------------------------------------
-# ingress-gateway-init init container
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2]' | tee /dev/stderr)
-
-  exp='consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
--gateway-kind="ingress-gateway" \
--consul-node-name="k8s-service-mesh" \
--proxy-id-file=/consul/service/proxy-id \
--service-name=release-name-consul-ingress-gateway \
--log-level=info \
--log-json=false'
-
-  [ "${actual}" = "${exp}" ]
 }
 
 #--------------------------------------------------------------------
