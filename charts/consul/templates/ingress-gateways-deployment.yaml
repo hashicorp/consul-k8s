@@ -63,7 +63,47 @@ spec:
         release: {{ $root.Release.Name }}
         component: ingress-gateway
         ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+        consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
       annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/gateway-kind": "ingress-gateway"
+        "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
+        {{- if $root.Values.global.enableConsulNamespaces }}
+        "consul.hashicorp.com/gateway-namespace": {{ (default $defaults.consulNamespace .consulNamespace) }}
+        {{- end }}
+        "consul.hashicorp.com/gateway-wan-address-source": "Service"
+        {{- $serviceType := (default $defaults.service.type $service.type) }}
+        {{- if (eq $serviceType "NodePort") }}
+        {{- if $service.ports }}
+        {{- $firstPort := first $service.ports}}
+        {{- if $firstPort.nodePort }}
+        "consul.hashicorp.com/gateway-wan-port": "{{ $firstPort.nodePort }}"
+        {{- else }}{{ fail "if ingressGateways .service.type=NodePort and defining ingressGateways.gateways.service.ports, the first port entry must include a nodePort" }}
+        {{- end }}
+        {{- else if $defaults.service.ports }}
+        {{- $firstDefaultPort := first $defaults.service.ports}}
+        {{- if $firstDefaultPort.nodePort }}
+        "consul.hashicorp.com/gateway-wan-port": "{{ $firstDefaultPort.nodePort }}"
+        {{- else }}{{ fail "if ingressGateways .service.type=NodePort and using ingressGateways.defaults.service.ports, the first port entry must include a nodePort" }}
+        {{- end }}
+        {{- else }}{{ fail "if ingressGateways .service.type=NodePort, the first port entry in either the defaults or specific gateway must include a nodePort" }}
+        {{- end }}
+        {{- else }}
+        {{- if $service.ports }}
+        {{- $firstPort := first $service.ports}}
+        {{- if $firstPort.port }}
+        "consul.hashicorp.com/gateway-wan-port": "{{ $firstPort.port }}"
+        {{- else }}{{ fail "if ingressGateways .service.type is not NodePort and defining ingressGateways.gateways.service.ports, the first port entry must include a port" }}
+        {{- end }}
+        {{- else if $defaults.service.ports }}
+        {{- $firstDefaultPort := first $defaults.service.ports}}
+        {{- if $firstDefaultPort.port }}
+        "consul.hashicorp.com/gateway-wan-port": "{{ $firstDefaultPort.port }}"
+        {{- else }}{{ fail "if ingressGateways .service.type is not NodePort and using ingressGateways.defaults.service.ports, the first port entry must include a port" }}
+        {{- end }}
+        {{- else }}{{ fail "if ingressGateways .service.type is not NodePort, the first port entry in either the defaults or specific gateway must include a port" }}
+        {{- end }}
+        {{- end }}
         {{- if (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/agent-inject": "true"
@@ -78,7 +118,6 @@ spec:
         {{ tpl $root.Values.global.secretsBackend.vault.agentAnnotations $root | nindent 8 | trim }}
         {{- end }}
         {{- end }}
-        "consul.hashicorp.com/connect-inject": "false"
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
         "prometheus.io/scrape": "true"
         "prometheus.io/path": "/metrics"
@@ -107,374 +146,172 @@ spec:
       terminationGracePeriodSeconds: {{ default $defaults.terminationGracePeriodSeconds .terminationGracePeriodSeconds }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
-        - name: consul-bin
-          emptyDir: {}
-        - name: consul-service
-          emptyDir:
-            medium: "Memory"
-        {{- if $root.Values.global.tls.enabled }}
-        {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
-        - name: consul-ca-cert
-          secret:
-            {{- if $root.Values.global.tls.caCert.secretName }}
-            secretName: {{ $root.Values.global.tls.caCert.secretName }}
-            {{- else }}
-            secretName: {{ template "consul.fullname" $root }}-ca-cert
-            {{- end }}
-            items:
-            - key: {{ default "tls.crt" $root.Values.global.tls.caCert.secretKey }}
-              path: tls.crt
-        {{- end }}
-        {{- if $root.Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-          emptyDir:
-            medium: "Memory"
-        {{- end }}
-        {{- end }}
+      - name: consul-service
+        emptyDir:
+          medium: "Memory"
+      {{- if $root.Values.global.tls.enabled }}
+      {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if $root.Values.global.tls.caCert.secretName }}
+          secretName: {{ $root.Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" $root }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" $root.Values.global.tls.caCert.secretKey }}
+            path: tls.crt
+      {{- end }}
+      {{- end }}
       initContainers:
-        # We use the Envoy image as our base image so we use an init container to
-        # copy the Consul binary to a shared directory that can be used when
-        # starting Envoy.
-        - name: copy-consul-bin
-          image: {{ $root.Values.global.image | quote }}
-          command:
-          - cp
-          - /bin/consul
-          - /consul-bin/consul
-          volumeMounts:
-          - name: consul-bin
-            mountPath: /consul-bin
-          {{- $initContainer := .initCopyConsulContainer }}
-          {{- if (or $initContainer $defaults.initCopyConsulContainer) }}
-          {{- if (default $defaults.initCopyConsulContainer.resources $initContainer.resources) }}
-          resources: {{ toYaml (default $defaults.initCopyConsulContainer.resources $initContainer.resources) | nindent 12 }}
-          {{- end }}
-          {{- end }}
-        {{- if (and $root.Values.global.tls.enabled $root.Values.global.tls.enableAutoEncrypt) }}
-        {{- include "consul.getAutoEncryptClientCA" $root | nindent 8 }}
+      # ingress-gateway-init registers the ingress gateway service with Consul.
+      - name: ingress-gateway-init
+        image: {{ $root.Values.global.imageK8S }}
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        {{- include "consul.consulK8sConsulServerEnvVars" $root | nindent 8 }}
+        {{- if $root.Values.global.enableConsulNamespaces }}
+        - name: CONSUL_NAMESPACE
+          value: {{ (default $defaults.consulNamespace .consulNamespace) }}
         {{- end }}
-        # ingress-gateway-init registers the ingress gateway service with Consul.
-        - name: ingress-gateway-init
-          image: {{ $root.Values.global.imageK8S }}
-          env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            {{- if $root.Values.global.tls.enabled }}
-            - name: CONSUL_HTTP_ADDR
-              value: https://$(HOST_IP):8501
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
-            {{- else }}
-            - name: CONSUL_HTTP_ADDR
-              value: http://$(HOST_IP):8500
-            {{- end }}
-          command:
-            - "/bin/sh"
-            - "-ec"
-            - |
-                {{- if $root.Values.global.acls.manageSystemACLs }}
-                consul-k8s-control-plane acl-init \
-                  -component-name=ingress-gateway/{{ template "consul.fullname" $root }}-{{ .name }} \
-                  -acl-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
-                  {{- if $root.Values.global.adminPartitions.enabled }}
-                  -partition={{ $root.Values.global.adminPartitions.name }} \
-                  {{- end }}
-                  -token-sink-file=/consul/service/acl-token \
-                  -consul-api-timeout={{ $root.Values.global.consulAPITimeout }} \
-                  -log-level={{ default $root.Values.global.logLevel }} \
-                  -log-json={{ $root.Values.global.logJSON }}
-                {{ end }}
-
-                {{- $serviceType := (default $defaults.service.type $service.type) }}
-                {{- if (eq $serviceType "NodePort") }}
-                WAN_ADDR="${HOST_IP}"
-                {{- else if (or (eq $serviceType "ClusterIP") (eq $serviceType "LoadBalancer")) }}
-                consul-k8s-control-plane service-address \
-                  -log-level={{ $root.Values.global.logLevel }} \
-                  -log-json={{ $root.Values.global.logJSON }} \
-                  -k8s-namespace={{ $root.Release.Namespace }} \
-                  -name={{ template "consul.fullname" $root }}-{{ .name }} \
-                  -output-file=/tmp/address.txt
-                WAN_ADDR="$(cat /tmp/address.txt)"
-                {{- else }}
-                {{- fail "currently set ingressGateway value service.type is not supported" }}
-                {{- end }}
-
-          {{- if (eq $serviceType "NodePort") }}
-            {{- if $service.ports }}
-                {{- $firstPort := first $service.ports}}
-              {{- if $firstPort.nodePort }}
-                WAN_PORT={{ $firstPort.nodePort }}
-              {{- else }}{{ fail "if ingressGateways .service.type=NodePort and defining ingressGateways.gateways.service.ports, the first port entry must include a nodePort" }}
-              {{- end }}
-            {{- else if $defaults.service.ports }}
-              {{- $firstDefaultPort := first $defaults.service.ports}}
-              {{- if $firstDefaultPort.nodePort }}
-                  WAN_PORT={{ $firstDefaultPort.nodePort }}
-              {{- else }}{{ fail "if ingressGateways .service.type=NodePort and using ingressGateways.defaults.service.ports, the first port entry must include a nodePort" }}
-              {{- end }}
-            {{- else }}{{ fail "if ingressGateways .service.type=NodePort, the first port entry in either the defaults or specific gateway must include a nodePort" }}
-            {{- end }}
-
-          {{- else }}
-            {{- if $service.ports }}
-                {{- $firstPort := first $service.ports}}
-              {{- if $firstPort.port }}
-                WAN_PORT={{ $firstPort.port }}
-              {{- else }}{{ fail "if ingressGateways .service.type is not NodePort and defining ingressGateways.gateways.service.ports, the first port entry must include a port" }}
-              {{- end }}
-            {{- else if $defaults.service.ports }}
-                {{- $firstDefaultPort := first $defaults.service.ports}}
-              {{- if $firstDefaultPort.port }}
-                WAN_PORT={{ $firstDefaultPort.port }}
-              {{- else }}{{ fail "if ingressGateways .service.type is not NodePort and using ingressGateways.defaults.service.ports, the first port entry must include a port" }}
-              {{- end }}
-            {{- else }}{{ fail "if ingressGateways .service.type is not NodePort, the first port entry in either the defaults or specific gateway must include a port" }}
-            {{- end }}
-          {{- end }}
-
-                cat > /consul/service/service.hcl << EOF
-                service {
-                  kind = "ingress-gateway"
-                  name = "{{ .name }}"
-                  id = "${POD_NAME}"
-                  {{- if $root.Values.global.enableConsulNamespaces }}
-                  namespace = "{{ (default $defaults.consulNamespace .consulNamespace) }}"
-                  {{- end }}
-                  {{- if $root.Values.global.adminPartitions.enabled }}
-                  partition = "{{ $root.Values.global.adminPartitions.name }}"
-                  {{- end }}
-                  port = ${WAN_PORT}
-                  address = "${WAN_ADDR}"
-                  tagged_addresses {
-                    lan {
-                      address = "${POD_IP}"
-                      port = 21000
-                    }
-                    wan {
-                      address = "${WAN_ADDR}"
-                      port = ${WAN_PORT}
-                    }
-                  }
-                  proxy {
-                    config {
-                      {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
-                      envoy_prometheus_bind_addr = "${POD_IP}:20200"
-                      {{- end }}
-                      envoy_gateway_no_default_bind = true
-                      envoy_gateway_bind_addresses {
-                        all-interfaces {
-                          address = "0.0.0.0"
-                        }
-                      }
-                    }
-                  }
-                  checks = [
-                    {
-                      name = "Ingress Gateway Listening"
-                      interval = "10s"
-                      tcp = "${POD_IP}:21000"
-                      deregister_critical_service_after = "6h"
-                    }
-                  ]
-                }
-                EOF
-
-                /consul-bin/consul services register \
-                  {{- if $root.Values.global.acls.manageSystemACLs }}
-                  -token-file=/consul/service/acl-token \
-                  {{- end }}
-                  /consul/service/service.hcl
-          volumeMounts:
-            - name: consul-service
-              mountPath: /consul/service
-            - name: consul-bin
-              mountPath: /consul-bin
-            {{- if $root.Values.global.tls.enabled }}
-            {{- if $root.Values.global.tls.enableAutoEncrypt }}
-            - name: consul-auto-encrypt-ca-cert
-            {{- else }}
-            - name: consul-ca-cert
-            {{- end }}
-              mountPath: /consul/tls/ca
-              readOnly: true
-            {{- end }}
-          resources:
-            requests:
-              memory: "50Mi"
-              cpu: "50m"
-            limits:
-              memory: "50Mi"
-              cpu: "50m"
+        {{- if $root.Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_AUTH_METHOD
+          value: {{ template "consul.fullname" $root }}-k8s-component-auth-method
+        - name: CONSUL_LOGIN_DATACENTER
+          value: {{ $root.Values.global.datacenter }}
+        - name: CONSUL_LOGIN_META
+          value: "component=ingress-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
+       {{- end }}
+        command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+          -gateway-kind="ingress-gateway" \
+          -consul-node-name="k8s-service-mesh" \
+          -proxy-id-file=/consul/service/proxy-id \
+          -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
+          -log-level={{ default $root.Values.global.logLevel }} \
+          -log-json={{ $root.Values.global.logJSON }}
+        volumeMounts:
+        - name: consul-service
+          mountPath: /consul/service
+        {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+        - name: consul-ca-cert
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
       containers:
-        - name: ingress-gateway
-          image: {{ $root.Values.global.imageEnvoy | quote }}
-          {{- if (default $defaults.resources .resources) }}
-          resources: {{ toYaml (default $defaults.resources .resources) | nindent 12 }}
-          {{- end }}
-          volumeMounts:
-          - name: consul-bin
-            mountPath: /consul-bin
-          - name: consul-service
-            mountPath: /consul/service
-            readOnly: true
-          {{- if $root.Values.global.tls.enabled }}
-          {{- if $root.Values.global.tls.enableAutoEncrypt }}
-          - name: consul-auto-encrypt-ca-cert
-          {{- else }}
-          - name: consul-ca-cert
-          {{- end }}
-            mountPath: /consul/tls/ca
-            readOnly: true
-          {{- end }}
-          env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            {{- if $root.Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_HTTP_TOKEN_FILE
-              value: "/consul/service/acl-token"
-            {{- end}}
-            {{- if $root.Values.global.tls.enabled }}
-            - name: CONSUL_HTTP_ADDR
-              value: https://$(HOST_IP):8501
-            - name: CONSUL_GRPC_ADDR
-              value: https://$(HOST_IP):8502
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
+      - name: ingress-gateway
+        image: {{ $root.Values.global.imageConsulDataplane | quote }}
+        {{- if (default $defaults.resources .resources) }}
+        resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+        - name: consul-ca-cert
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          consul-dataplane \
+            -envoy-ready-bind-address=$POD_IP \
+            -envoy-ready-bind-port=21000 \
+            {{- if $root.Values.externalServers.enabled }}
+            -addresses={{ $root.Values.externalServers.hosts | first | quote }} \
             {{- else }}
-            - name: CONSUL_HTTP_ADDR
-              value: http://$(HOST_IP):8500
-            - name: CONSUL_GRPC_ADDR
-              value: $(HOST_IP):8502
+            -addresses="{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc" \
             {{- end }}
-          command:
-            - /consul-bin/consul
-            - connect
-            - envoy
-            - -gateway=ingress
-            - -proxy-id=$(POD_NAME)
-            - -address=$(POD_IP):21000
+            {{- if $root.Values.externalServers.enabled }}
+            -grpc-port={{ $root.Values.externalServers.grpcPort }} \
+            {{- else }}
+            -grpc-port=8502 \
+            {{- end }}
+            -proxy-service-id=$POD_NAME \
+            -service-node-name="k8s-service-mesh" \
             {{- if $root.Values.global.enableConsulNamespaces }}
-            - -namespace={{ default $defaults.consulNamespace .consulNamespace }}
+            -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }} \
+            {{- end }}
+            {{- if and $root.Values.global.tls.enabled }}
+            {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+            -ca-certs=/consul/tls/ca/tls.crt \
+            {{- end }}
+            {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
+            -tls-server-name={{$root.Values.externalServers.tlsServerName }} \
+            {{- else }}
+            -tls-server-name=server.{{ $root.Values.global.datacenter }}.{{ $root.Values.global.domain }} \
+            {{- end }}
+            {{- else }}
+            -tls-disabled \
+            {{- end }}
+            {{- if $root.Values.global.acls.manageSystemACLs }}
+            -credential-type=login \
+            -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
+            -login-meta=component=ingress-gateway \
+            -login-meta=pod=${NAMESPACE}/${POD_NAME} \
+            -login-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
+            {{- if $root.Values.global.adminPartitions.enabled }}
+            -login-partition={{ $root.Values.global.adminPartitions.name }} \
+            {{- end }}
             {{- end }}
             {{- if $root.Values.global.adminPartitions.enabled }}
-            - -partition={{ $root.Values.global.adminPartitions.name }}
+            -service-partition={{ $root.Values.global.adminPartitions.name }} \
             {{- end }}
-          livenessProbe:
-            tcpSocket:
-              port: 21000
-            failureThreshold: 3
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-          readinessProbe:
-            tcpSocket:
-              port: 21000
-            failureThreshold: 3
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-          ports:
-            - name: gateway-health
-              containerPort: 21000
-            {{- range $index, $allPorts := (default $defaults.service.ports $service.ports) }}
-            - name: gateway-{{ $index }}
-              containerPort: {{ $allPorts.port }}
-            {{- end }}
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                  - "/bin/sh"
-                  - "-ec"
-                  - |
-                      /consul-bin/consul services deregister \
-                        {{- if $root.Values.global.enableConsulNamespaces }}
-                        -namespace={{ default $defaults.consulNamespace .consulNamespace }} \
-                        {{- end }}
-                        {{- if $root.Values.global.adminPartitions.enabled }}
-                        -partition={{ $root.Values.global.adminPartitions.name }} \
-                        {{- end }}
-                        -id="${POD_NAME}"
-                  {{- if $root.Values.global.acls.manageSystemACLs }}
-                  - "/consul-bin/consul logout"
-                  {{- end}}
-
-        # consul-sidecar ensures the ingress gateway is always registered with
-        # the local Consul agent, even if it loses the initial registration.
-        - name: consul-sidecar
-          image: {{ $root.Values.global.imageK8S }}
-          volumeMounts:
-            - name: consul-service
-              mountPath: /consul/service
-              readOnly: true
-            - name: consul-bin
-              mountPath: /consul-bin
-            {{- if $root.Values.global.tls.enabled }}
-            {{- if $root.Values.global.tls.enableAutoEncrypt }}
-            - name: consul-auto-encrypt-ca-cert
-            {{- else }}
-            - name: consul-ca-cert
-            {{- end }}
-              mountPath: /consul/tls/ca
-              readOnly: true
-            {{- end }}
-          {{- if  $root.Values.global.consulSidecarContainer }}
-          {{- if $root.Values.global.consulSidecarContainer.resources }}
-          resources: {{ toYaml $root.Values.global.consulSidecarContainer.resources | nindent 12 }}
-          {{- end }}
-          {{- end }}
-          env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            {{- if $root.Values.global.tls.enabled }}
-            - name: CONSUL_HTTP_ADDR
-              value: https://$(HOST_IP):8501
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
-            {{- else }}
-            - name: CONSUL_HTTP_ADDR
-              value: http://$(HOST_IP):8500
-            {{- end }}
-          command:
-            - consul-k8s-control-plane
-            - consul-sidecar
-            - -log-level={{ $root.Values.global.logLevel }}
-            - -log-json={{ $root.Values.global.logJSON }}
-            - -service-config=/consul/service/service.hcl
-            - -consul-binary=/consul-bin/consul
-            - -consul-api-timeout={{ $root.Values.global.consulAPITimeout }}
-            {{- if $root.Values.global.acls.manageSystemACLs }}
-            - -token-file=/consul/service/acl-token
-            {{- end }}
+            -log-level={{ default $root.Values.global.logLevel }} \
+            -log-json={{ $root.Values.global.logJSON }}
+        livenessProbe:
+          tcpSocket:
+            port: 21000
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: 21000
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        ports:
+        - name: gateway-health
+          containerPort: 21000
+        {{- range $index, $allPorts := (default $defaults.service.ports $service.ports) }}
+        - name: gateway-{{ $index }}
+          containerPort: {{ $allPorts.port }}
+        {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ default $defaults.priorityClassName .priorityClassName | quote }}
       {{- end }}

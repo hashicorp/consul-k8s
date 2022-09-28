@@ -18,24 +18,17 @@ const StaticClientName = "static-client"
 // Test that ingress gateways work in a default installation and a secure installation.
 func TestIngressGateway(t *testing.T) {
 	cases := []struct {
-		secure      bool
-		autoEncrypt bool
+		secure bool
 	}{
 		{
-			false,
-			false,
+			secure: false,
 		},
 		{
-			true,
-			false,
-		},
-		{
-			true,
-			true,
+			secure: true,
 		},
 	}
 	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+		name := fmt.Sprintf("secure: %t", c.secure)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
@@ -48,7 +41,6 @@ func TestIngressGateway(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.autoEncrypt":       strconv.FormatBool(c.autoEncrypt),
 			}
 
 			releaseName := helpers.RandomName()

@@ -35,18 +35,18 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/gateway-kind": "mesh-gateway"
-        "consul.hashicorp.com/mesh-gateway-consul-service-name": "{{ .Values.meshGateway.consulServiceName }}"
-        "consul.hashicorp.com/mesh-gateway-wan-address-source": "{{ .Values.meshGateway.wanAddress.source }}"
+        "consul.hashicorp.com/gateway-consul-service-name": "{{ .Values.meshGateway.consulServiceName }}"
         "consul.hashicorp.com/mesh-gateway-container-port": "{{ .Values.meshGateway.containerPort }}"
-        "consul.hashicorp.com/mesh-gateway-wan-address-static": "{{ .Values.meshGateway.wanAddress.static }}"
+        "consul.hashicorp.com/gateway-wan-address-source": "{{ .Values.meshGateway.wanAddress.source }}"
+        "consul.hashicorp.com/gateway-wan-address-static": "{{ .Values.meshGateway.wanAddress.static }}"
         {{- if eq .Values.meshGateway.wanAddress.source "Service" }}
         {{- if eq .Values.meshGateway.service.type "NodePort" }}
-        "consul.hashicorp.com/mesh-gateway-wan-port": "{{ .Values.meshGateway.service.nodePort }}"
+        "consul.hashicorp.com/gateway-wan-port": "{{ .Values.meshGateway.service.nodePort }}"
         {{- else }}
-        "consul.hashicorp.com/mesh-gateway-wan-port": "{{ .Values.meshGateway.service.port }}"
+        "consul.hashicorp.com/gateway-wan-port": "{{ .Values.meshGateway.service.port }}"
         {{- end }}
         {{- else }}
-        "consul.hashicorp.com/mesh-gateway-wan-port": "{{ .Values.meshGateway.wanAddress.port }}"
+        "consul.hashicorp.com/gateway-wan-port": "{{ .Values.meshGateway.wanAddress.port }}"
         {{- end }}
         {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
@@ -206,7 +206,7 @@ spec:
             {{- end }}
             -proxy-service-id=$POD_NAME \
             -service-node-name="k8s-service-mesh" \
-            {{- if and .Values.global.tls.enabled }}
+            {{- if .Values.global.tls.enabled }}
             {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
             -ca-certs=/consul/tls/ca/tls.crt \
             {{- end }}

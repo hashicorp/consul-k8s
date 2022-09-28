@@ -8,6 +8,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-cmp v0.5.7
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220831174802-b8af65262de8
+	github.com/hashicorp/consul-server-connection-manager v0.0.0-20220922180412-01c5be1c636f
 	github.com/hashicorp/consul/api v1.10.1-0.20220822180451-60c82757ea35
 	github.com/hashicorp/consul/sdk v0.11.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
@@ -70,7 +71,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/gophercloud/gophercloud v0.1.0 // indirect
-	github.com/hashicorp/consul-server-connection-manager v0.0.0-20220922180412-01c5be1c636f // indirect
 	github.com/hashicorp/consul/proto-public v0.1.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
