@@ -625,16 +625,10 @@ global:
         memory: "50Mi"
         cpu: "20m"
 
-  # The name (and tag) of the Envoy Docker image used for the
-  # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
-  # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
-  # @default: envoyproxy/envoy-alpine:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.23.1"
-
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "ishustava/consul-dataplane:latest@sha256:a19acc509b24960275a842cafc9c35b167e3e8ee9a75ccae1cbcaf3c40a3664a"
+  imageConsulDataplane: "ishustava/consul-dataplane:latest@sha256:1a4fe4fdc5d6cf248c5518be338271e007a1f4f5a852e637199c377334985f54"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
