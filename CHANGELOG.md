@@ -18,6 +18,7 @@ BUG FIXES:
 IMPROVEMENTS:
 * Helm:
   * API Gateway: Set primary datacenter flag when deploying controller into secondary datacenter with federation enabled [[GH-1511](https://github.com/hashicorp/consul-k8s/pull/1511)]
+  * API Gateway: Allow controller to create and update Secrets for storing Consul CA cert alongside gateway Deployments [[GH-1542](https://github.com/hashicorp/consul-k8s/pull/1542)]
 * Control-plane:
   * Support escaped commas in service tag annotations for pods which use `consul.hashicorp.com/connect-service-tags` or `consul.hashicorp.com/service-tags`. [[GH-1532](https://github.com/hashicorp/consul-k8s/pull/1532)]
 
