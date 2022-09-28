@@ -470,13 +470,13 @@ key2: value2' \
       local actual=$(echo $command | yq -r '. | any(contains("credential-type=login"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-meta=pod=${NAMESPACE}/${POD_NAME}"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-method=release-name-consul-k8s-component-auth-method"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 }
 
@@ -493,7 +493,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].command[2]]' | tee /dev/stderr)
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-method=release-name-consul-k8s-component-auth-method-dc1"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method-dc1"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-datacenter=dc2"))'| tee /dev/stderr)
