@@ -77,8 +77,17 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
-      {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName .Values.global.acls.bootstrapToken.secretName) }}
+      {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) .Values.externalServers.aclInit.extraVolumes) }}
       volumes:
+        {{- range .Values.externalServers.aclInit.extraVolumes }}
+        - name: userconfig-{{ .name }}
+          {{ .type }}:
+            {{- if (eq .type "configMap") }}
+            name: {{ .name }}
+            {{- else if (eq .type "secret") }}
+            secretName: {{ .name }}
+            {{- end }}
+        {{- end }}
         {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
         - name: consul-ca-cert
           secret:
@@ -115,8 +124,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName .Values.global.acls.bootstrapToken.secretName) }}
+          {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) .Values.externalServers.aclInit.extraVolumes) }}
           volumeMounts:
+            {{- range .Values.externalServers.aclInit.extraVolumes }}
+            - name: userconfig-{{ .name }}
+              readOnly: true
+              mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
             {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
