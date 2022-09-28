@@ -638,10 +638,6 @@ key2: value2' \
       yq '.spec.template.spec.initContainers[] | select(.name == "mesh-gateway-init")' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane connect-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
       yq '[.env[10].name] | any(contains("CONSUL_LOGIN_AUTH_METHOD"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
