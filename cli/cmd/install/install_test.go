@@ -612,7 +612,7 @@ func TestInstall(t *testing.T) {
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
 				"\n==> Checking if Consul Demo Application can be installed\n ✓ No existing Consul demo application installations found.\n",
 				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n",
-				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n ✓ Consul installed in namespace \"consul\".\n",
+				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
 				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: consul\n    \n    \n",
 				"\n==> Installing Consul demo application\n ✓ Downloaded charts.\n ! Helm returned an error.\n",
 			},
@@ -660,7 +660,7 @@ func TestInstall(t *testing.T) {
 			messages: []string{
 				"\n==> Performing dry run install. No changes will be made to the cluster.\n",
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
-				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n ✓ Consul installed in namespace \"consul\".\n    Dry run complete. No changes were made to the Kubernetes cluster.\n    Installation can proceed with this configuration.\n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    No overrides provided, using the default Helm values.\n    Dry run complete. No changes were made to the Kubernetes cluster.\n    Installation can proceed with this configuration.\n",
 			},
 			helmActionsRunner:                       &helm.MockActionRunner{},
 			expectedReturnCode:                      0,
