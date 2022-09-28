@@ -487,7 +487,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - checkout
@@ -598,7 +598,7 @@ jobs:
   ##########################
   cleanup-gcp-resources:
     docker:
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
     steps:
       - run:
           name: cleanup leftover resources
@@ -616,7 +616,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
     steps:
       - run:
           name: cleanup leftover resources
@@ -634,7 +634,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
     steps:
       - checkout
       - run:
@@ -661,7 +661,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - run:
@@ -729,7 +729,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - run:
@@ -795,10 +795,9 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
-      - KUBERNETES_EXEC_INFO: '{"apiVersion":"client.authentication.k8s.io/v1beta1"}'
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - checkout
@@ -853,10 +852,9 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
-      - KUBERNETES_EXEC_INFO: '{"apiVersion":"client.authentication.k8s.io/v1beta1"}'
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - checkout
@@ -912,7 +910,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - checkout
@@ -975,7 +973,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - checkout
@@ -1038,7 +1036,7 @@ jobs:
     parallelism: 1
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: jmurrethc/test-dockerfile:0.1.0
+      - image: jmurrethc/test-dockerfile:0.1.5
 
     steps:
       - checkout
