@@ -103,9 +103,6 @@ load _helpers
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_TLS_SERVER_NAME") | .value' | tee /dev/stderr)
-  [ "${actual}" = "server.dc1.consul" ]
-
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }

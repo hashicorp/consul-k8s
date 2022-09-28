@@ -16,7 +16,6 @@ import (
 	cmdInstallCNI "github.com/hashicorp/consul-k8s/control-plane/subcommand/install-cni"
 	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
-	cmdServiceAddress "github.com/hashicorp/consul-k8s/control-plane/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
 	cmdTLSInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/tls-init"
 	cmdVersion "github.com/hashicorp/consul-k8s/control-plane/subcommand/version"
@@ -66,10 +65,6 @@ func init() {
 
 		"delete-completed-job": func() (cli.Command, error) {
 			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
-		},
-
-		"service-address": func() (cli.Command, error) {
-			return &cmdServiceAddress.Command{UI: ui}, nil
 		},
 
 		"get-consul-client-ca": func() (cli.Command, error) {
