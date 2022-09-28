@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controller/ServiceAccount: disabled by default" {
+@test "controller/ServiceAccount: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-serviceaccount.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controller/ServiceAccount: enabled with controller.enabled=true" {

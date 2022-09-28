@@ -45,7 +45,9 @@ load _helpers
   cd `chart_dir`
   run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.bootstrapExpect=1' .
+      --set 'server.bootstrapExpect=1' \
+      --set 'server.replicas=3' \
+      .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "server.bootstrapExpect cannot be less than server.replicas" ]]
 }
@@ -678,7 +680,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = b13fbd9214f5131aaf1bc234c5e307db1e9be3f29a66f14a994c2a73175ab29c ]
+  [ "${actual}" = f3b00edc16ec09e90b7a20e379be5ddc1b10121ce60f602809a44130d2dc7aca ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -688,7 +690,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = a32421961a4d6086483ce99d496b8fc34730bc476a0245d3b7762f6d5557cef2 ]
+  [ "${actual}" = b51ac0ef8e40d138e197f4ea86e55f3ceebb91fa07d15998809d8904d5a69606 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -698,7 +700,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = a68b3056d1b756d09163f5104d13a201d1e577e7c08c2ea44163eb03b0ca98b8 ]
+  [ "${actual}" = a37768452067ddd3a0ab44d1da18e167fe093946b14e43e915f094fa8c86c37f ]
 }
 
 #--------------------------------------------------------------------

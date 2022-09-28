@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "exportedServices/CustomerResourceDefinition: disabled by default" {
+@test "exportedServices/CustomerResourceDefinition: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/crd-exportedservices.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "exportedServices/CustomerResourceDefinition: enabled with controller.enabled=true" {

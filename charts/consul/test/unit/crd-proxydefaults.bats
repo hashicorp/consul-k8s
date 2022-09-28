@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "proxyDefaults/CustomerResourceDefinition: disabled by default" {
+@test "proxyDefaults/CustomerResourceDefinition: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/crd-proxydefaults.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq -s 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "proxyDefaults/CustomerResourceDefinition: enabled with controller.enabled=true" {

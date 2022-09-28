@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "connectInject/ClusterRole: disabled by default" {
+@test "connectInject/ClusterRole: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/ClusterRole: enabled with global.enabled false" {

@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "connectInject/Deployment: disabled by default" {
+@test "connectInject/Deployment: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/Deployment: enable with global.enabled false, client.enabled true" {
@@ -33,6 +35,7 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=-' \
       --set 'global.enabled=false' \
       .
 }

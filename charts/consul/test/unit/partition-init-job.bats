@@ -6,14 +6,15 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
-      .
+      . 
 }
 
-@test "partitionInit/Job: enabled with global.adminPartitions.enabled=true and servers = false" {
+@test "partitionInit/Job: enabled with global.adminPartitions.enabled=true and server.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
@@ -28,6 +29,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=true' \
       .
 }
@@ -37,6 +39,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       .
 }
@@ -46,6 +49,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.enabled=true' \
       .
 }
@@ -55,6 +59,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=true' \
       .
 }
@@ -65,6 +70,7 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=false' .
   [ "$status" -eq 1 ]
@@ -77,6 +83,7 @@ load _helpers
       -s templates/partition-init-job.yaml \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'server.enabled=false' \
@@ -113,6 +120,7 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
@@ -167,6 +175,7 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -197,6 +206,7 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.acls.bootstrapToken.secretName=partition-token' \
@@ -252,6 +262,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=boot' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -272,6 +283,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -321,6 +333,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -364,6 +377,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -423,6 +437,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -447,6 +462,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -472,6 +488,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -497,6 +514,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -526,6 +544,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -547,6 +566,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
