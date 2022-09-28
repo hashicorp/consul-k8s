@@ -168,17 +168,9 @@ spec:
           {{- end }}
           {{- if $root.Values.global.acls.manageSystemACLs }}
           - name: CONSUL_LOGIN_AUTH_METHOD
-            {{- if and $root.Values.global.federation.enabled $root.Values.global.federation.primaryDatacenter }}
-            value: {{ template "consul.fullname" $root }}-k8s-component-auth-method-{{ $root.Values.global.datacenter }}
-            {{- else }}
             value: {{ template "consul.fullname" $root }}-k8s-component-auth-method
-            {{- end }}
           - name: CONSUL_LOGIN_DATACENTER
-            {{- if and $root.Values.global.federation.enabled $root.Values.global.federation.primaryDatacenter }}
-            value: {{ $root.Values.global.federation.primaryDatacenter }}
-            {{- else }}
             value: {{ $root.Values.global.datacenter }}
-            {{- end }}
           - name: CONSUL_LOGIN_META
             value: "component=terminating-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
           {{- end }}
