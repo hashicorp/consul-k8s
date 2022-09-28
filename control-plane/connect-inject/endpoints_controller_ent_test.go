@@ -2076,9 +2076,11 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				require.False(t, resp.Requeue)
 
 				// After reconciliation, Consul should not have any instances of service-deleted.
-				serviceInstances, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{})
+				defaultNS, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{Namespace: "default"})
 				require.NoError(t, err)
-				require.Empty(t, serviceInstances)
+				testNS, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{Namespace: ts.ConsulNS})
+				require.NoError(t, err)
+				require.Empty(t, append(defaultNS, testNS...))
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
