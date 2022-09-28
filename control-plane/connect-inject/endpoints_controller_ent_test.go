@@ -321,8 +321,9 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 					annotationGatewayKind:              MeshGateway,
 					annotationGatewayConsulServiceName: "mesh-gateway"})
 				terminatingGateway := createGatewayWithNamespace("terminating-gateway", "default", "4.4.4.4", map[string]string{
-					annotationGatewayKind:      TerminatingGateway,
-					annotationGatewayNamespace: testCase.ConsulNS})
+					annotationGatewayKind:              TerminatingGateway,
+					annotationGatewayNamespace:         testCase.ConsulNS,
+					annotationGatewayConsulServiceName: "terminating-gateway"})
 				ingressGateway := createGatewayWithNamespace("ingress-gateway", "default", "5.5.5.5", map[string]string{
 					annotationGatewayWANSource:         "Service",
 					annotationGatewayWANPort:           "8443",
@@ -407,7 +408,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 				},
 				{
 					ServiceID:      "terminating-gateway",
-					ServiceName:    "gateway",
+					ServiceName:    "terminating-gateway",
 					ServiceAddress: "4.4.4.4",
 					ServiceMeta:    map[string]string{MetaKeyPodName: "terminating-gateway", MetaKeyKubeServiceName: "gateway", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
@@ -447,7 +448,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 				},
 				{
 					CheckID:     "default/terminating-gateway",
-					ServiceName: "gateway",
+					ServiceName: "terminating-gateway",
 					ServiceID:   "terminating-gateway",
 					Name:        ConsulKubernetesCheckName,
 					Status:      api.HealthPassing,
@@ -2002,7 +2003,6 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				fakeClient := fake.NewClientBuilder().Build()
 
 				// Create test Consul server.
-				// Create test consulServer server
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
 				testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
@@ -2077,9 +2077,11 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				require.False(t, resp.Requeue)
 
 				// After reconciliation, Consul should not have any instances of service-deleted.
-				serviceInstances, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{Namespace: ts.ConsulNS})
+				defaultNS, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{Namespace: "default"})
 				require.NoError(t, err)
-				require.Empty(t, serviceInstances)
+				testNS, _, err := consulClient.Catalog().Service(consulSvcName, "", &api.QueryOptions{Namespace: ts.ConsulNS})
+				require.NoError(t, err)
+				require.Empty(t, append(defaultNS, testNS...))
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)

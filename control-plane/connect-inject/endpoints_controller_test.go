@@ -1226,7 +1226,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			svcName:       "terminating-gateway",
 			consulSvcName: "terminating-gateway",
 			k8sObjects: func() []runtime.Object {
-				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{annotationGatewayKind: TerminatingGateway})
+				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{
+					annotationGatewayKind:              TerminatingGateway,
+					annotationGatewayConsulServiceName: "terminating-gateway",
+				})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "terminating-gateway",
@@ -1283,7 +1286,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			svcName:        "terminating-gateway",
 			consulSvcName:  "terminating-gateway",
 			k8sObjects: func() []runtime.Object {
-				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{annotationGatewayKind: TerminatingGateway})
+				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{
+					annotationGatewayKind:              TerminatingGateway,
+					annotationGatewayConsulServiceName: "terminating-gateway",
+				})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "terminating-gateway",
@@ -6069,91 +6075,6 @@ func Test_GetWANData(t *testing.T) {
 				require.Equal(t, c.wanPort, port)
 			} else {
 				require.EqualError(t, err, c.expErr)
-			}
-		})
-	}
-}
-
-func TestCreateTerminatingGatewayRegistrations(t *testing.T) {
-	const (
-		podName          = "terminating-gateway"
-		serviceName      = "terminating-gateway"
-		serviceNamespace = "consul"
-	)
-
-	cases := map[string]struct {
-		annotations   map[string]string
-		service       *api.AgentService
-		metricsConfig MetricsConfig
-	}{
-		"Terminating Gateway Default": {
-			annotations: map[string]string{
-				annotationGatewayKind: TerminatingGateway,
-			},
-		},
-		"Terminating Gateway with Consul Namespace": {
-			annotations: map[string]string{
-				annotationGatewayKind:      TerminatingGateway,
-				annotationGatewayNamespace: "consul-namespace",
-			},
-		},
-		"Terminating Gateway with Metrics Enabled": {
-			annotations: map[string]string{
-				annotationGatewayKind: TerminatingGateway,
-			},
-			metricsConfig: MetricsConfig{
-				DefaultEnableMetrics: true,
-				EnableGatewayMetrics: true,
-			},
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			pod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   "consul",
-					Name:        podName,
-					Annotations: c.annotations,
-				},
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			}
-			serviceEndpoint := corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: serviceNamespace,
-					Name:      serviceName,
-				},
-			}
-
-			r := EndpointsController{
-				MetricsConfig: c.metricsConfig,
-			}
-
-			registration, err := r.createGatewayRegistrations(pod, serviceEndpoint, api.HealthPassing)
-			require.NoError(t, err)
-
-			require.Equal(t, api.ServiceKindTerminatingGateway, registration.Service.Kind)
-			require.Equal(t, "terminating-gateway", registration.Service.Service)
-			require.Equal(t, 8443, registration.Service.Port)
-
-			require.Equal(t, podName, registration.Service.ID)
-			require.Equal(t, "1.2.3.4", registration.Service.Address)
-			require.Equal(t, podName, registration.Service.Meta[MetaKeyPodName])
-			require.Equal(t, serviceName, registration.Service.Meta[MetaKeyKubeServiceName])
-			require.Equal(t, serviceNamespace, registration.Service.Meta[MetaKeyKubeNS])
-
-			require.Equal(t, fmt.Sprintf("%s/%s", "consul", podName), registration.Check.CheckID)
-			require.Equal(t, api.HealthPassing, registration.Check.Status)
-			require.Equal(t, podName, registration.Check.ServiceID)
-
-			if value, ok := c.annotations[annotationConsulNamespace]; ok {
-				require.Equal(t, value, registration.Service.Namespace)
-			}
-
-			if c.metricsConfig.DefaultEnableMetrics && c.metricsConfig.EnableGatewayMetrics {
-				require.Equal(t, "1.2.3.4:20200", registration.Service.Proxy.Config["envoy_prometheus_bind_addr"])
 			}
 		})
 	}

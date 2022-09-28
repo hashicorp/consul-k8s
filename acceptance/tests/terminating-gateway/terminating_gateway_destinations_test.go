@@ -60,7 +60,6 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.autoEncrypt":       strconv.FormatBool(c.secure),
 			}
 
 			logger.Log(t, "creating consul cluster")
