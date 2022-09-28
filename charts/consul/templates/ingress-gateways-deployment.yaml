@@ -269,8 +269,6 @@ spec:
             {{- end }}
             {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
             -tls-server-name={{$root.Values.externalServers.tlsServerName }} \
-            {{- else }}
-            -tls-server-name=server.{{ $root.Values.global.datacenter }}.{{ $root.Values.global.domain }} \
             {{- end }}
             {{- else }}
             -tls-disabled \

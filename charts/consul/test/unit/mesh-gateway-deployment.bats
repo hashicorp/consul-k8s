@@ -785,9 +785,6 @@ key2: value2' \
 
   local actual=$(echo $flags | yq -r '. | contains("-ca-certs=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
-
-  local actual=$(echo $flags | yq -r '. | contains("-tls-server-name=server.dc1.consul")' | tee /dev/stderr)
-  [ "${actual}" = 'true' ]
 }
 
 @test "meshGateway/Deployment: sets external server args when global.tls.enabled and externalServers.enabled" {

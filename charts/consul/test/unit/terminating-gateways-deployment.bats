@@ -159,9 +159,6 @@ load _helpers
 
   local actual=$(echo $object | yq -r '. | contains("-ca-certs=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  local actual=$(echo $object | yq -r '. | contains("-tls-server-name=server.dc1.consul")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: can overwrite CA secret with the provided one" {
