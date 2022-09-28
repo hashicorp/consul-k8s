@@ -69,6 +69,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
+        "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
         {{- if $root.Values.global.enableConsulNamespaces }}
         "consul.hashicorp.com/gateway-namespace": {{ (default $defaults.consulNamespace .consulNamespace) }}
         {{- end }}
@@ -114,83 +115,73 @@ spec:
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
-        - name: consul-service
-          emptyDir:
-            medium: "Memory"
-        {{- range (default $defaults.extraVolumes .extraVolumes) }}
-        - name: userconfig-{{ .name }}
-          {{ .type }}:
-            {{- if (eq .type "configMap") }}
-            name: {{ .name }}
-            {{- else if (eq .type "secret") }}
-            secretName: {{ .name }}
-            {{- end }}
-            {{- with .items }}
-            items:
-            {{- range . }}
-            - key: {{.key}}
-              path: {{.path}}
-            {{- end }}
-            {{- end }}
-        {{- end }}
-        {{- if $root.Values.global.tls.enabled }}
-        {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
-        - name: consul-ca-cert
-          secret:
-            {{- if $root.Values.global.tls.caCert.secretName }}
-            secretName: {{ $root.Values.global.tls.caCert.secretName }}
-            {{- else }}
-            secretName: {{ template "consul.fullname" $root }}-ca-cert
-            {{- end }}
-            items:
-            - key: {{ default "tls.crt" $root.Values.global.tls.caCert.secretKey }}
-              path: tls.crt
-        {{- end }}
-        {{- end }}
+      - name: consul-service
+        emptyDir:
+          medium: "Memory"
+      {{- range (default $defaults.extraVolumes .extraVolumes) }}
+      - name: userconfig-{{ .name }}
+        {{ .type }}:
+          {{- if (eq .type "configMap") }}
+          name: {{ .name }}
+          {{- else if (eq .type "secret") }}
+          secretName: {{ .name }}
+          {{- end }}
+          {{- with .items }}
+          items:
+          {{- range . }}
+          - key: {{.key}}
+            path: {{.path}}
+          {{- end }}
+          {{- end }}
+      {{- end }}
+      {{- if $root.Values.global.tls.enabled }}
+      {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if $root.Values.global.tls.caCert.secretName }}
+          secretName: {{ $root.Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" $root }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" $root.Values.global.tls.caCert.secretKey }}
+            path: tls.crt
+      {{- end }}
+      {{- end }}
       initContainers:
         # terminating-gateway-init registers the terminating gateway service with Consul.
         - name: terminating-gateway-init
           image: {{ $root.Values.global.imageK8S }}
           env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            {{- if $root.Values.global.tls.enabled }}
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
-            {{- end }}
-            - name: CONSUL_HTTP_ADDR
-              {{- if $root.Values.global.tls.enabled }}
-              value: "https://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8501"
-              {{- else }}
-              value: "http://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8500"
-              {{- end }}
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          {{- include "consul.consulK8sConsulServerEnvVars" $root | nindent 10 }}
+          {{- if $root.Values.global.enableConsulNamespaces }}
+          - name: CONSUL_NAMESPACE
+            value: {{ (default $defaults.consulNamespace .consulNamespace) }}
+          {{- end }}
+          {{- if $root.Values.global.acls.manageSystemACLs }}
+          - name: CONSUL_LOGIN_AUTH_METHOD
+            value: {{ template "consul.fullname" $root }}-k8s-component-auth-method
+          - name: CONSUL_LOGIN_DATACENTER
+            value: {{ $root.Values.global.datacenter }}
+          - name: CONSUL_LOGIN_META
+            value: "component=terminating-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
+          {{- end }}
           command:  
             - "/bin/sh"
             - "-ec"
             - |
-                consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-                  -consul-api-timeout={{ $root.Values.global.consulAPITimeout }} \
+                consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
                   -gateway-kind="terminating-gateway" \
                   -consul-node-name="k8s-service-mesh" \
-                  -proxy-id-file=/consul/service/proxyid \
-                  {{- if $root.Values.global.acls.manageSystemACLs }}
-                  -acl-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
-                  -acl-token-sink=/consul/service/acl-token \
-                  {{- end }}
+                  -proxy-id-file=/consul/service/proxy-id \
                   -service-name={{ .name }} \
                   -log-level={{ default $root.Values.global.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }}
@@ -213,7 +204,7 @@ spec:
               cpu: "50m"
       containers:
         - name: terminating-gateway
-          image: {{ $root.Values.global.imageEnvoy | quote }}
+          image: {{ $root.Values.global.imageConsulDataplane | quote }}
           volumeMounts:
             - name: consul-service
               mountPath: /consul/service
@@ -234,40 +225,61 @@ spec:
           resources: {{ toYaml (default $defaults.resources .resources) | nindent 12 }}
           {{- end }}
           env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            {{- if $root.Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_HTTP_TOKEN_FILE
-              value: "/consul/service/acl-token"
-            {{- end }}
-            {{- if $root.Values.global.tls.enabled }}
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
-            {{- end }}
-            - name: CONSUL_HTTP_ADDR
-              {{- if $root.Values.global.tls.enabled }}
-              value: "https://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8501"
-              {{- else }}
-              value: "http://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8500"
-              {{- end }}
-            - name: CONSUL_GRPC_ADDR
-              {{- if $root.Values.global.tls.enabled }}
-              value: "https://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8502"
-              {{- else }}
-              value: "http://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8502"
-              {{- end }}
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
           command:
-            - sleep infinity
+            - /bin/sh
+            - -ec
+            - |
+              consul-dataplane \
+                {{- if $root.Values.externalServers.enabled }}
+                -addresses={{ $root.Values.externalServers.hosts | first | quote }} \
+                {{- else }}
+                -addresses="{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc" \
+                {{- end }}
+                {{- if $root.Values.externalServers.enabled }}
+                -grpc-port={{ $root.Values.externalServers.grpcPort }} \
+                {{- else }}
+                -grpc-port=8502 \
+                {{- end }}
+                -proxy-service-id=$POD_NAME \
+                -service-node-name="k8s-service-mesh" \
+                {{- if $root.Values.global.enableConsulNamespaces }}
+                -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }} \
+                {{- end }}
+                {{- if and $root.Values.global.tls.enabled }}
+                {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+                -ca-certs=/consul/tls/ca/tls.crt \
+                {{- end }}
+                {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
+                -tls-server-name={{$root.Values.externalServers.tlsServerName }} \
+                {{- else }}
+                -tls-server-name=server.{{ $root.Values.global.datacenter }}.{{ $root.Values.global.domain }} \
+                {{- end }}
+                {{- else }}
+                -tls-disabled \
+                {{- end }}
+                {{- if $root.Values.global.acls.manageSystemACLs }}
+                -credential-type=login \
+                -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
+                -login-meta=component=terminating-gateway \
+                -login-meta=pod=${NAMESPACE}/${POD_NAME} \
+                -login-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
+                {{- if $root.Values.global.adminPartitions.enabled }}
+                -login-partition={{ $root.Values.global.adminPartitions.name }} \
+                {{- end }}
+                {{- end }}
+                {{- if $root.Values.global.adminPartitions.enabled }}
+                -service-partition={{ $root.Values.global.adminPartitions.name }} \
+                {{- end }}
+                -log-level={{ default $root.Values.global.logLevel }} \
+                -log-json={{ $root.Values.global.logJSON }}
           livenessProbe:
             tcpSocket:
               port: 8443
