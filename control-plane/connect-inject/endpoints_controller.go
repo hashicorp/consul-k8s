@@ -636,6 +636,12 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 		Meta:    meta,
 	}
 
+	gatewayServiceName, ok := pod.Annotations[annotationGatewayConsulServiceName]
+	if !ok {
+		return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationGatewayConsulServiceName, pod.Namespace, pod.Name)
+	}
+	service.Service = gatewayServiceName
+
 	var consulNS string
 
 	// Set the service values.
@@ -657,12 +663,6 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 			meta[MetaKeyConsulWANFederation] = "1"
 		}
 
-		gatewayServiceName, ok := pod.Annotations[annotationGatewayConsulServiceName]
-		if !ok {
-			return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationGatewayConsulServiceName, pod.Namespace, pod.Name)
-		}
-		service.Service = gatewayServiceName
-
 		wanAddr, wanPort, err := r.getWanData(pod, serviceEndpoints)
 		if err != nil {
 			return nil, err
@@ -679,7 +679,6 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 		}
 	case TerminatingGateway:
 		service.Kind = api.ServiceKindTerminatingGateway
-		service.Service = serviceEndpoints.Name
 		service.Port = 8443
 		if ns, ok := pod.Annotations[annotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
 			service.Namespace = ns
@@ -687,12 +686,6 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 		}
 	case IngressGateway:
 		service.Kind = api.ServiceKindIngressGateway
-		gatewayServiceName, ok := pod.Annotations[annotationGatewayConsulServiceName]
-		if !ok {
-			return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", annotationGatewayConsulServiceName, pod.Namespace, pod.Name)
-		}
-		service.Service = gatewayServiceName
-
 		if ns, ok := pod.Annotations[annotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
 			service.Namespace = ns
 			consulNS = ns
