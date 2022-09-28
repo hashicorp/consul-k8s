@@ -2026,12 +2026,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					EnableGatewayMetrics: true,
 				}
 			}
-			if tt.metricsEnabled {
-				ep.MetricsConfig = MetricsConfig{
-					DefaultEnableMetrics: true,
-					EnableGatewayMetrics: true,
-				}
-			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
 				Name:      tt.svcName,

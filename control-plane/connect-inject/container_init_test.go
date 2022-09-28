@@ -335,7 +335,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			w := MeshWebhook{
 				EnableTransparentProxy: c.globalEnabled,
 				EnableCNI:              c.cniEnabled,
-				ConsulConfig:           &consul.Config{HTTPPort: 8500, APITimeout: 5 * time.Second},
+				ConsulConfig:           &consul.Config{HTTPPort: 8500},
 			}
 			pod := minimal()
 			pod.Annotations = c.annotations
