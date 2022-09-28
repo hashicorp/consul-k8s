@@ -25,8 +25,12 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 	cases := []struct {
 		secure bool
 	}{
-		{secure: false},
-		{secure: true},
+		{
+			secure: false,
+		},
+		{
+			secure: true,
+		},
 	}
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t", c.secure)
