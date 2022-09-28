@@ -441,7 +441,6 @@ func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, 
 		return err
 	}
 
-	c.UI.Output("%s installed in namespace %q.", common.ReleaseTypeConsul, c.flagNamespace, terminal.WithSuccessStyle())
 	return nil
 }
 
