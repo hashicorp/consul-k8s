@@ -259,8 +259,6 @@ spec:
             - -ec
             - |
               consul-dataplane \
-                -envoy-ready-bind-address=$POD_IP \
-                -envoy-ready-bind-port=21000 \
                 {{- if $root.Values.externalServers.enabled }}
                 -addresses={{ $root.Values.externalServers.hosts | first | quote }} \
                 {{- else }}
@@ -291,7 +289,7 @@ spec:
                 {{- if $root.Values.global.acls.manageSystemACLs }}
                 -credential-type=login \
                 -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
-                -login-meta=component=ingress-gateway \
+                -login-meta=component=terminating-gateway \
                 -login-meta=pod=${NAMESPACE}/${POD_NAME} \
                 -login-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
                 {{- if $root.Values.global.adminPartitions.enabled }}
