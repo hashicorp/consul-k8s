@@ -69,6 +69,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
+        "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
         {{- if $root.Values.global.enableConsulNamespaces }}
         "consul.hashicorp.com/gateway-namespace": {{ (default $defaults.consulNamespace .consulNamespace) }}
         {{- end }}
@@ -181,16 +182,6 @@ spec:
           - name: CONSUL_LOGIN_META
             value: "component=terminating-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
           {{- end }}
-          {{- if $root.Values.global.tls.enabled }}
-          - name: CONSUL_CACERT
-            value: /consul/tls/ca/tls.crt
-          {{- end }}
-          - name: CONSUL_HTTP_ADDR
-            {{- if $root.Values.global.tls.enabled }}
-            value: "https://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8501"
-            {{- else }}
-            value: "http://{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc:8500"
-            {{- end }}
           command:  
             - "/bin/sh"
             - "-ec"
@@ -199,7 +190,7 @@ spec:
                   -gateway-kind="terminating-gateway" \
                   -consul-node-name="k8s-service-mesh" \
                   -proxy-id-file=/consul/service/proxy-id \
-                  -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
+                  -service-name={{ .name }} \
                   -log-level={{ default $root.Values.global.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }}
           volumeMounts:
@@ -250,10 +241,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-          {{- if $root.Values.global.tls.enabled }}
-          - name: CONSUL_CACERT
-            value: /consul/tls/ca/tls.crt
-          {{- end }}
           command:
             - /bin/sh
             - -ec
