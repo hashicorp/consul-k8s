@@ -388,6 +388,14 @@ func (c *Command) Run(args []string) int {
 	go watcher.Run()
 	defer watcher.Stop()
 
+	// This is a blocking command that is run in order to ensure we only start the
+	// connect-inject controllers only after we have access to the Consul server.
+	_, err = watcher.State()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to start Consul server watcher: %s", err))
+		return 1
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		LeaderElection:         true,

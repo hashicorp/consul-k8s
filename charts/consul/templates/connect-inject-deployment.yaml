@@ -120,6 +120,9 @@ spec:
             - "-ec"
             - |
               consul-k8s-control-plane inject-connect \
+                {{- if .Values.global.federation.enabled }}
+                -enable-federation \
+                {{- end }}
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
