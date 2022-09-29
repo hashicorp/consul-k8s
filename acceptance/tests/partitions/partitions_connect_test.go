@@ -146,7 +146,7 @@ func TestPartitions_Connect(t *testing.T) {
 				k8s.CopySecret(t, defaultPartitionClusterContext, secondaryPartitionClusterContext, partitionToken)
 			}
 
-			partitionServiceName := fmt.Sprintf("%s-expose-servers", releaseName)
+			partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
 			partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultPartitionClusterContext, partitionServiceName)
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryPartitionClusterContext)
