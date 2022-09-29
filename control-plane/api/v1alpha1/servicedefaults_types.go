@@ -161,6 +161,10 @@ type PassiveHealthCheck struct {
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
 	MaxFailures uint32 `json:"maxFailures,omitempty"`
+	// EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+	// when an outlier status is detected through consecutive 5xx.
+	// This setting can be used to disable ejection or to ramp it up slowly.
+	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
 }
 
 type ServiceDefaultsDestination struct {
@@ -387,9 +391,11 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 	if in == nil {
 		return nil
 	}
+
 	return &capi.PassiveHealthCheck{
-		Interval:    in.Interval.Duration,
-		MaxFailures: in.MaxFailures,
+		Interval:                in.Interval.Duration,
+		MaxFailures:             in.MaxFailures,
+		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
 	}
 }
 

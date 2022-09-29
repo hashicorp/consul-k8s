@@ -241,6 +241,13 @@ spec:
                           upstream proxy instances will be monitored for removal from
                           the load balancing pool.
                         properties:
+                          enforcing_consecutive_5xx:
+                            description: EnforcingConsecutive5xx is the % chance that
+                              a host will be actually ejected when an outlier status
+                              is detected through consecutive 5xx. This setting can
+                              be used to disable ejection or to ramp it up slowly.
+                            format: int32
+                            type: integer
                           interval:
                             description: Interval between health check analysis sweeps.
                               Each sweep may remove hosts or return hosts to the pool.
@@ -333,6 +340,13 @@ spec:
                             how upstream proxy instances will be monitored for removal
                             from the load balancing pool.
                           properties:
+                            enforcing_consecutive_5xx:
+                              description: EnforcingConsecutive5xx is the % chance
+                                that a host will be actually ejected when an outlier
+                                status is detected through consecutive 5xx. This setting
+                                can be used to disable ejection or to ramp it up slowly.
+                              format: int32
+                              type: integer
                             interval:
                               description: Interval between health check analysis
                                 sweeps. Each sweep may remove hosts or return hosts

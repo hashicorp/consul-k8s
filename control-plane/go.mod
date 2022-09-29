@@ -7,9 +7,10 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-cmp v0.5.7
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+	github.com/hashicorp/consul/api v1.10.1-0.20220913205944-e743eefbd104
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220831174802-b8af65262de8
 	github.com/hashicorp/consul-server-connection-manager v0.0.0-20220922180412-01c5be1c636f
-	github.com/hashicorp/consul/api v1.10.1-0.20220822180451-60c82757ea35
 	github.com/hashicorp/consul/sdk v0.11.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v1.2.2
