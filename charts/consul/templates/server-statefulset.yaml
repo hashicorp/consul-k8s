@@ -15,6 +15,7 @@
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 {{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
+{{ template "consul.validateCloudConfiguration" . }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -253,6 +254,43 @@ spec:
                   name: {{ .Values.global.acls.replicationToken.secretName | quote }}
                   key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
             {{- end }}
+            {{- if and .Values.global.cloud.enabled .Values.global.cloud.secretName }}
+            # These are mounted as secrets so that the consul server agent can use them.
+            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, 
+            #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
+            # - HCP_RESOURCE_ID is created for use in the 
+            #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
+            - name: HCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: client-id
+            - name: HCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: client-secret
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: resource-id
+            - name: HCP_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: auth-url
+            - name: HCP_API_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: api-hostname            
+            - name: HCP_SCADA_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.secretName }}
+                  key: scada-address            
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
@@ -298,6 +336,9 @@ spec:
                 {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json
+                {{- if and .Values.global.cloud.enabled .Values.global.cloud.secretName }}
+                -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
+                {{- end }}
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
               mountPath: /consul/data

@@ -3,6 +3,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -14,12 +15,14 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/posener/complete"
-	"helm.sh/helm/v3/pkg/action"
+
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -48,26 +51,42 @@ const (
 
 	flagNameContext    = "context"
 	flagNameKubeconfig = "kubeconfig"
+
+	flagNameDemo = "demo"
+	defaultDemo  = false
+
+	flagNameHCPResourceID = "hcp-resource-id"
+
+	envHCPClientID     = "HCP_CLIENT_ID"
+	envHCPClientSecret = "HCP_CLIENT_SECRET"
+
+	consulDemoChartPath = "demo"
 )
 
 type Command struct {
 	*common.BaseCommand
 
+	helmActionsRunner helm.HelmActionsRunner
+
 	kubernetes kubernetes.Interface
+
+	httpClient *http.Client
 
 	set *flag.Sets
 
-	flagPreset          string
-	flagDryRun          bool
-	flagAutoApprove     bool
-	flagValueFiles      []string
-	flagSetStringValues []string
-	flagSetValues       []string
-	flagFileValues      []string
-	flagTimeout         string
-	timeoutDuration     time.Duration
-	flagVerbose         bool
-	flagWait            bool
+	flagPreset            string
+	flagDryRun            bool
+	flagAutoApprove       bool
+	flagValueFiles        []string
+	flagSetStringValues   []string
+	flagSetValues         []string
+	flagFileValues        []string
+	flagTimeout           string
+	timeoutDuration       time.Duration
+	flagVerbose           bool
+	flagWait              bool
+	flagNameHCPResourceID string
+	flagDemo              bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -77,12 +96,6 @@ type Command struct {
 }
 
 func (c *Command) init() {
-	// Store all the possible preset values in 'presetList'. Printed in the help message.
-	var presetList []string
-	for name := range config.Presets {
-		presetList = append(presetList, name)
-	}
-
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.BoolVar(&flag.BoolVar{
@@ -107,7 +120,7 @@ func (c *Command) init() {
 		Name:    flagNamePreset,
 		Target:  &c.flagPreset,
 		Default: defaultPreset,
-		Usage:   fmt.Sprintf("Use an upgrade preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+		Usage:   fmt.Sprintf("Use an upgrade preset, one of %s. Defaults to none", strings.Join(preset.Presets, ", ")),
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetValues,
@@ -159,6 +172,19 @@ func (c *Command) init() {
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
 	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameHCPResourceID,
+		Target:  &c.flagNameHCPResourceID,
+		Default: "",
+		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
+	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameDemo,
+		Target:  &c.flagDemo,
+		Default: defaultDemo,
+		Usage: fmt.Sprintf("Install %s immediately after installing %s.",
+			common.ReleaseTypeConsulDemo, common.ReleaseTypeConsul),
+	})
 
 	c.help = c.set.Help()
 }
@@ -168,6 +194,10 @@ func (c *Command) Run(args []string) int {
 	c.Log.ResetNamed("upgrade")
 
 	defer common.CloseWithError(c.BaseCommand)
+
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
 
 	err := c.validateFlags(args)
 	if err != nil {
@@ -216,29 +246,45 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Checking if Consul can be upgraded", terminal.WithHeaderStyle())
 	uiLogger := c.createUILogger()
-	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
+	found, consulName, consulNamespace, err := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    settings,
+		ReleaseName: common.DefaultReleaseName,
+		DebugLog:    uiLogger,
+	})
+
 	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	if !found {
 		c.UI.Output("Cannot upgrade Consul. Existing Consul installation not found. Use the command `consul-k8s install` to install Consul.", terminal.WithErrorStyle())
 		return 1
+	} else {
+		c.UI.Output("Existing %s installation found to be upgraded.", common.ReleaseTypeConsul, terminal.WithSuccessStyle())
+		c.UI.Output("Name: %s\nNamespace: %s", consulName, consulNamespace, terminal.WithInfoStyle())
 	}
-	c.UI.Output("Existing Consul installation found to be upgraded.", terminal.WithSuccessStyle())
-	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
-	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
-
-	currentChartValues, err := helm.FetchChartValues(namespace, name, settings, uiLogger)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+	c.UI.Output(fmt.Sprintf("Checking if %s can be upgraded", common.ReleaseTypeConsulDemo), terminal.WithHeaderStyle())
+	// Ensure there is not an existing Consul demo installation which would cause a conflict.
+	foundDemo, demoName, demoNamespace, _ := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    settings,
+		ReleaseName: common.ConsulDemoAppReleaseName,
+		DebugLog:    uiLogger,
+	})
+	if foundDemo {
+		c.UI.Output("Existing %s installation found to be upgraded.", common.ReleaseTypeConsulDemo, terminal.WithSuccessStyle())
+		c.UI.Output("Name: %s\nNamespace: %s", demoName, demoNamespace, terminal.WithInfoStyle())
+	} else {
+		if c.flagDemo {
+			c.UI.Output("No existing %s installation found, but -demo flag provided. %s will be installed in namespace %s.",
+				common.ConsulDemoAppReleaseName, common.ConsulDemoAppReleaseName, consulNamespace, terminal.WithInfoStyle())
+		} else {
+			c.UI.Output("No existing %s installation found.", common.ReleaseTypeConsulDemo, terminal.WithInfoStyle())
+		}
 	}
 
 	// Handle preset, value files, and set values logic.
-	chartValues, err := c.mergeValuesFlagsWithPrecedence(settings)
+	chartValues, err := c.mergeValuesFlagsWithPrecedence(settings, consulNamespace)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -247,59 +293,90 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	chartValues = common.MergeMaps(config.Convert(config.GlobalNameConsul), chartValues)
+	chartValues = common.MergeMaps(config.ConvertToMap(config.GlobalNameConsul), chartValues)
 
-	// Print out the upgrade summary.
-	if err = c.printDiff(currentChartValues, chartValues); err != nil {
-		c.UI.Output("Could not print the different between current and upgraded charts: %v", err, terminal.WithErrorStyle())
+	timeout, err := time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	options := &helm.UpgradeOptions{
+		ReleaseName:       consulName,
+		ReleaseType:       common.ReleaseTypeConsul,
+		ReleaseTypeName:   common.ReleaseTypeConsul,
+		Namespace:         consulNamespace,
+		Values:            chartValues,
+		Settings:          settings,
+		EmbeddedChart:     consulChart.ConsulHelmChart,
+		ChartDirName:      common.TopLevelChartDirName,
+		UILogger:          uiLogger,
+		DryRun:            c.flagDryRun,
+		AutoApprove:       c.flagAutoApprove,
+		Wait:              c.flagWait,
+		Timeout:           timeout,
+		UI:                c.UI,
+		HelmActionsRunner: c.helmActionsRunner,
+	}
+
+	err = helm.UpgradeHelmRelease(options)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	// Check if the user is OK with the upgrade unless the auto approve or dry run flags are true.
-	if !c.flagAutoApprove && !c.flagDryRun {
-		confirmation, err := c.UI.Input(&terminal.Input{
-			Prompt: "Proceed with upgrade? (y/N)",
-			Style:  terminal.InfoStyle,
-			Secret: false,
-		})
+	timeout, err = time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
 
+	if foundDemo {
+		options := &helm.UpgradeOptions{
+			ReleaseName:       demoName,
+			ReleaseType:       common.ReleaseTypeConsulDemo,
+			ReleaseTypeName:   common.ConsulDemoAppReleaseName,
+			Namespace:         demoNamespace,
+			Values:            make(map[string]interface{}),
+			Settings:          settings,
+			EmbeddedChart:     consulChart.DemoHelmChart,
+			ChartDirName:      consulDemoChartPath,
+			UILogger:          uiLogger,
+			DryRun:            c.flagDryRun,
+			AutoApprove:       c.flagAutoApprove,
+			Wait:              c.flagWait,
+			Timeout:           timeout,
+			UI:                c.UI,
+			HelmActionsRunner: c.helmActionsRunner,
+		}
+
+		err = helm.UpgradeHelmRelease(options)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-		if common.Abort(confirmation) {
-			c.UI.Output("Upgrade aborted. Use the command `consul-k8s upgrade -help` to learn how to customize your upgrade.",
-				terminal.WithInfoStyle())
+	} else if c.flagDemo {
+
+		options := &helm.InstallOptions{
+			ReleaseName:       common.ConsulDemoAppReleaseName,
+			ReleaseType:       common.ReleaseTypeConsulDemo,
+			Namespace:         settings.Namespace(),
+			Values:            make(map[string]interface{}),
+			Settings:          settings,
+			EmbeddedChart:     consulChart.DemoHelmChart,
+			ChartDirName:      consulDemoChartPath,
+			UILogger:          uiLogger,
+			DryRun:            c.flagDryRun,
+			AutoApprove:       c.flagAutoApprove,
+			Wait:              c.flagWait,
+			Timeout:           timeout,
+			UI:                c.UI,
+			HelmActionsRunner: c.helmActionsRunner,
+		}
+		err = helm.InstallDemoApp(options)
+		if err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-	}
-
-	if !c.flagDryRun {
-		c.UI.Output("Upgrading Consul", terminal.WithHeaderStyle())
-	} else {
-		c.UI.Output("Performing Dry Run Upgrade", terminal.WithHeaderStyle())
-	}
-
-	// Setup action configuration for Helm Go SDK function calls.
-	actionConfig := new(action.Configuration)
-	actionConfig, err = helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Setup the upgrade action.
-	upgrade := action.NewUpgrade(actionConfig)
-	upgrade.Namespace = namespace
-	upgrade.DryRun = c.flagDryRun
-	upgrade.Wait = c.flagWait
-	upgrade.Timeout = c.timeoutDuration
-
-	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
-	_, err = upgrade.Run(common.DefaultReleaseName, chart, chartValues)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
 	}
 
 	if c.flagDryRun {
@@ -307,8 +384,6 @@ func (c *Command) Run(args []string) int {
 			"Upgrade can proceed with this configuration.", terminal.WithInfoStyle())
 		return 0
 	}
-
-	c.UI.Output("Consul upgraded in namespace %q.", namespace, terminal.WithSuccessStyle())
 	return 0
 }
 
@@ -329,6 +404,8 @@ func (c *Command) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameWait):            complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameDemo):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameHCPResourceID):   complete.PredictNothing,
 	}
 }
 
@@ -350,7 +427,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if ok := slices.Contains(preset.Presets, c.flagPreset); c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if _, err := time.ParseDuration(c.flagTimeout); err != nil {
@@ -362,6 +439,20 @@ func (c *Command) validateFlags(args []string) error {
 				return fmt.Errorf("file '%s' does not exist", filename)
 			}
 		}
+	}
+
+	if c.flagPreset == preset.PresetCloud {
+		clientID := os.Getenv(envHCPClientID)
+		clientSecret := os.Getenv(envHCPClientSecret)
+		if clientID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientID)
+		} else if clientSecret == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientSecret)
+		} else if c.flagNameHCPResourceID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
+		}
+	} else if c.flagNameHCPResourceID != "" {
+		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
 	}
 
 	return nil
@@ -376,7 +467,7 @@ func (c *Command) validateFlags(args []string) error {
 // 5. -set-file
 // For example, -set-file will override a value provided via -set.
 // Within each of these groups the rightmost flag value has the highest precedence.
-func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) (map[string]interface{}, error) {
+func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings, namespace string) (map[string]interface{}, error) {
 	p := getter.All(settings)
 	v := &values.Options{
 		ValueFiles:   c.flagValueFiles,
@@ -390,7 +481,14 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	}
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
+		p, err := c.getPreset(c.flagPreset, namespace)
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset provider: %s", err)
+		}
+		presetMap, err := p.GetValueMap()
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset values: %s", err)
+		}
 		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
@@ -424,24 +522,26 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 	}
 }
 
-// printDiff marshals both maps to YAML and prints the diff between the two.
-func (c *Command) printDiff(old, new map[string]interface{}) error {
-	diff, err := common.Diff(old, new)
-	if err != nil {
-		return err
+// getPreset is a factory function that, given a string, produces a struct that
+// implements the Preset interface.  If the string is not recognized an error is
+// returned.
+func (c *Command) getPreset(name string, namespace string) (preset.Preset, error) {
+	hcpConfig := &preset.HCPConfig{
+		ResourceID:   c.flagNameHCPResourceID,
+		ClientID:     os.Getenv(envHCPClientID),
+		ClientSecret: os.Getenv(envHCPClientSecret),
 	}
-
-	c.UI.Output("\nDifference between user overrides for current and upgraded charts"+
-		"\n--------------------------------------------------------------", terminal.WithInfoStyle())
-	for _, line := range strings.Split(diff, "\n") {
-		if strings.HasPrefix(line, "+") {
-			c.UI.Output(line, terminal.WithDiffAddedStyle())
-		} else if strings.HasPrefix(line, "-") {
-			c.UI.Output(line, terminal.WithDiffRemovedStyle())
-		} else {
-			c.UI.Output(line, terminal.WithDiffUnchangedStyle())
-		}
+	getPresetConfig := &preset.GetPresetConfig{
+		Name: name,
+		CloudPreset: &preset.CloudPreset{
+			KubernetesClient:    c.kubernetes,
+			KubernetesNamespace: namespace,
+			SkipSavingSecrets:   true,
+			UI:                  c.UI,
+			HTTPClient:          c.httpClient,
+			HCPConfig:           hcpConfig,
+			Context:             c.Ctx,
+		},
 	}
-
-	return nil
+	return preset.GetPreset(getPresetConfig)
 }

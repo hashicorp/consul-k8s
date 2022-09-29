@@ -7,6 +7,7 @@
 {{- if or (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey))  (and .Values.global.acls.bootstrapToken.secretKey (not .Values.global.acls.bootstrapToken.secretName))}}{{ fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided" }}{{ end -}}
 {{- if or (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.replicationToken.secretKey))  (and .Values.global.acls.replicationToken.secretKey (not .Values.global.acls.replicationToken.secretName))}}{{ fail "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" }}{{ end -}}
 {{- if (and .Values.global.secretsBackend.vault.enabled (and (not .Values.global.acls.bootstrapToken.secretName) (not .Values.global.acls.replicationToken.secretName ))) }}{{fail "global.acls.bootstrapToken or global.acls.replicationToken must be provided when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true" }}{{ end -}}
+{{ template "consul.validateCloudConfiguration" . }}
 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.secretsBackend.vault.manageSystemACLsRole)) }}{{fail "global.secretsBackend.vault.manageSystemACLsRole is required when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true" }}{{ end -}}
   {{- /* We don't render this job when server.updatePartition > 0 because that
     means a server rollout is in progress and this job won't complete unless
@@ -148,6 +149,9 @@ spec:
                 -resource-prefix=${CONSUL_FULLNAME} \
                 -k8s-namespace={{ .Release.Namespace }} \
                 -set-server-tokens={{ $serverEnabled }} \
+                {{- if .Values.global.cloud.enabled }}
+                -consul-tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+                {{- end}}
                 -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
 
                 {{- if .Values.externalServers.enabled }}

@@ -830,7 +830,6 @@ load _helpers
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_LOGIN_DATACENTER").value' | tee /dev/stderr)
   [ "${actual}" = "dc1" ]
-
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_LOGIN_META").value' | tee /dev/stderr)
   [ "${actual}" = 'component=connect-injector,pod=$(NAMESPACE)/$(POD_NAME)' ]
@@ -2333,4 +2332,23 @@ reservedNameTest() {
 
   local actual=$(echo "$spec" | yq '.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
+}
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "connectInject/Deployment: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
 }

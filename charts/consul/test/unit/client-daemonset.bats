@@ -2622,3 +2622,22 @@ rollingUpdate:
   [ "$status" -eq 1 ]
   [[ "$output" =~ "global.imageK8s is not a valid key, use global.imageK8S (note the capital 'S')" ]]
 }
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "client/DaemonSet: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
+}

@@ -14,3 +14,6 @@ import "embed"
 // explicitly embedded.
 //go:embed consul/Chart.yaml consul/values.yaml consul/templates consul/templates/_helpers.tpl
 var ConsulHelmChart embed.FS
+
+//go:embed demo/Chart.yaml demo/values.yaml demo/templates
+var DemoHelmChart embed.FS

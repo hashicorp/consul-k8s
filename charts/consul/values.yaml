@@ -647,6 +647,19 @@ global:
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
+  # Enables installing an HCP Consul self-managed cluster.
+  # Requires Consul v1.14+. 
+  cloud:
+    # If true, the Helm chart will enable the installation of an HCP Consul
+    # self-managed cluster.
+    enabled: false
+    
+    # The name of the Kubernetes secret that holds the HCP cloud configuration.
+    # It contains the HCP service principal client_id and client_secret as well
+    # as the HCP resource_id.
+    # @type: string
+    secretName: null
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.

@@ -1,28 +1,35 @@
 package uninstall
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v3/pkg/action"
+	helmRelease "helm.sh/helm/v3/pkg/release"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestDeletePVCs(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -63,7 +70,7 @@ func TestDeletePVCs(t *testing.T) {
 }
 
 func TestDeleteSecrets(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -106,7 +113,7 @@ func TestDeleteSecrets(t *testing.T) {
 }
 
 func TestDeleteServiceAccounts(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	sa := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -147,7 +154,7 @@ func TestDeleteServiceAccounts(t *testing.T) {
 }
 
 func TestDeleteRoles(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -188,7 +195,7 @@ func TestDeleteRoles(t *testing.T) {
 }
 
 func TestDeleteRoleBindings(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	rolebinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -229,7 +236,7 @@ func TestDeleteRoleBindings(t *testing.T) {
 }
 
 func TestDeleteJobs(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -270,7 +277,7 @@ func TestDeleteJobs(t *testing.T) {
 }
 
 func TestDeleteClusterRoles(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	clusterrole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
@@ -311,7 +318,7 @@ func TestDeleteClusterRoles(t *testing.T) {
 }
 
 func TestDeleteClusterRoleBindings(t *testing.T) {
-	c := getInitializedCommand(t)
+	c := getInitializedCommand(t, nil)
 	c.kubernetes = fake.NewSimpleClientset()
 	clusterrolebinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -352,17 +359,22 @@ func TestDeleteClusterRoleBindings(t *testing.T) {
 }
 
 // getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) *Command {
+func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
 	t.Helper()
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "cli",
 		Level:  hclog.Info,
 		Output: os.Stdout,
 	})
-
+	var ui terminal.UI
+	if buf != nil {
+		ui = terminal.NewUI(context.Background(), buf)
+	} else {
+		ui = terminal.NewBasicUI(context.Background())
+	}
 	baseCommand := &common.BaseCommand{
 		Log: log,
-		UI:  terminal.NewBasicUI(context.TODO()),
+		UI:  ui,
 	}
 
 	c := &Command{
@@ -374,7 +386,7 @@ func getInitializedCommand(t *testing.T) *Command {
 
 func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
 	t.Parallel()
-	cmd := getInitializedCommand(t)
+	cmd := getInitializedCommand(t, nil)
 
 	predictor := cmd.AutocompleteFlags()
 
@@ -397,7 +409,192 @@ func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
 }
 
 func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
-	cmd := getInitializedCommand(t)
+	cmd := getInitializedCommand(t, nil)
 	c := cmd.AutocompleteArgs()
 	assert.Equal(t, complete.PredictNothing, c)
+}
+
+func TestUninstall(t *testing.T) {
+	var k8s kubernetes.Interface
+	cases := map[string]struct {
+		input                                   []string
+		messages                                []string
+		helmActionsRunner                       *helm.MockActionRunner
+		preProcessingFunc                       func()
+		expectedReturnCode                      int
+		expectCheckedForConsulInstallations     bool
+		expectCheckedForConsulDemoInstallations bool
+		expectConsulUninstalled                 bool
+		expectConsulDemoUninstalled             bool
+	}{
+		"uninstall when consul installation exists returns success": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
+				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return false, "", "", nil
+					}
+				},
+			},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 true,
+			expectConsulDemoUninstalled:             false,
+		},
+		"uninstall when consul installation does not exist returns error": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n ! could not find Consul installation in cluster\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return false, "", "", nil
+					} else {
+						return false, "", "", nil
+					}
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 false,
+			expectConsulDemoUninstalled:             false,
+		},
+		"uninstall with -wipe-data flag processes other rescource and returns success": {
+			input: []string{
+				"-wipe-data",
+			},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n    No existing Consul demo application installation found.\n",
+				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n",
+				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return false, "", "", nil
+					}
+				},
+			},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 true,
+			expectConsulDemoUninstalled:             false,
+		},
+		"uninstall when both consul and consul demo installations exist returns success": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n ✓ Existing Consul demo application installation found.\n",
+				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo\n ✓ Successfully uninstalled Consul demo application Helm release.\n",
+				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return true, "consul-demo", "consul-demo", nil
+					}
+				},
+			},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 true,
+			expectConsulDemoUninstalled:             true,
+		},
+		"uninstall when consul uninstall errors returns error": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
+				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ! Helm returned an error.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return false, "", "", nil
+					}
+				},
+				UninstallFunc: func(uninstall *action.Uninstall, name string) (*helmRelease.UninstallReleaseResponse, error) {
+					return nil, errors.New("Helm returned an error.")
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 false,
+			expectConsulDemoUninstalled:             false,
+		},
+		"uninstall when consul demo is installed consul demo uninstall errors returns error": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n ✓ Existing Consul demo application installation found.\n",
+				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo\n ! Helm returned an error.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return true, "consul-demo", "consul-demo", nil
+					}
+				},
+				UninstallFunc: func(uninstall *action.Uninstall, name string) (*helmRelease.UninstallReleaseResponse, error) {
+					if name == "consul" {
+						return &helmRelease.UninstallReleaseResponse{}, nil
+					} else {
+						return nil, errors.New("Helm returned an error.")
+					}
+				},
+			},
+			expectedReturnCode:                      1,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 false,
+			expectConsulDemoUninstalled:             false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := getInitializedCommand(t, buf)
+			k8s = fake.NewSimpleClientset()
+			c.kubernetes = k8s
+			mock := tc.helmActionsRunner
+			c.helmActionsRunner = mock
+			if tc.preProcessingFunc != nil {
+				tc.preProcessingFunc()
+			}
+			input := append([]string{
+				"--auto-approve",
+			}, tc.input...)
+			returnCode := c.Run(input)
+			require.Equal(t, tc.expectedReturnCode, returnCode)
+			require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
+			require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
+			require.Equal(t, tc.expectConsulUninstalled, mock.ConsulUninstalled)
+			require.Equal(t, tc.expectConsulDemoUninstalled, mock.ConsulDemoUninstalled)
+			output := buf.String()
+			for _, msg := range tc.messages {
+				require.Contains(t, output, msg)
+			}
+		})
+	}
 }

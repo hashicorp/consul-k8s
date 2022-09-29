@@ -1902,3 +1902,188 @@ load _helpers
   local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "server/StatefulSet: cloud config is not set in command when global.cloud.enabled is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr)
+
+  # Test the flag is set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"cloud { resource_id = \\\"${HCP_RESOURCE_ID}\\\" }\""))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the HCP_RESOURCE_ID environment variable is set.
+  local envvar=$(echo "$object" |
+    yq -r -c '.spec.template.spec.containers[] | select(.name == "consul") | .env | select(.name == "HCP_RESOURCE_ID")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+}
+
+@test "server/StatefulSet: does not create HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, HCP_SCADA_ADDRESS, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml \
+    . | tee /dev/stderr )
+
+  local container=$(echo "$object" |
+    yq -r '.spec.template.spec.containers[] | select(.name == "consul")' | tee /dev/stderr)
+  
+
+  local envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_CLIENT_ID")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
+  envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_CLIENT_SECRET")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
+  envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_RESOURCE_ID")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
+  envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_AUTH_URL")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
+  envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_API_HOSTNAME")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
+  envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_SCADA_ADDRESS")' | tee /dev/stderr)
+  [ "${envvar}" = "" ]
+
+}
+
+@test "server/StatefulSet: cloud config is set in command when global.cloud.enabled is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=foo' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"cloud { resource_id = \\\"${HCP_RESOURCE_ID}\\\" }\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+
+@test "server/StatefulSet: creates HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, HCP_SCADA_ADDRESS, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml \
+    --set 'global.cloud.enabled=true' \
+    --set 'global.cloud.secretName=foo' \
+    . | tee /dev/stderr )
+
+  local container=$(echo "$object" |
+    yq -r '.spec.template.spec.containers[] | select(.name == "consul")' | tee /dev/stderr)
+  
+  # HCP_CLIENT_ID
+  local envvar=$(echo "$container" |
+    yq -r '.env[] | select(.name == "HCP_CLIENT_ID")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-id" ]
+
+  # HCP_CLIENT_SECRET
+  envvar=$(echo "$container" |
+  yq -r '.env[] | select(.name == "HCP_CLIENT_SECRET")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-secret" ]
+
+  # HCP_RESOURCE_ID
+  envvar=$(echo "$container" |
+  yq -r '.env[] | select(.name == "HCP_RESOURCE_ID")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "resource-id" ]
+
+  # HCP_AUTH_URL
+  envvar=$(echo "$container" |
+  yq -r '.env[] | select(.name == "HCP_AUTH_URL")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "auth-url" ]
+
+  # HCP_API_HOST
+  envvar=$(echo "$container" |
+  yq -r '.env[] | select(.name == "HCP_API_HOST")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "api-hostname" ]
+
+  # HCP_SCADA_ADDRESS
+  envvar=$(echo "$container" |
+  yq -r '.env[] | select(.name == "HCP_SCADA_ADDRESS")' | tee /dev/stderr)
+
+  local actual=$(echo "$envvar" |
+    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  actual=$(echo "$envvar" |
+  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "scada-address" ]
+}
+
+@test "server/StatefulSet: cloud config is set in command global.cloud.enabled is not set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.acls.enabled=true' \
+      --set 'global.acls.bootstrapToken.secretName=name' \
+      --set 'global.acls.bootstrapToken.secretKey=key' \
+      . | tee /dev/stderr)
+
+  # Test the flag is set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("-hcl=\"acl { tokens { initial_management = \\\"${ACL_BOOTSTRAP_TOKEN}\\\" } }\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the ACL_BOOTSTRAP_TOKEN environment variable is set.
+  local actual=$(echo "$object" |
+    yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ACL_BOOTSTRAP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = '[{"name":"ACL_BOOTSTRAP_TOKEN","valueFrom":{"secretKeyRef":{"name":"name","key":"key"}}}]' ]
+}
+
+@test "server/StatefulSet: fails when global.cloud.enabled is set and global.cloud.secretName is not set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.cloud.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
+}

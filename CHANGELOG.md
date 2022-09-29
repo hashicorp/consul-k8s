@@ -1,4 +1,8 @@
 ## UNRELEASED
+FEATURES:
+* CLI:
+  * Add the ability to install installing HCP self-managed clusters.  [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
+  * Add the ability to install the HashiCups demo application via the -demo flag. [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
 
 ## 0.49.0 (September 29, 2022)
 
