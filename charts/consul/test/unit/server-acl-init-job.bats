@@ -1068,7 +1068,7 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1107,11 +1107,11 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1200,7 +1200,7 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1247,15 +1247,15 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: inject namespace options set with .global.enableConsulNamespaces=true and inject enabled" {
