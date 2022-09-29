@@ -18,6 +18,7 @@ spec:
       passiveHealthCheck:
         interval: 1s
         maxFailures: 10
+        enforcing_consecutive_5xx: 60
     - name: "bar"
       limits:
         maxConnections: 5
