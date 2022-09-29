@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -31,7 +32,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	multiPort := mpi.serviceName != ""
-	cmd, err := w.getContainerSidecarCommand(namespace, mpi, bearerTokenFile, pod.Name)
+	cmd, err := w.getContainerSidecarCommand(namespace, mpi, bearerTokenFile, pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -122,10 +123,21 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	return container, nil
 }
 
-func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile, podName string) ([]string, error) {
+func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile string, pod corev1.Pod) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	if mpi.serviceName != "" {
 		proxyIDFileName = fmt.Sprintf("/consul/connect-inject/proxyid-%s", mpi.serviceName)
+	}
+
+	envoyConcurrency := w.DefaultEnvoyProxyConcurrency
+
+	// Check to see if the user has overriden concurrency via an annotation.
+	if envoyConcurrencyAnnotation, ok := pod.Annotations[annotationEnvoyProxyConcurrency]; ok {
+		val, err := strconv.ParseUint(envoyConcurrencyAnnotation, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse annotation %q: %w", annotationEnvoyProxyConcurrency, err)
+		}
+		envoyConcurrency = int(val)
 	}
 
 	cmd := []string{
@@ -136,13 +148,15 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		"-service-node-name=" + ConsulNodeName,
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
+		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
 	}
+
 	if w.AuthMethod != "" {
 		cmd = append(cmd,
 			"-credential-type=login",
-			"-login-method="+w.AuthMethod,
-			"-login-bearer-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, podName),
+			"-login-auth-method="+w.AuthMethod,
+			"-login-bearer-token-path="+bearerTokenFile,
+			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
 		)
 		if w.EnableNamespaces {
 			if w.EnableK8SNSMirroring {
@@ -162,7 +176,9 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, "-service-partition="+w.ConsulPartition)
 	}
 	if w.TLSEnabled {
-		cmd = append(cmd, "-tls-server-name="+w.ConsulTLSServerName)
+		if w.ConsulTLSServerName != "" {
+			cmd = append(cmd, "-tls-server-name="+w.ConsulTLSServerName)
+		}
 		if w.ConsulCACert != "" {
 			cmd = append(cmd, "-ca-certs="+ConsulCAFile)
 		}
@@ -174,50 +190,41 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
 	}
 
-	// todo (agentless): we need to enable this once we support passing extra flags to envoy through consul-dataplane
-	//if multiPortSvcName != "" {
-	//	// --base-id is needed so multiple Envoy proxies can run on the same host.
-	//	cmd = append(cmd, "--base-id", fmt.Sprintf("%d", multiPortSvcIdx))
-	//}
-	// Check to see if the user has overriden concurrency via an annotation.
-	//if pod.Annotations[annotationEnvoyProxyConcurrency] != "" {
-	//	val, err := strconv.ParseInt(pod.Annotations[annotationEnvoyProxyConcurrency], 10, 64)
-	//	if err != nil {
-	//		return nil, fmt.Errorf("unable to parse annotation: %s", annotationEnvoyProxyConcurrency)
-	//	}
-	//	if val < 0 {
-	//		return nil, fmt.Errorf("invalid envoy concurrency, must be >= 0: %s", pod.Annotations[annotationEnvoyProxyConcurrency])
-	//	} else {
-	//		cmd = append(cmd, "--concurrency", pod.Annotations[annotationEnvoyProxyConcurrency])
-	//	}
-	//} else {
-	//	// Use the default concurrency.
-	//	cmd = append(cmd, "--concurrency", fmt.Sprintf("%d", w.DefaultEnvoyProxyConcurrency))
-	//}
-	//
-	//extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
-	//
-	//if annotationSet || w.EnvoyExtraArgs != "" {
-	//	extraArgsToUse := w.EnvoyExtraArgs
-	//
-	//	// Prefer args set by pod annotation over the flag to the consul-k8s binary (h.EnvoyExtraArgs).
-	//	if annotationSet {
-	//		extraArgsToUse = extraArgs
-	//	}
-	//
-	//	// Split string into tokens.
-	//	// e.g. "--foo bar --boo baz" --> ["--foo", "bar", "--boo", "baz"]
-	//	tokens, err := shlex.Split(extraArgsToUse)
-	//	if err != nil {
-	//		return []string{}, err
-	//	}
-	//	for _, t := range tokens {
-	//		if strings.Contains(t, " ") {
-	//			t = strconv.Quote(t)
-	//		}
-	//		cmd = append(cmd, t)
-	//	}
-	//}
+	var envoyExtraArgs []string
+	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
+	// --base-id is an envoy arg rather than consul-dataplane, and so we need to make sure we're passing it
+	// last separated by the --.
+	if mpi.serviceName != "" {
+		// --base-id is needed so multiple Envoy proxies can run on the same host.
+		envoyExtraArgs = append(envoyExtraArgs, "--base-id", fmt.Sprintf("%d", mpi.serviceIndex))
+	}
+
+	if annotationSet || w.EnvoyExtraArgs != "" {
+		extraArgsToUse := w.EnvoyExtraArgs
+
+		// Prefer args set by pod annotation over the flag to the consul-k8s binary (h.EnvoyExtraArgs).
+		if annotationSet {
+			extraArgsToUse = extraArgs
+		}
+
+		// Split string into tokens.
+		// e.g. "--foo bar --boo baz" --> ["--foo", "bar", "--boo", "baz"]
+		tokens, err := shlex.Split(extraArgsToUse)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, t := range tokens {
+			if strings.Contains(t, " ") {
+				t = strconv.Quote(t)
+			}
+			envoyExtraArgs = append(envoyExtraArgs, t)
+		}
+	}
+	if envoyExtraArgs != nil {
+		cmd = append(cmd, "--")
+		cmd = append(cmd, envoyExtraArgs...)
+	}
+
 	cmd = append([]string{"/bin/sh", "-ec"}, strings.Join(cmd, " "))
 	return cmd, nil
 }

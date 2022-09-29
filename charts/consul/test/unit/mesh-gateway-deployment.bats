@@ -470,13 +470,13 @@ key2: value2' \
       local actual=$(echo $command | yq -r '. | any(contains("credential-type=login"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-meta=pod=${NAMESPACE}/${POD_NAME}"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-method=release-name-consul-k8s-component-auth-method"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 }
 
@@ -493,7 +493,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].command[2]]' | tee /dev/stderr)
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-method=release-name-consul-k8s-component-auth-method-dc1"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method-dc1"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-datacenter=dc2"))'| tee /dev/stderr)
@@ -575,19 +575,11 @@ key2: value2' \
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[8].name] | any(contains("CONSUL_TLS_SERVER_NAME"))' | tee /dev/stderr)
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[8].value] | any(contains("server.dc1.consul"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[9].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[9].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -638,19 +630,19 @@ key2: value2' \
       yq '.spec.template.spec.initContainers[] | select(.name == "mesh-gateway-init")' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq '[.env[10].name] | any(contains("CONSUL_LOGIN_AUTH_METHOD"))' | tee /dev/stderr)
+      yq '[.env[9].name] | any(contains("CONSUL_LOGIN_AUTH_METHOD"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[10].value] | any(contains("release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq '[.env[9].value] | any(contains("release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[11].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+      yq '[.env[10].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[11].value] | any(contains("dc1"))' | tee /dev/stderr)
+      yq '[.env[10].value] | any(contains("dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -784,9 +776,6 @@ key2: value2' \
       yq -r '.spec.template.spec.containers[0].command[]' | tee /dev/stderr)
 
   local actual=$(echo $flags | yq -r '. | contains("-ca-certs=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
-  [ "${actual}" = 'true' ]
-
-  local actual=$(echo $flags | yq -r '. | contains("-tls-server-name=server.dc1.consul")' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
 

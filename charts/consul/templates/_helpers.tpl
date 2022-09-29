@@ -356,10 +356,6 @@ Consul server environment variables for consul-k8s commands.
 - name: CONSUL_USE_TLS
   value: "true"
 {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
-{{- if not .Values.externalServers.tlsServerName }}
-- name: CONSUL_TLS_SERVER_NAME
-  value: server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}
-{{- end }}
 - name: CONSUL_CACERT_FILE
   {{- if .Values.global.secretsBackend.vault.enabled }}
   value: "/vault/secrets/serverca.crt"
