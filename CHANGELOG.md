@@ -25,6 +25,12 @@ BREAKING CHANGES:
     * API gateway is not yet supported.
     * Executables in the form of `exec=` are not yet supported when using external servers and ACLs.
 
+BREAKING CHANGES:
+* The following default Helm values have changed:
+  * `server.replicas=1` (formerly `server.replicas=3`)
+  * `connectInjectEnabled=true`
+  * `controller.enabled=true`
+
 ## 0.49.0 (September 29, 2022)
 
 FEATURES:
