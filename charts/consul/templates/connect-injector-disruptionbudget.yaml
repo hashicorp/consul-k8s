@@ -17,7 +17,11 @@ metadata:
     release: {{ .Release.Name }}
     component: connect-injector
 spec:
+  {{- if .Values.connectInject.disruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.connectInject.disruptionBudget.minAvailable }}
+  {{- else }}
   maxUnavailable: {{ template "consul.pdb.connectInject.maxUnavailable" . }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
