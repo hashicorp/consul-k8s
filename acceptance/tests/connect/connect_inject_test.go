@@ -242,7 +242,7 @@ const multiportAdmin = "multiport-admin"
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
 // multiport app to static-server.
 func TestConnectInject_MultiportServices(t *testing.T) {
-	for _, secure := range []bool{true} {
+	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
