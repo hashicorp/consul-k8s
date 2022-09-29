@@ -10,6 +10,7 @@
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+{{ template "consul.validateCloudConfiguration" . }}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -525,6 +526,8 @@ spec:
               {{- if .Values.externalServers.tlsServerName }}
               -tls-server-name={{ .Values.externalServers.tlsServerName }} \
               {{- end }}
+              {{- else if .Values.global.cloud.enabled }}
+              -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
               {{- end }}
               -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
               -init-type="client"

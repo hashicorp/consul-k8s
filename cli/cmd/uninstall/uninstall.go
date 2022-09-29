@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/posener/complete"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +42,8 @@ const (
 
 type Command struct {
 	*common.BaseCommand
+
+	helmActionsRunner helm.HelmActionsRunner
 
 	kubernetes kubernetes.Interface
 
@@ -124,6 +128,10 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
+
 	if err := c.set.Parse(args); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -174,9 +182,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
-	c.UI.Output("Existing Installation", terminal.WithHeaderStyle())
-
-	// Search for Consul installation by calling `helm list`. Depends on what's already specified.
 	actionConfig := new(action.Configuration)
 	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
@@ -184,51 +189,48 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	found, foundReleaseName, foundReleaseNamespace, err := c.findExistingInstallation(settings, uiLogger)
+	c.UI.Output(fmt.Sprintf("Checking if %s can be uninstalled", common.ReleaseTypeConsulDemo), terminal.WithHeaderStyle())
+	foundConsulDemo, foundDemoReleaseName, foundDemoReleaseNamespace, err := c.findExistingInstallation(&helm.CheckForInstallationsOptions{
+		Settings:              settings,
+		ReleaseName:           common.ConsulDemoAppReleaseName,
+		DebugLog:              uiLogger,
+		SkipErrorWhenNotFound: true,
+	})
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
-	} else {
-		c.UI.Output("Existing Consul installation found.", terminal.WithSuccessStyle())
-		c.UI.Output("Consul Uninstall Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Name: %s", foundReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", foundReleaseNamespace, terminal.WithInfoStyle())
+	} else if !foundConsulDemo {
+		c.UI.Output(fmt.Sprintf("No existing %s installation found.", common.ReleaseTypeConsulDemo), terminal.WithInfoStyle())
+	}
 
-		// Prompt for approval to uninstall Helm release.
-		if !c.flagAutoApprove {
-			confirmation, err := c.UI.Input(&terminal.Input{
-				Prompt: "Proceed with uninstall? (y/N)",
-				Style:  terminal.InfoStyle,
-				Secret: false,
-			})
-			if err != nil {
-				c.UI.Output(err.Error(), terminal.WithErrorStyle())
-				return 1
-			}
-			if common.Abort(confirmation) {
-				c.UI.Output("Uninstall aborted. To learn how to customize the uninstall, run:\nconsul-k8s uninstall --help", terminal.WithInfoStyle())
-				return 1
-			}
-		}
+	found, foundReleaseName, foundReleaseNamespace, err :=
+		c.findExistingInstallation(&helm.CheckForInstallationsOptions{
+			Settings:    settings,
+			ReleaseName: common.DefaultReleaseName,
+			DebugLog:    uiLogger,
+		})
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
 
-		// Actually call out to `helm delete`.
-		actionConfig, err = helm.InitActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
+	if foundConsulDemo {
+		err = c.uninstallHelmRelease(foundDemoReleaseName, foundDemoReleaseNamespace, common.ReleaseTypeConsulDemo, settings, uiLogger, actionConfig)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
+	} else {
+		c.UI.Output(fmt.Sprintf("No existing %s installation found.", common.ReleaseTypeConsulDemo), terminal.WithInfoStyle())
+	}
 
-		uninstaller := action.NewUninstall(actionConfig)
-		uninstaller.Timeout = c.timeoutDuration
-		res, err := uninstaller.Run(foundReleaseName)
+	c.UI.Output("Checking if Consul can be uninstalled", terminal.WithHeaderStyle())
+	if found {
+		err = c.uninstallHelmRelease(foundReleaseName, foundReleaseNamespace, common.ReleaseTypeConsul, settings, uiLogger, actionConfig)
 		if err != nil {
-			c.UI.Output("unable to uninstall: %s", err, terminal.WithErrorStyle())
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-		if res != nil && res.Info != "" {
-			c.UI.Output("Uninstall result: %s", res.Info, terminal.WithInfoStyle())
-		}
-		c.UI.Output("Successfully uninstalled Consul Helm release", terminal.WithSuccessStyle())
 	}
 
 	// If -auto-approve=true and -wipe-data=false, we should only uninstall the release, and skip deleting resources.
@@ -319,6 +321,50 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType string, settings *helmCLI.EnvSettings,
+	uiLogger action.DebugLog, actionConfig *action.Configuration) error {
+	c.UI.Output(fmt.Sprintf("Existing %s installation found.", releaseType), terminal.WithSuccessStyle())
+	c.UI.Output(fmt.Sprintf("%s Uninstall Summary", cases.Title(language.English).String(releaseType)), terminal.WithHeaderStyle())
+	c.UI.Output("Name: %s", releaseName, terminal.WithInfoStyle())
+	c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
+
+	// Prompt for approval to uninstall Helm release.
+	// Actually call out to `helm delete`.
+	if !c.flagAutoApprove {
+		confirmation, err := c.UI.Input(&terminal.Input{
+			Prompt: "Proceed with uninstall? (y/N)",
+			Style:  terminal.InfoStyle,
+			Secret: false,
+		})
+		if err != nil {
+			return err
+		}
+		if common.Abort(confirmation) {
+			c.UI.Output("Uninstall aborted. To learn how to customize the uninstall, run:\nconsul-k8s uninstall --help", terminal.WithInfoStyle())
+			return nil
+		}
+	}
+
+	actionConfig, err := helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
+	if err != nil {
+		return err
+	}
+
+	uninstall := action.NewUninstall(actionConfig)
+	uninstall.Timeout = c.timeoutDuration
+
+	res, err := c.helmActionsRunner.Uninstall(uninstall, releaseName)
+	if err != nil {
+		return err
+	}
+	if res != nil && res.Info != "" {
+		c.UI.Output("Uninstall result: %s", res.Info, terminal.WithInfoStyle())
+		return nil
+	}
+	c.UI.Output(fmt.Sprintf("Successfully uninstalled %s Helm release.", releaseType), terminal.WithSuccessStyle())
+	return nil
+}
+
 func (c *Command) Help() string {
 	c.once.Do(c.init)
 	s := "Usage: consul-k8s uninstall [flags]" + "\n" + "Uninstall Consul with options to delete data and resources associated with Consul installation." + "\n\n" + c.help
@@ -351,14 +397,18 @@ func (c *Command) AutocompleteArgs() complete.Predictor {
 	return complete.PredictNothing
 }
 
-func (c *Command) findExistingInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (bool, string, string, error) {
-	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
+func (c *Command) findExistingInstallation(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+	found, releaseName, namespace, err := c.helmActionsRunner.CheckForInstallations(options)
 	if err != nil {
 		return false, "", "", err
-	} else if c.flagNamespace == defaultAllNamespaces || c.flagNamespace == namespace {
+	} else if found && (c.flagNamespace == defaultAllNamespaces || c.flagNamespace == namespace) {
 		return true, releaseName, namespace, nil
 	} else {
-		return false, "", "", fmt.Errorf("could not find consul installation in namespace %s", c.flagNamespace)
+		var notFoundError error
+		if !options.SkipErrorWhenNotFound {
+			notFoundError = fmt.Errorf("could not find %s installation in cluster", common.ReleaseTypeConsul)
+		}
+		return false, "", "", notFoundError
 	}
 }
 

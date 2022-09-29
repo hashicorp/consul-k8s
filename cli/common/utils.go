@@ -1,19 +1,17 @@
 package common
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"strings"
-
-	"helm.sh/helm/v3/pkg/action"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
 )
 
 const (
-	DefaultReleaseName      = "consul"
-	DefaultReleaseNamespace = "consul"
-	TopLevelChartDirName    = "consul"
+	DefaultReleaseName       = "consul"
+	DefaultReleaseNamespace  = "consul"
+	ConsulDemoAppReleaseName = "consul-demo"
+	TopLevelChartDirName     = "consul"
+	ReleaseTypeConsul        = "Consul"
+	ReleaseTypeConsulDemo    = "Consul demo application"
 
 	// CLILabelKey and CLILabelValue are added to each secret on creation so the CLI knows
 	// which key to delete on an uninstall.
@@ -25,32 +23,6 @@ const (
 func Abort(raw string) bool {
 	confirmation := strings.TrimSuffix(raw, "\n")
 	return !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes")
-}
-
-// CheckForInstallations uses the helm Go SDK to find helm releases in all namespaces where the chart name is
-// "consul", and returns the release name and namespace if found, or an error if not found.
-func CheckForInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (string, string, error) {
-	// Need a specific action config to call helm list, where namespace is NOT specified.
-	listConfig := new(action.Configuration)
-	if err := listConfig.Init(settings.RESTClientGetter(), "",
-		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
-		return "", "", fmt.Errorf("couldn't initialize helm config: %s", err)
-	}
-
-	lister := action.NewList(listConfig)
-	lister.AllNamespaces = true
-	lister.StateMask = action.ListAll
-	res, err := lister.Run()
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't check for installations: %s", err)
-	}
-
-	for _, rel := range res {
-		if rel.Chart.Metadata.Name == "consul" {
-			return rel.Name, rel.Namespace, nil
-		}
-	}
-	return "", "", errors.New("couldn't find consul installation")
 }
 
 // MergeMaps merges two maps giving b precedent.

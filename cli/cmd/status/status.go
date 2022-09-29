@@ -28,6 +28,8 @@ const (
 type Command struct {
 	*common.BaseCommand
 
+	helmActionsRunner helm.HelmActionsRunner
+
 	kubernetes kubernetes.Interface
 
 	set *flag.Sets
@@ -63,6 +65,9 @@ func (c *Command) init() {
 // Run checks the status of a Consul installation on Kubernetes.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
 
 	// The logger is initialized in main with the name cli. Here, we reset the name to status so log lines would be prefixed with status.
 	c.Log.ResetNamed("status")
@@ -101,7 +106,11 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Consul Status Summary", terminal.WithHeaderStyle())
 
-	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
+	_, releaseName, namespace, err := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    settings,
+		ReleaseName: common.DefaultReleaseName,
+		DebugLog:    uiLogger,
+	})
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -165,7 +174,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 	}
 
 	statuser := action.NewStatus(statusConfig)
-	rel, err := statuser.Run(releaseName)
+	rel, err := c.helmActionsRunner.GetStatus(statuser, releaseName)
 	if err != nil {
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}

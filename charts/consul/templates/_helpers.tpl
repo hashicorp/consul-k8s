@@ -236,6 +236,9 @@ This template is for an init container.
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
+        {{- if .Values.global.cloud.enabled }}
+        -tls-server-name=server.{{.Values.global.datacenter}}.{{.Values.global.domain}} \
+        {{- end}}
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
@@ -369,4 +372,16 @@ Consul server environment variables for consul-k8s commands.
   value: {{ .Values.externalServers.tlsServerName }}
 {{- end }}
 {{- end }}
+{{- end -}}
+
+{{/*
+Fails global.cloud.enabled is true and global.cloud.secretName is nil or tempty.
+
+Usage: {{ template "consul.validateCloudConfiguration" . }}
+
+*/}}
+{{- define "consul.validateCloudConfiguration" -}}
+{{- if and .Values.global.cloud.enabled (not .Values.global.cloud.secretName) }}
+{{fail "When global.cloud.enabled is true, global.cloud.secretName must also be set."}}
+{{ end }}
 {{- end -}}
