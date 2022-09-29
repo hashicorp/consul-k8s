@@ -16,24 +16,17 @@ import (
 // Test that terminating gateways work in a default and secure installations.
 func TestTerminatingGateway(t *testing.T) {
 	cases := []struct {
-		secure      bool
-		autoEncrypt bool
+		secure bool
 	}{
 		{
-			false,
-			false,
+			secure: false,
 		},
 		{
-			true,
-			true,
-		},
-		{
-			true,
-			true,
+			secure: true,
 		},
 	}
 	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t, auto-encrypt: %t", c.secure, c.autoEncrypt)
+		name := fmt.Sprintf("secure: %t", c.secure)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
@@ -46,7 +39,6 @@ func TestTerminatingGateway(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.autoEncrypt":       strconv.FormatBool(c.autoEncrypt),
 			}
 
 			logger.Log(t, "creating consul cluster")

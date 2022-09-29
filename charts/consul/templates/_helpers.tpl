@@ -200,7 +200,7 @@ Add a special case for replicas=1, where it should default to 0 as well.
 {{- if eq (int .Values.connectInject.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.connectInject.disruptionBudget.maxUnavailable -}}
-{{ .Values.server.disruptionBudget.maxUnavailable -}}
+{{ .Values.connectInject.disruptionBudget.maxUnavailable -}}
 {{- else -}}
 {{- if eq (int .Values.connectInject.replicas) 3 -}}
 {{- 1 -}}
@@ -311,4 +311,62 @@ Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
 {{ end }}
 {{ end }}
+{{- end -}}
+
+{{/*
+Consul server environment variables for consul-k8s commands.
+*/}}
+{{- define "consul.consulK8sConsulServerEnvVars" -}}
+- name: CONSUL_ADDRESSES
+  {{- if .Values.externalServers.enabled }}
+  value: {{ .Values.externalServers.hosts | first }}
+  {{- else }}
+  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+  {{- end }}
+- name: CONSUL_GRPC_PORT
+  {{- if .Values.externalServers.enabled }}
+  value: "{{ .Values.externalServers.grpcPort }}"
+  {{- else }}
+  value: "8502"
+  {{- end }}
+- name: CONSUL_HTTP_PORT
+  {{- if .Values.externalServers.enabled }}
+  value: "{{ .Values.externalServers.httpsPort }}"
+  {{- else if .Values.global.tls.enabled }}
+  value: "8501"
+  {{- else }}
+  value: "8500"
+  {{- end }}
+- name: CONSUL_DATACENTER
+  value: {{ .Values.global.datacenter }}
+- name: CONSUL_API_TIMEOUT
+  value: {{ .Values.global.consulAPITimeout }}
+{{- if .Values.global.adminPartitions.enabled }}
+- name: CONSUL_PARTITION
+  value: {{ .Values.global.adminPartitions.name }}
+{{- if .Values.global.acls.manageSystemACLs }}
+- name: CONSUL_LOGIN_PARTITION
+  value: {{ .Values.global.adminPartitions.name }}
+{{- end }}
+{{- end }}
+{{- if .Values.global.tls.enabled }}
+- name: CONSUL_USE_TLS
+  value: "true"
+{{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+{{- if not .Values.externalServers.tlsServerName }}
+- name: CONSUL_TLS_SERVER_NAME
+  value: server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}
+{{- end }}
+- name: CONSUL_CACERT_FILE
+  {{- if .Values.global.secretsBackend.vault.enabled }}
+  value: "/vault/secrets/serverca.crt"
+  {{- else }}
+  value: "/consul/tls/ca/tls.crt"
+  {{- end }}
+{{- end }}
+{{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+- name: CONSUL_TLS_SERVER_NAME
+  value: {{ .Values.externalServers.tlsServerName }}
+{{- end }}
+{{- end }}
 {{- end -}}

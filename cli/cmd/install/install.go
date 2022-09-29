@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/consul-k8s/cli/validation"
+	"github.com/posener/complete"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -52,6 +53,9 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
+
+	flagNameContext    = "context"
+	flagNameKubeconfig = "kubeconfig"
 )
 
 type Command struct {
@@ -158,14 +162,14 @@ func (c *Command) init() {
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagNameKubeconfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "context",
+		Name:    flagNameContext,
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
@@ -265,20 +269,20 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var values helm.Values
-	err = yaml.Unmarshal(valuesYaml, &values)
+	var helmVals helm.Values
+	err = yaml.Unmarshal(valuesYaml, &helmVals)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	release := release.Release{
+	rel := release.Release{
 		Name:          "consul",
 		Namespace:     c.flagNamespace,
-		Configuration: values,
+		Configuration: helmVals,
 	}
 
-	msg, err := c.checkForPreviousSecrets(release)
+	msg, err := c.checkForPreviousSecrets(rel)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -286,8 +290,8 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output(msg, terminal.WithSuccessStyle())
 
 	// If an enterprise license secret was provided, check that the secret exists and that the enterprise Consul image is set.
-	if values.Global.EnterpriseLicense.SecretName != "" {
-		if err := c.checkValidEnterprise(release.Configuration.Global.EnterpriseLicense.SecretName); err != nil {
+	if helmVals.Global.EnterpriseLicense.SecretName != "" {
+		if err := c.checkValidEnterprise(rel.Configuration.Global.EnterpriseLicense.SecretName); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
@@ -381,6 +385,34 @@ func (c *Command) Help() string {
 // Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
 	return "Install Consul on Kubernetes."
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *Command) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNamePreset):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameNamespace):       complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameDryRun):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameAutoApprove):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameConfigFile):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameSetStringValues): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameSetValues):       complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameFileValues):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameTimeout):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameVerbose):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameWait):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictNothing,
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *Command) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 // checkForPreviousPVCs checks for existing Kubernetes persistent volume claims with a name containing "consul-server"

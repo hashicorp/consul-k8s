@@ -109,7 +109,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.13.1"
+  image: "hashicorp/consul:1.13.2"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -129,7 +129,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: hashicorp/consul-k8s-control-plane:0.48.0
+  imageK8S: hashicorp/consul-k8s-control-plane:1.0.0-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -631,6 +631,11 @@ global:
   # @default: envoyproxy/envoy-alpine:<latest supported version>
   imageEnvoy: "envoyproxy/envoy:v1.23.1"
 
+  # The name (and tag) of the consul-dataplane Docker image used for the
+  # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
+  # @default: hashicorp/consul-dataplane:<latest supported version>
+  imageConsulDataplane: "ishustava/consul-dataplane:latest@sha256:a19acc509b24960275a842cafc9c35b167e3e8ee9a75ccae1cbcaf3c40a3664a"
+
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
@@ -1093,7 +1098,7 @@ externalServers:
   httpsPort: 8501
 
   # The GRPC port of the Consul servers.
-  grpcPort: 8503
+  grpcPort: 8502
 
   # The server name to use as the SNI host header when connecting with HTTPS.
   # @type: string
@@ -1128,9 +1133,8 @@ client:
   # If true, the chart will install all
   # the resources necessary for a Consul client on every Kubernetes node. This _does not_ require
   # `server.enabled`, since the agents can be configured to join an external cluster.
-  # @default: global.enabled
   # @type: boolean
-  enabled: "-"
+  enabled: false
 
   # The name of the Docker image (including any tag) for the containers
   # running Consul client agents.
@@ -1795,12 +1799,12 @@ syncCatalog:
 
   # Refers to a Kubernetes secret that you have created that contains
   # an ACL token for your Consul cluster which allows the sync process the correct
-  # permissions. This is only needed if ACLs are enabled on the Consul cluster.
+  # permissions. This is only needed if ACLs are managed manually within the Consul cluster, i.e. `global.acls.manageSystemACLs` is `false`.
   aclSyncToken:
-    # The name of the Vault secret that holds the acl sync token.
+    # The name of the Kubernetes secret that holds the acl sync token.
     # @type: string
     secretName: null
-    # The key within the Vault secret that holds the acl sync.
+    # The key within the Kubernetes secret that holds the acl sync token.
     # @type: string
     secretKey: null
 
@@ -1960,7 +1964,20 @@ connectInject:
     # Location on the kubernetes node of all CNI configuration. Should be the absolute path and start with a '/'
     # @type: string
     cniNetDir: "/etc/cni/net.d"
- 
+
+    # If multus CNI plugin is enabled with consul-cni. When enabled, consul-cni will not be installed as a chained
+    # CNI plugin. Instead, a NetworkAttachementDefinition CustomResourceDefinition (CRD) will be created in the helm
+    # release namespace. Following multus plugin standards, an annotation is required in order for the consul-cni plugin
+    # to be executed and for your service to be added to the Consul Service Mesh. 
+    #
+    # Add the annotation `'k8s.v1.cni.cncf.io/networks': '[{ "name":"consul-cni","namespace": "consul" }]'` to your pod
+    # to use the default installed NetworkAttachementDefinition CRD.
+    #
+    # Please refer to the [Multus Quickstart Guide](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/quickstart.md)
+    # for more information about using multus. 
+    # @type: string
+    multus: false 
+
     # The resource settings for CNI installer daemonset.
     # @recurse: false
     # @type: map
@@ -2417,9 +2434,6 @@ meshGateway:
 
   # The service option configures the Service that fronts the Gateway Deployment.
   service:
-    # Whether to create a Service or not.
-    enabled: true
-
     # Type of service, ex. LoadBalancer, ClusterIP.
     type: LoadBalancer
 
@@ -2499,18 +2513,6 @@ meshGateway:
     limits:
       memory: "100Mi"
       cpu: "100m"
-
-  # The resource settings for the `copy-consul-bin` init container.
-  # @recurse: false
-  # @type: map
-  initCopyConsulContainer:
-    resources:
-      requests:
-        memory: "25Mi"
-        cpu: "50m"
-      limits:
-        memory: "150Mi"
-        cpu: "50m"
 
   # The resource settings for the `service-init` init container.
   # @recurse: false
@@ -2663,18 +2665,6 @@ ingressGateways:
         memory: "100Mi"
         cpu: "100m"
 
-    # The resource settings for the `copy-consul-bin` init container.
-    # @recurse: false
-    # @type: map
-    initCopyConsulContainer:
-      resources:
-        requests:
-          memory: "25Mi"
-          cpu: "50m"
-        limits:
-          memory: "150Mi"
-          cpu: "50m"
-
     # By default, we set an anti-affinity so that two of the same gateway pods
     # won't be on the same node. NOTE: Gateways require that Consul client agents are
     # also running on the nodes alongside each gateway pod.
@@ -2796,18 +2786,6 @@ terminatingGateways:
       limits:
         memory: "100Mi"
         cpu: "100m"
-
-    # The resource settings for the `copy-consul-bin` init container.
-    # @recurse: false
-    # @type: map
-    initCopyConsulContainer:
-      resources:
-        requests:
-          memory: "25Mi"
-          cpu: "50m"
-        limits:
-          memory: "150Mi"
-          cpu: "50m"
 
     # By default, we set an anti-affinity so that two of the same gateway pods
     # won't be on the same node. NOTE: Gateways require that Consul client agents are

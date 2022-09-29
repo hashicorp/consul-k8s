@@ -35,6 +35,10 @@ type HelmCluster struct {
 	// a bootstrap token from a Kubernetes secret stored in the cluster.
 	ACLToken string
 
+	// SkipCheckForPreviousInstallations is a toggle for skipping the check
+	// if there are any previous installations of this Helm chart in the cluster.
+	SkipCheckForPreviousInstallations bool
+
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
@@ -109,7 +113,9 @@ func (h *HelmCluster) Create(t *testing.T) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	if !h.SkipCheckForPreviousInstallations {
+		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	}
 
 	chartName := config.HelmChartPath
 	if h.helmOptions.Version != config.HelmChartPath {
@@ -565,9 +571,8 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 
 func defaultValues() map[string]string {
 	values := map[string]string{
-		"server.replicas":              "1",
-		"connectInject.envoyExtraArgs": "--log-level debug",
-		"connectInject.logLevel":       "debug",
+		"global.logLevel": "debug",
+		"server.replicas": "1",
 		// Disable DNS since enabling it changes the policy for the anonymous token,
 		// which could result in tests passing due to that token having privileges to read services
 		// (false positive).

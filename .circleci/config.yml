@@ -38,7 +38,7 @@ commands:
             sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
             rm gotestsum_1.6.4_linux_amd64.tar.gz
 
-            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.14.0/kind-linux-amd64
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.15.0/kind-linux-amd64
             chmod +x ./kind
             sudo mv ./kind /usr/local/bin/kind
 
@@ -46,8 +46,8 @@ commands:
             chmod +x ./kubectl
             sudo mv ./kubectl /usr/local/bin/kubectl
 
-            wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
-            tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
+            wget https://get.helm.sh/helm-v3.9.4-linux-amd64.tar.gz
+            tar -zxvf helm-v3.9.4-linux-amd64.tar.gz
             sudo mv linux-amd64/helm /usr/local/bin/helm
   create-kind-clusters:
     parameters:
@@ -110,9 +110,10 @@ commands:
                   do
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
-                          ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
+                          ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -debug-directory="$TEST_RESULTS/debug" \
+                          -consul-image=hashicorppreview/consul-enterprise:1.14-dev \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
@@ -485,7 +486,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - checkout
@@ -506,7 +507,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.0"
+          version: "v1.24.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -538,7 +539,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.0"
+          version: "v1.24.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -570,7 +571,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.0"
+          version: "v1.24.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -596,7 +597,7 @@ jobs:
   ##########################
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -614,7 +615,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -632,7 +633,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
     steps:
       - checkout
       - run:
@@ -657,9 +658,10 @@ jobs:
     parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - USE_GKE_GCLOUD_AUTH_PLUGIN: true
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - run:
@@ -725,9 +727,10 @@ jobs:
     parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - USE_GKE_GCLOUD_AUTH_PLUGIN: true
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - run:
@@ -795,7 +798,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - checkout
@@ -852,7 +855,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - checkout
@@ -908,7 +911,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - checkout
@@ -971,7 +974,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - checkout
@@ -1034,7 +1037,7 @@ jobs:
     parallelism: 1
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.11.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
 
     steps:
       - checkout
@@ -1217,14 +1220,14 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
-      - acceptance-tproxy-cni:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
-      - acceptance-tproxy:
-          context: consul-ci
-          requires:
-            - dev-upload-docker
+#      - acceptance-tproxy-cni:
+#          context: consul-ci
+#          requires:
+#            - dev-upload-docker
+#      - acceptance-tproxy:
+#          context: consul-ci
+#          requires:
+#            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:

@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,17 +29,22 @@ import (
 // "system" level namespaces and are always skipped (never injected).
 var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)
 
-// Webhook is the HTTP meshWebhook for admission webhooks.
+// MeshWebhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
-	ConsulClient *api.Client
-	Clientset    kubernetes.Interface
+	Clientset kubernetes.Interface
+
+	// ConsulClientConfig is the config to create a Consul API client.
+	ConsulConfig *consul.Config
+
+	// ConsulServerConnMgr is the watcher for the Consul server addresses.
+	ConsulServerConnMgr *discovery.Watcher
 
 	// ImageConsul is the container image for Consul to use.
-	// ImageEnvoy is the container image for Envoy to use.
+	// ImageConsulDataplane is the container image for Envoy to use.
 	//
 	// Both of these MUST be set.
-	ImageConsul string
-	ImageEnvoy  string
+	ImageConsul          string
+	ImageConsulDataplane string
 
 	// ImageConsulK8S is the container image for consul-k8s to use.
 	// This image is used for the consul-sidecar container.
@@ -61,6 +66,17 @@ type MeshWebhook struct {
 	// to use when communicating with Consul clients over HTTPS.
 	// If not set, will use HTTP.
 	ConsulCACert string
+
+	// TLSEnabled indicates whether we should use TLS for communicating to Consul.
+	TLSEnabled bool
+
+	// ConsulAddress is the address of the Consul server. This should be only the
+	// host (i.e. not including port or protocol).
+	ConsulAddress string
+
+	// ConsulTLSServerName is the SNI header to use to connect to the Consul servers
+	// over TLS.
+	ConsulTLSServerName string
 
 	// ConsulPartition is the name of the Admin Partition that the controller
 	// is deployed in. It is an enterprise feature requiring Consul Enterprise 1.11+.
@@ -156,13 +172,9 @@ type MeshWebhook struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
-	// ConsulAPITimeout is the duration that the consul API client will
-	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout time.Duration
-
 	// Log
 	Log logr.Logger
-	// Log settings for consul-sidecar
+	// Log settings for consul-dataplane and connect-init containers.
 	LogLevel string
 	LogJSON  bool
 
@@ -271,7 +283,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 		// Add the Envoy sidecar.
-		envoySidecar, err := w.envoySidecar(*ns, pod, multiPortInfo{})
+		envoySidecar, err := w.consulDataplaneSidecar(*ns, pod, multiPortInfo{})
 		if err != nil {
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
@@ -341,7 +353,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 			// Add the Envoy sidecar.
-			envoySidecar, err := w.envoySidecar(*ns, pod, mpi)
+			envoySidecar, err := w.consulDataplaneSidecar(*ns, pod, mpi)
 			if err != nil {
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
@@ -441,7 +453,19 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// all patches are created to guarantee no errors were encountered in
 	// that process before modifying the Consul cluster.
 	if w.EnableNamespaces {
-		if _, err := namespaces.EnsureExists(w.ConsulClient, w.consulNamespace(req.Namespace), w.CrossNamespaceACLPolicy); err != nil {
+		serverState, err := w.ConsulServerConnMgr.State()
+		if err != nil {
+			w.Log.Error(err, "error checking or creating namespace",
+				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
+		}
+		apiClient, err := consul.NewClientFromConnMgrState(w.ConsulConfig, serverState)
+		if err != nil {
+			w.Log.Error(err, "error checking or creating namespace",
+				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
+		}
+		if _, err := namespaces.EnsureExists(apiClient, w.consulNamespace(req.Namespace), w.CrossNamespaceACLPolicy); err != nil {
 			w.Log.Error(err, "error checking or creating namespace",
 				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
@@ -479,7 +503,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	if tproxyEnabled && overwriteProbes {
 		for i, container := range pod.Spec.Containers {
 			// skip the "envoy-sidecar" container from having it's probes overridden
-			if container.Name == envoySidecarContainer {
+			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
@@ -619,11 +643,11 @@ func portValue(pod corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
-func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcName string) (corev1.VolumeMount, string, error) {
+func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (corev1.VolumeMount, string, error) {
 	// In the case of a multiPort pod, there may be another service account
 	// token mounted as a different volume. Its name must be <svc>-serviceaccount.
 	// If not we'll fall back to the service account for the pod.
-	if multiPort {
+	if multiPortSvcName != "" {
 		for _, v := range pod.Spec.Volumes {
 			if v.Name == fmt.Sprintf("%s-service-account", multiPortSvcName) {
 				mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)

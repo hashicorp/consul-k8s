@@ -12,17 +12,18 @@ import (
 
 // addRedirectTrafficConfigAnnotation creates an iptables.Config based on proxy configuration.
 // iptables.Config:
-//   ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
-//   ProxyUserID: a constant set in Annotations
-//   ProxyInboundPort: the service port or bind port
-//   ProxyOutboundPort: default transparent proxy outbound port or transparent proxy outbound listener port
-//   ExcludeInboundPorts: prometheus, envoy stats, expose paths, checks and excluded pod annotations
-//   ExcludeOutboundPorts: pod annotations
-//   ExcludeOutboundCIDRs: pod annotations
-//   ExcludeUIDs: pod annotations
+//
+//	ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
+//	ProxyUserID: a constant set in Annotations
+//	ProxyInboundPort: the service port or bind port
+//	ProxyOutboundPort: default transparent proxy outbound port or transparent proxy outbound listener port
+//	ExcludeInboundPorts: prometheus, envoy stats, expose paths, checks and excluded pod annotations
+//	ExcludeOutboundPorts: pod annotations
+//	ExcludeOutboundCIDRs: pod annotations
+//	ExcludeUIDs: pod annotations
 func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
 	cfg := iptables.Config{
-		ProxyUserID: strconv.Itoa(envoyUserAndGroupID),
+		ProxyUserID: strconv.Itoa(sidecarUserAndGroupID),
 	}
 
 	// Set the proxy's inbound port.
@@ -53,7 +54,7 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 	if overwriteProbes {
 		for i, container := range pod.Spec.Containers {
 			// skip the "envoy-sidecar" container from having its probes overridden
-			if container.Name == envoySidecarContainer {
+			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {

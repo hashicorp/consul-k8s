@@ -43,23 +43,23 @@ func NewSets() *Sets {
 
 // NewSet creates a new single flag set. A set should be created for
 // any grouping of flags, for example "Common Options", "Auth Options", etc.
-func (f *Sets) NewSet(name string) *Set {
+func (s *Sets) NewSet(name string) *Set {
 	flagSet := NewSet(name)
 
 	// The union and completions are pointers to our own values
-	flagSet.unionSet = f.unionSet
-	flagSet.completions = f.completions
+	flagSet.unionSet = s.unionSet
+	flagSet.completions = s.completions
 
 	// Keep track of it for help generation
-	f.flagSets = append(f.flagSets, flagSet)
+	s.flagSets = append(s.flagSets, flagSet)
 	return flagSet
 }
 
 // GetSetFlags returns a slice of flags for a given set.
 // If the requested set does not exist, this will return an empty slice.
-func (f *Sets) GetSetFlags(setName string) []string {
+func (s *Sets) GetSetFlags(setName string) []string {
 	var setFlags []string
-	for _, set := range f.flagSets {
+	for _, set := range s.flagSets {
 		if set.name == setName {
 			set.flagSet.VisitAll(func(f *flag.Flag) {
 				setFlags = append(setFlags, fmt.Sprintf("-%s", f.Name))
@@ -72,36 +72,36 @@ func (f *Sets) GetSetFlags(setName string) []string {
 }
 
 // Completions returns the completions for this flag set.
-func (f *Sets) Completions() complete.Flags {
-	return f.completions
+func (s *Sets) Completions() complete.Flags {
+	return s.completions
 }
 
 // Parse parses the given flags, returning any errors.
-func (f *Sets) Parse(args []string) error {
-	return f.unionSet.Parse(args)
+func (s *Sets) Parse(args []string) error {
+	return s.unionSet.Parse(args)
 }
 
 // Parsed reports whether the command-line flags have been parsed.
-func (f *Sets) Parsed() bool {
-	return f.unionSet.Parsed()
+func (s *Sets) Parsed() bool {
+	return s.unionSet.Parsed()
 }
 
 // Args returns the remaining args after parsing.
-func (f *Sets) Args() []string {
-	return f.unionSet.Args()
+func (s *Sets) Args() []string {
+	return s.unionSet.Args()
 }
 
 // Visit visits the flags in lexicographical order, calling fn for each. It
 // visits only those flags that have been set.
-func (f *Sets) Visit(fn func(*flag.Flag)) {
-	f.unionSet.Visit(fn)
+func (s *Sets) Visit(fn func(*flag.Flag)) {
+	s.unionSet.Visit(fn)
 }
 
 // Help builds custom help for this command, grouping by flag set.
-func (fs *Sets) Help() string {
+func (s *Sets) Help() string {
 	var out bytes.Buffer
 
-	for _, set := range fs.flagSets {
+	for _, set := range s.flagSets {
 		printFlagTitle(&out, set.name+":")
 		set.VisitAll(func(f *flag.Flag) {
 			// Skip any hidden flags
@@ -115,9 +115,10 @@ func (fs *Sets) Help() string {
 	return strings.TrimRight(out.String(), "\n")
 }
 
-// Help builds custom help for this command, grouping by flag set.
-func (fs *Sets) VisitSets(fn func(name string, set *Set)) {
-	for _, set := range fs.flagSets {
+// VisitSets visits each set and performs action based on the passed in
+// function.
+func (s *Sets) VisitSets(fn func(name string, set *Set)) {
+	for _, set := range s.flagSets {
 		fn(set.name, set)
 	}
 }

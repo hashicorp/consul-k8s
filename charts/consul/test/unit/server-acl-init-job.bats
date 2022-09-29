@@ -99,17 +99,6 @@ load _helpers
   [[ "$output" =~ "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" ]]
 }
 
-@test "serverACLInit/Job: does not set -client=false when client is enabled (the default)" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command[2] | contains("-client=false")' |
-      tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
 @test "serverACLInit/Job: sets -consul-api-timeout=5s" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -557,6 +546,26 @@ load _helpers
 
   actual=$(echo $command | jq -r '. | any(contains("-server-port=8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: does not add consul-ca-cert volume when global.tls.enabled with externalServers and useSystemRoots" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'servers.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  actual=$(echo $spec | jq -r '.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  actual=$(echo $spec | jq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
 }
 
 @test "serverACLInit/Job: can overwrite CA secret with the provided one" {

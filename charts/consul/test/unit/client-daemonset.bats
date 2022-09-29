@@ -2,15 +2,6 @@
 
 load _helpers
 
-@test "client/DaemonSet: enabled by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-daemonset.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "client/DaemonSet: enabled with global.enabled=false and client.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -42,6 +33,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.image=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
@@ -52,6 +44,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.image=foo' \
       --set 'client.image=bar' \
       . | tee /dev/stderr |
@@ -63,6 +56,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.updateStrategy' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -75,6 +69,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'server.replicas=3' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -93,6 +88,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'server.replicas=3' \
       --set 'server.ports.serflan.port=9301' \
       . | tee /dev/stderr |
@@ -112,6 +108,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
@@ -131,6 +128,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
@@ -149,6 +147,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -158,6 +157,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.grpc=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
@@ -171,6 +171,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=pod-name:${HOSTNAME}"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -180,6 +181,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=host-ip:${HOST_IP}"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -189,6 +191,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.nodeMeta.pod-name=foobar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=pod-name:foobar"))' | tee /dev/stderr)
@@ -199,6 +202,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.nodeMeta.cluster-name=cluster01' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=cluster-name:cluster01"))' | tee /dev/stderr)
@@ -212,6 +216,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
   [ "${actual}" = '{"limits":{"cpu":"100m","memory":"100Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
@@ -221,6 +226,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.resources.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
@@ -232,6 +238,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.resources=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
@@ -247,6 +254,7 @@ load _helpers
   # check that the extra-config volume is defined
   local volume_name=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.volumes[] | select(.name == "extra-config") | .name' | tee /dev/stderr)
   [ "${volume_name}" = "extra-config" ]
@@ -254,6 +262,7 @@ load _helpers
   # check that the consul container mounts the volume at /consul/extra-config
   local mount_path=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "extra-config") | .mountPath' | tee /dev/stderr)
   [ "${mount_path}" = "/consul/extra-config" ]
@@ -268,6 +277,7 @@ load _helpers
   # Test that it defines it
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=configMap' \
       --set 'client.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
@@ -284,6 +294,7 @@ load _helpers
   # Test that it mounts it
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=configMap' \
       --set 'client.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
@@ -300,6 +311,7 @@ load _helpers
   # Doesn't load it
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=configMap' \
       --set 'client.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
@@ -313,6 +325,7 @@ load _helpers
   # Test that it defines it
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=secret' \
       --set 'client.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
@@ -329,6 +342,7 @@ load _helpers
   # Test that it mounts it
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=configMap' \
       --set 'client.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
@@ -345,6 +359,7 @@ load _helpers
   # Doesn't load it
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=configMap' \
       --set 'client.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
@@ -356,6 +371,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraVolumes[0].type=configMap' \
       --set 'client.extraVolumes[0].name=foo' \
       --set 'client.extraVolumes[0].load=true' \
@@ -371,6 +387,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -380,6 +397,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       --set 'client.nodeSelector=testing' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
@@ -393,6 +411,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec | .affinity? == null' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -402,6 +421,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.affinity=foobar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec | .affinity == "foobar"' | tee /dev/stderr)
@@ -415,6 +435,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.priorityClassName' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -424,6 +445,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.priorityClassName=testing' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
@@ -437,6 +459,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component") | del(."hasDNS")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
@@ -446,6 +469,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraLabels.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
@@ -456,6 +480,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraLabels.foo=bar' \
       --set 'client.extraLabels.baz=qux' \
       . | tee /dev/stderr)
@@ -473,6 +498,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
@@ -482,6 +508,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.annotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
@@ -495,6 +522,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       . | tee /dev/stderr |
@@ -506,6 +534,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       . | tee /dev/stderr |
@@ -517,6 +546,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       . | tee /dev/stderr |
@@ -528,6 +558,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       . | tee /dev/stderr |
@@ -540,6 +571,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.agentMetricsRetentionTime=5m'  \
@@ -556,6 +588,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
   [ "${actual}" = 55f93d04c3f0b85c7ef2869e4b8623296025a8388c881eab63be9f2dc70bafd6 ]
@@ -565,6 +598,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
@@ -575,6 +609,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
@@ -588,6 +623,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec | .tolerations? == null' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -597,6 +633,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.tolerations=foobar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.tolerations == "foobar"' | tee /dev/stderr)
@@ -610,6 +647,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
   [ "${actual}" = "" ]
@@ -619,6 +657,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
     yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="release-name-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
@@ -629,6 +668,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
     yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any(contains("-encrypt=\"${GOSSIP_KEY}\""))' \
@@ -640,6 +680,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.gossipEncryption.secretKey=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
@@ -650,6 +691,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.gossipEncryption.secretName=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
@@ -660,6 +702,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.gossipEncryption.secretKey=foo' \
       --set 'global.gossipEncryption.secretName=bar' \
       . | tee /dev/stderr |
@@ -671,6 +714,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | join(" ") | contains("encrypt")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -680,6 +724,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.gossipEncryption.secretKey=foo' \
       --set 'global.gossipEncryption.secretName=bar' \
       . | tee /dev/stderr |
@@ -694,6 +739,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
@@ -704,6 +750,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
@@ -714,6 +761,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-client-cert")' | tee /dev/stderr)
@@ -724,6 +772,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].ports[] | select (.containerPort == 8501)' | tee /dev/stderr)
@@ -734,6 +783,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].ports[] | select (.containerPort == 8501)' | tee /dev/stderr)
@@ -744,6 +794,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=false' \
       . | tee /dev/stderr |
@@ -755,6 +806,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=true' \
       . | tee /dev/stderr |
@@ -766,6 +818,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("http://127.0.0.1:8500")' | tee /dev/stderr)
@@ -776,6 +829,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("https://127.0.0.1:8501")' | tee /dev/stderr)
@@ -786,6 +840,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("-k")' | tee /dev/stderr)
@@ -796,6 +851,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=true' \
       . | tee /dev/stderr |
@@ -807,6 +863,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "client-tls-init") | length > 0' | tee /dev/stderr)
@@ -817,6 +874,7 @@ load _helpers
   cd `chart_dir`
   local env=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -831,6 +889,7 @@ load _helpers
   cd `chart_dir`
   local env=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
@@ -844,6 +903,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT")' | tee /dev/stderr)
@@ -855,6 +915,7 @@ load _helpers
   cd `chart_dir`
   local env=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -868,6 +929,7 @@ load _helpers
   cd `chart_dir`
   local has_acl_init_container=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -877,6 +939,7 @@ load _helpers
 
   local has_tls_init_container=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -889,6 +952,7 @@ load _helpers
   cd `chart_dir`
   local env=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
@@ -905,6 +969,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
@@ -924,6 +989,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -945,6 +1011,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -966,6 +1033,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.verify=false' \
       . | tee /dev/stderr |
@@ -986,6 +1054,7 @@ load _helpers
   cd `chart_dir`
   local spec=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
       --set 'global.tls.caCert.secretKey=key' \
@@ -1019,6 +1088,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -1030,6 +1100,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -1055,6 +1126,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -1066,6 +1138,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -1077,6 +1150,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -1088,6 +1162,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -1102,6 +1177,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraEnvironmentVars.custom_proxy=fakeproxy' \
       --set 'client.extraEnvironmentVars.no_proxy=custom_no_proxy' \
       . | tee /dev/stderr |
@@ -1123,6 +1199,7 @@ load _helpers
   cd `chart_dir`
   local volume_name=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.volumes[] | select(.name == "aclconfig") | .name' | tee /dev/stderr)
@@ -1133,6 +1210,7 @@ load _helpers
   cd `chart_dir`
   local mount_path=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "aclconfig") | .mountPath' | tee /dev/stderr)
@@ -1143,6 +1221,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("/consul/aclconfig"))' | tee /dev/stderr)
@@ -1153,6 +1232,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
@@ -1194,6 +1274,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=default' \
@@ -1246,6 +1327,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=false' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[] | select(.name == "consul") | .env[] | .name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
@@ -1256,6 +1338,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[] | select(.name == "consul") | .env[] | .name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
@@ -1266,6 +1349,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul logout"))' | tee /dev/stderr)
@@ -1276,6 +1360,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local volume=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | yq '.spec.template.spec.volumes[] | select(.name == "consul-data")' | tee /dev/stderr)
 
@@ -1292,6 +1377,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local volume_mount=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | yq '.spec.template.spec.containers[] | select(.name == "consul") | .volumeMounts[] | select(.name == "consul-data")' | tee /dev/stderr)
 
@@ -1308,6 +1394,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | yq '.spec.template.spec.initContainers[0].volumeMounts[1]' | tee /dev/stderr)
 
@@ -1328,6 +1415,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
@@ -1349,6 +1437,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=false' \
       . | yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
@@ -1359,6 +1448,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
@@ -1372,6 +1462,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
@@ -1391,6 +1482,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true'  \
       --set 'externalServers.enabled=true'  \
@@ -1408,6 +1500,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
@@ -1423,6 +1516,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
@@ -1438,6 +1532,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
@@ -1454,6 +1549,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=false'  \
       --set 'server.enabled=false' \
@@ -1470,6 +1566,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=false'  \
       --set 'server.enabled=false' \
@@ -1485,6 +1582,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local command=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
@@ -1504,6 +1602,7 @@ local actual=$(echo $object |
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name=="ADVERTISE_IP") | .valueFrom.fieldRef.fieldPath' |
@@ -1516,6 +1615,7 @@ local actual=$(echo $object |
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name=="ADVERTISE_IP") | .valueFrom.fieldRef.fieldPath' |
@@ -1527,6 +1627,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local has_exposed_host_ports=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'server.enabled=true' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
@@ -1539,6 +1640,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local has_exposed_host_ports=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
@@ -1555,6 +1657,7 @@ local actual=$(echo $object |
   # Test that hostPath is set to null.
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "data") | .hostPath == null' | tee /dev/stderr )
   [ "${actual}" = "true" ]
@@ -1562,6 +1665,7 @@ local actual=$(echo $object |
   # Test that emptyDir is set instead.
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "data") | .emptyDir == {}' | tee /dev/stderr )
   [ "${actual}" = "true" ]
@@ -1571,6 +1675,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.dataDirectoryHostPath=/opt/consul' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "data") | .hostPath.path == "/opt/consul"' | tee /dev/stderr)
@@ -1584,6 +1689,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.dnsPolicy == null' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1593,6 +1699,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       --set 'client.dnsPolicy=ClusterFirstWithHostNet' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.dnsPolicy == "ClusterFirstWithHostNet"' | tee /dev/stderr)
@@ -1606,6 +1713,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -1615,6 +1723,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       --set 'dns.enableRedirection=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
@@ -1628,6 +1737,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.hostNetwork == null' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1637,6 +1747,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       --set 'client.hostNetwork=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.hostNetwork == true' | tee /dev/stderr)
@@ -1649,6 +1760,7 @@ local actual=$(echo $object |
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr | \
       yq '.spec.updateStrategy == null' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1662,6 +1774,7 @@ rollingUpdate:
 "
   local actual=$(helm template \
       -s templates/client-daemonset.yaml \
+      --set 'client.enabled=true' \
       --set "client.updateStrategy=${updateStrategy}" \
       . | tee /dev/stderr | \
       yq -c '.spec.updateStrategy == {"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":5}}' | tee /dev/stderr)
@@ -1675,6 +1788,7 @@ rollingUpdate:
   cd `chart_dir`
   local has_security_context=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec | has("securityContext")' | tee /dev/stderr)
@@ -1688,6 +1802,7 @@ rollingUpdate:
   cd `chart_dir`
   local security_context=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
 
@@ -1708,6 +1823,7 @@ rollingUpdate:
   cd `chart_dir`
   local security_context=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.securityContext.runAsNonRoot=false' \
       --set 'client.securityContext.privileged=true' \
       . | tee /dev/stderr |
@@ -1727,6 +1843,7 @@ rollingUpdate:
   cd `chart_dir`
   local manifest=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=false' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1752,6 +1869,7 @@ rollingUpdate:
   cd `chart_dir`
   local manifest=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=false' \
@@ -1778,6 +1896,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -1789,6 +1908,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -1800,6 +1920,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -1811,6 +1932,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1823,6 +1945,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1835,6 +1958,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1847,6 +1971,7 @@ rollingUpdate:
     cd `chart_dir`
     run helm template \
         -s templates/client-daemonset.yaml \
+        --set 'client.enabled=true' \
         --set 'global.enterpriseLicense.secretName=' \
         --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
         .
@@ -1858,6 +1983,7 @@ rollingUpdate:
     cd `chart_dir`
     run helm template \
         -s templates/client-daemonset.yaml \
+        --set 'client.enabled=true' \
         --set 'global.enterpriseLicense.secretName=foo' \
         --set 'global.enterpriseLicense.secretKey=' \
         .
@@ -1871,6 +1997,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.recursors[0]=1.2.3.4' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
@@ -1883,6 +2010,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"default\"")' | tee /dev/stderr)
@@ -1893,6 +2021,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=test' \
       --set 'server.enabled=false' \
@@ -1907,6 +2036,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=test' \
       .
@@ -1919,6 +2049,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.federation.enabled=true' \
       .
@@ -1936,6 +2067,7 @@ rollingUpdate:
   # Test that it defines the extra container
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraContainers[0].image=test-image' \
       --set 'client.extraContainers[0].name=test-container' \
       --set 'client.extraContainers[0].ports[0].name=test-port' \
@@ -1981,6 +2113,7 @@ rollingUpdate:
 
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'client.extraContainers[0].image=test-image' \
       --set 'client.extraContainers[0].name=test-container' \
       --set 'client.extraContainers[1].image=test-image' \
@@ -1997,6 +2130,7 @@ rollingUpdate:
 
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
@@ -2010,6 +2144,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       .
@@ -2021,6 +2156,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -2034,6 +2170,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2050,6 +2187,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2065,6 +2203,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2080,6 +2219,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -2095,6 +2235,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2114,6 +2255,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2136,6 +2278,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2160,6 +2303,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2176,6 +2320,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2193,6 +2338,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2210,6 +2356,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2228,6 +2375,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2253,6 +2401,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2290,6 +2439,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2312,6 +2462,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2337,6 +2488,7 @@ rollingUpdate:
   cd `chart_dir`
   local env=$(helm template \
     -s templates/client-daemonset.yaml  \
+    --set 'client.enabled=true' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2355,6 +2507,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2369,6 +2522,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2383,6 +2537,7 @@ rollingUpdate:
   cd `chart_dir`
   local env=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=true' \
       --set 'global.acls.replicationToken.secretName=replication' \
@@ -2406,6 +2561,7 @@ rollingUpdate:
   cd `chart_dir`
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -2429,6 +2585,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2441,6 +2598,7 @@ rollingUpdate:
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
@@ -2457,6 +2615,7 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.imageK8s=something' \
       .
 

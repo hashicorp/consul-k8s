@@ -6,7 +6,7 @@
 # a script to configure kubectl, potentially install Helm, and run the tests
 # manually. This image only has the dependencies pre-installed.
 
-FROM circleci/golang:1.18
+FROM cimg/go:1.18
 
 # change the user to root so we can install stuff
 USER root
@@ -27,7 +27,11 @@ RUN apt-get install -y \
 RUN pip3 install yq
 
 # gcloud
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-sdk -y
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && \
+    apt-get update -y && \
+    apt-get install google-cloud-sdk -y && \
+    apt-get install google-cloud-sdk-gke-gcloud-auth-plugin
 
 # terraform
 RUN curl -sSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o /tmp/tf.zip \
@@ -64,7 +68,7 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     && rm -rf ./aws
 
 # AWS IAM authenticator
-RUN curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/aws-iam-authenticator \
+RUN curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v0.5.9/aws-iam-authenticator_0.5.9_linux_amd64 \
     && chmod +x ./aws-iam-authenticator \
     && mv ./aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 

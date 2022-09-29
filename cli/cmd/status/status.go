@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/posener/complete"
 	"helm.sh/helm/v3/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -17,6 +18,11 @@ import (
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
+)
+
+const (
+	flagNameKubeConfig  = "kubeconfig"
+	flagNameKubeContext = "context"
 )
 
 type Command struct {
@@ -68,7 +74,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err := c.validateFlags(args); err != nil {
+	if err := c.validateFlags(); err != nil {
 		c.UI.Output(err.Error())
 		return 1
 	}
@@ -124,11 +130,28 @@ func (c *Command) Run(args []string) int {
 }
 
 // validateFlags checks the command line flags and values for errors.
-func (c *Command) validateFlags(args []string) error {
+func (c *Command) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
 	}
 	return nil
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *Command) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNameKubeConfig):  complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameKubeContext): complete.PredictNothing,
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *Command) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 // checkHelmInstallation uses the helm Go SDK to depict the status of a named release. This function then prints

@@ -772,7 +772,86 @@ function add_unreleased_to_changelog {
    return $ret
 }
 
-function set_release_mode {
+function set_version {
+     # Arguments:
+     #   $1 - Path to top level Consul source
+     #   $2 - The version of the release
+     #   $3 - The release date
+     #   $4 - The pre-release version
+     #
+     #
+     # Returns:
+     #   0 - success
+     #   * - error
+
+     if ! test -d "$1"
+     then
+        err "ERROR: '$1' is not a directory. prepare_release must be called with the path to a git repo as the first argument"
+        return 1
+     fi
+
+     if test -z "$2"
+     then
+        err "ERROR: The version specified was empty"
+        return 1
+     fi
+
+     local sdir="$1"
+     local vers="$2"
+
+     status_stage "==> Updating control-plane version/version.go with version info: ${vers} "$4""
+     if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"
+     then
+        unset_changelog_version "${sdir}"
+        return 1
+     fi
+
+     status_stage "==> Updating cli version/version.go with version info: ${vers} "$4""
+     if ! update_version "${sdir}/cli/version/version.go" "${vers}" "$4"
+     then
+        unset_changelog_version "${sdir}"
+        return 1
+     fi
+
+     status_stage "==> Updating Helm chart versions with version info: ${vers} "$4""
+     if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4"
+     then
+        unset_changelog_version "${sdir}"
+        return 1
+     fi
+
+     return 0
+}
+
+function set_changelog {
+     # Arguments:
+     #   $1 - Path to top level Consul source
+     #   $2 - The version of the release
+     #   $3 - The release date
+     #   $4 - The pre-release version
+     #
+     #
+     # Returns:
+     #   0 - success
+     #   * - error
+     local sdir="$1"
+     local vers="$2"
+     local rel_date="$(date +"%B %d, %Y")"
+     if test -n "$3"
+     then
+        rel_date="$3"
+     fi
+
+     local changelog_vers="${vers}"
+     if test -n "$4"
+     then
+       changelog_vers="${vers}-$4"
+     fi
+     status_stage "==> Updating CHANGELOG.md with release info: ${changelog_vers} (${rel_date})"
+     set_changelog_version "${sdir}" "${changelog_vers}" "${rel_date}" || return 1
+}
+
+function prepare_release {
    # Arguments:
    #   $1 - Path to top level Consul source
    #   $2 - The version of the release
@@ -783,90 +862,32 @@ function set_release_mode {
    # Returns:
    #   0 - success
    #   * - error
-
-   if ! test -d "$1"
-   then
-      err "ERROR: '$1' is not a directory. set_release_mode must be called with the path to a git repo as the first argument"
-      return 1
-   fi
-
-   echo "release version: " $1 $2 $3 $4
-
-   if test -z "$2"
-   then
-      err "ERROR: The version specified was empty"
-      return 1
-   fi
-
-   local sdir="$1"
-   local vers="$2"
-   local rel_date="$(date +"%B %d, %Y")"
-
-   if test -n "$3"
-   then
-      rel_date="$3"
-   fi
-
-   local changelog_vers="${vers}"
-   if test -n "$4"
-   then
-      changelog_vers="${vers}-$4"
-   fi
-
-   status_stage "==> Updating CHANGELOG.md with release info: ${changelog_vers} (${rel_date})"
-   set_changelog_version "${sdir}" "${changelog_vers}" "${rel_date}" || return 1
-
-   status_stage "==> Updating control-plane version/version.go"
-   if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"
-   then
-      unset_changelog_version "${sdir}"
-      return 1
-   fi
-
-   status_stage "==> Updating cli version/version.go"
-   if ! update_version "${sdir}/cli/version/version.go" "${vers}" "$4"
-   then
-      unset_changelog_version "${sdir}"
-      return 1
-   fi
-
-   status_stage "==> Updating Helm chart versions"
-   if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4"
-   then
-      unset_changelog_version "${sdir}"
-      return 1
-   fi
-
-   return 0
+  echo "release version: " $1 $2 $3 $4
+  set_version "$1" "$2" "$3" "$4"
+  set_changelog "$1" "$2" "$3" "$4"
 }
 
-function set_dev_mode {
+function prepare_dev {
    # Arguments:
    #   $1 - Path to top level Consul source
+   #   $2 - The version of the release
+   #   $3 - The release date
+   #   $4 - The version of the next release
+   #   $5 - The pre-release version (for setting beta in changelog)
    #
    # Returns:
    #   0 - success
    #   * - error
 
-   if ! test -d "$1"
-   then
-      err "ERROR: '$1' is not a directory. set_dev_mode must be called with the path to a git repo as the first argument'"
-      return 1
-   fi
+   echo "dev version: " $1 $4 $3 "dev"
 
    local sdir="$1"
-   local vers="$(parse_version "${sdir}" false false)"
 
-   status_stage "==> Setting VersionPreRelease back to 'dev' for Control Plane"
-   update_version "${sdir}/version/version.go" "${vers}" dev || return 1
-
-   # This function has been modified for Consul-K8s monorepo. It now sets dev mode
-   # for the CLI module as well.
-   status_stage "==> Setting VersionPreRelease back to 'dev' for CLI"
-   update_version "${sdir}/../cli/version/version.go" "${vers}" dev || return 1
+   set_changelog "$1" "$2" "$3" "$5"
+   set_version "$1" "$4" "$3" "dev"
 
    status_stage "==> Adding new UNRELEASED label in CHANGELOG.md"
-   add_unreleased_to_changelog "${sdir}/.." || return 1
+   add_unreleased_to_changelog "${sdir}" || return 1
 
    return 0
 }

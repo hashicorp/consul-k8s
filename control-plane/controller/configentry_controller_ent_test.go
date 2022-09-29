@@ -13,8 +13,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -193,14 +193,9 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
 				ctx := context.Background()
 
-				consul, err := testutil.NewTestServerConfigT(t, nil)
-				req.NoError(err)
-				defer consul.Stop()
-				consul.WaitForServiceIntentions(t)
-				consulClient, err := capi.NewClient(&capi.Config{
-					Address: consul.HTTPAddr,
-				})
-				req.NoError(err)
+				testClient := test.TestServerWithConnMgrWatcher(t, nil)
+				testClient.TestServer.WaitForServiceIntentions(t)
+				consulClient := testClient.APIClient
 
 				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
@@ -209,7 +204,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					logrtest.TestLogger{T: t},
 					s,
 					&controller.ConfigEntryController{
-						ConsulClient:               consulClient,
+						ConsulClientConfig:         testClient.Cfg,
+						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
 						EnableNSMirroring:          c.Mirror,
 						NSMirroringPrefix:          c.MirrorPrefix,
@@ -459,14 +455,9 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
 				ctx := context.Background()
 
-				consul, err := testutil.NewTestServerConfigT(t, nil)
-				req.NoError(err)
-				defer consul.Stop()
-				consul.WaitForServiceIntentions(t)
-				consulClient, err := capi.NewClient(&capi.Config{
-					Address: consul.HTTPAddr,
-				})
-				req.NoError(err)
+				testClient := test.TestServerWithConnMgrWatcher(t, nil)
+				testClient.TestServer.WaitForServiceIntentions(t)
+				consulClient := testClient.APIClient
 
 				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
@@ -475,7 +466,8 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					logrtest.TestLogger{T: t},
 					s,
 					&controller.ConfigEntryController{
-						ConsulClient:               consulClient,
+						ConsulClientConfig:         testClient.Cfg,
+						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
 						EnableNSMirroring:          c.Mirror,
 						NSMirroringPrefix:          c.MirrorPrefix,
@@ -499,14 +491,14 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				// Now update it.
 				{
 					// First get it so we have the latest revision number.
-					err = fakeClient.Get(ctx, types.NamespacedName{
+					err := fakeClient.Get(ctx, types.NamespacedName{
 						Namespace: c.SourceKubeNS,
 						Name:      in.KubeResource.KubernetesName(),
 					}, in.KubeResource)
 					req.NoError(err)
 
 					// Update the resource.
-					err := in.UpdateResourceFunc(fakeClient, ctx, in.KubeResource)
+					err = in.UpdateResourceFunc(fakeClient, ctx, in.KubeResource)
 					req.NoError(err)
 
 					resp, err := r.Reconcile(ctx, ctrl.Request{
@@ -712,14 +704,9 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				s := runtime.NewScheme()
 				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
 
-				consul, err := testutil.NewTestServerConfigT(t, nil)
-				req.NoError(err)
-				defer consul.Stop()
-				consul.WaitForServiceIntentions(t)
-				consulClient, err := capi.NewClient(&capi.Config{
-					Address: consul.HTTPAddr,
-				})
-				req.NoError(err)
+				testClient := test.TestServerWithConnMgrWatcher(t, nil)
+				testClient.TestServer.WaitForServiceIntentions(t)
+				consulClient := testClient.APIClient
 
 				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
@@ -728,7 +715,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					logrtest.TestLogger{T: t},
 					s,
 					&controller.ConfigEntryController{
-						ConsulClient:               consulClient,
+						ConsulClientConfig:         testClient.Cfg,
+						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
 						EnableNSMirroring:          c.Mirror,
 						NSMirroringPrefix:          c.MirrorPrefix,

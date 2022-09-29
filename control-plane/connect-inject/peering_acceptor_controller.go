@@ -9,6 +9,8 @@ import (
 
 	"github.com/go-logr/logr"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,14 +31,23 @@ import (
 // PeeringAcceptorController reconciles a PeeringAcceptor object.
 type PeeringAcceptorController struct {
 	client.Client
-	// ConsulClient points at the agent local to the connect-inject deployment pod.
-	ConsulClient              *api.Client
-	ExposeServersServiceName  string
+	// ConsulClientConfig is the config to create a Consul API client.
+	ConsulClientConfig *consul.Config
+	// ConsulServerConnMgr is the watcher for the Consul server addresses.
+	ConsulServerConnMgr *discovery.Watcher
+	// ExposeServersServiceName is the Kubernetes service name that the Consul servers are using.
+	ExposeServersServiceName string
+	// ReadServerExternalService indicates whether we should read the external Kubernetes service for the
+	// Consul servers.
 	ReadServerExternalService bool
-	TokenServerAddresses      []string
-	ReleaseNamespace          string
-	Log                       logr.Logger
-	Scheme                    *runtime.Scheme
+	// TokenServerAddresses are the addresses of the Consul servers to include in the peering token.
+	TokenServerAddresses []string
+	// ReleaseNamespace is the namespace where this controller is deployed.
+	ReleaseNamespace string
+	// Log is the logger for this controller
+	Log logr.Logger
+	// Scheme is the API scheme that this controller should have.
+	Scheme *runtime.Scheme
 	context.Context
 }
 
@@ -83,6 +94,18 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	// Create Consul client for this reconcile.
+	serverState, err := r.ConsulServerConnMgr.State()
+	if err != nil {
+		r.Log.Error(err, "failed to get Consul server state", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	apiClient, err := consul.NewClientFromConnMgrState(r.ConsulClientConfig, serverState)
+	if err != nil {
+		r.Log.Error(err, "failed to create Consul API client", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
 	// The DeletionTimestamp is zero when the object has not been marked for deletion. The finalizer is added
 	// in case it does not exist to all resources. If the DeletionTimestamp is non-zero, the object has been
 	// marked for deletion and goes into the deletion workflow.
@@ -96,7 +119,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	} else {
 		if containsString(acceptor.Finalizers, FinalizerName) {
 			r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
-			err := r.deletePeering(ctx, req.Name)
+			err := r.deletePeering(ctx, apiClient, req.Name)
 			if acceptor.Secret().Backend == "kubernetes" {
 				err = r.deleteK8sSecret(ctx, acceptor.Secret().Name, acceptor.Namespace)
 			}
@@ -131,7 +154,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Read the peering from Consul.
-	peering, _, err := r.ConsulClient.Peerings().Read(ctx, acceptor.Name, nil)
+	peering, _, err := apiClient.Peerings().Read(ctx, acceptor.Name, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to get Peering from Consul", "name", req.Name)
 		return ctrl.Result{}, err
@@ -151,7 +174,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
-		if resp, err = r.generateToken(ctx, acceptor.Name, serverExternalAddresses); err != nil {
+		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name, serverExternalAddresses); err != nil {
 			r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
 			return ctrl.Result{}, err
 		}
@@ -181,7 +204,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
 		r.Log.Info("generating new token for an existing peering")
-		if resp, err = r.generateToken(ctx, acceptor.Name, serverExternalAddresses); err != nil {
+		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name, serverExternalAddresses); err != nil {
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
@@ -340,14 +363,14 @@ func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // generateToken is a helper function that calls the Consul api to generate a token for the peer.
-func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName string, serverExternalAddresses []string) (*api.PeeringGenerateTokenResponse, error) {
+func (r *PeeringAcceptorController) generateToken(ctx context.Context, apiClient *api.Client, peerName string, serverExternalAddresses []string) (*api.PeeringGenerateTokenResponse, error) {
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
 	}
 	if len(serverExternalAddresses) > 0 {
 		req.ServerExternalAddresses = serverExternalAddresses
 	}
-	resp, _, err := r.ConsulClient.Peerings().GenerateToken(ctx, req, nil)
+	resp, _, err := apiClient.Peerings().GenerateToken(ctx, req, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to get generate token", "err", err)
 		return nil, err
@@ -356,8 +379,8 @@ func (r *PeeringAcceptorController) generateToken(ctx context.Context, peerName 
 }
 
 // deletePeering is a helper function that calls the Consul api to delete a peering.
-func (r *PeeringAcceptorController) deletePeering(ctx context.Context, peerName string) error {
-	_, err := r.ConsulClient.Peerings().Delete(ctx, peerName, nil)
+func (r *PeeringAcceptorController) deletePeering(ctx context.Context, apiClient *api.Client, peerName string) error {
+	_, err := apiClient.Peerings().Delete(ctx, peerName, nil)
 	if err != nil {
 		r.Log.Error(err, "failed to delete Peering from Consul", "name", peerName)
 		return err

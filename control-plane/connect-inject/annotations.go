@@ -20,6 +20,37 @@ const (
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
 	annotationInject = "consul.hashicorp.com/connect-inject"
 
+	// annotationGatewayKind is the key of the annotation that indicates pods
+	// that represent Consul Connect Gateways. This should be set to a
+	// value that is either "mesh", "ingress" or "terminating".
+	annotationGatewayKind = "consul.hashicorp.com/gateway-kind"
+
+	// annotationGatewayConsulServiceName is the key of the annotation whose value
+	// is the service name with which the mesh gateway is registered.
+	annotationGatewayConsulServiceName = "consul.hashicorp.com/gateway-consul-service-name"
+
+	// annotationMeshGatewayContainerPort is the key of the annotation whose value is
+	// used as the port and also registered as the LAN port when the mesh-gateway
+	// service is registered.
+	annotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
+
+	// annotationGatewayWANSource is the key of the annotation that determines which
+	// source to use to determine the wan address and wan port for the mesh-gateway
+	// service registration.
+	annotationGatewayWANSource = "consul.hashicorp.com/gateway-wan-address-source"
+
+	// annotationGatewayWANAddress is the key of the annotation that when the source
+	// of the mesh-gateway is 'Static', is the value of the WAN address for the gateway.
+	annotationGatewayWANAddress = "consul.hashicorp.com/gateway-wan-address-static"
+
+	// annotationGatewayWANPort is the key of the annotation whose value is the
+	// WAN port for the mesh-gateway service registration.
+	annotationGatewayWANPort = "consul.hashicorp.com/gateway-wan-port"
+
+	// annotationGatewayNamespace is the key of the annotation that indicates the
+	// Consul namespace where a Terminating or Ingress Gateway pod is deployed.
+	annotationGatewayNamespace = "consul.hashicorp.com/gateway-namespace"
+
 	// annotationInjectMountVolumes is the key of the annotation that controls whether
 	// the data volume that connect inject uses to store data including the Consul ACL token
 	// is mounted to other containers in the pod. It is a comma-separated list of container names
@@ -108,11 +139,14 @@ const (
 	annotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
 	annotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
 
-	// annotations for configuring TLS for Prometheus.
-	annotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
-	annotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
-	annotationPrometheusCertFile = "consul.hashicorp.com/prometheus-cert-file"
-	annotationPrometheusKeyFile  = "consul.hashicorp.com/prometheus-key-file"
+	// todo (agentless): uncomment once consul-dataplane supports metrics
+	/*
+		annotations for configuring TLS for Prometheus.
+		annotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
+		annotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
+		annotationPrometheusCertFile = "consul.hashicorp.com/prometheus-cert-file"
+		annotationPrometheusKeyFile  = "consul.hashicorp.com/prometheus-key-file"
+	*/
 
 	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
 	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli

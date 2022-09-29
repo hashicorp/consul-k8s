@@ -39,27 +39,6 @@ load _helpers
   [ "${actual}" = "release-name-consul-ingress-gateway" ]
 }
 
-@test "ingressGateways/Deployment: Adds consul service volumeMount to gateway container" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | yq '.spec.template.spec.containers[0].volumeMounts[1]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "consul-service" ]
-
-  local actual=$(echo $object |
-      yq -r '.mountPath' | tee /dev/stderr)
-  [ "${actual}" = "/consul/service" ]
-
-  local actual=$(echo $object |
-      yq -r '.readOnly' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # prerequisites
 
@@ -71,40 +50,6 @@ load _helpers
       --set 'connectInject.enabled=false' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "connectInject.enabled must be true" ]]
-}
-
-@test "ingressGateways/Deployment: fails if client.grpc=false" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'client.grpc=false' \
-      --set 'connectInject.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "client.grpc must be true" ]]
-}
-
-@test "ingressGateways/Deployment: fails if global.enabled is false and clients are not explicitly enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enabled=false' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "clients must be enabled" ]]
-}
-
-@test "ingressGateways/Deployment: fails if global.enabled is true but clients are explicitly disabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enabled=true' \
-      --set 'client.enabled=false' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "clients must be enabled" ]]
 }
 
 @test "ingressGateways/Deployment: fails if there are duplicate gateway names" {
@@ -138,27 +83,15 @@ load _helpers
   [[ "$output" =~ "terminating gateways cannot have duplicate names of any ingress gateways" ]]
 }
 #--------------------------------------------------------------------
-# envoyImage
+# dataplaneImage
 
-@test "ingressGateways/Deployment: envoy image has default global value" {
+@test "ingressGateways/Deployment: dataplane image can be set using the global value" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [[ "${actual}" =~ "envoyproxy/envoy:v" ]]
-
-}
-
-@test "ingressGateways/Deployment: envoy image can be set using the global value" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.imageEnvoy=new/image' \
+      --set 'global.imageConsulDataplane=new/image' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[0].image' | tee /dev/stderr)
   [ "${actual}" = "new/image" ]
@@ -167,41 +100,35 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "ingressGateways/Deployment: sets TLS env variables when global.tls.enabled" {
+@test "ingressGateways/Deployment: sets flags when global.tls.enabled is false" {
   cd `chart_dir`
-  local env=$(helm template \
+  local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://$(HOST_IP):8501' ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_GRPC_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://$(HOST_IP):8502' ]
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+  local actual=$(echo $object | yq -r '. | contains("-tls-disabled")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
-@test "ingressGateways/Deployment: sets TLS env variables in consul sidecar when global.tls.enabled" {
+@test "ingressGateways/Deployment: sets TLS flags when global.tls.enabled" {
   cd `chart_dir`
-  local env=$(helm template \
+  local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://$(HOST_IP):8501' ]
+  local actual=$(echo $object | yq -r '. | contains("-ca-certs=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+  local actual=$(echo $object | yq -r '. | contains("-tls-server-name=server.dc1.consul")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "ingressGateways/Deployment: can overwrite CA secret with the provided one" {
@@ -240,182 +167,71 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.tls.enableAutoEncrypt
-
-@test "ingressGateways/Deployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq -s '.[0].spec.template.spec.volumes[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq -s '.[0].spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq -s '.[0].spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo.com' \
-      --set 'externalServers.useSystemRoots=true' \
-      . | tee /dev/stderr |
-      yq -s '.[0].spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
-}
-
-#--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "ingressGateways/Deployment: consul-sidecar uses -token-file flag when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -s '[.[0].spec.template.spec.containers[1].command[7]] | any(contains("-token-file=/consul/service/acl-token"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: consul-sidecar uses -consul-api-timeout flag" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s '[.[0].spec.template.spec.containers[1].command[6]] | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: Adds consul envvars CONSUL_HTTP_ADDR on ingress-gateway-init init container when ACLs are enabled and tls is enabled" {
+@test "ingressGateways/Deployment: Adds consul envvars on ingress-gateway-init init container when ACLs are enabled and tls is enabled" {
   cd `chart_dir`
   local env=$(helm template \
       -s templates/ingress-gateways-deployment.yaml \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[1].env[]' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = "https://\$(HOST_IP):8501" ]
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_AUTH_METHOD") | .value' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-k8s-component-auth-method" ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_DATACENTER") | .value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_META") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'component=ingress-gateway,pod=$(NAMESPACE)/$(POD_NAME)' ]
 }
 
-@test "ingressGateways/Deployment: Adds consul envvars CONSUL_HTTP_ADDR on ingress-gateway-init init container when ACLs are enabled and tls is not enabled" {
+@test "ingressGateways/Deployment: ACL flags are not set when acls are disabled" {
   cd `chart_dir`
-  local env=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[1].env[]' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = "http://\$(HOST_IP):8500" ]
-}
-
-@test "ingressGateways/Deployment: Does not add consul envvars CONSUL_CACERT on ingress-gateway-init init container when ACLs are enabled and tls is not enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[1].env[] | select(.name == "CONSUL_CACERT")' | tee /dev/stderr)
-
-  [ "${actual}" = "" ]
-}
-
-@test "ingressGateways/Deployment: Adds consul envvars CONSUL_CACERT on ingress-gateway-init init container when ACLs are enabled and tls is enabled" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[1].env[]' | tee /dev/stderr)
-
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
-}
-
-@test "ingressGateways/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=false' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '. | contains("-login-bearer-path")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -r '. | contains("-login-meta")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -r '. | contains("-login-method")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -r '. | contains("-credential-type=login")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "ingressGateways/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
+@test "ingressGateways/Deployment: command flags are set when acls are enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -s '[.[0].spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[3]] | any(contains("/consul-bin/consul logout"))' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '. | contains("-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object | yq -r '. | contains("-login-meta=component=ingress-gateway")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object | yq -r '. | contains("-login-method=release-name-consul-k8s-component-auth-method")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object | yq -r '. | contains("-credential-type=login")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -458,19 +274,6 @@ load _helpers
   [ "${actual}" = "/metrics" ]
 }
 
-@test "ingressGateways/Deployment: when global.metrics.enabled=true, sets proxy setting" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.metrics.enabled=true'  \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[1].command | join(" ") | contains("envoy_prometheus_bind_addr = \"${POD_IP}:20200\"")' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
-}
-
 @test "ingressGateways/Deployment: when global.metrics.enableGatewayMetrics=false, does not set proxy setting" {
   cd `chart_dir`
   local object=$(helm template \
@@ -481,9 +284,6 @@ load _helpers
       --set 'global.metrics.enableGatewayMetrics=false'  \
       . | tee /dev/stderr |
       yq '.spec.template' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.spec.initContainers[1].command | join(" ") | contains("envoy_prometheus_bind_addr = \"${POD_IP}:20200\"")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 
   local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -504,9 +304,6 @@ load _helpers
       --set 'global.metrics.enabled=false'  \
       . | tee /dev/stderr |
       yq '.spec.template' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.spec.initContainers[1].command | join(" ") | contains("envoy_prometheus_bind_addr = \"${POD_IP}:20200\"")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 
   local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -731,135 +528,16 @@ load _helpers
       yq -s -r '.[0].spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
-  [ "${actual}" = "25Mi" ]
+  [ "${actual}" = "50Mi" ]
 
   local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
   [ "${actual}" = "50m" ]
-
-  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
-  [ "${actual}" = "150Mi" ]
-
-  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
-  [ "${actual}" = "50m" ]
-}
-
-@test "ingressGateways/Deployment: init container resources can be set through defaults" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.requests.memory=memory' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.requests.cpu=cpu' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.limits.memory=memory2' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.limits.cpu=cpu2' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
-  [ "${actual}" = "memory" ]
-
-  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
-  [ "${actual}" = "cpu" ]
-
-  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
-  [ "${actual}" = "memory2" ]
-
-  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
-  [ "${actual}" = "cpu2" ]
-}
-
-@test "ingressGateways/Deployment: init container resources can be set through specific gateway, overriding defaults" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.requests.memory=memory' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.requests.cpu=cpu' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.limits.memory=memory2' \
-      --set 'ingressGateways.defaults.initCopyConsulContainer.resources.limits.cpu=cpu2' \
-      --set 'ingressGateways.gateways[0].name=gateway1' \
-      --set 'ingressGateways.gateways[0].initCopyConsulContainer.resources.requests.memory=gwmemory' \
-      --set 'ingressGateways.gateways[0].initCopyConsulContainer.resources.requests.cpu=gwcpu' \
-      --set 'ingressGateways.gateways[0].initCopyConsulContainer.resources.limits.memory=gwmemory2' \
-      --set 'ingressGateways.gateways[0].initCopyConsulContainer.resources.limits.cpu=gwcpu2' \
-      . | tee /dev/stderr |
-      yq -s '.[0].spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
-  [ "${actual}" = "gwmemory" ]
-
-  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
-  [ "${actual}" = "gwcpu" ]
-
-  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
-  [ "${actual}" = "gwmemory2" ]
-
-  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
-  [ "${actual}" = "gwcpu2" ]
-}
-
-#--------------------------------------------------------------------
-# consul sidecar resources
-
-@test "ingressGateways/Deployment: consul sidecar has default resources" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[1].resources' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
-  [ "${actual}" = "25Mi" ]
-
-  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
-  [ "${actual}" = "20m" ]
 
   local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
   [ "${actual}" = "50Mi" ]
 
   local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
-  [ "${actual}" = "20m" ]
-}
-
-@test "ingressGateways/Deployment: consul sidecar resources can be set" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.consulSidecarContainer.resources.requests.memory=memory' \
-      --set 'global.consulSidecarContainer.resources.requests.cpu=cpu' \
-      --set 'global.consulSidecarContainer.resources.limits.memory=memory2' \
-      --set 'global.consulSidecarContainer.resources.limits.cpu=cpu2' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[1].resources' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
-  [ "${actual}" = "memory" ]
-
-  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
-  [ "${actual}" = "cpu" ]
-
-  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
-  [ "${actual}" = "memory2" ]
-
-  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
-  [ "${actual}" = "cpu2" ]
-}
-
-@test "ingressGateways/Deployment: fails if global.lifecycleSidecarContainer is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.memory=100Mi' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." ]]
+  [ "${actual}" = "50m" ]
 }
 
 #--------------------------------------------------------------------
@@ -1074,7 +752,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+  [ "${actual}" = "5" ]
 }
 
 @test "ingressGateways/Deployment: extra annotations can be set through defaults" {
@@ -1089,7 +767,7 @@ key2: value2' \
       yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
   local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "7" ]
 
   local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
@@ -1111,7 +789,7 @@ key2: value2' \
       yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
   local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "7" ]
 
   local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
@@ -1134,7 +812,7 @@ key2: value2' \
       yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
   local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
-  [ "${actual}" = "4" ]
+  [ "${actual}" = "8" ]
 
   local actual=$(echo $object | yq -r '.defaultkey' | tee /dev/stderr)
   [ "${actual}" = "defaultvalue" ]
@@ -1147,413 +825,6 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
-# WAN_ADDR
-
-@test "ingressGateways/Deployment: WAN_ADDR set correctly for ClusterIP service set in defaults (the default)" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_ADDR=\"$(cat /tmp/address.txt)\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR set correctly for ClusterIP service set in specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=Static' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=ClusterIP' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_ADDR=\"$(cat /tmp/address.txt)\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR set correctly for LoadBalancer service set in defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=LoadBalancer' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_ADDR=\"$(cat /tmp/address.txt)\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR set correctly for LoadBalancer service set in specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=LoadBalancer' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_ADDR=\"$(cat /tmp/address.txt)\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR set correctly for NodePort service set in defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=NodePort' \
-      --set 'ingressGateways.defaults.service.ports[0].nodePort=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_ADDR=\"${HOST_IP}\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR set correctly for NodePort service set in specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=NodePort' \
-      --set 'ingressGateways.gateways[0].service.ports[0].nodePort=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_ADDR=\"${HOST_IP}\"")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR definition fails if using unknown service type in defaults" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=Static' \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "currently set ingressGateway value service.type is not supported" ]]
-}
-
-@test "ingressGateways/Deployment: WAN_ADDR definition fails if using unknown service type in specific gateway overriding defaults" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=Static' \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "currently set ingressGateway value service.type is not supported" ]]
-}
-
-#--------------------------------------------------------------------
-# WAN_PORT
-
-@test "ingressGateways/Deployment: WAN_PORT set correctly for non-NodePort service in defaults (the default)" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_PORT=80")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT can be set for non-NodePort service in defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.ports[0].port=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_PORT=1234")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT set correctly for non-NodePort service in specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.ports[0].port=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_PORT=1234")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT set correctly for NodePort service with nodePort set in defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=NodePort' \
-      --set 'ingressGateways.defaults.service.ports[0].nodePort=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_PORT=1234")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT set correctly for NodePort service with nodePort set in specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.ports[0].nodePort=8888' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=NodePort' \
-      --set 'ingressGateways.gateways[0].service.ports[0].nodePort=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("WAN_PORT=1234")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT definition fails if .service.type=NodePort and ports[0].nodePort is empty in defaults" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=NodePort' \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "if ingressGateways .service.type=NodePort and using ingressGateways.defaults.service.ports, the first port entry must include a nodePort" ]]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT definition fails if .service.type=NodePort and ports[0].nodePort is empty in specific gateway and not provided in defaults" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=NodePort' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.ports[0].port=1234' \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "if ingressGateways .service.type=NodePort and defining ingressGateways.gateways.service.ports, the first port entry must include a nodePort" ]]
-}
-
-@test "ingressGateways/Deployment: WAN_PORT definition fails if .service.type=NodePort and ports[0].nodePort is empty in defaults and specific gateway" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=NodePort' \
-      --set 'ingressGateways.defaults.service.ports=null' \
-      .
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "if ingressGateways .service.type=NodePort, the first port entry in either the defaults or specific gateway must include a nodePort" ]]
-}
-
-#--------------------------------------------------------------------
-# ingress-gateway-init init container
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2]' | tee /dev/stderr)
-
-  exp='consul-k8s-control-plane service-address \
-  -log-level=info \
-  -log-json=false \
-  -k8s-namespace=default \
-  -name=release-name-consul-ingress-gateway \
-  -output-file=/tmp/address.txt
-WAN_ADDR="$(cat /tmp/address.txt)"
-WAN_PORT=8080
-
-cat > /consul/service/service.hcl << EOF
-service {
-  kind = "ingress-gateway"
-  name = "ingress-gateway"
-  id = "${POD_NAME}"
-  port = ${WAN_PORT}
-  address = "${WAN_ADDR}"
-  tagged_addresses {
-    lan {
-      address = "${POD_IP}"
-      port = 21000
-    }
-    wan {
-      address = "${WAN_ADDR}"
-      port = ${WAN_PORT}
-    }
-  }
-  proxy {
-    config {
-      envoy_gateway_no_default_bind = true
-      envoy_gateway_bind_addresses {
-        all-interfaces {
-          address = "0.0.0.0"
-        }
-      }
-    }
-  }
-  checks = [
-    {
-      name = "Ingress Gateway Listening"
-      interval = "10s"
-      tcp = "${POD_IP}:21000"
-      deregister_critical_service_after = "6h"
-    }
-  ]
-}
-EOF
-
-/consul-bin/consul services register \
-  /consul/service/service.hcl'
-
-  [ "${actual}" = "${exp}" ]
-}
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container with acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2]' | tee /dev/stderr)
-
-  exp='consul-k8s-control-plane acl-init \
-  -component-name=ingress-gateway/release-name-consul-ingress-gateway \
-  -acl-auth-method=release-name-consul-k8s-component-auth-method \
-  -token-sink-file=/consul/service/acl-token \
-  -consul-api-timeout=5s \
-  -log-level=info \
-  -log-json=false
-
-consul-k8s-control-plane service-address \
-  -log-level=info \
-  -log-json=false \
-  -k8s-namespace=default \
-  -name=release-name-consul-ingress-gateway \
-  -output-file=/tmp/address.txt
-WAN_ADDR="$(cat /tmp/address.txt)"
-WAN_PORT=8080
-
-cat > /consul/service/service.hcl << EOF
-service {
-  kind = "ingress-gateway"
-  name = "ingress-gateway"
-  id = "${POD_NAME}"
-  port = ${WAN_PORT}
-  address = "${WAN_ADDR}"
-  tagged_addresses {
-    lan {
-      address = "${POD_IP}"
-      port = 21000
-    }
-    wan {
-      address = "${WAN_ADDR}"
-      port = ${WAN_PORT}
-    }
-  }
-  proxy {
-    config {
-      envoy_gateway_no_default_bind = true
-      envoy_gateway_bind_addresses {
-        all-interfaces {
-          address = "0.0.0.0"
-        }
-      }
-    }
-  }
-  checks = [
-    {
-      name = "Ingress Gateway Listening"
-      interval = "10s"
-      tcp = "${POD_IP}:21000"
-      deregister_critical_service_after = "6h"
-    }
-  ]
-}
-EOF
-
-/consul-bin/consul services register \
-  -token-file=/consul/service/acl-token \
-  /consul/service/service.hcl'
-
-  [ "${actual}" = "${exp}" ]
-}
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container includes service-address command for LoadBalancer set through defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=LoadBalancer' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container includes service-address command for LoadBalancer set through specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=LoadBalancer' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container does not include service-address command for NodePort set through defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.service.type=NodePort' \
-      --set 'ingressGateways.defaults.service.ports[0].port=80' \
-      --set 'ingressGateways.defaults.service.ports[0].nodePort=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "ingressGateways/Deployment: ingress-gateway-init init container does not include service-address command for NodePort set through specific gateway overriding defaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=ingress-gateway' \
-      --set 'ingressGateways.gateways[0].service.type=NodePort' \
-      --set 'ingressGateways.gateways[0].service.ports[0].port=80' \
-      --set 'ingressGateways.gateways[0].service.ports[0].nodePort=1234' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "ingress-gateway-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-#--------------------------------------------------------------------
 # namespaces
 
 @test "ingressGateways/Deployment: namespace command flag is not present by default" {
@@ -1563,13 +834,10 @@ EOF
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.command | any(contains("-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }
 
 @test "ingressGateways/Deployment: namespace command flag is specified through defaults" {
@@ -1581,16 +849,13 @@ EOF
       --set 'global.enableConsulNamespaces=true' \
       --set 'ingressGateways.defaults.consulNamespace=namespace' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.command | any(contains("-namespace=namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-namespace=namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo $object | yq -r '."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+  [ "${actual}" = "namespace" ]
 }
 
-@test "ingressGateways/Deployment: namespace command flag is specified through specific gateway overriding defaults" {
+@test "ingressGateways/Deployment: namespace annotation is specified through specific gateway overriding defaults" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -1601,13 +866,10 @@ EOF
       --set 'ingressGateways.gateways[0].name=ingress-gateway' \
       --set 'ingressGateways.gateways[0].consulNamespace=new-namespace' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.command | any(contains("-namespace=new-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-namespace=new-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo $object | yq -r '."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+  [ "${actual}" = "new-namespace" ]
 }
 
 #--------------------------------------------------------------------
@@ -1624,9 +886,6 @@ EOF
 
   local actual=$(echo $object | yq -r '.command | any(contains("-partition"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
-
-  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-partition"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 }
 
 @test "ingressGateways/Deployment: partition command flag is specified through partition name" {
@@ -1641,10 +900,7 @@ EOF
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.command | any(contains("-service-partition=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1692,38 +948,6 @@ EOF
 }
 
 #--------------------------------------------------------------------
-# get-auto-encrypt-client-ca
-
-@test "ingressGateways/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/ingress-gateways-deployment.yaml  \
-      --set 'ingressGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.gateways[0].name=gateway1' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
-  [ "${actual}" = "true" ]
-
-  # check server port
-  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
-
-  # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # Vault
 
 @test "ingressGateway/Deployment: vault tls annotations are set when tls is enabled" {
@@ -1733,7 +957,6 @@ EOF
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -1766,7 +989,6 @@ EOF
     --set 'ingressGateways.enabled=true' \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1774,8 +996,10 @@ EOF
     --set 'global.secretsBackend.vault.consulCARole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
+
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
+
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
@@ -1788,7 +1012,6 @@ EOF
     --set 'ingressGateways.enabled=true' \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1810,7 +1033,6 @@ EOF
     --set 'ingressGateways.enabled=true' \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1832,7 +1054,6 @@ EOF
     --set 'ingressGateways.enabled=true' \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1863,7 +1084,7 @@ EOF
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-wan-address-source") | del(."consul.hashicorp.com/gateway-wan-port") | del(."vconsul.hashicorp.com/gateway-wan-address-source") | del(."consul.hashicorp.com/gateway-consul-service-name") | del(."consul.hashicorp.com/gateway-kind")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -1874,7 +1095,6 @@ EOF
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
@@ -17,7 +16,7 @@ const (
 	InjectInitCopyContainerName  = "copy-consul-bin"
 	InjectInitContainerName      = "consul-connect-inject-init"
 	rootUserAndGroupID           = 0
-	envoyUserAndGroupID          = 5995
+	sidecarUserAndGroupID        = 5995
 	initContainersUserAndGroupID = 5996
 	netAdminCapability           = "NET_ADMIN"
 	dnsServiceHostEnvSuffix      = "DNS_SERVICE_HOST"
@@ -34,25 +33,11 @@ type initContainerCommandData struct {
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
-	ConsulNamespace           string
-	NamespaceMirroringEnabled bool
+	ConsulNamespace string
 
-	// The PEM-encoded CA certificate to use when
-	// communicating with Consul clients
-	ConsulCACert string
-	// EnableMetrics adds a listener to Envoy where Prometheus will scrape
-	// metrics from.
-	EnableMetrics bool
-	// PrometheusScrapePath configures the path on the listener on Envoy where
-	// Prometheus will scrape metrics from.
-	PrometheusScrapePath string
-	// PrometheusBackendPort configures where the listener on Envoy will point to.
-	PrometheusBackendPort string
-	// The file paths to use for configuring TLS on the Prometheus metrics endpoint.
-	PrometheusCAFile   string
-	PrometheusCAPath   string
-	PrometheusCertFile string
-	PrometheusKeyFile  string
+	// ConsulNodeName is the node name in Consul where services are registered.
+	ConsulNodeName string
+
 	// EnvoyUID is the Linux user id that will be used when tproxy is enabled.
 	EnvoyUID int
 
@@ -88,17 +73,9 @@ type initContainerCommandData struct {
 	// of the services on the multi port Pod.
 	MultiPort bool
 
-	// EnvoyAdminPort configures the admin port of the Envoy sidecar. This will be unique per service in a multi port
-	// Pod.
-	EnvoyAdminPort int
-
-	// BearerTokenFile configures where the service account token can be found. This will be unique per service in a
-	// multi port Pod.
-	BearerTokenFile string
-
-	// ConsulAPITimeout is the duration that the consul API client will
-	// wait for a response from the API before cancelling the request.
-	ConsulAPITimeout time.Duration
+	// Log settings for the connect-init command.
+	LogLevel string
+	LogJSON  bool
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -162,8 +139,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		AuthMethod:                 w.AuthMethod,
 		ConsulPartition:            w.ConsulPartition,
 		ConsulNamespace:            w.consulNamespace(namespace.Name),
-		NamespaceMirroringEnabled:  w.EnableK8SNSMirroring,
-		ConsulCACert:               w.ConsulCACert,
+		ConsulNodeName:             ConsulNodeName,
 		EnableTransparentProxy:     tproxyEnabled,
 		EnableCNI:                  w.EnableCNI,
 		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
@@ -171,10 +147,10 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
 		ConsulDNSClusterIP:         consulDNSClusterIP,
-		EnvoyUID:                   envoyUserAndGroupID,
+		EnvoyUID:                   sidecarUserAndGroupID,
 		MultiPort:                  multiPort,
-		EnvoyAdminPort:             19000 + mpi.serviceIndex,
-		ConsulAPITimeout:           w.ConsulAPITimeout,
+		LogLevel:                   w.LogLevel,
+		LogJSON:                    w.LogJSON,
 	}
 
 	// Create expected volume mounts
@@ -190,6 +166,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	} else {
 		data.ServiceName = pod.Annotations[annotationService]
 	}
+	var bearerTokenFile string
 	if w.AuthMethod != "" {
 		if multiPort {
 			// If multi port then we require that the service account name
@@ -199,58 +176,59 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			data.ServiceAccountName = pod.Spec.ServiceAccountName
 		}
 		// Extract the service account token's volume mount
-		saTokenVolumeMount, bearerTokenFile, err := findServiceAccountVolumeMount(pod, multiPort, mpi.serviceName)
+		var saTokenVolumeMount corev1.VolumeMount
+		saTokenVolumeMount, bearerTokenFile, err = findServiceAccountVolumeMount(pod, mpi.serviceName)
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		data.BearerTokenFile = bearerTokenFile
 
 		// Append to volume mounts
 		volMounts = append(volMounts, saTokenVolumeMount)
 	}
 
-	// This determines how to configure the consul connect envoy command: what
-	// metrics backend to use and what path to expose on the
-	// envoy_prometheus_bind_addr listener for scraping.
-	metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
-	if err != nil {
-		return corev1.Container{}, err
-	}
-	if metricsServer {
-		prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
-		mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
-		if err != nil {
-			return corev1.Container{}, err
-		}
-		data.PrometheusScrapePath = prometheusScrapePath
-		data.PrometheusBackendPort = mergedMetricsPort
-	}
-	// Pull the TLS config from the relevant annotations.
-	if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
-		data.PrometheusCAFile = raw
-	}
-	if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
-		data.PrometheusCAPath = raw
-	}
-	if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
-		data.PrometheusCertFile = raw
-	}
-	if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
-		data.PrometheusKeyFile = raw
-	}
-
-	// Validate required Prometheus TLS config is present if set.
-	if data.PrometheusCertFile != "" || data.PrometheusKeyFile != "" || data.PrometheusCAFile != "" || data.PrometheusCAPath != "" {
-		if data.PrometheusCAFile == "" && data.PrometheusCAPath == "" {
-			return corev1.Container{}, fmt.Errorf("Must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
-		}
-		if data.PrometheusCertFile == "" {
-			return corev1.Container{}, fmt.Errorf("Must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
-		}
-		if data.PrometheusKeyFile == "" {
-			return corev1.Container{}, fmt.Errorf("Must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
-		}
-	}
+	// todo (agentless): this needs to be configured in consul-dataplane once it supports telemetry
+	//// This determines how to configure the consul connect envoy command: what
+	//// metrics backend to use and what path to expose on the
+	//// envoy_prometheus_bind_addr listener for scraping.
+	//metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	//if err != nil {
+	//	return corev1.Container{}, err
+	//}
+	//if metricsServer {
+	//	prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
+	//	mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
+	//	if err != nil {
+	//		return corev1.Container{}, err
+	//	}
+	//	data.PrometheusScrapePath = prometheusScrapePath
+	//	data.PrometheusBackendPort = mergedMetricsPort
+	//}
+	//// Pull the TLS config from the relevant annotations.
+	//if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
+	//	data.PrometheusCAFile = raw
+	//}
+	//if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
+	//	data.PrometheusCAPath = raw
+	//}
+	//if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
+	//	data.PrometheusCertFile = raw
+	//}
+	//if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
+	//	data.PrometheusKeyFile = raw
+	//}
+	//
+	//// Validate required Prometheus TLS config is present if set.
+	//if data.PrometheusCertFile != "" || data.PrometheusKeyFile != "" || data.PrometheusCAFile != "" || data.PrometheusCAPath != "" {
+	//	if data.PrometheusCAFile == "" && data.PrometheusCAPath == "" {
+	//		return corev1.Container{}, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
+	//	}
+	//	if data.PrometheusCertFile == "" {
+	//		return corev1.Container{}, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
+	//	}
+	//	if data.PrometheusKeyFile == "" {
+	//		return corev1.Container{}, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
+	//	}
+	//}
 
 	// Render the command
 	var buf bytes.Buffer
@@ -270,18 +248,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		Image: w.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
-			},
-			{
-				Name: "POD_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-				},
-			},
-			{
 				Name: "POD_NAME",
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
@@ -293,10 +259,97 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
+			{
+				Name:  "CONSUL_ADDRESSES",
+				Value: w.ConsulAddress,
+			},
+			{
+				Name:  "CONSUL_GRPC_PORT",
+				Value: strconv.Itoa(w.ConsulConfig.GRPCPort),
+			},
+			{
+				Name:  "CONSUL_HTTP_PORT",
+				Value: strconv.Itoa(w.ConsulConfig.HTTPPort),
+			},
+			{
+				Name:  "CONSUL_API_TIMEOUT",
+				Value: w.ConsulConfig.APITimeout.String(),
+			},
 		},
 		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
+	}
+
+	if w.TLSEnabled {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_USE_TLS",
+				Value: "true",
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_CACERT_PEM",
+				Value: w.ConsulCACert,
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_TLS_SERVER_NAME",
+				Value: w.ConsulTLSServerName,
+			})
+	}
+
+	if w.AuthMethod != "" {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_LOGIN_AUTH_METHOD",
+				Value: w.AuthMethod,
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+				Value: bearerTokenFile,
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_LOGIN_META",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			})
+
+		if w.EnableNamespaces {
+			if w.EnableK8SNSMirroring {
+				container.Env = append(container.Env,
+					corev1.EnvVar{
+						Name:  "CONSUL_LOGIN_NAMESPACE",
+						Value: "default",
+					})
+			} else {
+				container.Env = append(container.Env,
+					corev1.EnvVar{
+						Name:  "CONSUL_LOGIN_NAMESPACE",
+						Value: w.consulNamespace(namespace.Name),
+					})
+			}
+		}
+
+		if w.ConsulPartition != "" {
+			container.Env = append(container.Env,
+				corev1.EnvVar{
+					Name:  "CONSUL_LOGIN_PARTITION",
+					Value: w.ConsulPartition,
+				})
+		}
+	}
+	if w.EnableNamespaces {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_NAMESPACE",
+				Value: w.consulNamespace(namespace.Name),
+			})
+	}
+
+	if w.ConsulPartition != "" {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_PARTITION",
+				Value: w.ConsulPartition,
+			})
 	}
 
 	if tproxyEnabled {
@@ -384,36 +437,13 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
-{{- if .ConsulCACert}}
-export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
-export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
-export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
-cat <<EOF >/consul/connect-inject/consul-ca.pem
-{{ .ConsulCACert }}
-EOF
-{{- else}}
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-{{- end}}
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-api-timeout={{ .ConsulAPITimeout }} \
+  -consul-node-name={{ .ConsulNodeName }} \
+  -log-level={{ .LogLevel }} \
+  -log-json={{ .LogJSON }} \
   {{- if .AuthMethod }}
-  -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
-  -bearer-token-file={{ .BearerTokenFile }} \
-  {{- if .MultiPort }}
-  -acl-token-sink=/consul/connect-inject/acl-token-{{ .ServiceName }} \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  {{- if .NamespaceMirroringEnabled }}
-  {{- /* If namespace mirroring is enabled, the auth method is
-         defined in the default namespace */}}
-  -auth-method-namespace="default" \
-  {{- else }}
-  -auth-method-namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-  {{- end }}
   {{- end }}
   {{- if .MultiPort }}
   -multiport=true \
@@ -422,56 +452,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -service-name="{{ .ServiceName }}" \
   {{- end }}
   {{- end }}
-  {{- if .ConsulPartition }}
-  -partition="{{ .ConsulPartition }}" \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  -consul-service-namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-
-# Generate the envoy bootstrap code
-/consul/connect-inject/consul connect envoy \
-  {{- if .MultiPort }}
-  -proxy-id="$(cat /consul/connect-inject/proxyid-{{.ServiceName}})" \
-  {{- else }}
-  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  {{- end }}
-  {{- if .PrometheusScrapePath }}
-  -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
-  {{- end }}
-  {{- if .PrometheusBackendPort }}
-  -prometheus-backend-port="{{ .PrometheusBackendPort }}" \
-  {{- end }}
-  {{- if .PrometheusCAFile }}
-  -prometheus-ca-file="{{ .PrometheusCAFile }}" \
-  {{- end }}
-  {{- if .PrometheusCAPath }}
-  -prometheus-ca-path="{{ .PrometheusCAPath }}" \
-  {{- end }}
-  {{- if .PrometheusCertFile }}
-  -prometheus-cert-file="{{ .PrometheusCertFile }}" \
-  {{- end }}
-  {{- if .PrometheusKeyFile }}
-  -prometheus-key-file="{{ .PrometheusKeyFile }}" \
-  {{- end }}
-  {{- if .AuthMethod }}
-  {{- if .MultiPort }}
-  -token-file="/consul/connect-inject/acl-token-{{ .ServiceName }}" \
-  {{- else }}
-  -token-file="/consul/connect-inject/acl-token" \
-  {{- end }}
-  {{- end }}
-  {{- if .ConsulPartition }}
-  -partition="{{ .ConsulPartition }}" \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  -namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-  {{- if .MultiPort }}
-  -admin-bind=127.0.0.1:{{ .EnvoyAdminPort }} \
-  {{- end }}
-  -bootstrap > {{ if .MultiPort }}/consul/connect-inject/envoy-bootstrap-{{.ServiceName}}.yaml{{ else }}/consul/connect-inject/envoy-bootstrap.yaml{{ end }}
-
 
 {{- if .EnableTransparentProxy }}
 {{- if not .EnableCNI }}

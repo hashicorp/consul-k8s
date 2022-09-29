@@ -53,6 +53,9 @@ agent_prefix "" {
 partition_prefix "" {
   namespace_prefix "" {
     acl = "write"
+    service_prefix "" {
+      policy = "write"
+    }
   }
 }`
 

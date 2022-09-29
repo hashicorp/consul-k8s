@@ -294,6 +294,7 @@ spec:
                 {{- if .Values.global.tls.enableAutoEncrypt }}
                 -hcl='auto_encrypt = {tls = true}' \
                 -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\",\"$POD_IP\"]}" \
+                -hcl='tls { grpc { use_auto_cert = true } }' \
                 {{- else }}
                 -hcl='tls { defaults { cert_file = "/consul/tls/client/tls.crt" }}' \
                 -hcl='tls { defaults { key_file = "/consul/tls/client/tls.key" }}' \

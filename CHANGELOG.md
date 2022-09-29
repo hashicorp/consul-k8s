@@ -1,5 +1,28 @@
 ## UNRELEASED
 
+## 0.49.0 (September 29, 2022)
+
+FEATURES:
+* CLI:
+  * Add support for tab autocompletion [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1501)]
+* Consul CNI Plugin
+  * Support for OpenShift and Multus CNI plugin [[GH-1527](https://github.com/hashicorp/consul-k8s/pull/1527)]
+
+BUG FIXES:
+* Control plane
+  * Use global ACL auth method to provision ACL tokens for API Gateway in secondary datacenter [[GH-1481](https://github.com/hashicorp/consul-k8s/pull/1481)]
+  * Peering: pass new `use_auto_cert` value to gRPC TLS config when auto-encrypt is enabled. [[GH-1541](https://github.com/hashicorp/consul-k8s/pull/1541)]
+* Helm:
+  * Only create Federation Secret Job when server.updatePartition is 0 [[GH-1512](https://github.com/hashicorp/consul-k8s/pull/1512)]
+  * Fixes a typo in the templating of `global.connectInject.disruptionBudget.maxUnavailable`. [[GH-1530](https://github.com/hashicorp/consul-k8s/pull/1530)]
+
+IMPROVEMENTS:
+* Helm:
+  * API Gateway: Set primary datacenter flag when deploying controller into secondary datacenter with federation enabled [[GH-1511](https://github.com/hashicorp/consul-k8s/pull/1511)]
+  * API Gateway: Allow controller to create and update Secrets for storing Consul CA cert alongside gateway Deployments [[GH-1542](https://github.com/hashicorp/consul-k8s/pull/1542)]
+* Control-plane:
+  * Support escaped commas in service tag annotations for pods which use `consul.hashicorp.com/connect-service-tags` or `consul.hashicorp.com/service-tags`. [[GH-1532](https://github.com/hashicorp/consul-k8s/pull/1532)]
+
 ## 0.48.0 (September 01, 2022)
 
 FEATURES:
