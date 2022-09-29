@@ -32,6 +32,7 @@ const (
 	MetaKeyKubeServiceName     = "k8s-service-name"
 	MetaKeyKubeNS              = "k8s-namespace"
 	MetaKeyManagedBy           = "managed-by"
+	MetaKeySyntheticNode       = "synthetic-node"
 	MetaKeyConsulWANFederation = "consul-wan-federation"
 	TokenMetaPodNameKey        = "pod"
 
@@ -395,6 +396,7 @@ func (r *EndpointsController) createServiceRegistrations(apiClient *api.Client, 
 		MetaKeyKubeServiceName: serviceEndpoints.Name,
 		MetaKeyKubeNS:          serviceEndpoints.Namespace,
 		MetaKeyManagedBy:       managedByValue,
+		MetaKeySyntheticNode:   "true",
 	}
 	for k, v := range pod.Annotations {
 		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
@@ -420,6 +422,9 @@ func (r *EndpointsController) createServiceRegistrations(apiClient *api.Client, 
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    ConsulNodeName,
 		Address: ConsulNodeAddress,
+		NodeMeta: map[string]string{
+			MetaKeySyntheticNode: "true",
+		},
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, svcID),
@@ -605,6 +610,9 @@ func (r *EndpointsController) createServiceRegistrations(apiClient *api.Client, 
 	proxyServiceRegistration := &api.CatalogRegistration{
 		Node:    ConsulNodeName,
 		Address: ConsulNodeAddress,
+		NodeMeta: map[string]string{
+			MetaKeySyntheticNode: "true",
+		},
 		Service: proxyService,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, proxySvcID),
@@ -628,6 +636,7 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 		MetaKeyKubeServiceName: serviceEndpoints.Name,
 		MetaKeyKubeNS:          serviceEndpoints.Namespace,
 		MetaKeyManagedBy:       managedByValue,
+		MetaKeySyntheticNode:   "true",
 	}
 
 	service := &api.AgentService{
@@ -736,6 +745,9 @@ func (r *EndpointsController) createGatewayRegistrations(pod corev1.Pod, service
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    ConsulNodeName,
 		Address: ConsulNodeAddress,
+		NodeMeta: map[string]string{
+			MetaKeySyntheticNode: "true",
+		},
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, pod.Name),
