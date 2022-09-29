@@ -33,7 +33,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.AuthMethod = "test-auth-method"
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -tls-disabled",
 		},
 		"with ACLs and namespace mirroring": {
@@ -42,7 +42,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled",
 		},
 		"with ACLs and single destination namespace": {
@@ -51,7 +51,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "test-ns"
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled",
 		},
 		"with ACLs and partitions": {
@@ -59,7 +59,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.AuthMethod = "test-auth-method"
 				w.ConsulPartition = "test-part"
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-method=test-auth-method -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled",
 		},
 		"with TLS and CA cert provided": {
@@ -163,13 +163,12 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 
 			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
-			// todo(agentless): test default concurrency
 			expCmd := []string{
 				"/bin/sh", "-ec",
 				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
-					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + c.additionalExpCmdArgs}
-			require.Equal(t, container.Command, expCmd)
+					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs}
+			require.Equal(t, expCmd, container.Command)
 
 			if w.AuthMethod != "" {
 				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
@@ -210,46 +209,45 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
-	// todo(agentless): re-enable once we support passing extra flags to Envoy.
-	t.Skipf("skip until we support extra flag to Envoy")
 	cases := map[string]struct {
 		annotations map[string]string
-		expCommand  []string
+		expFlags    string
 		expErr      string
 	}{
 		"default settings, no annotations": {
 			annotations: map[string]string{
 				annotationService: "foo",
 			},
-			expCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "0",
-			},
+			expFlags: "-envoy-concurrency=0",
 		},
 		"default settings, annotation override": {
 			annotations: map[string]string{
 				annotationService:               "foo",
 				annotationEnvoyProxyConcurrency: "42",
 			},
-			expCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "42",
-			},
+			expFlags: "-envoy-concurrency=42",
 		},
 		"default settings, invalid concurrency annotation negative number": {
 			annotations: map[string]string{
 				annotationService:               "foo",
 				annotationEnvoyProxyConcurrency: "-42",
 			},
-			expErr: "invalid envoy concurrency, must be >= 0: -42",
+			expErr: "unable to parse annotation \"consul.hashicorp.com/consul-envoy-proxy-concurrency\": strconv.ParseUint: parsing \"-42\": invalid syntax",
+		},
+		"default settings, not-parseable concurrency annotation": {
+			annotations: map[string]string{
+				annotationService:               "foo",
+				annotationEnvoyProxyConcurrency: "not-int",
+			},
+			expErr: "unable to parse annotation \"consul.hashicorp.com/consul-envoy-proxy-concurrency\": strconv.ParseUint: parsing \"not-int\": invalid syntax",
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := MeshWebhook{}
+			h := MeshWebhook{
+				ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+			}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: c.annotations,
@@ -267,7 +265,7 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 				require.EqualError(t, err, c.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, c.expCommand, container.Command)
+				require.Contains(t, container.Command[2], c.expFlags)
 			}
 		})
 	}
@@ -337,18 +335,18 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			}
 			expCommand := [][]string{
 				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -tls-disabled -envoy-admin-bind-port=19000"},
+					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
 				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -tls-disabled -envoy-admin-bind-port=19001"},
+					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
 			}
 			if aclsEnabled {
 				expCommand = [][]string{
 					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
-						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -credential-type=login -login-method=test-auth-method " +
-						"-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000"},
+						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
 					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
-						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -credential-type=login -login-method=test-auth-method " +
-						"-login-bearer-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001"},
+						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
 				}
 			}
 			expSAVolumeMounts := []corev1.VolumeMount{
@@ -581,46 +579,29 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 // or via pod annotations. When arguments are passed in both ways, the
 // arguments set via pod annotations are used.
 func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
-	// todo(agentless): enable when we support passing extra args to Envoy.
-	t.Skipf("skip until we support passing extra args to Envoy")
 	cases := []struct {
-		name                     string
-		envoyExtraArgs           string
-		pod                      *corev1.Pod
-		expectedContainerCommand []string
+		name              string
+		envoyExtraArgs    string
+		pod               *corev1.Pod
+		expectedExtraArgs string
 	}{
 		{
-			name:           "no extra options provided",
-			envoyExtraArgs: "",
-			pod:            &corev1.Pod{},
-			expectedContainerCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "0",
-			},
+			name:              "no extra options provided",
+			envoyExtraArgs:    "",
+			pod:               &corev1.Pod{},
+			expectedExtraArgs: "",
 		},
 		{
-			name:           "via flag: extra log-level option",
-			envoyExtraArgs: "--log-level debug",
-			pod:            &corev1.Pod{},
-			expectedContainerCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "0",
-				"--log-level", "debug",
-			},
+			name:              "via flag: extra log-level option",
+			envoyExtraArgs:    "--log-level debug",
+			pod:               &corev1.Pod{},
+			expectedExtraArgs: "-- --log-level debug",
 		},
 		{
-			name:           "via flag: multiple arguments with quotes",
-			envoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
-			pod:            &corev1.Pod{},
-			expectedContainerCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "0",
-				"--log-level", "debug",
-				"--admin-address-path", "\"/tmp/consul/foo bar\"",
-			},
+			name:              "via flag: multiple arguments with quotes",
+			envoyExtraArgs:    "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			pod:               &corev1.Pod{},
+			expectedExtraArgs: "-- --log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 		},
 		{
 			name:           "via annotation: multiple arguments with quotes",
@@ -632,13 +613,7 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 					},
 				},
 			},
-			expectedContainerCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "0",
-				"--log-level", "debug",
-				"--admin-address-path", "\"/tmp/consul/foo bar\"",
-			},
+			expectedExtraArgs: "-- --log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 		},
 		{
 			name:           "via flag and annotation: should prefer setting via the annotation",
@@ -650,13 +625,7 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 					},
 				},
 			},
-			expectedContainerCommand: []string{
-				"envoy",
-				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-				"--concurrency", "0",
-				"--log-level", "debug",
-				"--admin-address-path", "\"/tmp/consul/foo bar\"",
-			},
+			expectedExtraArgs: "-- --log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 		},
 	}
 
@@ -665,12 +634,13 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 			h := MeshWebhook{
 				ImageConsul:          "hashicorp/consul:latest",
 				ImageConsulDataplane: "hashicorp/consul-k8s:latest",
+				ConsulConfig:         &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 				EnvoyExtraArgs:       tc.envoyExtraArgs,
 			}
 
 			c, err := h.consulDataplaneSidecar(testNS, *tc.pod, multiPortInfo{})
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedContainerCommand, c.Command)
+			require.Contains(t, c.Command[2], tc.expectedExtraArgs)
 		})
 	}
 }

@@ -260,18 +260,16 @@ spec:
                 {{- end }}
                 {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
                 -tls-server-name={{$root.Values.externalServers.tlsServerName }} \
-                {{- else }}
-                -tls-server-name=server.{{ $root.Values.global.datacenter }}.{{ $root.Values.global.domain }} \
                 {{- end }}
                 {{- else }}
                 -tls-disabled \
                 {{- end }}
                 {{- if $root.Values.global.acls.manageSystemACLs }}
                 -credential-type=login \
-                -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
+                -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
                 -login-meta=component=terminating-gateway \
                 -login-meta=pod=${NAMESPACE}/${POD_NAME} \
-                -login-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
+                -login-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
                 {{- if $root.Values.global.adminPartitions.enabled }}
                 -login-partition={{ $root.Values.global.adminPartitions.name }} \
                 {{- end }}

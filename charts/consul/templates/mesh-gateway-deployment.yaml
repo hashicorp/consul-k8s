@@ -213,22 +213,20 @@ spec:
             {{- end }}
             {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
             -tls-server-name={{.Values.externalServers.tlsServerName }} \
-            {{- else }}
-            -tls-server-name=server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }} \
             {{- end }}
             {{- else }}
             -tls-disabled \
             {{- end }}
             {{- if .Values.global.acls.manageSystemACLs }}
             -credential-type=login \
-            -login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
+            -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
             -login-meta=component=mesh-gateway \
             -login-meta=pod=${NAMESPACE}/${POD_NAME} \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            -login-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
             -login-datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- else }}
-            -login-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
             {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
             -login-partition={{ .Values.global.adminPartitions.name }} \

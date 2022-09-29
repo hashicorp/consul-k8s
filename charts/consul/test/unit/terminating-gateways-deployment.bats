@@ -103,9 +103,6 @@ load _helpers
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_TLS_SERVER_NAME") | .value' | tee /dev/stderr)
-  [ "${actual}" = "server.dc1.consul" ]
-
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
@@ -158,9 +155,6 @@ load _helpers
       yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | contains("-ca-certs=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object | yq -r '. | contains("-tls-server-name=server.dc1.consul")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -281,13 +275,13 @@ load _helpers
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '. | contains("-login-bearer-path=/var/run/secrets/kubernetes.io/serviceaccount/token")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '. | contains("-login-meta=component=terminating-gateway")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '. | contains("-login-method=release-name-consul-k8s-component-auth-method")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | contains("-login-auth-method=release-name-consul-k8s-component-auth-method")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '. | contains("-credential-type=login")' | tee /dev/stderr)
