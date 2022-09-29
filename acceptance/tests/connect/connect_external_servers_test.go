@@ -19,9 +19,7 @@ import (
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
 func TestConnectInject_ExternalServers(t *testing.T) {
-	cases := []bool{false, true}
-
-	for _, secure := range cases {
+	for _, secure := range []bool{false, true} {
 		caseName := fmt.Sprintf("secure: %t", secure)
 		t.Run(caseName, func(t *testing.T) {
 			cfg := suite.Config()
@@ -47,6 +45,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"externalServers.enabled":   "true",
 				"externalServers.hosts[0]":  fmt.Sprintf("%s-consul-server", serverReleaseName),
 				"externalServers.httpsPort": "8500",
+
+				// This prevents controllers from being installed twice, causing a failure.
+				"controller.enabled": "false",
 			}
 
 			if secure {
