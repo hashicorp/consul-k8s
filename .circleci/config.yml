@@ -145,6 +145,7 @@ commands:
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -enable-multi-cluster \
                       -debug-directory="$TEST_RESULTS/debug" \
+                      -consul-image=hashicorppreview/consul-enterprise:1.14-dev \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
