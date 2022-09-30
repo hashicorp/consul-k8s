@@ -145,6 +145,7 @@ commands:
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -enable-multi-cluster \
                       -debug-directory="$TEST_RESULTS/debug" \
+                      -consul-image=hashicorppreview/consul-enterprise:1.14-dev \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
@@ -1229,13 +1230,13 @@ workflows:
 #          requires:
 #            - dev-upload-docker
   nightly-acceptance-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    # triggers:
+    #   - schedule:
+    #       cron: "0 0 * * *"
+    #       filters:
+    #         branches:
+    #           only:
+    #             - main
     jobs:
       - build-distro:
           OS: "linux"
