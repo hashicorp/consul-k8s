@@ -1,4 +1,4 @@
-## 0.49.0 (September 29, 2022)
+## 0.49.0 (September 30, 2022)
 
 FEATURES:
 * CLI:
