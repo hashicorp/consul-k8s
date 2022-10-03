@@ -3,9 +3,8 @@ package serveraclinit
 import (
 	"errors"
 	"fmt"
-	"net/http"
+	"net"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
@@ -17,15 +16,15 @@ import (
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
 // If bootstrapToken is not empty then ACLs are already bootstrapped.
-func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, bootTokenSecretName, scheme string) (string, error) {
+func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, bootstrapToken, bootTokenSecretName string) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
-	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
+	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
 
 	if bootstrapToken == "" {
 		c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
 
 		var err error
-		bootstrapToken, err = c.bootstrapACLs(firstServerAddr, scheme, bootTokenSecretName)
+		bootstrapToken, err = c.bootstrapACLs(firstServerAddr, bootTokenSecretName)
 		if err != nil {
 			return "", err
 		}
@@ -36,26 +35,8 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 	// We should only create and set server tokens when servers are running within this cluster.
 	if c.flagSetServerTokens {
 		c.log.Info("Setting Consul server tokens")
-
-		// Override our original client with a new one that has the bootstrap token
-		// set.
-		clientConfig := api.DefaultConfig()
-		clientConfig.Address = firstServerAddr
-		clientConfig.Scheme = scheme
-		clientConfig.Token = bootstrapToken
-		clientConfig.TLSConfig = api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		}
-
-		consulClient, err := consul.NewClient(clientConfig,
-			c.flagConsulAPITimeout)
-		if err != nil {
-			return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
-		}
-
 		// Create new tokens for each server and apply them.
-		if err = c.setServerTokens(consulClient, serverAddresses, bootstrapToken, scheme); err != nil {
+		if err := c.setServerTokens(serverAddresses, bootstrapToken); err != nil {
 			return "", err
 		}
 	}
@@ -64,27 +45,11 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootstrapToken, boo
 
 // bootstrapACLs makes the ACL bootstrap API call and writes the bootstrap token
 // to a kube secret.
-func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootTokenSecretName string) (string, error) {
-	clientConfig := api.DefaultConfig()
-	clientConfig.Address = firstServerAddr
-	clientConfig.Scheme = scheme
-	clientConfig.TLSConfig = api.TLSConfig{
-		Address: c.flagConsulTLSServerName,
-		CAFile:  c.flagConsulCACert,
-	}
-	// Exempting this particular use of the http client from using global.consulAPITimeout
-	// which defaults to 5 seconds.  In acceptance tests, we saw that the call
-	// to /v1/acl/bootstrap taking 5-7 seconds and when it does, the request times
-	// out without returning the bootstrap token, but the bootstrapping does complete.
-	// This would leave cases where server-acl-init job would get a 403 that it had
-	// already bootstrapped and would not be able to complete.
-	// Since this is an area where we have to wait and can't retry, we are setting it
-	// to a large number like 5 minutes since previously this had no timeout.
-	clientConfig.HttpClient = &http.Client{
-		Timeout: 5 * time.Minute,
-	}
-	consulClient, err := consul.NewClient(clientConfig,
-		c.flagConsulAPITimeout)
+func (c *Command) bootstrapACLs(firstServerAddr, bootTokenSecretName string) (string, error) {
+	config := c.consulFlags.ConsulClientConfig().APIClientConfig
+	config.Address = firstServerAddr
+	consulClient, err := consul.NewClient(config,
+		c.consulFlags.APITimeout)
 
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
@@ -143,13 +108,22 @@ func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootToken
 
 // setServerTokens creates policies and associated ACL token for each server
 // and then provides the token to the server.
-func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []string, bootstrapToken, scheme string) error {
-	agentPolicy, err := c.setServerPolicy(consulClient)
+func (c *Command) setServerTokens(serverAddresses []net.IPAddr, bootstrapToken string) error {
+	// server specifically.
+	clientConfig := c.consulFlags.ConsulClientConfig().APIClientConfig
+	clientConfig.Address = fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
+	clientConfig.Token = bootstrapToken
+	serverClient, err := consul.NewClient(clientConfig,
+		c.consulFlags.APITimeout)
+	if err != nil {
+		return err
+	}
+	agentPolicy, err := c.setServerPolicy(serverClient)
 	if err != nil {
 		return err
 	}
 
-	existingTokens, _, err := consulClient.ACL().TokenList(nil)
+	existingTokens, _, err := serverClient.ACL().TokenList(nil)
 	if err != nil {
 		return err
 	}
@@ -160,22 +134,16 @@ func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []st
 
 		// We create a new client for each server because we need to call each
 		// server specifically.
-		clientConfig := api.DefaultConfig()
-		clientConfig.Address = fmt.Sprintf("%s:%d", host, c.flagServerPort)
-		clientConfig.Scheme = scheme
+		clientConfig := c.consulFlags.ConsulClientConfig().APIClientConfig
+		clientConfig.Address = fmt.Sprintf("%s:%d", host.IP.String(), c.consulFlags.HTTPPort)
 		clientConfig.Token = bootstrapToken
-		clientConfig.TLSConfig = api.TLSConfig{
-			Address: c.flagConsulTLSServerName,
-			CAFile:  c.flagConsulCACert,
-		}
-
 		serverClient, err := consul.NewClient(clientConfig,
-			c.flagConsulAPITimeout)
+			c.consulFlags.APITimeout)
 		if err != nil {
 			return err
 		}
 
-		tokenDescription := fmt.Sprintf("Server Token for %s", host)
+		tokenDescription := fmt.Sprintf("Server Token for %s", host.IP.String())
 
 		// Check if the token was already created. We're matching on the description
 		// since that's the only part that's unique.
