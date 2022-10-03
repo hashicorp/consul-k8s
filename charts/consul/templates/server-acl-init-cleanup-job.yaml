@@ -62,6 +62,14 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+          {{- if .Values.global.acls.job.tolerations }}
+          tolerations:
+            {{ tpl .Values.global.acls.job.tolerations . | indent 12 | trim }}
+          {{- end }}
+          {{- if .Values.global.acls.job.nodeSelector }}
+          nodeSelector:
+            {{ tpl .Values.global.acls.job.nodeSelector . | indent 12 | trim }}
+          {{- end }}
   {{- end }}
   {{- end }}
   {{- end }}
