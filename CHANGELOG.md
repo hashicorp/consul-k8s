@@ -1,5 +1,11 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm 
+  * `server.replicas` now defaults to `1`. Formerly, this defaulted to `3`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+  * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+  * `controller.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+
 ## 1.0.0-beta1 (October 4, 2022)
 FEATURES:
 * CLI:
@@ -24,12 +30,6 @@ BREAKING CHANGES:
     * Metrics and observability is not yet supported.
     * API gateway is not yet supported.
     * Executables in the form of `exec=` are not yet supported when using external servers and ACLs.
-
-BREAKING CHANGES:
-* The following default Helm values have changed:
-  * `server.replicas=1` (formerly `server.replicas=3`)
-  * `connectInject.enabled=true`
-  * `controller.enabled=true`
 
 ## 0.49.0 (September 29, 2022)
 
