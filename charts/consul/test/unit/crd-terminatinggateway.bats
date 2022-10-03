@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "terminatingGateway/CustomerResourceDefinition: enabled by default" {
+@test "terminatingGateway/CustomResourceDefinition: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-terminatinggateways.yaml  \
@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "terminatingGateway/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "terminatingGateway/CustomResourceDefinition: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-terminatinggateways.yaml  \

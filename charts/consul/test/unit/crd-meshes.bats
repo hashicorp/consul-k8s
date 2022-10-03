@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "mesh/CustomerResourceDefinition: enabled by default" {
+@test "mesh/CustomResourceDefinition: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-meshes.yaml  \
@@ -15,7 +15,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "mesh/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "mesh/CustomResourceDefinition: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-meshes.yaml  \

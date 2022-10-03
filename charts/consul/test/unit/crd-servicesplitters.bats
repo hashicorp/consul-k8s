@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "serviceSplitters/CustomerResourceDefinition: enabled by default" {
+@test "serviceSplitters/CustomResourceDefinition: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-servicesplitters.yaml  \
@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serviceSplitters/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "serviceSplitters/CustomResourceDefinition: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-servicesplitters.yaml  \

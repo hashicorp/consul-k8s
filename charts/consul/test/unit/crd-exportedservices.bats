@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "exportedServices/CustomerResourceDefinition: enabled by default" {
+@test "exportedServices/CustomResourceDefinition: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-exportedservices.yaml  \
@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "exportedServices/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "exportedServices/CustomResourceDefinition: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-exportedservices.yaml  \

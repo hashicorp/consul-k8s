@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "serviceRouters/CustomerResourceDefinition: enabled by default" {
+@test "serviceRouters/CustomResourceDefinition: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-servicerouters.yaml  \
@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serviceRouters/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "serviceRouters/CustomResourceDefinition: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-servicerouters.yaml  \
