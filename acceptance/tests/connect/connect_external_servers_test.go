@@ -28,6 +28,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			serverHelmValues := map[string]string{
 				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 				"global.tls.enabled":           strconv.FormatBool(secure),
+
+				// This prevents controllers from being installed twice, causing a failure.
+				"controller.enabled": "false",
 			}
 			serverReleaseName := helpers.RandomName()
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
@@ -45,9 +48,6 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"externalServers.enabled":   "true",
 				"externalServers.hosts[0]":  fmt.Sprintf("%s-consul-server", serverReleaseName),
 				"externalServers.httpsPort": "8500",
-
-				// This prevents controllers from being installed twice, causing a failure.
-				"controller.enabled": "false",
 			}
 
 			if secure {
