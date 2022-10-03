@@ -1552,6 +1552,51 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# global.acls.job
+
+@test "serverACLInit/Job: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "serverACLInit/Job: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.job.tolerations=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+@test "serverACLInit/Job: nodeSelector not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "serverACLInit/Job: nodeSelector can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.job.nodeSelector=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].nodeSelector[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+#--------------------------------------------------------------------
 # externalServers.enabled
 
 @test "serverACLInit/Job: fails if external servers are enabled but externalServers.hosts are not set" {
