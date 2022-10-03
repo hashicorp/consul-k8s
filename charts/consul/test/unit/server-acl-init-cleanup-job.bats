@@ -80,7 +80,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].tolerations' | tee /dev/stderr)
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -91,7 +91,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.job.tolerations=- key: value' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].tolerations[0].key' | tee /dev/stderr)
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
 
@@ -101,7 +101,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].nodeSelector' | tee /dev/stderr)
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -112,6 +112,6 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.job.nodeSelector=- key: value' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].nodeSelector[0].key' | tee /dev/stderr)
+      yq -r '.spec.template.spec.nodeSelector[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
