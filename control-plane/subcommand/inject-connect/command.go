@@ -697,7 +697,7 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Inject the proxy sidecar, run endpoints controller and peering controller."
+const synopsis = "Inject the proxy sidecar, run endpoints controller and peering controllers."
 const help = `
 Usage: consul-k8s-control-plane inject-connect [options]
 
