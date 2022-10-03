@@ -697,9 +697,10 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Inject the Consul service mesh dataplane."
+const synopsis = "Inject the proxy sidecar, run endpoints controller and peering controller."
 const help = `
 Usage: consul-k8s-control-plane inject-connect [options]
 
-  Run the admission webhook server for injecting the Consul service mesh dataplane.
+  Run the admission webhook server for injecting the Consul service mesh dataplane,
+  the endpoints controller, and the peering controller.
 `
