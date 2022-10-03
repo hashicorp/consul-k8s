@@ -3084,6 +3084,19 @@ webhookCertManager:
   # @type: string
   tolerations: null
 
+  # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+  # labels for webhook cert manager pod assignment, formatted as a multi-line string.
+  #
+  # Example:
+  #
+  # ```yaml
+  # nodeSelector: |
+  #   beta.kubernetes.io/arch: amd64
+  # ```
+  #
+  # @type: string
+  nodeSelector: null
+
 # Configures a demo Prometheus installation.
 prometheus:
   # When true, the Helm chart will install a demo Prometheus server instance
