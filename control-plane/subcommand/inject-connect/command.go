@@ -702,5 +702,5 @@ const help = `
 Usage: consul-k8s-control-plane inject-connect [options]
 
   Run the admission webhook server for injecting the sidecar proxy,
-  the endpoints controller, and the peering controller.
+  the endpoints controller, and the peering controllers.
 `
