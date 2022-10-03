@@ -4,6 +4,24 @@ FEATURES:
   * Add the ability to install installing HCP self-managed clusters.  [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
   * Add the ability to install the HashiCups demo application via the -demo flag. [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
 
+BREAKING CHANGES:
+* Consul client agents are no longer deployed by default, and Consul service mesh no longer uses Consul clients to operate. This change affects several main areas listed below. [[GH-1552](https://github.com/hashicorp/consul-k8s/pull/1552)]
+  * Control plane:
+    * A new component `consul-dataplane` is now injected as a sidecar-proxy instead of plain Envoy. `consul-dataplane` manages the Envoy proxy process and proxies xDS requests from Envoy to Consul servers.
+    * All services on the service mesh are now registered directly with the central catalog in Consul servers.
+    * All service-mesh consul-k8s components are configured to talk directly to Consul servers.
+    * Mesh, ingress, and terminating gateways are now registered centrally by the endpoints controller, similar to how service-mesh services are registered.
+  * Helm:
+    * `client.enabled` now defaults to `false`. Setting it to `true` will deploy client agents, however, none of the consul-k8s components will use clients for their operation.
+    * `global.imageEnvoy` is no longer used for sidecar proxies, as well as mesh, terminating, and ingress gateways.
+    * `externalServers.grpcPort` default is now `8502` instead of `8503`.
+    * `meshGateway.service.enabled` value is removed. Mesh gateways now will always have a Kubernetes service as this is required to register them as a service with Consul.
+    * `meshGateway.initCopyConsulContainer`, `ingressGateways.initCopyConsulContainer`, `terminatingGateways.initCopyConsulContainer` values are removed.
+  * Known `beta` limitations:
+    * Transparent proxy is not yet supported.
+    * Metrics and observability is not yet supported.
+    * API gateway is not yet supported.
+
 ## 0.49.0 (September 29, 2022)
 
 FEATURES:
