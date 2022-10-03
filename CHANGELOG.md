@@ -28,7 +28,7 @@ BREAKING CHANGES:
 BREAKING CHANGES:
 * The following default Helm values have changed:
   * `server.replicas=1` (formerly `server.replicas=3`)
-  * `connectInjectEnabled=true`
+  * `connectInject.enabled=true`
   * `controller.enabled=true`
 
 ## 0.49.0 (September 29, 2022)
