@@ -21,6 +21,7 @@ BREAKING CHANGES:
     * Transparent proxy is not yet supported.
     * Metrics and observability is not yet supported.
     * API gateway is not yet supported.
+    * Executables in the form of `exec=` are not yet supported when using external servers and ACLs.
 
 ## 0.49.0 (September 29, 2022)
 
