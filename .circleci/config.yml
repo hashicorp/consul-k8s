@@ -113,7 +113,6 @@ commands:
                           -enable-multi-cluster \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -consul-image=hashicorppreview/consul-enterprise:1.14-dev \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
@@ -522,7 +521,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2"
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -554,7 +553,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -704,7 +703,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -773,7 +772,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni
+          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -830,7 +829,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig"
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -887,7 +886,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -949,7 +948,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig"
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1012,7 +1011,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1066,7 +1065,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1113,7 +1112,8 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          consul-k8s-image: $CONSUL_K8S_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1151,7 +1151,8 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          consul-k8s-image: $CONSUL_K8S_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1189,7 +1190,8 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          consul-k8s-image: $CONSUL_K8S_IMAGE
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
