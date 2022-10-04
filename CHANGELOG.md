@@ -1,4 +1,6 @@
 ## UNRELEASED
+
+## 1.0.0-beta1 (October 4, 2022)
 FEATURES:
 * CLI:
   * Add the ability to install HCP self-managed clusters.  [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
