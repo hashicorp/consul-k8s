@@ -63,77 +63,6 @@ func TestCheckConsulServers(t *testing.T) {
 	require.Contains(t, err.Error(), fmt.Sprintf("%d/%d Consul servers unhealthy", 1, replicas))
 }
 
-// TestCheckConsulClients is very similar to TestCheckConsulServers() in structure.
-func TestCheckConsulClients(t *testing.T) {
-	c := getInitializedCommand(t, nil)
-	c.kubernetes = fake.NewSimpleClientset()
-
-	// No client daemon set should cause an error.
-	_, err := c.checkConsulClients("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no client daemon set found")
-
-	// Next create a daemon set.
-	var desired int32 = 3
-
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "consul-client-test1",
-			Namespace: "default",
-			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-		},
-		Status: appsv1.DaemonSetStatus{
-			DesiredNumberScheduled: desired,
-			NumberReady:            desired,
-		},
-	}
-
-	c.kubernetes.AppsV1().DaemonSets("default").Create(context.Background(), ds, metav1.CreateOptions{})
-
-	// Now run checkConsulClients() and make sure it succeeds.
-	s, err := c.checkConsulClients("default")
-	require.NoError(t, err)
-	require.Equal(t, "Consul clients healthy (3/3)", s)
-
-	// Creating another daemon set should cause an error.
-	ds2 := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "consul-client-test2",
-			Namespace: "default",
-			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-		},
-		Status: appsv1.DaemonSetStatus{
-			DesiredNumberScheduled: desired,
-			NumberReady:            desired,
-		},
-	}
-	c.kubernetes.AppsV1().DaemonSets("default").Create(context.Background(), ds2, metav1.CreateOptions{})
-
-	_, err = c.checkConsulClients("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "found multiple client daemon sets")
-
-	// Clear out the client and run a test with fewer than desired daemon sets ready.
-	c.kubernetes = fake.NewSimpleClientset()
-
-	ds3 := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "consul-client-test2",
-			Namespace: "default",
-			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-		},
-		Status: appsv1.DaemonSetStatus{
-			DesiredNumberScheduled: desired,
-			NumberReady:            desired - 1,
-		},
-	}
-	c.kubernetes.AppsV1().DaemonSets("default").Create(context.Background(), ds3, metav1.CreateOptions{})
-
-	_, err = c.checkConsulClients("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), fmt.Sprintf("%d/%d Consul clients unhealthy", 1, desired))
-}
-
 // TestStatus creates a fake stateful set and tests the checkConsulServers function.
 func TestStatus(t *testing.T) {
 	nowTime := helmTime.Now()
@@ -150,7 +79,7 @@ func TestStatus(t *testing.T) {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \n ✓ Consul servers healthy (3/3)\n ✓ Consul clients healthy (3/3)\n",
+				"\n==> Config:\n    {}\n    \n ✓ Consul servers healthy (3/3)\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
 				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
@@ -196,36 +125,12 @@ func TestStatus(t *testing.T) {
 			},
 			expectedReturnCode: 1,
 		},
-		"status with no clients returns error": {
-			input: []string{},
-			messages: []string{
-				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \n ✓ Consul servers healthy (3/3)\n ! no client daemon set found\n",
-			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
-			},
-			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
-					return &helmRelease.Release{
-						Name: "consul", Namespace: "consul",
-						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
-						Chart: &chart.Chart{
-							Metadata: &chart.Metadata{
-								Version: "1.0.0",
-							},
-						},
-						Config: make(map[string]interface{})}, nil
-				},
-			},
-			expectedReturnCode: 1,
-		},
 		"status with pre-install and pre-upgrade hooks returns success and outputs hook status": {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \n",
-				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\n ✓ Consul servers healthy (3/3)\n ✓ Consul clients healthy (3/3)\n",
+				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\n ✓ Consul servers healthy (3/3)\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
 				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)

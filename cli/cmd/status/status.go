@@ -69,9 +69,7 @@ func (c *Command) Run(args []string) int {
 		c.helmActionsRunner = &helm.ActionRunner{}
 	}
 
-	// The logger is initialized in main with the name cli. Here, we reset the name to status so log lines would be prefixed with status.
 	c.Log.ResetNamed("status")
-
 	defer common.CloseWithError(c.BaseCommand)
 
 	if err := c.set.Parse(args); err != nil {
@@ -122,13 +120,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if s, err := c.checkConsulServers(namespace); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	} else {
-		c.UI.Output(s, terminal.WithSuccessStyle())
-	}
-
-	if s, err := c.checkConsulClients(namespace); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	} else {
@@ -243,25 +234,6 @@ func (c *Command) checkConsulServers(namespace string) (string, error) {
 		return "", fmt.Errorf("%d/%d Consul servers unhealthy", desiredReplicas-readyReplicas, desiredReplicas)
 	}
 	return fmt.Sprintf("Consul servers healthy (%d/%d)", readyReplicas, desiredReplicas), nil
-}
-
-// checkConsulClients uses the Kubernetes list function to report if the consul clients are healthy.
-func (c *Command) checkConsulClients(namespace string) (string, error) {
-	clients, err := c.kubernetes.AppsV1().DaemonSets(namespace).List(c.Ctx,
-		metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm"})
-	if err != nil {
-		return "", err
-	} else if len(clients.Items) == 0 {
-		return "", errors.New("no client daemon set found")
-	} else if len(clients.Items) > 1 {
-		return "", errors.New("found multiple client daemon sets")
-	}
-	desiredReplicas := int(clients.Items[0].Status.DesiredNumberScheduled)
-	readyReplicas := int(clients.Items[0].Status.NumberReady)
-	if readyReplicas < desiredReplicas {
-		return "", fmt.Errorf("%d/%d Consul clients unhealthy", desiredReplicas-readyReplicas, desiredReplicas)
-	}
-	return fmt.Sprintf("Consul clients healthy (%d/%d)", readyReplicas, desiredReplicas), nil
 }
 
 // setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
