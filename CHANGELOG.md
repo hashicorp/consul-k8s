@@ -25,6 +25,10 @@ BREAKING CHANGES:
     * API gateway is not yet supported.
     * Executables in the form of `exec=` are not yet supported when using external servers and ACLs.
 
+    * IMPROVEMENTS
+      * Helm:
+        * API Gateway: Allow controller to create Namespaces in Consul in the case that mirroring is enabled and a gateway is created in a namespace that doesn't already exist in Consul. [[GH-1586](https://github.com/hashicorp/consul-k8s/pull/1586)]
+
 ## 0.49.0 (September 29, 2022)
 
 FEATURES:
