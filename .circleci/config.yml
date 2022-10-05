@@ -1109,7 +1109,8 @@ jobs:
       - create-kind-clusters:
           version: "v1.23.0"
       - restore_cache:
-          keys:
+            paths:
+              - ~/.go_workspace/pkg/modkeys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
