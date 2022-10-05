@@ -1089,8 +1089,8 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-      - HELM_CHART_VERSION: "0.48.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
+      - HELM_CHART_VERSION: "0.49.0"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -1150,8 +1150,8 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
-      - HELM_CHART_VERSION: "0.48.0"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
+      - HELM_CHART_VERSION: "0.49.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -1211,8 +1211,8 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.23.1"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-      - HELM_CHART_VERSION: "0.48.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
+      - HELM_CHART_VERSION: "0.49.0"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
