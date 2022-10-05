@@ -80,10 +80,6 @@ spec:
         - name: sync-catalog
           image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
           env:
-            {{- if .Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_HTTP_TOKEN_FILE
-              value: "/consul/login/acl-token"
-            {{- end }}
             - name: HOST_IP
               valueFrom:
                 fieldRef:
