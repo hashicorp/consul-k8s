@@ -107,8 +107,10 @@ spec:
             - name: CONSUL_HTTP_ADDR
               value: https://{{ template "consul.fullname" . }}-server:8501
             {{- end }}
+            {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
+            {{- end }}
             {{- else }}
             {{- if .Values.client.enabled }}
             - name: CONSUL_HTTP_ADDR
