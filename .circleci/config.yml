@@ -1095,7 +1095,16 @@ jobs:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
     steps:
-      - run: git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
+      - run: 
+          name: checkout code
+          command: |
+            if [ -e '/home/circleci/project/.git' ] ; then
+              cd '/home/circleci/project'
+            else
+              mkdir -p '/home/circleci/project'
+              cd '/home/circleci/project'
+            fi
+            git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
@@ -1134,7 +1143,16 @@ jobs:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
     steps:
-      - run: git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
+      - run: 
+          name: checkout code
+          command: |
+            if [ -e '/home/circleci/project/.git' ] ; then
+              cd '/home/circleci/project'
+            else
+              mkdir -p '/home/circleci/project'
+              cd '/home/circleci/project'
+            fi
+            git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
@@ -1173,7 +1191,16 @@ jobs:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
     steps:
-      - run: git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
+      - run: 
+          name: checkout code
+          command: |
+            if [ -e '/home/circleci/project/.git' ] ; then
+              cd '/home/circleci/project'
+            else
+              mkdir -p '/home/circleci/project'
+              cd '/home/circleci/project'
+            fi
+            git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
