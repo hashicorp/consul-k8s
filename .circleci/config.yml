@@ -1108,18 +1108,17 @@ jobs:
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
-      - restore_cache:
-            paths:
-              - ~/.go_workspace/pkg/modkeys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      # - restore_cache:
+      #     keys:
+      #       - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
           working_directory: *acceptance-mod-path
           command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
+      # - save_cache:
+      #     key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      #     paths:
+      #       - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
@@ -1157,17 +1156,17 @@ jobs:
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      # - restore_cache:
+      #     keys:
+      #       - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
           working_directory: *acceptance-mod-path
           command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
+      # - save_cache:
+      #     key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      #     paths:
+      #       - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
@@ -1205,17 +1204,17 @@ jobs:
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      # - restore_cache:
+      #     keys:
+      #       - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
           working_directory: *acceptance-mod-path
           command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
+      # - save_cache:
+      #     key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      #     paths:
+      #       - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
