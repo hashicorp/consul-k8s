@@ -1099,7 +1099,7 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
