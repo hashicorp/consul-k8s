@@ -1099,26 +1099,39 @@ jobs:
           name: checkout code
           command: |
             if [ -e '/home/circleci/project/.git' ] ; then
+              echo 'Fetching into existing repository'
+              existing_repo='true'
               cd '/home/circleci/project'
+              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
             else
+              echo 'Cloning git repository'
+              existing_repo='false'
               mkdir -p '/home/circleci/project'
               cd '/home/circleci/project'
+              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
             fi
-            git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
+
+            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+              echo 'Fetching from remote repository'
+                git fetch --force --tags origin
+            fi
+
+            echo 'Checking out tag'
+            git checkout --force "v$HELM_CHART_VERSION"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
-      # - restore_cache:
-      #     keys:
-      #       - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
           working_directory: *acceptance-mod-path
           command: go mod download
-      # - save_cache:
-      #     key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      #     paths:
-      #       - ~/.go_workspace/pkg/mod
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
@@ -1147,26 +1160,39 @@ jobs:
           name: checkout code
           command: |
             if [ -e '/home/circleci/project/.git' ] ; then
+              echo 'Fetching into existing repository'
+              existing_repo='true'
               cd '/home/circleci/project'
+              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
             else
+              echo 'Cloning git repository'
+              existing_repo='false'
               mkdir -p '/home/circleci/project'
               cd '/home/circleci/project'
+              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
             fi
-            git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
+
+            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+              echo 'Fetching from remote repository'
+                git fetch --force --tags origin
+            fi
+
+            echo 'Checking out tag'
+            git checkout --force "v$HELM_CHART_VERSION"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
-      # - restore_cache:
-      #     keys:
-      #       - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
           working_directory: *acceptance-mod-path
           command: go mod download
-      # - save_cache:
-      #     key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      #     paths:
-      #       - ~/.go_workspace/pkg/mod
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
@@ -1195,26 +1221,39 @@ jobs:
           name: checkout code
           command: |
             if [ -e '/home/circleci/project/.git' ] ; then
+              echo 'Fetching into existing repository'
+              existing_repo='true'
               cd '/home/circleci/project'
+              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
             else
+              echo 'Cloning git repository'
+              existing_repo='false'
               mkdir -p '/home/circleci/project'
               cd '/home/circleci/project'
+              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
             fi
-            git clone -b "v$HELM_CHART_VERSION" "$CIRCLE_REPOSITORY_URL"
+
+            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+              echo 'Fetching from remote repository'
+                git fetch --force --tags origin
+            fi
+
+            echo 'Checking out tag'
+            git checkout --force "v$HELM_CHART_VERSION"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
-      # - restore_cache:
-      #     keys:
-      #       - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
       - run:
           name: go mod download
           working_directory: *acceptance-mod-path
           command: go mod download
-      # - save_cache:
-      #     key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      #     paths:
-      #       - ~/.go_workspace/pkg/mod
+      - save_cache:
+          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
