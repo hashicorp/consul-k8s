@@ -88,6 +88,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 12 }}
             {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
