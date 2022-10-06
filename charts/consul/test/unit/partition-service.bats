@@ -16,6 +16,7 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'server.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -34,6 +35,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-service.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       .
 }
@@ -54,6 +56,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/partition-service.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations | length' | tee /dev/stderr)
   [ "${actual}" = "0" ]
@@ -65,6 +68,7 @@ load _helpers
       -s templates/partition-service.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.service.annotations=key: value' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations.key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
@@ -80,6 +84,7 @@ load _helpers
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.service.type=NodePort' \
       --set 'global.adminPartitions.service.nodePort.rpc=4443' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.spec.ports[] | select(.name == "server") | .nodePort' | tee /dev/stderr)
   [ "${actual}" == "4443" ]
@@ -92,6 +97,7 @@ load _helpers
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.service.type=NodePort' \
       --set 'global.adminPartitions.service.nodePort.serf=4444' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.spec.ports[] | select(.name == "serflan") | .nodePort' | tee /dev/stderr)
   [ "${actual}" == "4444" ]
@@ -104,6 +110,7 @@ load _helpers
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.service.type=NodePort' \
       --set 'global.adminPartitions.service.nodePort.https=4444' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.spec.ports[] | select(.name == "https") | .nodePort' | tee /dev/stderr)
   [ "${actual}" == "4444" ]
@@ -118,6 +125,7 @@ load _helpers
       --set 'global.adminPartitions.service.nodePort.rpc=4443' \
       --set 'global.adminPartitions.service.nodePort.https=4444' \
       --set 'global.adminPartitions.service.nodePort.serf=4445' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.spec.ports[]' | tee /dev/stderr)
 

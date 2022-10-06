@@ -2,6 +2,13 @@
 
 load _helpers
 
+@test "client/Role: disabled by default" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/client-role.yaml  \
+      . 
+}
+
 @test "client/Role: disabled with global.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \

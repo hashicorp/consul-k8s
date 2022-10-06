@@ -133,12 +133,6 @@ load _helpers
   local actual
   actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -924,6 +918,7 @@ load _helpers
     --set 'global.acls.partitionToken.secretKey=token' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=default" \
+    --set 'global.enableConsulNamespaces=true' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -1022,7 +1017,7 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
@@ -1069,11 +1064,11 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1112,11 +1107,11 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1156,11 +1151,11 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1201,11 +1196,11 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
@@ -1248,19 +1243,19 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: inject namespace options set with .global.enableConsulNamespaces=true and inject enabled" {
@@ -1854,14 +1849,14 @@ load _helpers
 #--------------------------------------------------------------------
 # controller
 
-@test "serverACLInit/Job: -controller not set by default" {
+@test "serverACLInit/Job: -controller set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("controller"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: -controller set when controller.enabled=true" {
