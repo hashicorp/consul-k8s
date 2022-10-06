@@ -5,8 +5,8 @@ load _helpers
 @test "expose-servers/Service: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/expose-servers-service.yaml  \
-      .
+      -s templates/expose-servers-service.yaml \
+      . 
 }
 
 @test "expose-servers/Service: enabled when servers and peering are enabled" {
@@ -51,6 +51,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

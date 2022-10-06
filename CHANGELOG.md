@@ -1,5 +1,11 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm 
+  * `server.replicas` now defaults to `1`. Formerly, this defaulted to `3`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+  * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+  * `controller.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+
 ## 1.0.0-beta1 (October 4, 2022)
 FEATURES:
 * CLI:

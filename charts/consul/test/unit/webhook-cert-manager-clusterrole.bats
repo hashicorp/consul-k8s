@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "webhookCertManager/ClusterRole: disabled by default" {
+@test "webhookCertManager/ClusterRole: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "webhookCertManager/ClusterRole: enabled with controller.enabled=true and connectInject.enabled=false" {

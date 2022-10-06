@@ -591,7 +591,7 @@ load _helpers
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 55f93d04c3f0b85c7ef2869e4b8623296025a8388c881eab63be9f2dc70bafd6 ]
+  [ "${actual}" = f9be2829fed80a127e3752e10be32f29c2f9ca0ea548abcf3d4fc2c985cb7201 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
@@ -602,7 +602,7 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 891c0e207e1e0259ffb150d7364b667b7b12786ce37af3dd89f366bc6d2f21aa ]
+  [ "${actual}" = e9fb5f0b4ff4e36a89e8ca2dc1aed2072306e0dd6d4cc60b3edf155cf8dbe2e9 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
@@ -2011,6 +2011,7 @@ rollingUpdate:
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"default\"")' | tee /dev/stderr)
@@ -2022,6 +2023,7 @@ rollingUpdate:
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=test' \
       --set 'server.enabled=false' \
@@ -2037,6 +2039,7 @@ rollingUpdate:
   run helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=test' \
       .

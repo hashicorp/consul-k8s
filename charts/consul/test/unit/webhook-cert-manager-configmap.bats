@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "webhookCertManager/Configmap: disabled by default" {
+@test "webhookCertManager/Configmap: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/webhook-cert-manager-configmap.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "webhookCertManager/Configmap: enabled with controller.enabled=true" {

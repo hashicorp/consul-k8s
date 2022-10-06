@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controllerLeaderElection/Role: disabled by default" {
+@test "controllerLeaderElection/Role: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-leader-election-role.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controllerLeaderElection/Role: enabled with controller.enabled=true" {

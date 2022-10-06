@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controller/MutatingWebhookConfiguration: disabled by default" {
+@test "controller/MutatingWebhookConfiguration: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-mutatingwebhookconfiguration.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controller/MutatingWebhookConfiguration: enabled with controller.enabled=true" {
