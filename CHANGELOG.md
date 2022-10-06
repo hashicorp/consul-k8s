@@ -1,4 +1,4 @@
-## UNRELEASED
+## 1.0.0-beta2 (October 6, 2022)
 
 BREAKING CHANGES:
 * Helm 
