@@ -176,9 +176,9 @@ spec:
                 -server-port=8501 \
                 {{- end }}
                 {{- if .Values.externalServers.tlsServerName }}
-                -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
                 {{- else if .Values.global.cloud.enabled }}
-                -consul-tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+                -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
                 {{- end }}
 

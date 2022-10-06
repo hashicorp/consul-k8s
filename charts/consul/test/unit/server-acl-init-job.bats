@@ -1694,7 +1694,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'externalServers.tlsServerName=foo' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-consul-tls-server-name=foo"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1921,6 +1921,6 @@ load _helpers
       --set 'global.cloud.enabled=true' \
       --set 'global.cloud.secretName=blah' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-consul-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

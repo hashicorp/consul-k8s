@@ -172,7 +172,7 @@ func (c *Command) init() {
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to the PEM-encoded CA certificate of the Consul cluster.")
-	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
+	c.flags.StringVar(&c.flagConsulTLSServerName, "tls-server-name", "",
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
