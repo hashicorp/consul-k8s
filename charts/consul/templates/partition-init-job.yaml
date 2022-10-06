@@ -105,7 +105,7 @@ spec:
                 -log-level={{ .Values.global.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 {{- if .Values.global.cloud.enabled }}
-                -consul-tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+                -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
           resources:
             requests:
