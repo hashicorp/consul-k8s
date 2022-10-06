@@ -149,9 +149,6 @@ spec:
                 -resource-prefix=${CONSUL_FULLNAME} \
                 -k8s-namespace={{ .Release.Namespace }} \
                 -set-server-tokens={{ $serverEnabled }} \
-                {{- if .Values.global.cloud.enabled }}
-                -consul-tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
-                {{- end}}
                 -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
 
                 {{- if .Values.externalServers.enabled }}
@@ -179,7 +176,9 @@ spec:
                 -server-port=8501 \
                 {{- end }}
                 {{- if .Values.externalServers.tlsServerName }}
-                -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                -tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                {{- else if .Values.global.cloud.enabled }}
+                -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
                 {{- end }}
 

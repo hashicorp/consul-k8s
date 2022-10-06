@@ -104,6 +104,9 @@ spec:
               consul-k8s-control-plane partition-init \
                 -log-level={{ .Values.global.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
+                {{- if .Values.global.cloud.enabled }}
+                -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+                {{- end }}
           resources:
             requests:
               memory: "50Mi"

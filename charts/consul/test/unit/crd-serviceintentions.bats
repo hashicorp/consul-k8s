@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "serviceintentions/CustomResourceDefinitions: disabled by default" {
+@test "serviceintentions/CustomResourceDefinitions: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/crd-serviceintentions.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq -s 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "serviceintentions/CustomResourceDefinitions: enabled with controller.enabled=true" {

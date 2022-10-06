@@ -302,10 +302,20 @@ func (i *CloudPreset) saveServerHCPConfigSecret(config *CloudBootstrapConfig) er
 		secretKeyHCPClientID:     []byte(config.HCPConfig.ClientID),
 		secretKeyHCPClientSecret: []byte(config.HCPConfig.ClientSecret),
 		secretKeyHCPResourceID:   []byte(config.HCPConfig.ResourceID),
-		secretKeyHCPAuthURL:      []byte(config.HCPConfig.AuthURL),
-		secretKeyHCPAPIHostname:  []byte(config.HCPConfig.APIHostname),
-		secretKeyHCPScadaAddress: []byte(config.HCPConfig.ScadaAddress),
 	}
+
+	if config.HCPConfig.AuthURL != "" {
+		data[secretKeyHCPAuthURL] = []byte(config.HCPConfig.AuthURL)
+	}
+
+	if config.HCPConfig.APIHostname != "" {
+		data[secretKeyHCPAPIHostname] = []byte(config.HCPConfig.APIHostname)
+	}
+
+	if config.HCPConfig.ScadaAddress != "" {
+		data[secretKeyHCPScadaAddress] = []byte(config.HCPConfig.ScadaAddress)
+	}
+
 	if err := i.saveSecret(secretNameHCPConfig, data, corev1.SecretTypeOpaque); err != nil {
 		return err
 	}

@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "connectInject/Deployment: disabled by default" {
+@test "connectInject/Deployment: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/Deployment: enable with global.enabled false, client.enabled true" {
@@ -33,6 +35,7 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=-' \
       --set 'global.enabled=false' \
       .
 }
@@ -2351,4 +2354,18 @@ reservedNameTest() {
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
+}
+
+@test "connectInject/Deployment: sets TLS server name if global.cloud.enabled is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=blah' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }

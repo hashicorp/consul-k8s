@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controllerLeaderElection/RoleBinding: disabled by default" {
+@test "controllerLeaderElection/RoleBinding: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-leader-election-rolebinding.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controllerLeaderElection/RoleBinding: enabled with controller.enabled=true" {

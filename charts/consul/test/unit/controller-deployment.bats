@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controller/Deployment: disabled by default" {
+@test "controller/Deployment: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-deployment.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controller/Deployment: enabled with controller.enabled=true" {
@@ -858,4 +860,18 @@ load _helpers
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
+}
+
+@test "controller/Deployment: sets TLS server name if global.cloud.enabled is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=blah' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }

@@ -643,6 +643,7 @@ function update_version_helm {
    #   $1 - Path to the directory where the root of the Helm chart is
    #   $2 - Version string
    #   $3 - PreRelease version (if unset will become an empty string)
+   #   $4 - Image base path
    #
    # Returns:
    #   0 - success
@@ -669,11 +670,10 @@ function update_version_helm {
    then
      full_version="$2-$3"
    fi
-   local image_k8s="hashicorp\/consul-k8s-control-plane:$full_version"
 
-   sed_i ${SED_EXT} -e "s/(imageK8S:[[:space:]]*hashicorp\/consul-k8s-control-plane:)[^\"]*/\1${full_version}/g" "${vfile}"
+   sed_i ${SED_EXT} -e "s/(imageK8S:.*\/consul-k8s-control-plane:)[^\"]*/imageK8S: $4${full_version}/g" "${vfile}"
    sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
-   sed_i ${SED_EXT} -e "s/(image:[[:space:]]*hashicorp\/consul-k8s-control-plane:)[^\"]*/\1${full_version}/g" "${cfile}"
+   sed_i ${SED_EXT} -e "s/(image:.*\/consul-k8s-control-plane:)[^\"]*/image: $4${full_version}/g" "${cfile}"
 
    if test -z "$3"
    then
@@ -778,6 +778,7 @@ function set_version {
      #   $2 - The version of the release
      #   $3 - The release date
      #   $4 - The pre-release version
+     #   $5 - The helm docker image base path
      #
      #
      # Returns:
@@ -814,7 +815,7 @@ function set_version {
      fi
 
      status_stage "==> Updating Helm chart versions with version info: ${vers} "$4""
-     if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4"
+     if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4" "$5"
      then
         unset_changelog_version "${sdir}"
         return 1
@@ -863,7 +864,7 @@ function prepare_release {
    #   0 - success
    #   * - error
   echo "release version: " $1 $2 $3 $4
-  set_version "$1" "$2" "$3" "$4"
+  set_version "$1" "$2" "$3" "$4" "hashicorp\/consul-k8s-control-plane:"
   set_changelog "$1" "$2" "$3" "$4"
 }
 
@@ -884,7 +885,7 @@ function prepare_dev {
    local sdir="$1"
 
    set_changelog "$1" "$2" "$3" "$5"
-   set_version "$1" "$4" "$3" "dev"
+   set_version "$1" "$4" "$3" "dev" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:"
 
    status_stage "==> Adding new UNRELEASED label in CHANGELOG.md"
    add_unreleased_to_changelog "${sdir}" || return 1

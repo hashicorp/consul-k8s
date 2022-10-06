@@ -126,8 +126,8 @@ func TestGetValueMap(t *testing.T) {
 	testCases := []struct {
 		description        string
 		installer          *CloudPreset
-		expectedConfig     *CloudBootstrapConfig
 		postProcessingFunc func()
+		requireCheck       func()
 	}{
 		{
 			"Should save secrets when SkipSavingSecrets is false.",
@@ -139,9 +139,11 @@ func TestGetValueMap(t *testing.T) {
 				HTTPClient:          hcpMockServer.Client(),
 				Context:             context.Background(),
 			},
-			bsConfig,
 			func() {
 				deleteSecrets(k8s)
+			},
+			func() {
+				checkAllSecretsWereSaved(t, k8s, bsConfig)
 			},
 		},
 		{
@@ -155,9 +157,40 @@ func TestGetValueMap(t *testing.T) {
 				HTTPClient:          hcpMockServer.Client(),
 				Context:             context.Background(),
 			},
-			bsConfig,
 			func() {
 				deleteSecrets(k8s)
+			},
+			func() {
+				checkAllSecretsWereSaved(t, k8s, bsConfig)
+			},
+		},
+		{
+			"Should not save save api-hostname, scada-address, or auth-url keys as empty strings if they are not configured.",
+			&CloudPreset{
+				HCPConfig: &HCPConfig{
+					ResourceID:   hcpResourceID,
+					ClientID:     hcpClientID,
+					ClientSecret: hcpClientSecret,
+				},
+				KubernetesClient:    k8s,
+				KubernetesNamespace: namespace,
+				UI:                  terminal.NewBasicUI(context.Background()),
+				SkipSavingSecrets:   false,
+				HTTPClient:          hcpMockServer.Client(),
+				Context:             context.Background(),
+			},
+			func() {
+				deleteSecrets(k8s)
+			},
+			func() {
+				hcpConfigSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPConfig, metav1.GetOptions{})
+				require.NoError(t, err)
+				require.Equal(t, bsConfig.HCPConfig.ClientID, string(hcpConfigSecret.Data[secretKeyHCPClientID]))
+				require.Equal(t, bsConfig.HCPConfig.ClientSecret, string(hcpConfigSecret.Data[secretKeyHCPClientSecret]))
+				require.Equal(t, bsConfig.HCPConfig.ResourceID, string(hcpConfigSecret.Data[secretKeyHCPResourceID]))
+				require.Nil(t, hcpConfigSecret.Data[secretKeyHCPAuthURL])
+				require.Nil(t, hcpConfigSecret.Data[secretKeyHCPScadaAddress])
+				require.Nil(t, hcpConfigSecret.Data[secretKeyHCPAPIHostname])
 			},
 		},
 	}
@@ -170,7 +203,7 @@ func TestGetValueMap(t *testing.T) {
 			if tc.installer.SkipSavingSecrets {
 				checkSecretsWereNotSaved(k8s)
 			} else {
-				checkSecretsWereSaved(t, k8s, bsConfig)
+				tc.requireCheck()
 			}
 			tc.postProcessingFunc()
 		})
@@ -310,7 +343,7 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 				require.Equal(t, expectedSecretNameServerCA, secretNameServerCA)
 				require.Equal(t, expectedSecretNameServerCert, secretNameServerCert)
 
-				checkSecretsWereSaved(t, k8s, validBootstrapConfig)
+				checkAllSecretsWereSaved(t, k8s, validBootstrapConfig)
 
 			}
 			tc.postProcessingFunc()
@@ -390,7 +423,7 @@ func deleteSecrets(k8sClient kubernetes.Interface) {
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameServerCA, metav1.DeleteOptions{})
 }
 
-func checkSecretsWereSaved(t require.TestingT, k8s kubernetes.Interface, expectedConfig *CloudBootstrapConfig) {
+func checkAllSecretsWereSaved(t require.TestingT, k8s kubernetes.Interface, expectedConfig *CloudBootstrapConfig) {
 
 	// Check that namespace is created
 	_, err := k8s.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})

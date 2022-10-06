@@ -1866,7 +1866,7 @@ func TestRun_HTTPS(t *testing.T) {
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-use-https",
-		"-consul-tls-server-name", "server.dc1.consul",
+		"-tls-server-name", "server.dc1.consul",
 		"-consul-ca-cert", caFile,
 		"-server-address=" + strings.Split(srv.HTTPSAddr, ":")[0],
 		"-server-port=" + strings.Split(srv.HTTPSAddr, ":")[1],

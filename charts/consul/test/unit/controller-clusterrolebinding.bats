@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controller/ClusterRoleBinding: disabled by default" {
+@test "controller/ClusterRoleBinding: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-clusterrolebinding.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controller/ClusterRoleBinding: enabled with controller.enabled=true" {

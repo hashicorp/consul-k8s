@@ -1089,13 +1089,35 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-      - HELM_CHART_VERSION: "0.48.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
+      - HELM_CHART_VERSION: "0.49.0"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
     steps:
-      - checkout
+      - run: 
+          name: checkout code
+          command: |
+            if [ -e '/home/circleci/project/.git' ] ; then
+              echo 'Fetching into existing repository'
+              existing_repo='true'
+              cd '/home/circleci/project'
+              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
+            else
+              echo 'Cloning git repository'
+              existing_repo='false'
+              mkdir -p '/home/circleci/project'
+              cd '/home/circleci/project'
+              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
+            fi
+
+            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+              echo 'Fetching from remote repository'
+                git fetch --force --tags origin
+            fi
+
+            echo 'Checking out tag'
+            git checkout --force "v$HELM_CHART_VERSION"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
@@ -1128,13 +1150,35 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.22.2"
-      - HELM_CHART_VERSION: "0.48.0"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
+      - HELM_CHART_VERSION: "0.49.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
     steps:
-      - checkout
+      - run: 
+          name: checkout code
+          command: |
+            if [ -e '/home/circleci/project/.git' ] ; then
+              echo 'Fetching into existing repository'
+              existing_repo='true'
+              cd '/home/circleci/project'
+              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
+            else
+              echo 'Cloning git repository'
+              existing_repo='false'
+              mkdir -p '/home/circleci/project'
+              cd '/home/circleci/project'
+              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
+            fi
+
+            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+              echo 'Fetching from remote repository'
+                git fetch --force --tags origin
+            fi
+
+            echo 'Checking out tag'
+            git checkout --force "v$HELM_CHART_VERSION"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"
@@ -1167,13 +1211,35 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
       - ENVOY_IMAGE: "envoyproxy/envoy:v1.23.1"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.48.0"
-      - HELM_CHART_VERSION: "0.48.0"
+      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
+      - HELM_CHART_VERSION: "0.49.0"
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
     steps:
-      - checkout
+      - run: 
+          name: checkout code
+          command: |
+            if [ -e '/home/circleci/project/.git' ] ; then
+              echo 'Fetching into existing repository'
+              existing_repo='true'
+              cd '/home/circleci/project'
+              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
+            else
+              echo 'Cloning git repository'
+              existing_repo='false'
+              mkdir -p '/home/circleci/project'
+              cd '/home/circleci/project'
+              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
+            fi
+
+            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+              echo 'Fetching from remote repository'
+                git fetch --force --tags origin
+            fi
+
+            echo 'Checking out tag'
+            git checkout --force "v$HELM_CHART_VERSION"
       - install-prereqs
       - create-kind-clusters:
           version: "v1.23.0"

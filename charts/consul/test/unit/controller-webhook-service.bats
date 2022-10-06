@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "controllerWebhook/Service: disabled by default" {
+@test "controllerWebhook/Service: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/controller-webhook-service.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "controllerWebhook/Service: enabled with controller.enabled=true" {
