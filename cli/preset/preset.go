@@ -2,12 +2,19 @@ package preset
 
 import (
 	"fmt"
+	"os"
 )
 
 const (
 	PresetSecure     = "secure"
 	PresetQuickstart = "quickstart"
 	PresetCloud      = "cloud"
+
+	EnvHCPClientID     = "HCP_CLIENT_ID"
+	EnvHCPClientSecret = "HCP_CLIENT_SECRET"
+	EnvHCPAuthURL      = "HCP_AUTH_URL"
+	EnvHCPAPIHost      = "HCP_API_HOST"
+	EnvHCPScadaAddress = "HCP_SCADA_ADDRESS"
 )
 
 // Presets is a list of all the available presets for use with CLI's install
@@ -41,4 +48,37 @@ func GetPreset(config *GetPresetConfig) (Preset, error) {
 		return &SecurePreset{}, nil
 	}
 	return nil, fmt.Errorf("'%s' is not a valid preset", config.Name)
+}
+
+func GetHCPPresetFromEnv(resourceID string) *HCPConfig {
+	hcpConfig := &HCPConfig{
+		ResourceID: resourceID,
+	}
+
+	// Read clientID from environment
+	if clientID, ok := os.LookupEnv(EnvHCPClientID); ok {
+		hcpConfig.ClientID = clientID
+	}
+
+	// Read clientSecret from environment
+	if clientSecret, ok := os.LookupEnv(EnvHCPClientSecret); ok {
+		hcpConfig.ClientSecret = clientSecret
+	}
+
+	// Read authURL from environment
+	if authURL, ok := os.LookupEnv(EnvHCPAuthURL); ok {
+		hcpConfig.AuthURL = authURL
+	}
+
+	// Read apiHost from environment
+	if apiHost, ok := os.LookupEnv(EnvHCPAPIHost); ok {
+		hcpConfig.APIHostname = apiHost
+	}
+
+	// Read scadaAddress from environment
+	if scadaAddress, ok := os.LookupEnv(EnvHCPScadaAddress); ok {
+		hcpConfig.ScadaAddress = scadaAddress
+	}
+
+	return hcpConfig
 }

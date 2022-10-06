@@ -64,12 +64,6 @@ const (
 
 	flagNameHCPResourceID = "hcp-resource-id"
 
-	envHCPClientID     = "HCP_CLIENT_ID"
-	envHCPClientSecret = "HCP_CLIENT_SECRET"
-	envHCPAuthURL      = "HCP_AUTH_URL"
-	envHCPAPIHost      = "HCP_API_HOST"
-	envHCPScadaAddress = "HCP_SCADA_ADDRESS"
-
 	flagNameDemo = "demo"
 	defaultDemo  = false
 )
@@ -603,12 +597,12 @@ func (c *Command) validateFlags(args []string) error {
 	}
 
 	if c.flagPreset == preset.PresetCloud {
-		clientID := os.Getenv(envHCPClientID)
-		clientSecret := os.Getenv(envHCPClientSecret)
+		clientID := os.Getenv(preset.EnvHCPClientID)
+		clientSecret := os.Getenv(preset.EnvHCPClientSecret)
 		if clientID == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientID)
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientID)
 		} else if clientSecret == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, envHCPClientSecret)
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientSecret)
 		} else if c.flagNameHCPResourceID == "" {
 			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
 		}
@@ -649,14 +643,7 @@ func (c *Command) checkValidEnterprise(secretName string) error {
 // implements the Preset interface.  If the string is not recognized an error is
 // returned.
 func (c *Command) getPreset(name string) (preset.Preset, error) {
-	hcpConfig := &preset.HCPConfig{
-		ResourceID:   c.flagNameHCPResourceID,
-		ClientID:     os.Getenv(envHCPClientID),
-		ClientSecret: os.Getenv(envHCPClientSecret),
-		AuthURL:      os.Getenv(envHCPAuthURL),
-		APIHostname:  os.Getenv(envHCPAPIHost),
-		ScadaAddress: os.Getenv(envHCPScadaAddress),
-	}
+	hcpConfig := preset.GetHCPPresetFromEnv(c.flagNameHCPResourceID)
 	getPresetConfig := &preset.GetPresetConfig{
 		Name: name,
 		CloudPreset: &preset.CloudPreset{
