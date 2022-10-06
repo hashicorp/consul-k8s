@@ -54,9 +54,6 @@ spec:
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       volumes:
-      - name: consul-data
-        emptyDir:
-          medium: "Memory"
       {{- if .Values.global.tls.enabled }}
       {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert
@@ -89,38 +86,30 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 12 }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_LOGIN_AUTH_METHOD
+              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+              value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+              {{- else }}
+              value: {{ template "consul.fullname" . }}-k8s-component-auth-method
+              {{- end }}
+            - name: CONSUL_LOGIN_DATACENTER
+              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+              value: {{ .Values.global.federation.primaryDatacenter }}
+              {{- else }}
+              value: {{ .Values.global.datacenter }}
+              {{- end }}
+            - name: CONSUL_LOGIN_META
+              value: "component=controller,pod=$(POD_NAME)"
+            {{- end }}
             {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
-            - name: CONSUL_HTTP_TOKEN
+            - name: CONSUL_ACL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
                   key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
             {{- end }}
-            {{- if .Values.global.tls.enabled }}
-            {{- if .Values.client.enabled }}
-            - name: CONSUL_HTTP_ADDR
-              value: https://$(HOST_IP):8501
-            {{- else }}
-            - name: CONSUL_HTTP_ADDR
-              value: https://{{ template "consul.fullname" . }}-server:8501
-            {{- end }}
-            {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-            - name: CONSUL_CACERT
-              value: /consul/tls/ca/tls.crt
-            {{- end }}
-            {{- else }}
-            {{- if .Values.client.enabled }}
-            - name: CONSUL_HTTP_ADDR
-              value: http://$(HOST_IP):8500
-            {{- else }}
-            - name: CONSUL_HTTP_ADDR
-              value: http://{{ template "consul.fullname" . }}-server:8500
-            {{- end }}
-            {{- end }}
           volumeMounts:
-            - mountPath: /consul/login
-              name: consul-data
-              readOnly: true
             {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
             {{- if .Values.global.tls.enabled }}
             {{- if and .Values.global.tls.enableAutoEncrypt $clientEnabled }}
@@ -200,16 +189,6 @@ spec:
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
-          {{- if .Values.global.acls.manageSystemACLs }}
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                - "/bin/sh"
-                - "-ec"
-                - |
-                  consul-k8s-control-plane consul-logout -consul-api-timeout={{ .Values.global.consulAPITimeout }}
-          {{- end }}
           livenessProbe:
             httpGet:
               path: /health/ready
