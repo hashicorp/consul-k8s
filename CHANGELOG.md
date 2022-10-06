@@ -6,6 +6,12 @@ BREAKING CHANGES:
   * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
   * `controller.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
 
+BUG FIXES:
+* CLI
+  * Pass required environment variables to the CLI for cluster bootstrapping. [[GH-1593](https://github.com/hashicorp/consul-k8s/pull/1593)]
+  * Configure `-tls-server-name` when `global.cloud.enabled=true` so that it matches the server certificate created via HCP [[GH-1591](https://github.com/hashicorp/consul-k8s/pull/1591)]
+  * Do not query clients in the status command since clients no longer exist. [[GH-1573](https://github.com/hashicorp/consul-k8s/pull/1573)]
+
 ## 1.0.0-beta1 (October 4, 2022)
 FEATURES:
 * CLI:
