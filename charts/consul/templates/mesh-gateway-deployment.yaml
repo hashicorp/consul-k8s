@@ -213,6 +213,8 @@ spec:
             {{- end }}
             {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
             -tls-server-name={{.Values.externalServers.tlsServerName }} \
+            {{- else if .Values.global.cloud.enabled }}
+            -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
             {{- end }}
             {{- else }}
             -tls-disabled \

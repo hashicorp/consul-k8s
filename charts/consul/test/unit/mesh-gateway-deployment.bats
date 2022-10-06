@@ -1353,3 +1353,18 @@ key2: value2' \
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.secretName must also be set." ]]
 }
+
+@test "meshGateway/Deployment: sets TLS server name if global.cloud.enabled is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.secretName=blah' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
