@@ -591,6 +591,7 @@ reservedNameTest() {
 -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
