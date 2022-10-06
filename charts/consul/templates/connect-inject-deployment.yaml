@@ -269,6 +269,9 @@ spec:
                 -default-consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
                 {{- end }}
                 {{- end }}
+                {{- if .Values.global.cloud.enabled }}
+                -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+                {{- end }}
           startupProbe:
             httpGet:
               path: /readyz/ready

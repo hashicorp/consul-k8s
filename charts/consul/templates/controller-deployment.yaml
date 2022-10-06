@@ -98,6 +98,9 @@ spec:
             -consul-cross-namespace-acl-policy=cross-namespace-policy \
             {{- end }}
             {{- end }}
+            {{- if .Values.global.cloud.enabled }}
+            -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+            {{- end }}
         env:
         - name: NAMESPACE
           valueFrom:
