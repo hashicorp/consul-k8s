@@ -251,7 +251,12 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			// Create test consul server.
-			acceptorPeerServer, err := testutil.NewTestServerConfigT(t, nil)
+			acceptorPeerServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				// We set the datacenter because the server name, typically formatted as "server.<datacenter>.<domain>"
+				// must be unique on the acceptor and dialer peers. Otherwise the following consul error will be thrown:
+				// https://github.com/hashicorp/consul/blob/74b87d49d33069a048aead7a86d85d4b4b6461b5/agent/rpc/peering/service.go#L491.
+				c.Datacenter = "acceptor-dc"
+			})
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
 			acceptorPeerServer.WaitForServiceIntentions(t)
@@ -285,7 +290,6 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				}
 			}
 
-			// Create test consul server.
 			// Create test consul server.
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
 			dialerClient := testClient.APIClient
@@ -419,7 +423,11 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			// Create test consul server.
-			acceptorPeerServer, err := testutil.NewTestServerConfigT(t, nil)
+			acceptorPeerServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				// We set the datacenter because the server name, typically formatted as "server.<datacenter>.<domain>"
+				// must be unique on the acceptor and dialer peers.
+				c.Datacenter = "acceptor-dc"
+			})
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
 			acceptorPeerServer.WaitForServiceIntentions(t)
