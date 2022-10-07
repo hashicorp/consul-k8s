@@ -21,6 +21,11 @@ func TestConsulDNS(t *testing.T) {
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set")
 	}
+
+	if cfg.UseAKS {
+		t.Skipf("skipping because -use-aks is set")
+	}
+
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
