@@ -90,7 +90,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								Partition: "third",
 							},
 							{
-								PeerName: "second-peer",
+								Peer: "second-peer",
 							},
 						},
 					},
@@ -105,7 +105,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								Partition: "fifth",
 							},
 							{
-								PeerName: "third-peer",
+								Peer: "third-peer",
 							},
 						},
 					},
@@ -214,7 +214,7 @@ func TestExportedServices_ToConsul(t *testing.T) {
 								Partition: "third",
 							},
 							{
-								PeerName: "second-peer",
+								Peer: "second-peer",
 							},
 						},
 					},
@@ -229,7 +229,7 @@ func TestExportedServices_ToConsul(t *testing.T) {
 								Partition: "fifth",
 							},
 							{
-								PeerName: "third-peer",
+								Peer: "third-peer",
 							},
 						},
 					},
