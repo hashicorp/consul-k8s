@@ -305,8 +305,9 @@ func (c *Command) Run(args []string) int {
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
 			&webhook.Admission{Handler: &v1alpha1.MeshWebhook{
-				Client: mgr.GetClient(),
-				Logger: ctrl.Log.WithName("webhooks").WithName(common.Mesh),
+				Client:     mgr.GetClient(),
+				Logger:     ctrl.Log.WithName("webhooks").WithName(common.Mesh),
+				ConsulMeta: consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
 			&webhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
