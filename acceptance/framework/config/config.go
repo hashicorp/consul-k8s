@@ -53,8 +53,9 @@ type TestConfig struct {
 	NoCleanupOnFailure bool
 	DebugDirectory     string
 
-	UseKind bool
+	UseAKS  bool
 	UseGKE  bool
+	UseKind bool
 
 	helmChartPath string
 }
