@@ -60,6 +60,9 @@ func TestMesh_MatchesConsul(t *testing.T) {
 					HTTP: &MeshHTTPConfig{
 						SanitizeXForwardedClientCert: true,
 					},
+					Peering: &PeeringMeshConfig{
+						PeerThroughMeshGateways: true,
+					},
 				},
 			},
 			Theirs: &capi.MeshConfigEntry{
@@ -80,6 +83,9 @@ func TestMesh_MatchesConsul(t *testing.T) {
 				},
 				HTTP: &capi.MeshHTTPConfig{
 					SanitizeXForwardedClientCert: true,
+				},
+				Peering: &capi.PeeringMeshConfig{
+					PeerThroughMeshGateways: true,
 				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -154,6 +160,9 @@ func TestMesh_ToConsul(t *testing.T) {
 					HTTP: &MeshHTTPConfig{
 						SanitizeXForwardedClientCert: true,
 					},
+					Peering: &PeeringMeshConfig{
+						PeerThroughMeshGateways: true,
+					},
 				},
 			},
 			Exp: &capi.MeshConfigEntry{
@@ -174,6 +183,9 @@ func TestMesh_ToConsul(t *testing.T) {
 				},
 				HTTP: &capi.MeshHTTPConfig{
 					SanitizeXForwardedClientCert: true,
+				},
+				Peering: &capi.PeeringMeshConfig{
+					PeerThroughMeshGateways: true,
 				},
 				Namespace: "",
 				Meta: map[string]string{
@@ -197,6 +209,7 @@ func TestMesh_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input           *Mesh
 		expectedErrMsgs []string
+		consulMeta      common.ConsulMeta
 	}{
 		"tls.incoming.minTLSVersion invalid": {
 			input: &Mesh{
@@ -296,6 +309,53 @@ func TestMesh_Validate(t *testing.T) {
 				},
 			},
 		},
+		"peering.peerThroughMeshGateways in invalid partition": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					Peering: &PeeringMeshConfig{
+						PeerThroughMeshGateways: true,
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "blurg",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				`spec.peering.peerThroughMeshGateways: Forbidden: "peerThroughMeshGateways" is only valid in the "default" partition`,
+			},
+		},
+		"peering.peerThroughMeshGateways valid partition": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					Peering: &PeeringMeshConfig{
+						PeerThroughMeshGateways: true,
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+		},
+		"peering.peerThroughMeshGateways valid with no partitions": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					Peering: &PeeringMeshConfig{
+						PeerThroughMeshGateways: true,
+					},
+				},
+			},
+		},
 		"multiple errors": {
 			input: &Mesh{
 				ObjectMeta: metav1.ObjectMeta{
@@ -312,20 +372,28 @@ func TestMesh_Validate(t *testing.T) {
 							TLSMaxVersion: "bar",
 						},
 					},
+					Peering: &PeeringMeshConfig{
+						PeerThroughMeshGateways: true,
+					},
 				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "blurg",
+				PartitionsEnabled: true,
 			},
 			expectedErrMsgs: []string{
 				`spec.tls.incoming.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
 				`spec.tls.incoming.tlsMaxVersion: Invalid value: "bar": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
 				`spec.tls.outgoing.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
 				`spec.tls.outgoing.tlsMaxVersion: Invalid value: "bar": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+				`spec.peering.peerThroughMeshGateways: Forbidden: "peerThroughMeshGateways" is only valid in the "default" partition`,
 			},
 		},
 	}
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(common.ConsulMeta{})
+			err := testCase.input.Validate(testCase.consulMeta)
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {
