@@ -205,7 +205,7 @@ spec:
                 {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
                 -consul-destination-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }} \
                 {{- end }}
-                {{- if and .Values.global.enableConsulNamespaces .Values.connectInject.consulNamespaces.mirroringK8S }} // test this change
+                {{- if and .Values.global.enableConsulNamespaces .Values.connectInject.consulNamespaces.mirroringK8S }}
                 -enable-k8s-namespace-mirroring=true \
                 {{- if .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}
                 -k8s-namespace-mirroring-prefix={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }} \
