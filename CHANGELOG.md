@@ -1,7 +1,9 @@
 ## UNRELEASED
+
 FEATURES:
 * Peering: Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
 
+## 1.0.0-beta2 (October 7, 2022)
 BREAKING CHANGES:
 * Peering: Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
 * Helm 
