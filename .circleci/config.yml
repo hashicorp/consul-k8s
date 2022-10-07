@@ -520,7 +520,8 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorp/consul-enterprise:1.14.0-beta1-ent
+          failfast: true
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
