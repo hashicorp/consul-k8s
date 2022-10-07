@@ -41,8 +41,9 @@ type TestFlags struct {
 
 	flagDebugDirectory string
 
-	flagUseKind bool
+	flagUseAKS  bool
 	flagUseGKE  bool
+	flagUseKind bool
 
 	flagDisablePeering bool
 
@@ -105,10 +106,12 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagDebugDirectory, "debug-directory", "", "The directory where to write debug information about failed test runs, "+
 		"such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.")
 
-	flag.BoolVar(&t.flagUseKind, "use-kind", false,
-		"If true, the tests will assume they are running against a local kind cluster(s).")
+	flag.BoolVar(&t.flagUseAKS, "use-aks", false,
+		"If true, the tests will assume they are running against an AKS cluster(s).")
 	flag.BoolVar(&t.flagUseGKE, "use-gke", false,
 		"If true, the tests will assume they are running against a GKE cluster(s).")
+	flag.BoolVar(&t.flagUseKind, "use-kind", false,
+		"If true, the tests will assume they are running against a local kind cluster(s).")
 
 	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
 		"If true, the peering tests will not run.")
@@ -168,7 +171,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
-		UseKind:            t.flagUseKind,
+		UseAKS:             t.flagUseAKS,
 		UseGKE:             t.flagUseGKE,
+		UseKind:            t.flagUseKind,
 	}
 }

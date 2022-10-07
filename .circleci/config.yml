@@ -829,7 +829,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -886,7 +886,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results

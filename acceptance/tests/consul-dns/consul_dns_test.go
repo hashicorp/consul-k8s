@@ -21,6 +21,11 @@ func TestConsulDNS(t *testing.T) {
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set")
 	}
+
+	if cfg.UseAKS {
+		t.Skipf("skipping because -use-aks is set")
+	}
+
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
@@ -55,7 +60,7 @@ func TestConsulDNS(t *testing.T) {
 			}
 
 			dnsTestPodArgs := []string{
-				"run", "-i", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-i", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "sh", "-c", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
