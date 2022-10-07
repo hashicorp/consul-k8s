@@ -629,7 +629,7 @@ You can run other tests by enabling them by passing appropriate flags to `go tes
 For example, to run mesh gateway tests, which require two Kubernetes clusters,
 you may use the following command:
 
-    go test ./charts/consul/... -p 1 -timeout 20m \
+    go test ./... -p 1 -timeout 20m \
         -enable-multi-cluster \
         -kubecontext=<name of the primary Kubernetes context> \
         -secondary-kubecontext=<name of the secondary Kubernetes context>
