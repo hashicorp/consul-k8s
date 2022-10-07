@@ -60,7 +60,7 @@ func TestConsulDNS(t *testing.T) {
 			}
 
 			dnsTestPodArgs := []string{
-				"run", "-i", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "sh", "-c", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-i", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
