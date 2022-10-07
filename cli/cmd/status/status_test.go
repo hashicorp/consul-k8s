@@ -173,7 +173,7 @@ func TestStatus(t *testing.T) {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \n ✓ Consul servers healthy (3/3)\n",
+				"\n==> Config:\n    {}\n    \nConsul Clients Healthy 3/3\nConsul Servers Healthy 3/3\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
 				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
@@ -195,39 +195,14 @@ func TestStatus(t *testing.T) {
 			},
 			expectedReturnCode: 0,
 		},
-		"status with no servers returns error": {
-			input: []string{},
-			messages: []string{
-				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \n ! no server stateful set found\n",
-			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-			},
-			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
-					return &helmRelease.Release{
-						Name: "consul", Namespace: "consul",
-						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
-						Chart: &chart.Chart{
-							Metadata: &chart.Metadata{
-								Version: "1.0.0",
-							},
-						},
-						Config: make(map[string]interface{})}, nil
-				},
-			},
-			expectedReturnCode: 1,
-		},
 		"status with pre-install and pre-upgrade hooks returns success and outputs hook status": {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \n",
-				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\n ✓ Consul servers healthy (3/3)\n",
+				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul Servers Healthy 3/3\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
 				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
