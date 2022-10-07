@@ -384,6 +384,12 @@ spec:
               hostPort: 8502
               {{- end }}
               protocol: "TCP"
+            - name: grpc-tls
+              containerPort: 8503
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: 8503
+              {{- end }}
+              protocol: "TCP"
             - name: serflan-tcp
               containerPort: {{ .Values.server.ports.serflan.port }}
               {{- if .Values.server.exposeGossipAndRPCPorts }}
