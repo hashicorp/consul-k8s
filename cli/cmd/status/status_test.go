@@ -28,39 +28,133 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// TestCheckConsulServers creates a fake stateful set and tests the checkConsulServers function.
-func TestCheckConsulServers(t *testing.T) {
-	c := getInitializedCommand(t, nil)
-	c.kubernetes = fake.NewSimpleClientset()
+func TestCheckConsulAgents(t *testing.T) {
+	namespace := "default"
 
-	// First check that no stateful sets causes an error.
-	_, err := c.checkConsulServers("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no server stateful set found")
+	cases := map[string]struct {
+		clients int
+		servers int
+	}{
+		"No clients, no agents": {0, 0},
+		"3 clients, no agents":  {3, 0},
+		"3 clients, 3 agents":   {3, 3},
+		"No clients, 3 agents":  {3, 3},
+	}
 
-	// Next create a stateful set with 3 desired replicas and 3 ready replicas.
-	var replicas int32 = 3
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := setupCommand(buf)
+			c.kubernetes = fake.NewSimpleClientset()
 
-	createStatefulSet("consul-server-test1", "default", replicas, replicas, c.kubernetes)
+			// Before deployment, we shouldn't see the checks or errors.
+			err := c.checkConsulAgents(namespace)
+			require.NoError(t, err)
 
-	// Now we run the checkConsulServers() function and it should succeed.
-	s, err := c.checkConsulServers("default")
-	require.NoError(t, err)
-	require.Equal(t, "Consul servers healthy (3/3)", s)
+			actual := buf.String()
+			require.NotContains(t, actual, "Consul Clients Healthy")
+			require.NotContains(t, actual, "Consul Servers Healthy")
+			buf.Reset()
 
-	// If you then create another stateful set it should error.
-	createStatefulSet("consul-server-test2", "default", replicas, replicas, c.kubernetes)
-	_, err = c.checkConsulServers("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "found multiple server stateful sets")
+			if tc.clients != 0 {
+				// Deploy clients where only 1 of the clients is healthy.
+				ds := &appsv1.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "consul-clients",
+						Namespace: namespace,
+						Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
+					},
+					Status: appsv1.DaemonSetStatus{
+						DesiredNumberScheduled: int32(tc.clients),
+						NumberReady:            1,
+					},
+				}
+				c.kubernetes.AppsV1().DaemonSets(namespace).Create(context.Background(), ds, metav1.CreateOptions{})
+			}
 
-	// Clear out the client and now run a test where the stateful set isn't ready.
-	c.kubernetes = fake.NewSimpleClientset()
-	createStatefulSet("consul-server-test2", "default", replicas, replicas-1, c.kubernetes)
+			if tc.servers != 0 {
+				// Deploy servers where only 1 of the servers is healthy.
+				servers := int32(tc.servers)
+				ss := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: namespace,
+						Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Replicas: &servers,
+					},
+					Status: appsv1.StatefulSetStatus{
+						Replicas:      int32(tc.servers),
+						ReadyReplicas: 1,
+					},
+				}
+				c.kubernetes.AppsV1().StatefulSets(namespace).Create(context.Background(), ss, metav1.CreateOptions{})
+			}
 
-	_, err = c.checkConsulServers("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), fmt.Sprintf("%d/%d Consul servers unhealthy", 1, replicas))
+			// Verify that unhealthy clients and servers are seen.
+			err = c.checkConsulAgents(namespace)
+			require.NoError(t, err)
+
+			actual = buf.String()
+			if tc.clients != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul Clients Healthy 1/%d", tc.clients))
+			}
+			if tc.servers != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul Servers Healthy 1/%d", tc.servers))
+			}
+			buf.Reset()
+
+			if tc.clients != 0 {
+				// Update clients so that all clients are healthy.
+				ds := &appsv1.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "consul-clients",
+						Namespace: namespace,
+						Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
+					},
+					Status: appsv1.DaemonSetStatus{
+						DesiredNumberScheduled: int32(tc.clients),
+						NumberReady:            int32(tc.clients),
+					},
+				}
+				c.kubernetes.AppsV1().DaemonSets(namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
+			}
+
+			if tc.servers != 0 {
+				// Update servers so that all servers are healthy.
+				servers := int32(tc.servers)
+				ss := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: namespace,
+						Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Replicas: &servers,
+					},
+					Status: appsv1.StatefulSetStatus{
+						Replicas:      int32(tc.servers),
+						ReadyReplicas: int32(tc.servers),
+					},
+				}
+				c.kubernetes.AppsV1().StatefulSets(namespace).Update(context.Background(), ss, metav1.UpdateOptions{})
+			}
+
+			// Verify that healthy clients and servers are seen.
+			err = c.checkConsulAgents(namespace)
+			require.NoError(t, err)
+
+			actual = buf.String()
+			if tc.clients != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul Clients Healthy %d/%d", tc.clients, tc.clients))
+			}
+			if tc.servers != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul Servers Healthy %d/%d", tc.servers, tc.servers))
+			}
+			buf.Reset()
+		})
+	}
 }
 
 // TestStatus creates a fake stateful set and tests the checkConsulServers function.
@@ -324,4 +418,24 @@ func createDaemonset(name, namespace string, replicas, readyReplicas int32, k8s 
 	}
 
 	k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), ds, metav1.CreateOptions{})
+}
+
+func setupCommand(buf io.Writer) *Command {
+	// Log at a test level to standard out.
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "test",
+		Level:  hclog.Debug,
+		Output: os.Stdout,
+	})
+
+	// Setup and initialize the command struct
+	command := &Command{
+		BaseCommand: &common.BaseCommand{
+			Log: log,
+			UI:  terminal.NewUI(context.Background(), buf),
+		},
+	}
+	command.init()
+
+	return command
 }
