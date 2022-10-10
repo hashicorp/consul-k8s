@@ -654,6 +654,15 @@ global:
     # self-managed cluster.
     enabled: false
     
+    # The name of the Kubernetes secret that holds the HCP resource id.
+    resourceId:
+      # The name of the Kubernetes secret that holds the resource id.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the resource id.
+      # @type: string
+      secretKey: null
+
     # The name of the Kubernetes secret that holds the HCP cloud client id.
     clientId:
       # The name of the Kubernetes secret that holds the client id.
