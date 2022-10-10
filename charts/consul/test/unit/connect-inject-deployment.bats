@@ -653,17 +653,6 @@ load _helpers
 #--------------------------------------------------------------------
 # namespaces
 
-@test "connectInject/Deployment: fails if namespaces are disabled and mirroringK8S is true" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'global.enableConsulNamespaces=false' \
-      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
-      --set 'connectInject.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.enableConsulNamespaces must be true if mirroringK8S=true" ]]
-}
-
 @test "connectInject/Deployment: namespace options disabled by default" {
   cd `chart_dir`
   local object=$(helm template \
@@ -708,20 +697,20 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("enable-k8s-namespace-mirroring"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
     yq 'any(contains("k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: mirroring options set with .connectInject.consulNamespaces.mirroringK8S=true" {
+@test "connectInject/Deployment: mirroring options omitted with .connectInject.consulNamespaces.mirroringK8S=false" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
-      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -735,7 +724,7 @@ load _helpers
 
   local actual=$(echo $object |
     yq 'any(contains("enable-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
     yq 'any(contains("k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)

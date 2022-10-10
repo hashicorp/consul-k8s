@@ -3,6 +3,11 @@
 FEATURES:
 * Peering: Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
 
+BREAKING CHANGES:
+* Helm:
+  * `syncCatalog.consulNamespaces.mirroringK8S` now defaults to `true`. [[GH-1601](https://github.com/hashicorp/consul-k8s/pull/1601)]
+  * `connectInject.consulNamespaces.mirroringK8S` now defaults to `true`. [[GH-1601](https://github.com/hashicorp/consul-k8s/pull/1601)]
+
 IMPROVEMENTS:
 * Helm:
   * API Gateway: Allow controller to read MeshServices for use as a route backend. [[GH-1574](https://github.com/hashicorp/consul-k8s/pull/1574)]
