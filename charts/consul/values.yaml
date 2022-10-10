@@ -1755,7 +1755,7 @@ syncCatalog:
     # If mirroring is enabled, avoid creating any Consul resources in the following 
     # Kubernetes namespaces, as Consul currently reserves these namespaces for 
     # system use: "system", "universal", "operator", "root". 
-    mirroringK8S: false
+    mirroringK8S: true
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
     # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
@@ -2205,7 +2205,7 @@ connectInject:
     # `consulDestinationNamespace` setting. If mirroring is enabled, avoid creating any Consul 
     # resources in the following Kubernetes namespaces, as Consul currently reserves these 
     # namespaces for system use: "system", "universal", "operator", "root". 
-    mirroringK8S: false
+    mirroringK8S: true
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
     # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
