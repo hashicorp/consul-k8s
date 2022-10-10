@@ -27,6 +27,14 @@ rules:
   verbs:
   - update
 - apiGroups:
+  - api-gateway.consul.hashicorp.com
+  resources:
+  - meshservices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - apps
   resources:
   - deployments
