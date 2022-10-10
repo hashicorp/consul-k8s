@@ -3,6 +3,7 @@
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{ template "consul.validateCloudSecretNames" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

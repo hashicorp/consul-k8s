@@ -971,7 +971,7 @@ load _helpers
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set,thetemplate fails." {
+@test "apiGateway/Deployment: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -993,7 +993,7 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set,the template fails." {
+@test "apiGateway/Deployment: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1018,7 +1018,7 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set,the template fails." {
+@test "apiGateway/Deployment: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1043,7 +1043,7 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set,the template fails." {
+@test "apiGateway/Deployment: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1068,7 +1068,7 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set,the template fails." {
+@test "apiGateway/Deployment: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1093,7 +1093,7 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set,the template fails." {
+@test "apiGateway/Deployment: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1115,10 +1115,10 @@ load _helpers
 
   [ "$status" -eq 1 ]
   echo "$output"
-  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.scadaAddress is defined, both must be set." ]]
+  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
-@test "apiGateway/Deployment: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set,the template fails." {
+@test "apiGateway/Deployment: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
   cd `chart_dir`
   run helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
