@@ -58,38 +58,16 @@ func TestCheckConsulAgents(t *testing.T) {
 
 			if tc.clients != 0 {
 				// Deploy clients where only 1 of the clients is healthy.
-				ds := &appsv1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "consul-clients",
-						Namespace: namespace,
-						Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-					},
-					Status: appsv1.DaemonSetStatus{
-						DesiredNumberScheduled: int32(tc.clients),
-						NumberReady:            1,
-					},
-				}
-				c.kubernetes.AppsV1().DaemonSets(namespace).Create(context.Background(), ds, metav1.CreateOptions{})
+				clients := mockClients("consul-clients", namespace, int32(tc.clients), 1)
+				_, err := c.kubernetes.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
+				require.NoError(t, err)
 			}
 
 			if tc.servers != 0 {
 				// Deploy servers where only 1 of the servers is healthy.
-				servers := int32(tc.servers)
-				ss := &appsv1.StatefulSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-						Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
-					},
-					Spec: appsv1.StatefulSetSpec{
-						Replicas: &servers,
-					},
-					Status: appsv1.StatefulSetStatus{
-						Replicas:      int32(tc.servers),
-						ReadyReplicas: 1,
-					},
-				}
-				c.kubernetes.AppsV1().StatefulSets(namespace).Create(context.Background(), ss, metav1.CreateOptions{})
+				servers := mockServers("consul-servers", namespace, int32(tc.servers), 1)
+				_, err := c.kubernetes.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
+				require.NoError(t, err)
 			}
 
 			// Verify that unhealthy clients and servers are seen.
@@ -107,38 +85,16 @@ func TestCheckConsulAgents(t *testing.T) {
 
 			if tc.clients != 0 {
 				// Update clients so that all clients are healthy.
-				ds := &appsv1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "consul-clients",
-						Namespace: namespace,
-						Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-					},
-					Status: appsv1.DaemonSetStatus{
-						DesiredNumberScheduled: int32(tc.clients),
-						NumberReady:            int32(tc.clients),
-					},
-				}
-				c.kubernetes.AppsV1().DaemonSets(namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
+				clients := mockClients("consul-clients", namespace, int32(tc.clients), int32(tc.clients))
+				_, err := c.kubernetes.AppsV1().DaemonSets(namespace).Update(context.Background(), &clients, metav1.UpdateOptions{})
+				require.NoError(t, err)
 			}
 
 			if tc.servers != 0 {
 				// Update servers so that all servers are healthy.
-				servers := int32(tc.servers)
-				ss := &appsv1.StatefulSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-						Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
-					},
-					Spec: appsv1.StatefulSetSpec{
-						Replicas: &servers,
-					},
-					Status: appsv1.StatefulSetStatus{
-						Replicas:      int32(tc.servers),
-						ReadyReplicas: int32(tc.servers),
-					},
-				}
-				c.kubernetes.AppsV1().StatefulSets(namespace).Update(context.Background(), ss, metav1.UpdateOptions{})
+				servers := mockServers("consul-servers", namespace, int32(tc.servers), int32(tc.servers))
+				_, err := c.kubernetes.AppsV1().StatefulSets(namespace).Update(context.Background(), &servers, metav1.UpdateOptions{})
+				require.NoError(t, err)
 			}
 
 			// Verify that healthy clients and servers are seen.
@@ -256,6 +212,7 @@ func TestStatus(t *testing.T) {
 				"\n==> Consul Status Summary\n ! kaboom!\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
+
 				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
 				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
 			},
@@ -360,8 +317,8 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	assert.Equal(t, complete.PredictNothing, c)
 }
 
-func createStatefulSet(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
-	ss := &appsv1.StatefulSet{
+func mockServers(name, namespace string, replicas, readyReplicas int32) appsv1.StatefulSet {
+	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -375,12 +332,15 @@ func createStatefulSet(name, namespace string, replicas, readyReplicas int32, k8
 			ReadyReplicas: readyReplicas,
 		},
 	}
-
-	k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), ss, metav1.CreateOptions{})
 }
 
-func createDaemonset(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
-	ds := &appsv1.DaemonSet{
+func createStatefulSet(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
+	servers := mockServers(name, namespace, replicas, readyReplicas)
+	k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
+}
+
+func mockClients(name, namespace string, replicas, readyReplicas int32) appsv1.DaemonSet {
+	return appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -391,8 +351,11 @@ func createDaemonset(name, namespace string, replicas, readyReplicas int32, k8s 
 			NumberReady:            readyReplicas,
 		},
 	}
+}
 
-	k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), ds, metav1.CreateOptions{})
+func createDaemonset(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
+	clients := mockClients(name, namespace, replicas, readyReplicas)
+	k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
 }
 
 func setupCommand(buf io.Writer) *Command {
