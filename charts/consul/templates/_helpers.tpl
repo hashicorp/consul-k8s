@@ -377,7 +377,7 @@ Usage: {{ template "consul.validateCloudConfiguration" . }}
 
 */}}
 {{- define "consul.validateCloudConfiguration" -}}
-{{- if and .Values.global.cloud.enabled (not .Values.global.cloud.secretName) }}
-{{fail "When global.cloud.enabled is true, global.cloud.secretName must also be set."}}
+{{- if and .Values.global.cloud.enabled (or (not .Values.global.cloud.resourceId.secretName) (not .Values.global.cloud.clientId.secretName) (not .Values.global.cloud.clientSecret.secretName)) }}
+{{fail "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set."}}
 {{ end }}
 {{- end -}}

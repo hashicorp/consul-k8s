@@ -654,11 +654,50 @@ global:
     # self-managed cluster.
     enabled: false
     
-    # The name of the Kubernetes secret that holds the HCP cloud configuration.
-    # It contains the HCP service principal client_id and client_secret as well
-    # as the HCP resource_id.
-    # @type: string
-    secretName: null
+    # The name of the Kubernetes secret that holds the HCP cloud client id.
+    clientId:
+      # The name of the Kubernetes secret that holds the client id.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the client id.
+      # @type: string
+      secretKey: null
+    
+    # The name of the Kubernetes secret that holds the HCP cloud client secret.
+    clientSecret:
+      # The name of the Kubernetes secret that holds the client secret.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the client secret.
+      # @type: string
+      secretKey: null
+
+    # The name of the Kubernetes secret that holds the HCP cloud client id.
+    apiHost:
+      # The name of the Kubernetes secret that holds the api hostname.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the api hostname.
+      # @type: string
+      secretKey: null
+
+    # The name of the Kubernetes secret that holds the HCP cloud authorization url.
+    authUrl:
+      # The name of the Kubernetes secret that holds the authorization url.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the authorization url.
+      # @type: string
+      secretKey: null
+
+    # The name of the Kubernetes secret that holds the HCP cloud scada address.
+    scadaAddress:
+      # The name of the Kubernetes secret that holds the scada address.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the scada address.
+      # @type: string
+      secretKey: null
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to

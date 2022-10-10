@@ -22,16 +22,21 @@ import (
 )
 
 const (
-	hcpClientID                  = "RAxJflDbxDXw8kLY6jWmwqMz3kVe7NnL"
-	hcpClientSecret              = "1fNzurLatQPLPwf7jnD4fRtU9f5nH31RKBHayy08uQ6P-6nwI1rFZjMXb4m3cCKH"
-	hcpResourceID                = "organization/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/project/36019e0d-ed59-4df6-9990-05bb7fc793b6/hashicorp.consul.global-network-manager.cluster/prod-on-prem"
-	expectedSecretNameHCPConfig  = "consul-hcp-config"
-	expectedSecretNameGossipKey  = "consul-gossip-key"
-	expectedSecretNameBootstrap  = "consul-bootstrap-token"
-	expectedSecretNameServerCA   = "consul-server-ca"
-	expectedSecretNameServerCert = "consul-server-cert"
-	namespace                    = "consul"
-	validResponse                = `
+	hcpClientID                       = "RAxJflDbxDXw8kLY6jWmwqMz3kVe7NnL"
+	hcpClientSecret                   = "1fNzurLatQPLPwf7jnD4fRtU9f5nH31RKBHayy08uQ6P-6nwI1rFZjMXb4m3cCKH"
+	hcpResourceID                     = "organization/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/project/36019e0d-ed59-4df6-9990-05bb7fc793b6/hashicorp.consul.global-network-manager.cluster/prod-on-prem"
+	expectedSecretNameHCPClientId     = "consul-hcp-client-id"
+	expectedSecretNameHCPClientSecret = "consul-hcp-client-secret"
+	expectedSecretNameHCPResourceId   = "consul-hcp-resource-id"
+	expectedSecretNameHCPAuthURL      = "consul-hcp-auth-url"
+	expectedSecretNameHCPApiHostname  = "consul-hcp-api-host"
+	expectedSecretNameHCPScadaAddress = "consul-hcp-scada-address"
+	expectedSecretNameGossipKey       = "consul-gossip-key"
+	expectedSecretNameBootstrap       = "consul-bootstrap-token"
+	expectedSecretNameServerCA        = "consul-server-ca"
+	expectedSecretNameServerCert      = "consul-server-cert"
+	namespace                         = "consul"
+	validResponse                     = `
 {
 	"cluster": 
 	{
@@ -183,14 +188,43 @@ func TestGetValueMap(t *testing.T) {
 				deleteSecrets(k8s)
 			},
 			func() {
-				hcpConfigSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPConfig, metav1.GetOptions{})
-				require.NoError(t, err)
-				require.Equal(t, bsConfig.HCPConfig.ClientID, string(hcpConfigSecret.Data[secretKeyHCPClientID]))
-				require.Equal(t, bsConfig.HCPConfig.ClientSecret, string(hcpConfigSecret.Data[secretKeyHCPClientSecret]))
-				require.Equal(t, bsConfig.HCPConfig.ResourceID, string(hcpConfigSecret.Data[secretKeyHCPResourceID]))
-				require.Nil(t, hcpConfigSecret.Data[secretKeyHCPAuthURL])
-				require.Nil(t, hcpConfigSecret.Data[secretKeyHCPScadaAddress])
-				require.Nil(t, hcpConfigSecret.Data[secretKeyHCPAPIHostname])
+				// Check the hcp resource id secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPResourceID, secretKeyHCPResourceID,
+					bsConfig.HCPConfig.ResourceID, corev1.SecretTypeOpaque)
+
+				// Check the hcp client id secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPClientID, secretKeyHCPClientID,
+					bsConfig.HCPConfig.ClientID, corev1.SecretTypeOpaque)
+
+				// Check the hcp client secret secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPClientSecret, secretKeyHCPClientSecret,
+					bsConfig.HCPConfig.ClientSecret, corev1.SecretTypeOpaque)
+
+				// Check the bootstrap token secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameBootstrapToken, secretKeyBootstrapToken,
+					bsConfig.ConsulConfig.ACL.Tokens.InitialManagement, corev1.SecretTypeOpaque)
+
+				// Check the gossip key secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameGossipKey, secretKeyGossipKey,
+					bsConfig.BootstrapResponse.Bootstrap.GossipKey, corev1.SecretTypeOpaque)
+
+				// Check the server cert secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameServerCert, corev1.TLSCertKey,
+					bsConfig.BootstrapResponse.Bootstrap.ServerTLS.Cert, corev1.SecretTypeTLS)
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameServerCert, corev1.TLSPrivateKeyKey,
+					bsConfig.BootstrapResponse.Bootstrap.ServerTLS.PrivateKey, corev1.SecretTypeTLS)
+
+				// Check the server CA secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameServerCA, corev1.TLSCertKey,
+					bsConfig.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0], corev1.SecretTypeOpaque)
+
+				// Check that HCP scada address, auth url, and api hostname are not saved
+				hcpAuthURLSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAuthURL, metav1.GetOptions{})
+				require.Nil(t, hcpAuthURLSecret)
+				hcpApiHostnameSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAPIHostname, metav1.GetOptions{})
+				require.Nil(t, hcpApiHostnameSecret)
+				hcpScadaAddress, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPScadaAddress, metav1.GetOptions{})
+				require.Nil(t, hcpScadaAddress)
 			},
 		},
 	}
@@ -266,20 +300,75 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 			},
 		},
 		{
-			"Errors when hcp config secret already exists.",
+			"Errors when hcp client id secret already exists",
 			true,
-			fmt.Sprintf("'%s' secret in '%s' namespace already exists.", expectedSecretNameHCPConfig, namespace),
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameHCPClientId, namespace),
 			func() {
-				savePlaceholderSecret(expectedSecretNameHCPConfig, k8s)
+				savePlaceholderSecret(expectedSecretNameHCPClientId, k8s)
 			},
 			func() {
 				deleteSecrets(k8s)
 			},
 		},
 		{
-			"Errors when bootstrap token secret already exists.",
+			"Errors when hcp client secret secret already exists",
 			true,
-			fmt.Sprintf("'%s' secret in '%s' namespace already exists.", expectedSecretNameBootstrap, namespace),
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameHCPClientSecret, namespace),
+			func() {
+				savePlaceholderSecret(expectedSecretNameHCPClientSecret, k8s)
+			},
+			func() {
+				deleteSecrets(k8s)
+			},
+		},
+		{
+			"Errors when hcp resource id secret already exists",
+			true,
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameHCPResourceId, namespace),
+			func() {
+				savePlaceholderSecret(expectedSecretNameHCPResourceId, k8s)
+			},
+			func() {
+				deleteSecrets(k8s)
+			},
+		},
+		{
+			"Errors when hcp auth url secret already exists",
+			true,
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameHCPAuthURL, namespace),
+			func() {
+				savePlaceholderSecret(expectedSecretNameHCPAuthURL, k8s)
+			},
+			func() {
+				deleteSecrets(k8s)
+			},
+		},
+		{
+			"Errors when hcp api hostname secret already exists",
+			true,
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameHCPApiHostname, namespace),
+			func() {
+				savePlaceholderSecret(expectedSecretNameHCPApiHostname, k8s)
+			},
+			func() {
+				deleteSecrets(k8s)
+			},
+		},
+		{
+			"Errors when hcp scada address secret already exists",
+			true,
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameHCPScadaAddress, namespace),
+			func() {
+				savePlaceholderSecret(expectedSecretNameHCPScadaAddress, k8s)
+			},
+			func() {
+				deleteSecrets(k8s)
+			},
+		},
+		{
+			"Errors when bootstrap token secret already exists",
+			true,
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameBootstrap, namespace),
 			func() {
 				savePlaceholderSecret(expectedSecretNameBootstrap, k8s)
 			},
@@ -288,9 +377,9 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 			},
 		},
 		{
-			"Errors when gossip key secret already exists.",
+			"Errors when gossip key secret already exists",
 			true,
-			fmt.Sprintf("'%s' secret in '%s' namespace already exists.", expectedSecretNameGossipKey, namespace),
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameGossipKey, namespace),
 			func() {
 				savePlaceholderSecret(expectedSecretNameGossipKey, k8s)
 			},
@@ -299,9 +388,9 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 			},
 		},
 		{
-			"Errors when server cert secret already exists.",
+			"Errors when server cert secret already exists",
 			true,
-			fmt.Sprintf("'%s' secret in '%s' namespace already exists.", expectedSecretNameServerCert, namespace),
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameServerCert, namespace),
 			func() {
 				savePlaceholderSecret(expectedSecretNameServerCert, k8s)
 			},
@@ -310,9 +399,9 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 			},
 		},
 		{
-			"Errors when server CA secret already exists.",
+			"Errors when server CA secret already exists",
 			true,
-			fmt.Sprintf("'%s' secret in '%s' namespace already exists.", expectedSecretNameServerCA, namespace),
+			fmt.Sprintf("'%s' secret in '%s' namespace already exists", expectedSecretNameServerCA, namespace),
 			func() {
 				savePlaceholderSecret(expectedSecretNameServerCA, k8s)
 			},
@@ -339,7 +428,9 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expectedSecretNameBootstrap, secretNameBootstrapToken)
 				require.Equal(t, expectedSecretNameGossipKey, secretNameGossipKey)
-				require.Equal(t, expectedSecretNameHCPConfig, secretNameHCPConfig)
+				require.Equal(t, expectedSecretNameHCPClientId, secretNameHCPClientID)
+				require.Equal(t, expectedSecretNameHCPClientSecret, secretNameHCPClientSecret)
+				require.Equal(t, expectedSecretNameHCPResourceId, secretNameHCPResourceID)
 				require.Equal(t, expectedSecretNameServerCA, secretNameServerCA)
 				require.Equal(t, expectedSecretNameServerCert, secretNameServerCert)
 
@@ -355,7 +446,7 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 func TestGetHelmConfigWithMapSecretNames(t *testing.T) {
 	t.Parallel()
 
-	const expected = `connectInject:
+	const expectedFull = `connectInject:
   enabled: true
 controller:
   enabled: true
@@ -366,8 +457,62 @@ global:
       secretName: consul-bootstrap-token
     manageSystemACLs: true
   cloud:
+    apiHost:
+      secretKey: api-hostname
+      secretName: consul-hcp-api-host
+    authUrl:
+      secretKey: auth-url
+      secretName: consul-hcp-auth-url
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-client-secret
     enabled: true
-    secretName: consul-hcp-config
+    resourceId:
+      secretKey: resource-id
+      secretName: consul-hcp-resource-id
+    scadaAddress:
+      secretKey: scada-address
+      secretName: consul-hcp-scada-address
+  datacenter: dc1
+  gossipEncryption:
+    secretKey: key
+    secretName: consul-gossip-key
+  tls:
+    caCert:
+      secretKey: tls.crt
+      secretName: consul-server-ca
+    enableAutoEncrypt: true
+    enabled: true
+server:
+  replicas: 3
+  serverCert:
+    secretName: consul-server-cert
+`
+
+	const expectedWithoutOptional = `connectInject:
+  enabled: true
+controller:
+  enabled: true
+global:
+  acls:
+    bootstrapToken:
+      secretKey: token
+      secretName: consul-bootstrap-token
+    manageSystemACLs: true
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-client-secret
+    enabled: true
+    resourceId:
+      secretKey: resource-id
+      secretName: consul-hcp-resource-id
   datacenter: dc1
   gossipEncryption:
     secretKey: key
@@ -385,20 +530,59 @@ server:
 `
 
 	cloudPreset := &CloudPreset{}
-	cfg := &CloudBootstrapConfig{
-		BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
-			Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
-				BootstrapExpect: 3,
-				ID:              "dc1",
+
+	testCases := []struct {
+		description  string
+		config       *CloudBootstrapConfig
+		expectedYaml string
+	}{
+		{"Config including optional parameters",
+			&CloudBootstrapConfig{
+				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
+					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
+						BootstrapExpect: 3,
+						ID:              "dc1",
+					},
+				},
+				HCPConfig: HCPConfig{
+					ResourceID:   "consul-hcp-resource-id",
+					ClientID:     "consul-hcp-client-id",
+					ClientSecret: "consul-hcp-client-secret",
+					AuthURL:      "consul-hcp-auth-url",
+					APIHostname:  "consul-hcp-api-host",
+					ScadaAddress: "consul-hcp-scada-address",
+				},
 			},
+			expectedFull,
+		},
+		{"Config without optional parameters",
+			&CloudBootstrapConfig{
+				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
+					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
+						BootstrapExpect: 3,
+						ID:              "dc1",
+					},
+				},
+				HCPConfig: HCPConfig{
+					ResourceID:   "consul-hcp-resource-id",
+					ClientID:     "consul-hcp-client-id",
+					ClientSecret: "consul-hcp-client-secret",
+				},
+			},
+			expectedWithoutOptional,
 		},
 	}
-	cloudHelmValues := cloudPreset.getHelmConfigWithMapSecretNames(cfg)
-	require.NotNil(t, cloudHelmValues)
-	valuesYaml, err := yaml.Marshal(cloudHelmValues)
-	yml := string(valuesYaml)
-	require.NoError(t, err)
-	require.Equal(t, expected, yml)
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cloudHelmValues := cloudPreset.getHelmConfigWithMapSecretNames(tc.config)
+			require.NotNil(t, cloudHelmValues)
+			valuesYaml, err := yaml.Marshal(cloudHelmValues)
+			yml := string(valuesYaml)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedYaml, yml)
+		})
+	}
+
 }
 
 func savePlaceholderSecret(secretName string, k8sClient kubernetes.Interface) {
@@ -416,7 +600,12 @@ func savePlaceholderSecret(secretName string, k8sClient kubernetes.Interface) {
 }
 
 func deleteSecrets(k8sClient kubernetes.Interface) {
-	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPConfig, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPClientId, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPClientSecret, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPResourceId, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPAuthURL, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPApiHostname, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPScadaAddress, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameBootstrap, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameGossipKey, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameServerCert, metav1.DeleteOptions{})
@@ -429,56 +618,70 @@ func checkAllSecretsWereSaved(t require.TestingT, k8s kubernetes.Interface, expe
 	_, err := k8s.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	require.NoError(t, err)
 
-	// Check the hcp config secret is as expected.
-	hcpConfigSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPConfig, metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, expectedConfig.HCPConfig.ClientID, string(hcpConfigSecret.Data[secretKeyHCPClientID]))
-	require.Equal(t, expectedConfig.HCPConfig.ClientSecret, string(hcpConfigSecret.Data[secretKeyHCPClientSecret]))
-	require.Equal(t, expectedConfig.HCPConfig.ResourceID, string(hcpConfigSecret.Data[secretKeyHCPResourceID]))
-	require.Equal(t, expectedConfig.HCPConfig.AuthURL, string(hcpConfigSecret.Data[secretKeyHCPAuthURL]))
-	require.Equal(t, expectedConfig.HCPConfig.ScadaAddress, string(hcpConfigSecret.Data[secretKeyHCPScadaAddress]))
-	require.Equal(t, expectedConfig.HCPConfig.APIHostname, string(hcpConfigSecret.Data[secretKeyHCPAPIHostname]))
-	require.Equal(t, corev1.SecretTypeOpaque, hcpConfigSecret.Type)
-	require.Equal(t, common.CLILabelValue, hcpConfigSecret.Labels[common.CLILabelKey])
+	// Check the hcp resource id secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPResourceID, secretKeyHCPResourceID,
+		expectedConfig.HCPConfig.ResourceID, corev1.SecretTypeOpaque)
+
+	// Check the hcp client id secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPClientID, secretKeyHCPClientID,
+		expectedConfig.HCPConfig.ClientID, corev1.SecretTypeOpaque)
+
+	// Check the hcp client secret secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPClientSecret, secretKeyHCPClientSecret,
+		expectedConfig.HCPConfig.ClientSecret, corev1.SecretTypeOpaque)
+
+	// Check the hcp auth URL secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPAuthURL, secretKeyHCPAuthURL,
+		expectedConfig.HCPConfig.AuthURL, corev1.SecretTypeOpaque)
+
+	// Check the hcp api hostname secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPAPIHostname, secretKeyHCPAPIHostname,
+		expectedConfig.HCPConfig.APIHostname, corev1.SecretTypeOpaque)
+
+	// Check the hcp scada address secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPScadaAddress, secretKeyHCPScadaAddress,
+		expectedConfig.HCPConfig.ScadaAddress, corev1.SecretTypeOpaque)
 
 	// Check the bootstrap token secret is as expected.
-	bootstrapSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameBootstrapToken, metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, expectedConfig.ConsulConfig.ACL.Tokens.InitialManagement, string(bootstrapSecret.Data["token"]))
-	require.Equal(t, corev1.SecretTypeOpaque, bootstrapSecret.Type)
-	require.Equal(t, common.CLILabelValue, bootstrapSecret.Labels[common.CLILabelKey])
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameBootstrapToken, secretKeyBootstrapToken,
+		expectedConfig.ConsulConfig.ACL.Tokens.InitialManagement, corev1.SecretTypeOpaque)
 
 	// Check the gossip key secret is as expected.
-	gossipKeySecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameGossipKey, metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, expectedConfig.BootstrapResponse.Bootstrap.GossipKey, string(gossipKeySecret.Data["key"]))
-	require.Equal(t, corev1.SecretTypeOpaque, gossipKeySecret.Type)
-	require.Equal(t, common.CLILabelValue, gossipKeySecret.Labels[common.CLILabelKey])
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameGossipKey, secretKeyGossipKey,
+		expectedConfig.BootstrapResponse.Bootstrap.GossipKey, corev1.SecretTypeOpaque)
 
 	// Check the server cert secret is as expected.
-	serverCertSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameServerCert, metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, expectedConfig.BootstrapResponse.Bootstrap.ServerTLS.Cert, string(serverCertSecret.Data[corev1.TLSCertKey]))
-	require.Equal(t, expectedConfig.BootstrapResponse.Bootstrap.ServerTLS.PrivateKey, string(serverCertSecret.Data[corev1.TLSPrivateKeyKey]))
-	require.Equal(t, corev1.SecretTypeTLS, serverCertSecret.Type)
-	require.Equal(t, common.CLILabelValue, serverCertSecret.Labels[common.CLILabelKey])
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameServerCert, corev1.TLSCertKey,
+		expectedConfig.BootstrapResponse.Bootstrap.ServerTLS.Cert, corev1.SecretTypeTLS)
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameServerCert, corev1.TLSPrivateKeyKey,
+		expectedConfig.BootstrapResponse.Bootstrap.ServerTLS.PrivateKey, corev1.SecretTypeTLS)
 
 	// Check the server CA secret is as expected.
-	serverCASecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameServerCA, metav1.GetOptions{})
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameServerCA, corev1.TLSCertKey,
+		expectedConfig.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0], corev1.SecretTypeOpaque)
+}
+
+func ensureSecretKeyValueMatchesExpected(t require.TestingT, k8s kubernetes.Interface,
+	secretName, secretKey,
+	expectedValue string, expectedSecretType corev1.SecretType) {
+	secret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	require.NoError(t, err)
-	require.Equal(t, expectedConfig.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0], string(serverCASecret.Data[corev1.TLSCertKey]))
-	require.Equal(t, corev1.SecretTypeOpaque, serverCASecret.Type)
-	require.Equal(t, common.CLILabelValue, serverCASecret.Labels[common.CLILabelKey])
+	require.Equal(t, expectedValue, string(secret.Data[secretKey]))
+	require.Equal(t, expectedSecretType, secret.Type)
+	require.Equal(t, common.CLILabelValue, secret.Labels[common.CLILabelKey])
 }
 
 func checkSecretsWereNotSaved(k8s kubernetes.Interface) bool {
 	ns, _ := k8s.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
-	hcpConfigSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPConfig, metav1.GetOptions{})
+	hcpClientIdSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPClientID, metav1.GetOptions{})
+	hcpClientSecretSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPClientSecret, metav1.GetOptions{})
+	hcpResourceIdSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPResourceID, metav1.GetOptions{})
 	bootstrapSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameBootstrapToken, metav1.GetOptions{})
 	gossipKeySecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameGossipKey, metav1.GetOptions{})
 	serverCertSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameServerCert, metav1.GetOptions{})
 	serverCASecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameServerCA, metav1.GetOptions{})
-	return ns == nil && hcpConfigSecret == nil && bootstrapSecret == nil &&
+	return ns == nil && hcpClientIdSecret == nil && hcpClientSecretSecret == nil &&
+		hcpResourceIdSecret == nil && bootstrapSecret == nil &&
 		gossipKeySecret == nil && serverCASecret == nil && serverCertSecret == nil
 }
 
