@@ -15,7 +15,6 @@ load _helpers
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "apiGateway.image must be set to enable api gateway" ]]
 }
@@ -924,7 +923,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
@@ -945,7 +943,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
@@ -966,7 +963,6 @@ load _helpers
       --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
       --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
@@ -988,7 +984,6 @@ load _helpers
       --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
 }
@@ -1012,7 +1007,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
-
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
@@ -1037,7 +1031,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
-
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
@@ -1062,7 +1055,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
-
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
@@ -1087,7 +1079,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
-
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
@@ -1112,7 +1103,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
-
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
@@ -1137,7 +1127,6 @@ load _helpers
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
-
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]

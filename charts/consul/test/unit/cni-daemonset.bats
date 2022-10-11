@@ -37,7 +37,6 @@ load _helpers
       --set 'connectInject.enabled=false' \
       -s templates/cni-daemonset.yaml  \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "connectInject.enabled must be true if connectInject.cni.enabled is true" ]]
 }
