@@ -28,7 +28,6 @@ data:
       "domain": "{{ .Values.global.domain }}",
       "ports": {
         "grpc": 8502,
-        "grpc_tls": 8503,
         "serf_lan": {{ .Values.server.ports.serflan.port }}
       },
       "recursors": {{ .Values.global.recursors | toJson }},
