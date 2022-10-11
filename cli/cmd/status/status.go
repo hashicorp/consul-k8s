@@ -120,7 +120,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err := c.checkConsulAgents(namespace); err != nil {
-		c.UI.Output("Unable to check Kubernetes cluster for Consul clients: %v", err)
+		c.UI.Output("Unable to check Kubernetes cluster for Consul agents: %v", err)
 		return 1
 	}
 
