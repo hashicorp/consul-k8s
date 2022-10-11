@@ -252,80 +252,96 @@ func (i *CloudPreset) saveSecretsFromBootstrapConfig(config *CloudBootstrapConfi
 	}
 
 	// HCP resource id
-	data := map[string][]byte{
-		secretKeyHCPResourceID: []byte(config.HCPConfig.ResourceID),
+	if config.HCPConfig.ResourceID != "" {
+		data := map[string][]byte{
+			secretKeyHCPResourceID: []byte(config.HCPConfig.ResourceID),
+		}
+		if err := i.saveSecret(secretNameHCPResourceID, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("HCP resource id saved in '%s' secret in namespace '%s'.",
+			secretKeyHCPResourceID, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameHCPResourceID, data, corev1.SecretTypeOpaque); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("HCP resource id saved in '%s' secret in namespace '%s'.",
-		secretKeyHCPResourceID, i.KubernetesNamespace), terminal.WithSuccessStyle())
 
 	// HCP client id
-	data = map[string][]byte{
-		secretKeyHCPClientID: []byte(config.HCPConfig.ClientID),
+	if config.HCPConfig.ClientID != "" {
+		data := map[string][]byte{
+			secretKeyHCPClientID: []byte(config.HCPConfig.ClientID),
+		}
+		if err := i.saveSecret(secretNameHCPClientID, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("HCP client id saved in '%s' secret in namespace '%s'.",
+			secretKeyHCPClientID, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameHCPClientID, data, corev1.SecretTypeOpaque); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("HCP client id saved in '%s' secret in namespace '%s'.",
-		secretKeyHCPClientID, i.KubernetesNamespace), terminal.WithSuccessStyle())
 
 	// HCP client secret
-	data = map[string][]byte{
-		secretKeyHCPClientSecret: []byte(config.HCPConfig.ClientSecret),
+	if config.HCPConfig.ClientSecret != "" {
+		data := map[string][]byte{
+			secretKeyHCPClientSecret: []byte(config.HCPConfig.ClientSecret),
+		}
+		if err := i.saveSecret(secretNameHCPClientSecret, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("HCP client secret saved in '%s' secret in namespace '%s'.",
+			secretKeyHCPClientSecret, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameHCPClientSecret, data, corev1.SecretTypeOpaque); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("HCP client secret saved in '%s' secret in namespace '%s'.",
-		secretKeyHCPClientSecret, i.KubernetesNamespace), terminal.WithSuccessStyle())
 
 	// bootstrap token
-	data = map[string][]byte{
-		secretKeyBootstrapToken: []byte(config.ConsulConfig.ACL.Tokens.InitialManagement),
+	if config.ConsulConfig.ACL.Tokens.InitialManagement != "" {
+		data := map[string][]byte{
+			secretKeyBootstrapToken: []byte(config.ConsulConfig.ACL.Tokens.InitialManagement),
+		}
+		if err := i.saveSecret(secretNameBootstrapToken, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("ACL bootstrap token saved as '%s' key in '%s' secret in namespace '%s'.",
+			secretKeyBootstrapToken, secretNameBootstrapToken, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameBootstrapToken, data, corev1.SecretTypeOpaque); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("ACL bootstrap token saved as '%s' key in '%s' secret in namespace '%s'.",
-		secretKeyBootstrapToken, secretNameBootstrapToken, i.KubernetesNamespace), terminal.WithSuccessStyle())
 
 	// gossip key
-	data = map[string][]byte{
-		secretKeyGossipKey: []byte(config.BootstrapResponse.Bootstrap.GossipKey),
+	if config.BootstrapResponse.Bootstrap.GossipKey != "" {
+		data := map[string][]byte{
+			secretKeyGossipKey: []byte(config.BootstrapResponse.Bootstrap.GossipKey),
+		}
+		if err := i.saveSecret(secretNameGossipKey, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("Gossip encryption key saved as '%s' key in '%s' secret in namespace '%s'.",
+			secretKeyGossipKey, secretNameGossipKey, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameGossipKey, data, corev1.SecretTypeOpaque); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("Gossip encryption key saved as '%s' key in '%s' secret in namespace '%s'.",
-		secretKeyGossipKey, secretNameGossipKey, i.KubernetesNamespace), terminal.WithSuccessStyle())
 
 	// server cert secret
-	data = map[string][]byte{
-		corev1.TLSCertKey:       []byte(config.BootstrapResponse.Bootstrap.ServerTLS.Cert),
-		corev1.TLSPrivateKeyKey: []byte(config.BootstrapResponse.Bootstrap.ServerTLS.PrivateKey),
+	if config.BootstrapResponse.Bootstrap.ServerTLS.Cert != "" {
+		data := map[string][]byte{
+			corev1.TLSCertKey:       []byte(config.BootstrapResponse.Bootstrap.ServerTLS.Cert),
+			corev1.TLSPrivateKeyKey: []byte(config.BootstrapResponse.Bootstrap.ServerTLS.PrivateKey),
+		}
+		if err := i.saveSecret(secretNameServerCert, data, corev1.SecretTypeTLS); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("Server TLS cert and key saved as '%s' and '%s' key in '%s secret in namespace '%s'.",
+			corev1.TLSCertKey, corev1.TLSPrivateKeyKey, secretNameServerCert, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameServerCert, data, corev1.SecretTypeTLS); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("Server TLS cert and key saved as '%s' and '%s' key in '%s secret in namespace '%s'.",
-		corev1.TLSCertKey, corev1.TLSPrivateKeyKey, secretNameServerCert, i.KubernetesNamespace), terminal.WithSuccessStyle())
 
 	// server CA
-	data = map[string][]byte{
-		corev1.TLSCertKey: []byte(config.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0]),
+	if len(config.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities) > 0 &&
+		config.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0] != "" {
+		data := map[string][]byte{
+			corev1.TLSCertKey: []byte(config.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0]),
+		}
+		if err := i.saveSecret(secretNameServerCA, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		i.UI.Output(fmt.Sprintf("Server TLS CA saved as '%s' key in '%s' secret in namespace '%s'.",
+			corev1.TLSCertKey, secretNameServerCA, i.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
-	if err := i.saveSecret(secretNameServerCA, data, corev1.SecretTypeOpaque); err != nil {
-		return err
-	}
-	i.UI.Output(fmt.Sprintf("Server TLS CA saved as '%s' key in '%s' secret in namespace '%s'.",
-		corev1.TLSCertKey, secretNameServerCA, i.KubernetesNamespace), terminal.WithSuccessStyle())
-
 	// Optional secrets
 	// HCP auth url
 	if config.HCPConfig.AuthURL != "" {
-		data[secretKeyHCPAuthURL] = []byte(config.HCPConfig.AuthURL)
+		data := map[string][]byte{
+			secretKeyHCPAuthURL: []byte(config.HCPConfig.AuthURL),
+		}
 		if err := i.saveSecret(secretNameHCPAuthURL, data, corev1.SecretTypeOpaque); err != nil {
 			return err
 		}
@@ -335,7 +351,9 @@ func (i *CloudPreset) saveSecretsFromBootstrapConfig(config *CloudBootstrapConfi
 
 	// HCP api hostname
 	if config.HCPConfig.APIHostname != "" {
-		data[secretKeyHCPAPIHostname] = []byte(config.HCPConfig.APIHostname)
+		data := map[string][]byte{
+			secretKeyHCPAPIHostname: []byte(config.HCPConfig.APIHostname),
+		}
 		if err := i.saveSecret(secretNameHCPAPIHostname, data, corev1.SecretTypeOpaque); err != nil {
 			return err
 		}
@@ -345,7 +363,9 @@ func (i *CloudPreset) saveSecretsFromBootstrapConfig(config *CloudBootstrapConfi
 
 	// HCP scada address
 	if config.HCPConfig.ScadaAddress != "" {
-		data[secretKeyHCPScadaAddress] = []byte(config.HCPConfig.ScadaAddress)
+		data := map[string][]byte{
+			secretKeyHCPScadaAddress: []byte(config.HCPConfig.ScadaAddress)
+		}
 		if err := i.saveSecret(secretNameHCPScadaAddress, data, corev1.SecretTypeOpaque); err != nil {
 			return err
 		}
