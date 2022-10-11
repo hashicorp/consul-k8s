@@ -7,6 +7,36 @@ import (
 	"github.com/fatih/color"
 )
 
+const (
+	HeaderStyle        = "header"
+	ErrorStyle         = "error"
+	ErrorBoldStyle     = "error-bold"
+	WarningStyle       = "warning"
+	WarningBoldStyle   = "warning-bold"
+	InfoStyle          = "info"
+	LibraryStyle       = "library"
+	SuccessStyle       = "success"
+	SuccessBoldStyle   = "success-bold"
+	DiffUnchangedStyle = "diff-unchanged"
+	DiffAddedStyle     = "diff-added"
+	DiffRemovedStyle   = "diff-removed"
+)
+
+var (
+	colorHeader        = color.New(color.Bold)
+	colorInfo          = color.New()
+	colorError         = color.New(color.FgRed)
+	colorErrorBold     = color.New(color.FgRed, color.Bold)
+	colorLibrary       = color.New(color.FgCyan)
+	colorSuccess       = color.New(color.FgGreen)
+	colorSuccessBold   = color.New(color.FgGreen, color.Bold)
+	colorWarning       = color.New(color.FgYellow)
+	colorWarningBold   = color.New(color.FgYellow, color.Bold)
+	colorDiffUnchanged = color.New()
+	colorDiffAdded     = color.New(color.FgGreen)
+	colorDiffRemoved   = color.New(color.FgRed)
+)
+
 // ErrNonInteractive is returned when Input is called on a non-Interactive UI.
 var ErrNonInteractive = errors.New("noninteractive UI doesn't support this operation")
 
@@ -64,21 +94,6 @@ type Input struct {
 	// True if this input is a secret. The input will be masked.
 	Secret bool
 }
-
-const (
-	HeaderStyle        = "header"
-	ErrorStyle         = "error"
-	ErrorBoldStyle     = "error-bold"
-	WarningStyle       = "warning"
-	WarningBoldStyle   = "warning-bold"
-	InfoStyle          = "info"
-	LibraryStyle       = "library"
-	SuccessStyle       = "success"
-	SuccessBoldStyle   = "success-bold"
-	DiffUnchangedStyle = "diff-unchanged"
-	DiffAddedStyle     = "diff-added"
-	DiffRemovedStyle   = "diff-removed"
-)
 
 type config struct {
 	// Writer is where the message will be written to.
@@ -167,18 +182,3 @@ func WithStyle(style string) Option {
 func WithWriter(w io.Writer) Option {
 	return func(c *config) { c.Writer = w }
 }
-
-var (
-	colorHeader        = color.New(color.Bold)
-	colorInfo          = color.New()
-	colorError         = color.New(color.FgRed)
-	colorErrorBold     = color.New(color.FgRed, color.Bold)
-	colorLibrary       = color.New(color.FgCyan)
-	colorSuccess       = color.New(color.FgGreen)
-	colorSuccessBold   = color.New(color.FgGreen, color.Bold)
-	colorWarning       = color.New(color.FgYellow)
-	colorWarningBold   = color.New(color.FgYellow, color.Bold)
-	colorDiffUnchanged = color.New()
-	colorDiffAdded     = color.New(color.FgGreen)
-	colorDiffRemoved   = color.New(color.FgRed)
-)
