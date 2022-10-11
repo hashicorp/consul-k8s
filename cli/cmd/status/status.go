@@ -119,11 +119,9 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if s, err := c.checkConsulServers(namespace); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+	if err := c.checkConsulServers(namespace); err != nil {
+		c.UI.Output("Unable to check Kubernetes cluster for Consul servers: %v", err)
 		return 1
-	} else {
-		c.UI.Output(s, terminal.WithSuccessStyle())
 	}
 
 	return 0
@@ -216,24 +214,24 @@ func validEvent(events []release.HookEvent) bool {
 	return false
 }
 
-// checkConsulServers uses the Kubernetes list function to report if the consul servers are healthy.
-func (c *Command) checkConsulServers(namespace string) (string, error) {
-	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(c.Ctx,
-		metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
+// checkConsulServers prints the status of Consul servers if they
+// are expected to be found in the Kubernetes cluster. It does not check for
+// server status if they are not running within the Kubernetes cluster.
+func (c *Command) checkConsulServers(namespace string) error {
+	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
 	if err != nil {
-		return "", err
-	} else if len(servers.Items) == 0 {
-		return "", errors.New("no server stateful set found")
-	} else if len(servers.Items) > 1 {
-		return "", errors.New("found multiple server stateful sets")
+		return err
+	}
+	if len(servers.Items) != 0 {
+		desiredServers, readyServers := int(*servers.Items[0].Spec.Replicas), int(servers.Items[0].Status.ReadyReplicas)
+		if readyServers < desiredServers {
+			c.UI.Output("Consul servers healthy %d/%d", readyServers, desiredServers, terminal.WithErrorStyle())
+		} else {
+			c.UI.Output("Consul servers healthy %d/%d", readyServers, desiredServers)
+		}
 	}
 
-	desiredReplicas := int(*servers.Items[0].Spec.Replicas)
-	readyReplicas := int(servers.Items[0].Status.ReadyReplicas)
-	if readyReplicas < desiredReplicas {
-		return "", fmt.Errorf("%d/%d Consul servers unhealthy", desiredReplicas-readyReplicas, desiredReplicas)
-	}
-	return fmt.Sprintf("Consul servers healthy (%d/%d)", readyReplicas, desiredReplicas), nil
+	return nil
 }
 
 // setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use

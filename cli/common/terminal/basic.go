@@ -79,7 +79,7 @@ func (ui *basicUI) Interactive() bool {
 	return isatty.IsTerminal(os.Stdin.Fd())
 }
 
-// Output implements UI.
+// Output prints the given message using the formatting options passed in.
 func (ui *basicUI) Output(msg string, raw ...interface{}) {
 	msg, style, w := ui.parse(msg, raw...)
 
@@ -115,7 +115,6 @@ func (ui *basicUI) Output(msg string, raw ...interface{}) {
 		msg = strings.Join(lines, "\n")
 	}
 
-	// Write it
 	fmt.Fprintln(w, msg)
 }
 

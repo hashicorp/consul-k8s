@@ -11,6 +11,8 @@ BREAKING CHANGES:
 IMPROVEMENTS:
 * Helm:
   * API Gateway: Allow controller to read MeshServices for use as a route backend. [[GH-1574](https://github.com/hashicorp/consul-k8s/pull/1574)]
+* CLI:
+  * `consul-k8s status` command will only show status of servers if they are expected to be present in the Kubernetes cluster. [[GH-1603](https://github.com/hashicorp/consul-k8s/pull/1603)]
 
 ## 1.0.0-beta2 (October 7, 2022)
 BREAKING CHANGES:

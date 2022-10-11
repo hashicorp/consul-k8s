@@ -28,39 +28,38 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// TestCheckConsulServers creates a fake stateful set and tests the checkConsulServers function.
 func TestCheckConsulServers(t *testing.T) {
-	c := getInitializedCommand(t, nil)
-	c.kubernetes = fake.NewSimpleClientset()
+	namespace := "default"
+	cases := map[string]struct {
+		desired int
+		healthy int
+	}{
+		"No servers":                    {0, 0},
+		"3 servers expected, 1 healthy": {3, 1},
+		"3 servers expected, 3 healthy": {3, 3},
+	}
 
-	// First check that no stateful sets causes an error.
-	_, err := c.checkConsulServers("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no server stateful set found")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := getInitializedCommand(t, buf)
+			c.kubernetes = fake.NewSimpleClientset()
 
-	// Next create a stateful set with 3 desired replicas and 3 ready replicas.
-	var replicas int32 = 3
+			// Deploy servers
+			err := createServers("consul-servers", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
+			require.NoError(t, err)
 
-	createStatefulSet("consul-server-test1", "default", replicas, replicas, c.kubernetes)
+			// Verify that the correct server statuses are seen.
+			err = c.checkConsulServers(namespace)
+			require.NoError(t, err)
 
-	// Now we run the checkConsulServers() function and it should succeed.
-	s, err := c.checkConsulServers("default")
-	require.NoError(t, err)
-	require.Equal(t, "Consul servers healthy (3/3)", s)
-
-	// If you then create another stateful set it should error.
-	createStatefulSet("consul-server-test2", "default", replicas, replicas, c.kubernetes)
-	_, err = c.checkConsulServers("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "found multiple server stateful sets")
-
-	// Clear out the client and now run a test where the stateful set isn't ready.
-	c.kubernetes = fake.NewSimpleClientset()
-	createStatefulSet("consul-server-test2", "default", replicas, replicas-1, c.kubernetes)
-
-	_, err = c.checkConsulServers("default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), fmt.Sprintf("%d/%d Consul servers unhealthy", 1, replicas))
+			actual := buf.String()
+			if tc.desired != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul servers healthy %d/%d", tc.healthy, tc.desired))
+			}
+			buf.Reset()
+		})
+	}
 }
 
 // TestStatus creates a fake stateful set and tests the checkConsulServers function.
@@ -71,19 +70,18 @@ func TestStatus(t *testing.T) {
 	cases := map[string]struct {
 		input              []string
 		messages           []string
-		preProcessingFunc  func(k8s kubernetes.Interface)
+		preProcessingFunc  func(k8s kubernetes.Interface) error
 		helmActionsRunner  *helm.MockActionRunner
 		expectedReturnCode int
 	}{
-		"status with clients and servers returns success": {
+		"status with servers returns success": {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \n ✓ Consul servers healthy (3/3)\n",
+				"\n==> Config:\n    {}\n    \nConsul servers healthy 3/3\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -101,40 +99,15 @@ func TestStatus(t *testing.T) {
 			},
 			expectedReturnCode: 0,
 		},
-		"status with no servers returns error": {
-			input: []string{},
-			messages: []string{
-				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \n ! no server stateful set found\n",
-			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-			},
-			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
-					return &helmRelease.Release{
-						Name: "consul", Namespace: "consul",
-						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
-						Chart: &chart.Chart{
-							Metadata: &chart.Metadata{
-								Version: "1.0.0",
-							},
-						},
-						Config: make(map[string]interface{})}, nil
-				},
-			},
-			expectedReturnCode: 1,
-		},
 		"status with pre-install and pre-upgrade hooks returns success and outputs hook status": {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \n",
-				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\n ✓ Consul servers healthy (3/3)\n",
+				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul servers healthy 3/3\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -186,9 +159,8 @@ func TestStatus(t *testing.T) {
 			messages: []string{
 				"\n==> Consul Status Summary\n ! kaboom!\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -203,9 +175,8 @@ func TestStatus(t *testing.T) {
 			messages: []string{
 				"\n==> Consul Status Summary\n ! couldn't check for installations: kaboom!\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -223,7 +194,8 @@ func TestStatus(t *testing.T) {
 			c.kubernetes = fake.NewSimpleClientset()
 			c.helmActionsRunner = tc.helmActionsRunner
 			if tc.preProcessingFunc != nil {
-				tc.preProcessingFunc(c.kubernetes)
+				err := tc.preProcessingFunc(c.kubernetes)
+				require.NoError(t, err)
 			}
 			returnCode := c.Run([]string{})
 			require.Equal(t, tc.expectedReturnCode, returnCode)
@@ -233,32 +205,6 @@ func TestStatus(t *testing.T) {
 			}
 		})
 	}
-}
-
-// getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
-	t.Helper()
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "cli",
-		Level:  hclog.Info,
-		Output: os.Stdout,
-	})
-	var ui terminal.UI
-	if buf != nil {
-		ui = terminal.NewUI(context.Background(), buf)
-	} else {
-		ui = terminal.NewBasicUI(context.Background())
-	}
-	baseCommand := &common.BaseCommand{
-		Log: log,
-		UI:  ui,
-	}
-
-	c := &Command{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	return c
 }
 
 func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
@@ -291,8 +237,34 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	assert.Equal(t, complete.PredictNothing, c)
 }
 
-func createStatefulSet(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
-	ss := &appsv1.StatefulSet{
+// getInitializedCommand sets up a command struct for tests.
+func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
+	t.Helper()
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "cli",
+		Level:  hclog.Info,
+		Output: os.Stdout,
+	})
+	var ui terminal.UI
+	if buf != nil {
+		ui = terminal.NewUI(context.Background(), buf)
+	} else {
+		ui = terminal.NewBasicUI(context.Background())
+	}
+	baseCommand := &common.BaseCommand{
+		Log: log,
+		UI:  ui,
+	}
+
+	c := &Command{
+		BaseCommand: baseCommand,
+	}
+	c.init()
+	return c
+}
+
+func createServers(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
+	servers := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -306,22 +278,6 @@ func createStatefulSet(name, namespace string, replicas, readyReplicas int32, k8
 			ReadyReplicas: readyReplicas,
 		},
 	}
-
-	k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), ss, metav1.CreateOptions{})
-}
-
-func createDaemonset(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-		},
-		Status: appsv1.DaemonSetStatus{
-			DesiredNumberScheduled: replicas,
-			NumberReady:            readyReplicas,
-		},
-	}
-
-	k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), ds, metav1.CreateOptions{})
+	_, err := k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
+	return err
 }
