@@ -119,7 +119,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err := c.checkConsulAgents(namespace); err != nil {
+	if err := c.checkConsulServers(namespace); err != nil {
 		c.UI.Output("Unable to check Kubernetes cluster for Consul agents: %v", err)
 		return 1
 	}
@@ -214,25 +214,10 @@ func validEvent(events []release.HookEvent) bool {
 	return false
 }
 
-// checkConsulAgents prints the status of Consul servers and clients if they
+// checkConsulServers prints the status of Consul servers if they
 // are expected to be found in the Kubernetes cluster. It does not check for
 // server status if they are not running within the Kubernetes cluster.
-func (c *Command) checkConsulAgents(namespace string) error {
-	// Check clients (TODO this can be removed when more users are using Agentless Consul - t-eckert 7 Oct 22)
-	clients, err := c.kubernetes.AppsV1().DaemonSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm"})
-	if err != nil {
-		return err
-	}
-	if len(clients.Items) != 0 {
-		desiredClients, readyClients := int(clients.Items[0].Status.DesiredNumberScheduled), int(clients.Items[0].Status.NumberReady)
-		if readyClients < desiredClients {
-			c.UI.Output("Consul Clients Healthy %d/%d", readyClients, desiredClients, terminal.WithErrorStyle())
-		} else {
-			c.UI.Output("Consul Clients Healthy %d/%d", readyClients, desiredClients)
-		}
-	}
-
-	// Check servers if deployed within Kubernetes cluster.
+func (c *Command) checkConsulServers(namespace string) error {
 	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
 	if err != nil {
 		return err
@@ -240,9 +225,9 @@ func (c *Command) checkConsulAgents(namespace string) error {
 	if len(servers.Items) != 0 {
 		desiredServers, readyServers := int(*servers.Items[0].Spec.Replicas), int(servers.Items[0].Status.ReadyReplicas)
 		if readyServers < desiredServers {
-			c.UI.Output("Consul Servers Healthy %d/%d", readyServers, desiredServers, terminal.WithErrorStyle())
+			c.UI.Output("Consul servers healthy %d/%d", readyServers, desiredServers, terminal.WithErrorStyle())
 		} else {
-			c.UI.Output("Consul Servers Healthy %d/%d", readyServers, desiredServers)
+			c.UI.Output("Consul servers healthy %d/%d", readyServers, desiredServers)
 		}
 	}
 

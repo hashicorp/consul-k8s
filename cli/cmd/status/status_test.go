@@ -28,47 +28,34 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestCheckConsulAgents(t *testing.T) {
+func TestCheckConsulServers(t *testing.T) {
 	namespace := "default"
 	cases := map[string]struct {
-		desiredClients int
-		healthyClients int
-		desiredServers int
-		healthyServers int
+		desired int
+		healthy int
 	}{
-		"No clients, no agents":                       {0, 0, 0, 0},
-		"3 clients - 1 healthy, no agents":            {3, 1, 0, 0},
-		"3 clients - 3 healthy, no agents":            {3, 3, 0, 0},
-		"3 clients - 1 healthy, 3 agents - 1 healthy": {3, 1, 3, 1},
-		"3 clients - 3 healthy, 3 agents - 3 healthy": {3, 3, 3, 3},
-		"No clients, 3 agents - 1 healthy":            {0, 0, 3, 1},
-		"No clients, 3 agents - 3 healthy":            {0, 0, 3, 3},
+		"No servers":                    {0, 0},
+		"3 servers expected, 1 healthy": {3, 1},
+		"3 servers expected, 3 healthy": {3, 3},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			c := setupCommand(buf)
+			c := getInitializedCommand(t, buf)
 			c.kubernetes = fake.NewSimpleClientset()
 
-			// Deploy clients
-			err := createClients("consul-clients", namespace, int32(tc.desiredClients), int32(tc.healthyClients), c.kubernetes)
-			require.NoError(t, err)
-
 			// Deploy servers
-			err = createServers("consul-servers", namespace, int32(tc.desiredServers), int32(tc.healthyServers), c.kubernetes)
+			err := createServers("consul-servers", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
 			require.NoError(t, err)
 
-			// Verify that the correct clients and server statuses are seen.
-			err = c.checkConsulAgents(namespace)
+			// Verify that the correct server statuses are seen.
+			err = c.checkConsulServers(namespace)
 			require.NoError(t, err)
 
 			actual := buf.String()
-			if tc.desiredClients != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul Clients Healthy %d/%d", tc.healthyClients, tc.desiredClients))
-			}
-			if tc.desiredServers != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul Servers Healthy %d/%d", tc.healthyServers, tc.desiredServers))
+			if tc.desired != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul servers healthy %d/%d", tc.healthy, tc.desired))
 			}
 			buf.Reset()
 		})
@@ -83,19 +70,18 @@ func TestStatus(t *testing.T) {
 	cases := map[string]struct {
 		input              []string
 		messages           []string
-		preProcessingFunc  func(k8s kubernetes.Interface)
+		preProcessingFunc  func(k8s kubernetes.Interface) error
 		helmActionsRunner  *helm.MockActionRunner
 		expectedReturnCode int
 	}{
-		"status with clients and servers returns success": {
+		"status with servers returns success": {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \nConsul Clients Healthy 3/3\nConsul Servers Healthy 3/3\n",
+				"\n==> Config:\n    {}\n    \nConsul servers healthy 3/3\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createClients("consul-client-test1", "consul", 3, 3, k8s)
-				createServers("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -118,10 +104,10 @@ func TestStatus(t *testing.T) {
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \n",
-				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul Servers Healthy 3/3\n",
+				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul servers healthy 3/3\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createServers("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -173,9 +159,8 @@ func TestStatus(t *testing.T) {
 			messages: []string{
 				"\n==> Consul Status Summary\n ! kaboom!\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createClients("consul-client-test1", "consul", 3, 3, k8s)
-				createServers("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -190,9 +175,8 @@ func TestStatus(t *testing.T) {
 			messages: []string{
 				"\n==> Consul Status Summary\n ! couldn't check for installations: kaboom!\n",
 			},
-			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createClients("consul-client-test1", "consul", 3, 3, k8s)
-				createServers("consul-server-test1", "consul", 3, 3, k8s)
+			preProcessingFunc: func(k8s kubernetes.Interface) error {
+				return createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -210,7 +194,8 @@ func TestStatus(t *testing.T) {
 			c.kubernetes = fake.NewSimpleClientset()
 			c.helmActionsRunner = tc.helmActionsRunner
 			if tc.preProcessingFunc != nil {
-				tc.preProcessingFunc(c.kubernetes)
+				err := tc.preProcessingFunc(c.kubernetes)
+				require.NoError(t, err)
 			}
 			returnCode := c.Run([]string{})
 			require.Equal(t, tc.expectedReturnCode, returnCode)
@@ -220,32 +205,6 @@ func TestStatus(t *testing.T) {
 			}
 		})
 	}
-}
-
-// getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
-	t.Helper()
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "cli",
-		Level:  hclog.Info,
-		Output: os.Stdout,
-	})
-	var ui terminal.UI
-	if buf != nil {
-		ui = terminal.NewUI(context.Background(), buf)
-	} else {
-		ui = terminal.NewBasicUI(context.Background())
-	}
-	baseCommand := &common.BaseCommand{
-		Log: log,
-		UI:  ui,
-	}
-
-	c := &Command{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	return c
 }
 
 func TestTaskCreateCommand_AutocompleteFlags(t *testing.T) {
@@ -278,6 +237,32 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	assert.Equal(t, complete.PredictNothing, c)
 }
 
+// getInitializedCommand sets up a command struct for tests.
+func getInitializedCommand(t *testing.T, buf io.Writer) *Command {
+	t.Helper()
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "cli",
+		Level:  hclog.Info,
+		Output: os.Stdout,
+	})
+	var ui terminal.UI
+	if buf != nil {
+		ui = terminal.NewUI(context.Background(), buf)
+	} else {
+		ui = terminal.NewBasicUI(context.Background())
+	}
+	baseCommand := &common.BaseCommand{
+		Log: log,
+		UI:  ui,
+	}
+
+	c := &Command{
+		BaseCommand: baseCommand,
+	}
+	c.init()
+	return c
+}
+
 func createServers(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
 	servers := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -295,40 +280,4 @@ func createServers(name, namespace string, replicas, readyReplicas int32, k8s ku
 	}
 	_, err := k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
 	return err
-}
-
-func createClients(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
-	clients := appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
-		},
-		Status: appsv1.DaemonSetStatus{
-			DesiredNumberScheduled: replicas,
-			NumberReady:            readyReplicas,
-		},
-	}
-	_, err := k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
-	return err
-}
-
-func setupCommand(buf io.Writer) *Command {
-	// Log at a test level to standard out.
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "test",
-		Level:  hclog.Debug,
-		Output: os.Stdout,
-	})
-
-	// Setup and initialize the command struct
-	command := &Command{
-		BaseCommand: &common.BaseCommand{
-			Log: log,
-			UI:  terminal.NewUI(context.Background(), buf),
-		},
-	}
-	command.init()
-
-	return command
 }
