@@ -30,15 +30,19 @@ import (
 
 func TestCheckConsulAgents(t *testing.T) {
 	namespace := "default"
-
 	cases := map[string]struct {
-		clients int
-		servers int
+		desiredClients int
+		healthyClients int
+		desiredServers int
+		healthyServers int
 	}{
-		"No clients, no agents": {0, 0},
-		"3 clients, no agents":  {3, 0},
-		"3 clients, 3 agents":   {3, 3},
-		"No clients, 3 agents":  {3, 3},
+		"No clients, no agents":                       {0, 0, 0, 0},
+		"3 clients - 1 healthy, no agents":            {3, 1, 0, 0},
+		"3 clients - 3 healthy, no agents":            {3, 3, 0, 0},
+		"3 clients - 1 healthy, 3 agents - 1 healthy": {3, 1, 3, 1},
+		"3 clients - 3 healthy, 3 agents - 3 healthy": {3, 3, 3, 3},
+		"No clients, 3 agents - 1 healthy":            {0, 0, 3, 1},
+		"No clients, 3 agents - 3 healthy":            {0, 0, 3, 3},
 	}
 
 	for name, tc := range cases {
@@ -47,66 +51,24 @@ func TestCheckConsulAgents(t *testing.T) {
 			c := setupCommand(buf)
 			c.kubernetes = fake.NewSimpleClientset()
 
-			// Before deployment, we shouldn't see the checks or errors.
-			err := c.checkConsulAgents(namespace)
+			// Deploy clients
+			err := createClients("consul-clients", namespace, int32(tc.desiredClients), int32(tc.healthyClients), c.kubernetes)
+			require.NoError(t, err)
+
+			// Deploy servers
+			err = createServers("consul-servers", namespace, int32(tc.desiredServers), int32(tc.healthyServers), c.kubernetes)
+			require.NoError(t, err)
+
+			// Verify that the correct clients and server statuses are seen.
+			err = c.checkConsulAgents(namespace)
 			require.NoError(t, err)
 
 			actual := buf.String()
-			require.NotContains(t, actual, "Consul Clients Healthy")
-			require.NotContains(t, actual, "Consul Servers Healthy")
-			buf.Reset()
-
-			if tc.clients != 0 {
-				// Deploy clients where only 1 of the clients is healthy.
-				clients := mockClients("consul-clients", namespace, int32(tc.clients), 1)
-				_, err := c.kubernetes.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
-				require.NoError(t, err)
+			if tc.desiredClients != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul Clients Healthy %d/%d", tc.healthyClients, tc.desiredClients))
 			}
-
-			if tc.servers != 0 {
-				// Deploy servers where only 1 of the servers is healthy.
-				servers := mockServers("consul-servers", namespace, int32(tc.servers), 1)
-				_, err := c.kubernetes.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
-				require.NoError(t, err)
-			}
-
-			// Verify that unhealthy clients and servers are seen.
-			err = c.checkConsulAgents(namespace)
-			require.NoError(t, err)
-
-			actual = buf.String()
-			if tc.clients != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul Clients Healthy 1/%d", tc.clients))
-			}
-			if tc.servers != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul Servers Healthy 1/%d", tc.servers))
-			}
-			buf.Reset()
-
-			if tc.clients != 0 {
-				// Update clients so that all clients are healthy.
-				clients := mockClients("consul-clients", namespace, int32(tc.clients), int32(tc.clients))
-				_, err := c.kubernetes.AppsV1().DaemonSets(namespace).Update(context.Background(), &clients, metav1.UpdateOptions{})
-				require.NoError(t, err)
-			}
-
-			if tc.servers != 0 {
-				// Update servers so that all servers are healthy.
-				servers := mockServers("consul-servers", namespace, int32(tc.servers), int32(tc.servers))
-				_, err := c.kubernetes.AppsV1().StatefulSets(namespace).Update(context.Background(), &servers, metav1.UpdateOptions{})
-				require.NoError(t, err)
-			}
-
-			// Verify that healthy clients and servers are seen.
-			err = c.checkConsulAgents(namespace)
-			require.NoError(t, err)
-
-			actual = buf.String()
-			if tc.clients != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul Clients Healthy %d/%d", tc.clients, tc.clients))
-			}
-			if tc.servers != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul Servers Healthy %d/%d", tc.servers, tc.servers))
+			if tc.desiredServers != 0 {
+				require.Contains(t, actual, fmt.Sprintf("Consul Servers Healthy %d/%d", tc.healthyServers, tc.desiredServers))
 			}
 			buf.Reset()
 		})
@@ -132,8 +94,8 @@ func TestStatus(t *testing.T) {
 				"\n==> Config:\n    {}\n    \nConsul Clients Healthy 3/3\nConsul Servers Healthy 3/3\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+				createClients("consul-client-test1", "consul", 3, 3, k8s)
+				createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -159,7 +121,7 @@ func TestStatus(t *testing.T) {
 				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul Servers Healthy 3/3\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+				createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -212,9 +174,8 @@ func TestStatus(t *testing.T) {
 				"\n==> Consul Status Summary\n ! kaboom!\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
-
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+				createClients("consul-client-test1", "consul", 3, 3, k8s)
+				createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -230,8 +191,8 @@ func TestStatus(t *testing.T) {
 				"\n==> Consul Status Summary\n ! couldn't check for installations: kaboom!\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) {
-				createDaemonset("consul-client-test1", "consul", 3, 3, k8s)
-				createStatefulSet("consul-server-test1", "consul", 3, 3, k8s)
+				createClients("consul-client-test1", "consul", 3, 3, k8s)
+				createServers("consul-server-test1", "consul", 3, 3, k8s)
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -317,8 +278,8 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	assert.Equal(t, complete.PredictNothing, c)
 }
 
-func mockServers(name, namespace string, replicas, readyReplicas int32) appsv1.StatefulSet {
-	return appsv1.StatefulSet{
+func createServers(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
+	servers := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -332,15 +293,12 @@ func mockServers(name, namespace string, replicas, readyReplicas int32) appsv1.S
 			ReadyReplicas: readyReplicas,
 		},
 	}
+	_, err := k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
+	return err
 }
 
-func createStatefulSet(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
-	servers := mockServers(name, namespace, replicas, readyReplicas)
-	k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
-}
-
-func mockClients(name, namespace string, replicas, readyReplicas int32) appsv1.DaemonSet {
-	return appsv1.DaemonSet{
+func createClients(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
+	clients := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -351,11 +309,8 @@ func mockClients(name, namespace string, replicas, readyReplicas int32) appsv1.D
 			NumberReady:            readyReplicas,
 		},
 	}
-}
-
-func createDaemonset(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) {
-	clients := mockClients(name, namespace, replicas, readyReplicas)
-	k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
+	_, err := k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
+	return err
 }
 
 func setupCommand(buf io.Writer) *Command {
