@@ -520,7 +520,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          failfast: true
+          failfast: false
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=ndhanushkodi/consul-dev:peermeshgw2
       - store_test_results:
           path: /tmp/test-results

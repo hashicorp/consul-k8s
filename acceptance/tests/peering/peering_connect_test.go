@@ -42,6 +42,10 @@ func TestPeering_Connect(t *testing.T) {
 		ACLsEnabled bool
 	}{
 		{
+			"default installation",
+			false,
+		},
+		{
 			"secure installation",
 			true,
 		},
