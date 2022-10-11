@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Consul Community Support
+    url: https://discuss.hashicorp.com/c/consul/29
+    about: If you have a question or are looking for advice on Consul K8s, please post on our Discuss forum! The community loves to chime in to help. Happy Coding!
   - name: Consul on Kubernetes Learn Tutorials
     url: https://learn.hashicorp.com/collections/consul/kubernetes
     about: Please check out our Learn Tutorials. These hands on tutorials deal with many of the tasks common to using Consul on Kubernetes.
