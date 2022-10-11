@@ -10,7 +10,7 @@
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
-{{ template "consul.validateCloudSecretNames" . }}
+{{ template "consul.validaterequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
