@@ -22,7 +22,7 @@ BREAKING CHANGES:
 
 BUG FIXES:
 * CLI
-  * Pass required environment variables to the CLI for cluster bootstrapping. [[GH-1593](https://github.com/hashicorp/consul-k8s/pull/1593)]
+  * Allow optional environment variables for use in the cloud preset to the CLI for cluster bootstrapping. [[GH-1608](https://github.com/hashicorp/consul-k8s/pull/1608)]
   * Configure `-tls-server-name` when `global.cloud.enabled=true` so that it matches the server certificate created via HCP [[GH-1591](https://github.com/hashicorp/consul-k8s/pull/1591)]
   * Do not query clients in the status command since clients no longer exist. [[GH-1573](https://github.com/hashicorp/consul-k8s/pull/1573)]
 
