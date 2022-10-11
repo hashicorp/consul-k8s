@@ -15,7 +15,7 @@
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 {{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
-{{ template "consul.validaterequiredCloudSecretsExist" . }}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
@@ -255,7 +255,7 @@ spec:
                   name: {{ .Values.global.acls.replicationToken.secretName | quote }}
                   key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
             {{- end }}
-            {{- if and .Values.global.cloud.enabled}}
+            {{- if .Values.global.cloud.enabled}}
             # These are mounted as secrets so that the consul server agent can use them.
             # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, 
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.

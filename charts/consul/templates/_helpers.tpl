@@ -376,10 +376,10 @@ Fails global.cloud.enabled is true and one of the following secrets is nil or em
 - global.cloud.clientId.secretName
 - global.cloud.clientSecret.secretName
 
-Usage: {{ template "consul.validaterequiredCloudSecretsExist" . }}
+Usage: {{ template "consul.validateRequiredCloudSecretsExist" . }}
 
 */}}
-{{- define "consul.validaterequiredCloudSecretsExist" -}}
+{{- define "consul.validateRequiredCloudSecretsExist" -}}
 {{- if (and .Values.global.cloud.enabled (or (not .Values.global.cloud.resourceId.secretName) (not .Values.global.cloud.clientId.secretName) (not .Values.global.cloud.clientSecret.secretName))) }}
 {{fail "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set."}}
 {{- end }}

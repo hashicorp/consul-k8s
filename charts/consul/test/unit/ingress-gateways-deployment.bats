@@ -1146,7 +1146,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # global.cloud
 
-@test "ingressGateways/Deployment: fails when global.cloud.enabled is set and global.cloud.clientId.secretName is not set but global.cloud.clientSecret.secretName and global.cloud.resourceId.secretName is set" {
+@test "ingressGateways/Deployment: fails when global.cloud.enabled is true and global.cloud.clientId.secretName is not set but global.cloud.clientSecret.secretName and global.cloud.resourceId.secretName is set" {
   cd `chart_dir`
   run helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -1167,7 +1167,7 @@ key2: value2' \
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "ingressGateways/Deployment: fails when global.cloud.enabled is set and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
+@test "ingressGateways/Deployment: fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
   cd `chart_dir`
   run helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -1188,7 +1188,7 @@ key2: value2' \
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "ingressGateways/Deployment: fails when global.cloud.enabled is set and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
+@test "ingressGateways/Deployment: fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
   cd `chart_dir`
   run helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -1252,7 +1252,7 @@ key2: value2' \
       .
 
   [ "$status" -eq 1 ]
-  echo "$output"
+  
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -1277,7 +1277,7 @@ key2: value2' \
       .
 
   [ "$status" -eq 1 ]
-  echo "$output"
+  
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -1302,7 +1302,7 @@ key2: value2' \
       .
 
   [ "$status" -eq 1 ]
-  echo "$output"
+  
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -1327,7 +1327,7 @@ key2: value2' \
       .
 
   [ "$status" -eq 1 ]
-  echo "$output"
+  
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -1352,7 +1352,7 @@ key2: value2' \
       .
 
   [ "$status" -eq 1 ]
-  echo "$output"
+  
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -1377,7 +1377,7 @@ key2: value2' \
       .
 
   [ "$status" -eq 1 ]
-  echo "$output"
+  
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
