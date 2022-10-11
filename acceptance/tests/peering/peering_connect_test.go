@@ -73,6 +73,7 @@ func TestPeering_Connect(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+				"peering.tokenGeneration.serverAddresses.source": "consul",
 			}
 
 			staticServerPeerHelmValues := map[string]string{
