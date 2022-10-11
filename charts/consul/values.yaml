@@ -655,6 +655,7 @@ global:
     enabled: false
     
     # The name of the Kubernetes secret that holds the HCP resource id.
+    # This is required when global.cloud.enabled is true.
     resourceId:
       # The name of the Kubernetes secret that holds the resource id.
       # @type: string
@@ -664,6 +665,7 @@ global:
       secretKey: null
 
     # The name of the Kubernetes secret that holds the HCP cloud client id.
+    # This is required when global.cloud.enabled is true.
     clientId:
       # The name of the Kubernetes secret that holds the client id.
       # @type: string
@@ -673,6 +675,7 @@ global:
       secretKey: null
     
     # The name of the Kubernetes secret that holds the HCP cloud client secret.
+    # This is required when global.cloud.enabled is true.
     clientSecret:
       # The name of the Kubernetes secret that holds the client secret.
       # @type: string
@@ -682,6 +685,7 @@ global:
       secretKey: null
 
     # The name of the Kubernetes secret that holds the HCP cloud client id.
+    # This is optional when global.cloud.enabled is true.
     apiHost:
       # The name of the Kubernetes secret that holds the api hostname.
       # @type: string
@@ -691,6 +695,7 @@ global:
       secretKey: null
 
     # The name of the Kubernetes secret that holds the HCP cloud authorization url.
+    # This is optional when global.cloud.enabled is true.
     authUrl:
       # The name of the Kubernetes secret that holds the authorization url.
       # @type: string
@@ -700,6 +705,7 @@ global:
       secretKey: null
 
     # The name of the Kubernetes secret that holds the HCP cloud scada address.
+    # This is optional when global.cloud.enabled is true.
     scadaAddress:
       # The name of the Kubernetes secret that holds the scada address.
       # @type: string
