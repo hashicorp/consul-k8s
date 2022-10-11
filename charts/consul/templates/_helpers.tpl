@@ -371,13 +371,50 @@ Consul server environment variables for consul-k8s commands.
 {{- end -}}
 
 {{/*
-Fails global.cloud.enabled is true and global.cloud.secretName is nil or tempty.
+Fails global.cloud.enabled is true and one of the following secrets is nil or empty.
+- global.cloud.resourceId.secretName
+- global.cloud.clientId.secretName
+- global.cloud.clientSecret.secretName
 
-Usage: {{ template "consul.validateCloudConfiguration" . }}
+Usage: {{ template "consul.validateRequiredCloudSecretsExist" . }}
 
 */}}
-{{- define "consul.validateCloudConfiguration" -}}
-{{- if and .Values.global.cloud.enabled (not .Values.global.cloud.secretName) }}
-{{fail "When global.cloud.enabled is true, global.cloud.secretName must also be set."}}
-{{ end }}
+{{- define "consul.validateRequiredCloudSecretsExist" -}}
+{{- if (and .Values.global.cloud.enabled (or (not .Values.global.cloud.resourceId.secretName) (not .Values.global.cloud.clientId.secretName) (not .Values.global.cloud.clientSecret.secretName))) }}
+{{fail "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set."}}
+{{- end }}
+{{- end -}}
+
+{{/*
+Fails global.cloud.enabled is true and one of the following secrets has either an empty secretName or secretKey.
+- global.cloud.resourceId.secretName / secretKey
+- global.cloud.clientId.secretName / secretKey
+- global.cloud.clientSecret.secretName / secretKey
+- global.cloud.authUrl.secretName / secretKey
+- global.cloud.apiHost.secretName / secretKey
+- global.cloud.scadaAddress.secretName / secretKey
+Usage: {{ template "consul.validateCloudSecretKeys" . }}
+
+*/}}
+{{- define "consul.validateCloudSecretKeys" -}}
+{{- if and .Values.global.cloud.enabled }} 
+{{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
+{{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.clientId.secretName (not .Values.global.cloud.clientId.secretKey)) (and .Values.global.cloud.clientId.secretKey (not .Values.global.cloud.clientId.secretName)) }}
+{{fail "When either global.cloud.clientId.secretName or global.cloud.clientId.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.clientSecret.secretName (not .Values.global.cloud.clientSecret.secretKey)) (and .Values.global.cloud.clientSecret.secretKey (not .Values.global.cloud.clientSecret.secretName)) }}
+{{fail "When either global.cloud.clientSecret.secretName or global.cloud.clientSecret.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.authUrl.secretName (not .Values.global.cloud.authUrl.secretKey)) (and .Values.global.cloud.authUrl.secretKey (not .Values.global.cloud.authUrl.secretName)) }}
+{{fail "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.apiHost.secretName (not .Values.global.cloud.apiHost.secretKey)) (and .Values.global.cloud.apiHost.secretKey (not .Values.global.cloud.apiHost.secretName)) }}
+{{fail "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.scadaAddress.secretName (not .Values.global.cloud.scadaAddress.secretKey)) (and .Values.global.cloud.scadaAddress.secretKey (not .Values.global.cloud.scadaAddress.secretName)) }}
+{{fail "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set."}}
+{{- end }}
+{{- end }}
 {{- end -}}

@@ -1,7 +1,8 @@
 {{- $clientEnabled := (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
 {{- template "consul.reservedNamesFailer" (list .Values.syncCatalog.consulNamespaces.consulDestinationNamespace "syncCatalog.consulNamespaces.consulDestinationNamespace") }}
-{{ template "consul.validateCloudConfiguration" . }}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
 # The deployment for running the sync-catalog pod
 apiVersion: apps/v1
 kind: Deployment

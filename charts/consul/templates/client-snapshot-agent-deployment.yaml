@@ -2,7 +2,8 @@
 {{- if or (and .Values.client.snapshotAgent.configSecret.secretName (not .Values.client.snapshotAgent.configSecret.secretKey)) (and (not .Values.client.snapshotAgent.configSecret.secretName) .Values.client.snapshotAgent.configSecret.secretKey) }}{{fail "client.snapshotAgent.configSecret.secretKey and client.snapshotAgent.configSecret.secretName must both be specified." }}{{ end -}}
 {{- if .Values.client.snapshotAgent.enabled }}
 {{- if or (and .Values.client.snapshotAgent.configSecret.secretName (not .Values.client.snapshotAgent.configSecret.secretKey)) (and (not .Values.client.snapshotAgent.configSecret.secretName) .Values.client.snapshotAgent.configSecret.secretKey) }}{{fail "client.snapshotAgent.configSecret.secretKey and client.snapshotAgent.configSecret.secretName must both be specified." }}{{ end -}}
-{{ template "consul.validateCloudConfiguration" . }}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

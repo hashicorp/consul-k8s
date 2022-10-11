@@ -15,7 +15,8 @@
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 {{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
-{{ template "consul.validateCloudConfiguration" . }}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -254,42 +255,54 @@ spec:
                   name: {{ .Values.global.acls.replicationToken.secretName | quote }}
                   key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
             {{- end }}
-            {{- if and .Values.global.cloud.enabled .Values.global.cloud.secretName }}
+            {{- if .Values.global.cloud.enabled}}
             # These are mounted as secrets so that the consul server agent can use them.
             # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, 
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
             # - HCP_RESOURCE_ID is created for use in the 
             #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
+            {{- if .Values.global.cloud.clientId.secretName }}
             - name: HCP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.secretName }}
-                  key: client-id
+                  name: {{ .Values.global.cloud.clientId.secretName }}
+                  key: {{ .Values.global.cloud.clientId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.clientSecret.secretName }}
             - name: HCP_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.secretName }}
-                  key: client-secret
+                  name: {{ .Values.global.cloud.clientSecret.secretName }}
+                  key: {{ .Values.global.cloud.clientSecret.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.resourceId.secretName }}
             - name: HCP_RESOURCE_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.secretName }}
-                  key: resource-id
+                  name: {{ .Values.global.cloud.resourceId.secretName }}
+                  key: {{ .Values.global.cloud.resourceId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.authUrl.secretName }}
             - name: HCP_AUTH_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.secretName }}
-                  key: auth-url
+                  name: {{ .Values.global.cloud.authUrl.secretName }}
+                  key: {{ .Values.global.cloud.authUrl.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.apiHost.secretName }}
             - name: HCP_API_HOST
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.secretName }}
-                  key: api-hostname            
+                  name: {{ .Values.global.cloud.apiHost.secretName }}
+                  key: {{ .Values.global.cloud.apiHost.secretKey }}            
+            {{- end}}
+            {{- if .Values.global.cloud.scadaAddress.secretName }}
             - name: HCP_SCADA_ADDRESS
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.secretName }}
-                  key: scada-address            
+                  name: {{ .Values.global.cloud.scadaAddress.secretName }}
+                  key: {{ .Values.global.cloud.scadaAddress.secretKey }}
+            {{- end}}          
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
@@ -336,7 +349,7 @@ spec:
                 {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json
-                {{- if and .Values.global.cloud.enabled .Values.global.cloud.secretName }}
+                {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
                 {{- end }}
           volumeMounts:
