@@ -1,4 +1,4 @@
-## UNRELEASED
+## 1.0.0-beta3 (October 12, 2022)
 
 FEATURES:
 * Peering: Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
