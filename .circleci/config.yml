@@ -521,7 +521,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: false
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=ndhanushkodi/consul-dev:peermeshgw2
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=ndhanushkodi/consul-dev:peermeshgw2 -run TestPeering_Connect
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:

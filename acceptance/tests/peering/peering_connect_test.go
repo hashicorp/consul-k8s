@@ -190,6 +190,20 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 
+			// Create Mesh resource to use mesh gateways.
+			logger.Log(t, "creating mesh config")
+			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
+
+			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			})
+
+			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			})
+
 			logger.Log(t, "creating static-server in server peer")
 			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
