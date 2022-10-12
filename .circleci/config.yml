@@ -1084,67 +1084,6 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-11:
-    environment:
-      - TEST_RESULTS: /tmp/test-results
-      - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
-      - ENVOY_IMAGE: "envoyproxy/envoy:v1.20.2"
-      - CONSUL_K8S_IMAGE: "docker.mirror.hashicorp.services/hashicorp/consul-k8s-control-plane:0.49.0"
-      - HELM_CHART_VERSION: "0.49.0"
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: xlarge
-    steps:
-      - run: 
-          name: checkout code
-          command: |
-            if [ -e '/home/circleci/project/.git' ] ; then
-              echo 'Fetching into existing repository'
-              existing_repo='true'
-              cd '/home/circleci/project'
-              git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
-            else
-              echo 'Cloning git repository'
-              existing_repo='false'
-              mkdir -p '/home/circleci/project'
-              cd '/home/circleci/project'
-              git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
-            fi
-
-            if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
-              echo 'Fetching from remote repository'
-                git fetch --force --tags origin
-            fi
-
-            echo 'Checking out tag'
-            git checkout --force "v$HELM_CHART_VERSION"
-      - install-prereqs
-      - create-kind-clusters:
-          version: "v1.23.0"
-      - restore_cache:
-          keys:
-            - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-      - run:
-          name: go mod download
-          working_directory: *acceptance-mod-path
-          command: go mod download
-      - save_cache:
-          key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
-          paths:
-            - ~/.go_workspace/pkg/mod
-      - run: mkdir -p $TEST_RESULTS
-      - run-acceptance-tests:
-          consul-k8s-image: $CONSUL_K8S_IMAGE
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.11" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-      - slack/status:
-          channel: *slack-channel
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
   acceptance-kind-1-23-consul-nightly-1-12:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1353,6 +1292,5 @@ workflows:
               only:
                 - main
     jobs:
-      - acceptance-kind-1-23-consul-nightly-1-11
       - acceptance-kind-1-23-consul-nightly-1-12
       - acceptance-kind-1-23-consul-nightly-1-13
