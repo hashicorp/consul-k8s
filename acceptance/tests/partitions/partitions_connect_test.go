@@ -118,7 +118,6 @@ func TestPartitions_Connect(t *testing.T) {
 			// share the same node network (docker bridge), we can use
 			// a NodePort service so that we can access node(s) in a different Kind cluster.
 			if cfg.UseKind {
-				defaultPartitionHelmValues["global.adminPartitions.service.type"] = "NodePort"
 				defaultPartitionHelmValues["meshGateway.service.type"] = "NodePort"
 				defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200" // todo: do we need to set this port?
 				defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
