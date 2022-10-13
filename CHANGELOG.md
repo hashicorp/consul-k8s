@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Helm:
+  * Remove use of deprecated annotation `service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"` in server-service template. [[GH-1619](https://github.com/hashicorp/consul-k8s/pull/1619)]
+
 ## 1.0.0-beta3 (October 12, 2022)
 
 FEATURES:
