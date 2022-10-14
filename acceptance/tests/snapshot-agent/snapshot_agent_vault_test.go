@@ -54,13 +54,6 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// -------------------------
 	// PKI
 	// -------------------------
-	// Configure Service Mesh CA
-	connectCAPolicy := "connect-ca-dc1"
-	connectCARootPath := "connect_root"
-	connectCAIntermediatePath := "dc1/connect_inter"
-	// Configure Policy for Connect CA
-	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
-
 	// Configure Server PKI
 	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "pki",
@@ -112,7 +105,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// Snapshot Agent config
-	snapshotAgentConfig := generateSnapshotAgentConfig(t, bootstrapToken)
+	snapshotAgentConfig := generateSnapshotAgentConfig(t)
 	require.NoError(t, err)
 	snapshotAgentConfigSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/snapshot-agent-config",
@@ -125,7 +118,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// -------------------------
 	// Additional Auth Roles
 	// -------------------------
-	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName, snapshotAgentConfigSecret.PolicyName)
 	if cfg.EnableEnterprise {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
@@ -140,18 +133,6 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		PolicyNames:         serverPolicies,
 	}
 	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
-
-	// client
-	consulClientRole := "client"
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "client")
-	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  consulClientServiceAccountName,
-		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
-		RoleName:            consulClientRole,
-		PolicyNames:         gossipSecret.PolicyName,
-	}
-	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
 	// manageSystemACLs
 	manageSystemACLsRole := "server-acl-init"
@@ -175,18 +156,6 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	}
 	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
-	// snapshot agent config
-	snapAgentRole := "snapshot-agent"
-	snapAgentServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "snapshot-agent")
-	saAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  snapAgentServiceAccountName,
-		KubernetesNamespace: ns,
-		AuthMethodPath:      "kubernetes",
-		RoleName:            snapAgentRole,
-		PolicyNames:         fmt.Sprintf("%s,%s", licenseSecret.PolicyName, snapshotAgentConfigSecret.PolicyName),
-	}
-	saAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
-
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
 	consulHelmValues := map[string]string{
@@ -194,22 +163,16 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled":  "true",
+		"connectInject.enabled":  "false",
 		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
+		"controller.enabled":     "false",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
-		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
-		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
-
-		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
-		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
 
 		"global.acls.manageSystemACLs":          "true",
 		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
@@ -220,10 +183,9 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		"global.tls.caCert.secretName": serverPKIConfig.CAPath,
 		"global.tls.enableAutoEncrypt": "true",
 
-		"client.snapshotAgent.enabled":                        "true",
-		"client.snapshotAgent.configSecret.secretName":        snapshotAgentConfigSecret.Path,
-		"client.snapshotAgent.configSecret.secretKey":         snapshotAgentConfigSecret.Key,
-		"global.secretsBackend.vault.consulSnapshotAgentRole": snapAgentRole,
+		"server.snapshotAgent.enabled":                 "true",
+		"server.snapshotAgent.configSecret.secretName": snapshotAgentConfigSecret.Path,
+		"server.snapshotAgent.configSecret.secretKey":  snapshotAgentConfigSecret.Key,
 	}
 
 	if cfg.EnableEnterprise {
@@ -240,7 +202,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Create k8s client from kubectl options.
 	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
 	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
-		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=client-snapshot-agent,release=%s", consulReleaseName)})
+		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=server,release=%s", consulReleaseName)})
 	require.NoError(t, err)
 	require.True(t, len(podList.Items) > 0)
 
@@ -250,7 +212,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
 	hasSnapshots := false
 	for _, pod := range podList.Items {
-		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/")
+		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
 		logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
 		require.NoError(t, err)
 		if strings.Contains(snapshotFileListOutput, ".snap") {
