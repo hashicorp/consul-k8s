@@ -330,11 +330,11 @@ spec:
               cpu: "50m"
       {{- if .Values.global.acls.tolerations }}
       tolerations:
-        {{ tpl .Values.global.acls.tolerations . | indent 12 | trim }}
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
       {{- end }}
       {{- if .Values.global.acls.nodeSelector }}
       nodeSelector:
-        {{ tpl .Values.global.acls.nodeSelector . | indent 12 | trim }}
+        {{ tpl .Values.global.acls.nodeSelector . | indent 8 | trim }}
       {{- end }}
 {{- end }}
 {{- end }}
