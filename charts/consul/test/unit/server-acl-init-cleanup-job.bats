@@ -95,7 +95,7 @@ load _helpers
   [ "${actual}" = "value" ]
 }
 
-@test "serverACLInit/Job: nodeSelector not set by default" {
+@test "serverACLInitCleanup/Job: nodeSelector not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
@@ -105,7 +105,7 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "serverACLInit/Job: nodeSelector can be set" {
+@test "serverACLInitCleanup/Job: nodeSelector can be set" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
