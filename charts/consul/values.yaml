@@ -515,25 +515,23 @@ global:
       # @type: string
       secretKey: null
 
-    # job configures settings for the server-acl-init and server-acl-cleanup jobs
-    job:
-      # tolerations configures the taints and tolerations for the server-acl-init
-      # and server-acl-cleanup jobs. This should be a multi-line string matching the
-      # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
-      tolerations: ""
+    # tolerations configures the taints and tolerations for the server-acl-init
+    # and server-acl-cleanup jobs. This should be a multi-line string matching the
+    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    tolerations: ""
 
-      # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
-      # labels for the server-acl-init and server-acl-cleanup jobs pod assignment, formatted as a multi-line string.
-      #
-      # Example:
-      #
-      # ```yaml
-      # nodeSelector: |
-      #   beta.kubernetes.io/arch: amd64
-      # ```
-      #
-      # @type: string
-      nodeSelector: null
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for the server-acl-init and server-acl-cleanup jobs pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an

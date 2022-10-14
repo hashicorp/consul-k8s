@@ -62,13 +62,13 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
-      {{- if .Values.global.acls.job.tolerations }}
+      {{- if .Values.global.acls.tolerations }}
       tolerations:
-        {{ tpl .Values.global.acls.job.tolerations . | indent 12 | trim }}
+        {{ tpl .Values.global.acls.tolerations . | indent 12 | trim }}
       {{- end }}
-      {{- if .Values.global.acls.job.nodeSelector }}
+      {{- if .Values.global.acls.nodeSelector }}
       nodeSelector:
-        {{ tpl .Values.global.acls.job.nodeSelector . | indent 12 | trim }}
+        {{ tpl .Values.global.acls.nodeSelector . | indent 12 | trim }}
       {{- end }}
   {{- end }}
   {{- end }}

@@ -1552,7 +1552,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.acls.job
+# global.acls.tolerations and global.acls.nodeSelector
 
 @test "serverACLInit/Job: tolerations not set by default" {
   cd `chart_dir`
@@ -1569,7 +1569,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.job.tolerations=- key: value' \
+      --set 'global.acls.tolerations=- key: value' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
@@ -1590,7 +1590,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.job.nodeSelector=- key: value' \
+      --set 'global.acls.nodeSelector=- key: value' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
