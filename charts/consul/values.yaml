@@ -1978,6 +1978,11 @@ connectInject:
     # @type: integer
     maxUnavailable: null
 
+    # The minimum number of available pods.
+    # Takes precedence over maxUnavailable if set.
+    # @type: integer
+    minAvailable: null
+
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
     # If true, then all traffic redirection setup will use the consul-cni plugin. 
