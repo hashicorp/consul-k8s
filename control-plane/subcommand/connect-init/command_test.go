@@ -879,8 +879,10 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			code := cmd.Run(flags)
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 			require.Truef(t, iptablesProvider.applyCalled, "redirect traffic rules were not applied")
-			actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.iptablesConfig)
-			require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
+			if c.expIptablesParamsFunc != nil {
+				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.iptablesConfig)
+				require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
+			}
 		})
 	}
 }
