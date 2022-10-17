@@ -1,6 +1,8 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
 * Helm:
+  * Remove deprecated annotation `service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"` in the `server-service` template. [[GH-1619](https://github.com/hashicorp/consul-k8s/pull/1619)]
   * Support `minAvailable` on connect injector `PodDisruptionBudget`. [[GH-1557](https://github.com/hashicorp/consul-k8s/pull/1557)]
 
 ## 1.0.0-beta3 (October 12, 2022)
