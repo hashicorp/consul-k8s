@@ -208,7 +208,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	//	data.PrometheusCAFile = raw
 	//}
 	//if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
-	//	data.PrometheusCAPath = raw
+	//		data.PrometheusCAPath = raw
 	//}
 	//if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
 	//	data.PrometheusCertFile = raw
