@@ -11,7 +11,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// todo(ishustava): add docs
+// addRedirectTrafficConfigAnnotation creates an iptables.Config in JSON format based on proxy configuration.
+// iptables.Config:
+//
+//	ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
+//	ProxyUserID: a constant set in Annotations
+//	ProxyInboundPort: the service port or bind port
+//	ProxyOutboundPort: default transparent proxy outbound port or transparent proxy outbound listener port
+//	ExcludeInboundPorts: prometheus, envoy stats, expose paths, checks and excluded pod annotations
+//	ExcludeOutboundPorts: pod annotations
+//	ExcludeOutboundCIDRs: pod annotations
+//	ExcludeUIDs: pod annotations
 func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
 	cfg := iptables.Config{
 		ProxyUserID: strconv.Itoa(sidecarUserAndGroupID),
@@ -104,17 +114,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	return string(iptablesConfigJson), nil
 }
 
-// addRedirectTrafficConfigAnnotation creates an iptables.Config based on proxy configuration.
-// iptables.Config:
-//
-//	ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
-//	ProxyUserID: a constant set in Annotations
-//	ProxyInboundPort: the service port or bind port
-//	ProxyOutboundPort: default transparent proxy outbound port or transparent proxy outbound listener port
-//	ExcludeInboundPorts: prometheus, envoy stats, expose paths, checks and excluded pod annotations
-//	ExcludeOutboundPorts: pod annotations
-//	ExcludeOutboundCIDRs: pod annotations
-//	ExcludeUIDs: pod annotations
+// addRedirectTrafficConfigAnnotation add the created iptables JSON config as an annotation on the provided pod.
 func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
 	iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
 	if err != nil {
