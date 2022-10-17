@@ -202,20 +202,14 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		}
 		cmd = append(cmd, "-telemetry-prom-scrape-path="+prometheusScrapePath,
 			"-telemetry-prom-merge-port="+mergedMetricsPort)
-		// Pull the TLS config from the relevant annotations.
-
-		// - telemetry-prom-ca-certs-path
-		// - telemetry-prom-key-file
-		// - telemetry-prom-cert-file
-		// - telemetry-prom-service-metrics-url
-		// - telemetry-prom-scrape-path
 
 		serviceMetricsPath := pod.Annotations[annotationServiceMetricsPath]
 		serviceMetricsPort := pod.Annotations[annotationServiceMetricsPort]
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			cmd = append(cmd, "telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+			cmd = append(cmd, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
 		}
 
+		// Pull the TLS config from the relevant annotations.
 		var prometheusCAFile string
 		if prometheusCAFile, ok := pod.Annotations[annotationPrometheusCAFile]; ok && prometheusCAFile != "" {
 			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile)
