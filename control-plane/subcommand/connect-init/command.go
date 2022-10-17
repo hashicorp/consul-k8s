@@ -360,6 +360,9 @@ func (c *Command) Help() string {
 	return c.help
 }
 
+// This below implementation is loosely based on
+// https://github.com/hashicorp/consul/blob/fe2d41ddad9ba2b8ff86cbdebbd8f05855b1523c/command/connect/redirecttraffic/redirect_traffic.go#L136.
+
 // trafficRedirectProxyConfig is a snippet of xds/config.go
 // with only the configuration values that we need to parse from Proxy.Config
 // to apply traffic redirection rules.
