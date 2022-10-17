@@ -98,6 +98,15 @@ load _helpers
 #--------------------------------------------------------------------
 # annotations
 
+@test "server/Service: no annotation by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-service.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
 @test "server/Service: can set annotations" {
   cd `chart_dir`
   local actual=$(helm template \
