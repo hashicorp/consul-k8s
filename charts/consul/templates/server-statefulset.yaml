@@ -124,7 +124,9 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-server
       {{- if not .Values.global.openshift.enabled }}
       securityContext:
-        {{- merge .Values.global.podSecurityStandards.securityContext .Values.server.securityContext | toYaml | nindent 8 }}
+        {{- $tmp := dict -}}
+        {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.server.securityContext -}}
+        {{- $dst | toYaml | nindent 8 }}
       {{- end }}
       volumes:
         - name: config
@@ -462,7 +464,9 @@ spec:
           {{- end }}
           {{- if not .Values.global.openshift.enabled }}
           securityContext:
-            {{- merge .Values.global.podSecurityStandards.securityContext .Values.server.containerSecurityContext.server | toYaml | nindent 12 }}
+            {{- $tmp := dict -}}
+            {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.server.containerSecurityContext.server -}}
+            {{- $dst | toYaml | nindent 12 }}
           {{- end }}
           {{- if .Values.server.extraContainers }}
           {{ toYaml .Values.server.extraContainers | nindent 8 }}
