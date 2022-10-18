@@ -485,6 +485,23 @@ global:
       # @type: string
       secretKey: null
 
+    # tolerations configures the taints and tolerations for the server-acl-init
+    # and server-acl-init-cleanup jobs. This should be a multi-line string matching the
+    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    tolerations: ""
+
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for the server-acl-init and server-acl-init-cleanup jobs pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
@@ -3071,6 +3088,19 @@ webhookCertManager:
   # in a PodSpec.
   # @type: string
   tolerations: null
+
+  # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+  # labels for the webhook-cert-manager pod assignment, formatted as a multi-line string.
+  #
+  # Example:
+  #
+  # ```yaml
+  # nodeSelector: |
+  #   beta.kubernetes.io/arch: amd64
+  # ```
+  #
+  # @type: string
+  nodeSelector: null
 
 # Configures a demo Prometheus installation.
 prometheus:
