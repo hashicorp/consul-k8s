@@ -111,14 +111,12 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Apply a PodSecurityStandard which is compatible with Pod Security Admission controllers in Kubernetes-1.23+.
+  # Apply a PodSecurityStandard securityContext which is compatible with Pod Security Admission controllers in Kubernetes-1.23+.
   # This stanza takes a securityContext object that will be applied to all resources and merged with any existing
-  # securityContext settings. This feature is incompatible with PodSecurityPolies, which are deprecated by Kubernetes.
+  # securityContext settings with precedence given to this stanza. This feature is incompatible with PodSecurityPolies 
+  # which are deprecated by Kubernetes.  https://kubernetes.io/docs/concepts/security/pod-security-standards/
   # Please see: https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/ for more information about
   # migrating from PSP to PSS/PSA.
-  # https://kubernetes.io/docs/concepts/security/pod-security-standards/
-  # @type: map
-  # @recurse: false
   #
   # Example:
   #
@@ -140,6 +138,8 @@ global:
   #   pod-security.kubernetes.io/enforce=restricted \
   #   pod-security.kubernetes.io/enforce-version=v1.24
   # ```
+  # @type: map
+  # @recurse: false
   podSecurityStandards:
     securityContext: {}
 
