@@ -64,6 +64,10 @@ spec:
       {{- if .Values.webhookCertManager.tolerations }}
       tolerations:
         {{ tpl .Values.webhookCertManager.tolerations . | indent 8 | trim }}
-      {{- end}}
+      {{- end }}
+      {{- if .Values.webhookCertManager.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.webhookCertManager.nodeSelector . | indent 8 | trim }}
+      {{- end }}
 
 {{- end }}

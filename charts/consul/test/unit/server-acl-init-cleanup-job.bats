@@ -70,3 +70,48 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.acls.tolerations and global.acls.nodeSelector
+
+@test "serverACLInitCleanup/Job: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "serverACLInitCleanup/Job: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.tolerations=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+@test "serverACLInitCleanup/Job: nodeSelector not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "serverACLInitCleanup/Job: nodeSelector can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.nodeSelector=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
