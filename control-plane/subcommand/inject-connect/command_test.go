@@ -114,40 +114,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "request must be <= limit: -init-container-cpu-request value of \"50m\" is greater than the -init-container-cpu-limit value of \"25m\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "envoy:1.16.0",
-				"-default-consul-sidecar-cpu-limit=unparseable"},
-			expErr: "-default-consul-sidecar-cpu-limit 'unparseable' is invalid",
-		},
-		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
-				"-default-consul-sidecar-cpu-request=unparseable"},
-			expErr: "-default-consul-sidecar-cpu-request 'unparseable' is invalid",
-		},
-		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
-				"-default-consul-sidecar-memory-limit=unparseable"},
-			expErr: "-default-consul-sidecar-memory-limit 'unparseable' is invalid",
-		},
-		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
-				"-default-consul-sidecar-memory-request=unparseable"},
-			expErr: "-default-consul-sidecar-memory-request 'unparseable' is invalid",
-		},
-		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
-				"-default-consul-sidecar-memory-request=50Mi",
-				"-default-consul-sidecar-memory-limit=25Mi",
-			},
-			expErr: "request must be <= limit: -default-consul-sidecar-memory-request value of \"50Mi\" is greater than the -default-consul-sidecar-memory-limit value of \"25Mi\"",
-		},
-		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
-				"-default-consul-sidecar-cpu-request=50m",
-				"-default-consul-sidecar-cpu-limit=25m",
-			},
-			expErr: "request must be <= limit: -default-consul-sidecar-cpu-request value of \"50m\" is greater than the -default-consul-sidecar-cpu-limit value of \"25m\"",
-		},
-		{
 			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
 				"-listen", "999999"},
 			expErr: "missing port in address: 999999",
@@ -189,10 +155,4 @@ func TestRun_ResourceLimitDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagInitContainerCPULimit, "50m")
 	require.Equal(t, cmd.flagInitContainerMemoryRequest, "25Mi")
 	require.Equal(t, cmd.flagInitContainerMemoryLimit, "150Mi")
-
-	// Consul sidecar container defaults
-	require.Equal(t, cmd.flagDefaultConsulSidecarCPURequest, "20m")
-	require.Equal(t, cmd.flagDefaultConsulSidecarCPULimit, "20m")
-	require.Equal(t, cmd.flagDefaultConsulSidecarMemoryRequest, "25Mi")
-	require.Equal(t, cmd.flagDefaultConsulSidecarMemoryLimit, "50Mi")
 }

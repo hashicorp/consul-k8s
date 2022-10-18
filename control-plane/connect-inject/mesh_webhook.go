@@ -362,26 +362,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
-	// Now that the consul-sidecar no longer needs to re-register services periodically
-	// (that functionality lives in the endpoints-controller),
-	// we only need the consul sidecar to run the metrics merging server.
-	// First, determine if we need to run the metrics merging server.
-	shouldRunMetricsMerging, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
-	if err != nil {
-		w.Log.Error(err, "error determining if metrics merging server should be run", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if metrics merging server should be run: %s", err))
-	}
-
-	// Add the consul-sidecar only if we need to run the metrics merging server.
-	if shouldRunMetricsMerging {
-		consulSidecar, err := w.consulSidecar(pod)
-		if err != nil {
-			w.Log.Error(err, "error configuring consul sidecar container", "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
-		}
-		pod.Spec.Containers = append(pod.Spec.Containers, consulSidecar)
-	}
-
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[keyInjectStatus] = injected

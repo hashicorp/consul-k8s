@@ -6,7 +6,6 @@ import (
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
-	cmdConsulSidecar "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-sidecar"
 	cmdController "github.com/hashicorp/consul-k8s/control-plane/subcommand/controller"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
@@ -41,10 +40,6 @@ func init() {
 
 		"inject-connect": func() (cli.Command, error) {
 			return &cmdInjectConnect.Command{UI: ui}, nil
-		},
-
-		"consul-sidecar": func() (cli.Command, error) {
-			return &cmdConsulSidecar.Command{UI: ui}, nil
 		},
 
 		"consul-logout": func() (cli.Command, error) {
