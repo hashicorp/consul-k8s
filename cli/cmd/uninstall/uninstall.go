@@ -3,6 +3,7 @@ package uninstall
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"sync"
 	"time"
 
@@ -345,6 +346,12 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		}
 	}
 
+	if releaseType == common.ReleaseTypeConsul {
+		if err := c.deleteCustomResources(); err != nil {
+			return err
+		}
+	}
+
 	actionConfig, err := helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
 	if err != nil {
 		return err
@@ -361,7 +368,27 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		c.UI.Output("Uninstall result: %s", res.Info, terminal.WithInfoStyle())
 		return nil
 	}
+
+	if releaseType == common.ReleaseTypeConsul {
+		if err := c.patchCustomResources(); err != nil {
+			return err
+		}
+	}
+
 	c.UI.Output(fmt.Sprintf("Successfully uninstalled %s Helm release.", releaseType), terminal.WithSuccessStyle())
+	return nil
+}
+
+func (c *Command) deleteCustomResources() error {
+	for _, kind := range []string{"exported-services", "ingress-gateways", "meshes", "proxy-defaults", "service-defaults", "service-intentions", "service-resolvers", "service-routers", "service-splitters", "terminating-gateways"} {
+		out, err := exec.Command("kubectl", "delete", kind, "-A", "--all").Output()
+		c.UI.Output(string(out))
+		c.UI.Output(err.Error())
+	}
+	return nil
+}
+
+func (c *Command) patchCustomResources() error {
 	return nil
 }
 
