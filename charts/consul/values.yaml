@@ -2976,8 +2976,9 @@ apiGateway:
       # Example:
       #
       # ```yaml
-      # service: |
-      # - external-dns.alpha.kubernetes.io/hostname
+      # service:
+      #   annotations: |
+      #   - external-dns.alpha.kubernetes.io/hostname
       # ```
       #
       # @type: string
