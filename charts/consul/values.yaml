@@ -111,6 +111,38 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
+  # Apply a PodSecurityStandard which is compatible with Pod Security Admission controllers in Kubernetes-1.23+.
+  # This stanza takes a securityContext object that will be applied to all resources and merged with any existing
+  # securityContext settings. This feature is incompatible with PodSecurityPolies, which are deprecated by Kubernetes.
+  # Please see: https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/ for more information about
+  # migrating from PSP to PSS/PSA.
+  # https://kubernetes.io/docs/concepts/security/pod-security-standards/
+  # @type: map
+  # @recurse: false
+  #
+  # Example:
+  #
+  # ```yaml
+  # podSecurityStandards:
+  #   securityContext:
+  #      runAsNonRoot: true
+  #      allowPrivilegeEscalation: false
+  #      capabilities:
+  #        drop:
+  #        - ALL
+  #      seccompProfile:
+  #        type: RuntimeDefault
+  # ```
+  #
+  # Enabling `restricted:1.24` PSA:
+  # ```shell
+  # $ kubectl label --overwrite ns default \
+  #   pod-security.kubernetes.io/enforce=restricted \
+  #   pod-security.kubernetes.io/enforce-version=v1.24
+  # ```
+  podSecurityStandards:
+    securityContext: {}
+
   # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
   # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
   # and have necessary secrets, policies and roles created prior to installing Consul.
@@ -886,7 +918,7 @@ server:
     # The consul server agent container
     # @type: map
     # @recurse: false
-    server: null
+    server: {}
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
