@@ -404,7 +404,12 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
 	}
 
 	// Configure any relevant information from the proxy service
-	return iptables.Setup(c.iptablesConfig)
+	err = iptables.Setup(c.iptablesConfig)
+	if err != nil {
+		return err
+	}
+	c.logger.Info("Successfully applied traffic redirection rules")
+	return nil
 }
 
 const synopsis = "Inject connect init command."
