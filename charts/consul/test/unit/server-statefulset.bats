@@ -591,28 +591,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# DNS
-
-@test "server/StatefulSet: recursor flags unset by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml \
-      . | tee /dev/stderr |
-      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/StatefulSet: add recursor flags if dns.enableRedirection is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml \
-      --set 'dns.enableRedirection=true' \
-      . | tee /dev/stderr |
-      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # annotations
 
 @test "server/StatefulSet: no annotations defined by default" {

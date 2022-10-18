@@ -1016,7 +1016,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 					},
 				},
 				Conditions: v1alpha1.Conditions{
-					{
+					v1alpha1.Condition{
 						Type:   v1alpha1.ConditionSynced,
 						Status: corev1.ConditionTrue,
 					},
@@ -1059,7 +1059,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 					},
 				},
 				Conditions: v1alpha1.Conditions{
-					{
+					v1alpha1.Condition{
 						Type:   v1alpha1.ConditionSynced,
 						Status: corev1.ConditionTrue,
 					},
@@ -1133,7 +1133,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				Conditions: v1alpha1.Conditions{
-					{
+					v1alpha1.Condition{
 						Type:    v1alpha1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
 						Reason:  InternalError,
