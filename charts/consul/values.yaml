@@ -50,6 +50,36 @@ global:
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
 
+    # Partition service properties.
+    service:
+      type: LoadBalancer
+      # Optionally set the nodePort value of the partition service if using a NodePort service.
+      # If not set and using a NodePort service, Kubernetes will automatically assign
+      # a port.
+      nodePort:
+
+        # RPC node port
+        # @type: integer
+        rpc: null
+
+        # Serf node port
+        # @type: integer
+        serf: null
+
+        # HTTPS node port
+        # @type: integer
+        https: null
+
+      # Annotations to apply to the partition service.
+      #
+      # ```yaml
+      # annotations: |
+      #   "annotation-key": "annotation-value"
+      # ```
+      #
+      # @type: string
+      annotations: null
+
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
   # version tag, otherwise you may inadvertently upgrade your Consul version.
@@ -583,7 +613,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: hashicorp/consul-dataplane:1.0.0-beta2
+  imageConsulDataplane: hashicorp/consul-dataplane:1.0.0-beta1
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -1956,11 +1986,6 @@ connectInject:
     # command because of a limitation in the Helm templating language.
     # @type: integer
     maxUnavailable: null
-
-    # The minimum number of available pods.
-    # Takes precedence over maxUnavailable if set.
-    # @type: integer
-    minAvailable: null
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
