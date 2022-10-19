@@ -45,10 +45,10 @@ func TestPeering_Connect(t *testing.T) {
 			"default installation",
 			false,
 		},
-		//{
-		//	"secure installation",
-		//	true,
-		//},
+		{
+			"secure installation",
+			true,
+		},
 	}
 
 	for _, c := range cases {
@@ -58,6 +58,9 @@ func TestPeering_Connect(t *testing.T) {
 			staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
 
 			commonHelmValues := map[string]string{
+				"global.imageK8S": "ndhanushkodi/consul-k8s-dev:pmgw1",
+				"global.image":    "ndhanushkodi/consul-dev:peermeshgw2",
+
 				"global.peering.enabled": "true",
 
 				"global.tls.enabled":   "true",
@@ -78,8 +81,7 @@ func TestPeering_Connect(t *testing.T) {
 			}
 
 			staticServerPeerHelmValues := map[string]string{
-				"global.datacenter":                  staticServerPeer,
-				"meshGateway.service.additionalSpec": "loadBalancerIP: 34.173.188.14",
+				"global.datacenter": staticServerPeer,
 			}
 
 			if !cfg.UseKind {
@@ -287,7 +289,6 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
 
-			t.Fail()
 		})
 	}
 }
