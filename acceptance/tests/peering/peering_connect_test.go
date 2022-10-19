@@ -107,8 +107,7 @@ func TestPeering_Connect(t *testing.T) {
 			staticServerPeerCluster.Create(t)
 
 			staticClientPeerHelmValues := map[string]string{
-				"global.datacenter":                  staticClientPeer,
-				"meshGateway.service.additionalSpec": "loadBalancerSourceRanges: [34.173.188.14/32]",
+				"global.datacenter": staticClientPeer,
 			}
 
 			if !cfg.UseKind {
