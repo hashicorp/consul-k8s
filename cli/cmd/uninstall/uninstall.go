@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +20,10 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,9 +58,10 @@ type Command struct {
 	helmActionsRunner helm.HelmActionsRunner
 
 	// Configuration for interacting with Kubernetes.
-	kubernetes kubernetes.Interface
-	client     client.Client
-	restClient rest.Interface
+	kubernetes        kubernetes.Interface
+	dynamicKubernetes dynamic.Interface
+	client            client.Client
+	restClient        rest.Interface
 
 	set *flag.Sets
 
@@ -186,6 +190,13 @@ func (c *Command) Run(args []string) int {
 			c.UI.Output("initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
 			return 1
 		}
+
+		c.dynamicKubernetes, err = dynamic.NewForConfig(restConfig)
+		if err != nil {
+			c.UI.Output("initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
+			return 1
+		}
+
 		if c.restClient == nil {
 			c.restClient = c.kubernetes.CoreV1().RESTClient()
 		}
@@ -366,6 +377,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		}
 	}
 
+	// Delete any custom resources managed by Consul
 	if releaseType == common.ReleaseTypeConsul {
 		if err := c.deleteCustomResources(); err != nil {
 			return err
@@ -389,8 +401,12 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		return nil
 	}
 
+	// Patch the finalizers on any remaining custom resources so that they get deleted.
 	if releaseType == common.ReleaseTypeConsul {
-		if err := c.patchCustomResources(); err != nil {
+		err := backoff.Retry(
+			func() error { return c.patchCustomResources() },
+			backoff.WithMaxRetries(backoff.NewConstantBackOff(100*time.Millisecond), 1800))
+		if err != nil {
 			return err
 		}
 	}
@@ -429,8 +445,9 @@ type crs struct {
 
 // cr is used to deserialize the JSOn definition of a single CR.
 type cr struct {
-	Kind     string `json:"kind"`
-	Metadata struct {
+	ApiVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Metadata   struct {
 		Name      string `json:"name"`
 		Namespace string `json:"namespace"`
 		Uid       string `json:"uid"`
@@ -482,6 +499,8 @@ func (c *Command) deleteCustomResources() error {
 	return nil
 }
 
+// patchCustomResources patches the finalizers on every custom resource
+// managed by Consul to be an empty list.
 func (c *Command) patchCustomResources() error {
 	c.UI.Output("Patching finalizers for Consul custom resources.", terminal.WithLibraryStyle())
 
@@ -522,14 +541,28 @@ func (c *Command) patchCustomResources() error {
 		}
 	}
 
-	// Patch the finalizers for each custom resource.
-	var target = &unstructured.Unstructured{}
-	for _, cr := range consulCRs {
-		target.SetNamespace(cr.Metadata.Namespace)
-		target.SetName(cr.Metadata.Name)
-		target.SetKind(cr.Kind)
+	finalizerPatch := []byte(`[{
+		"op": "replace",
+		"path": "/metadata/finalizers",
+		"value": []
+	}]`)
 
-		if err := c.client.Patch(c.Ctx, target, common.NewFinalizer()); err != nil {
+	// Patch the finalizers for each custom resource.
+	for _, cr := range consulCRs {
+		apiVersion := strings.Split(cr.ApiVersion, "/")
+		version := apiVersion[len(apiVersion)-1]
+
+		target := schema.GroupVersionResource{
+			Group:    consulGroup,
+			Version:  version,
+			Resource: strings.ToLower(cr.Kind),
+		}
+
+		_, err := c.dynamicKubernetes.
+			Resource(target).
+			Namespace(cr.Metadata.Namespace).
+			Patch(c.Ctx, cr.Metadata.Name, types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
+		if err != nil {
 			return err
 		}
 	}
@@ -542,7 +575,7 @@ func (c *Command) patchCustomResources() error {
 func crPaths(crd crd) []string {
 	var paths []string
 	for _, version := range crd.Spec.Versions {
-		paths = append(paths, fmt.Sprintf("/apis/%s/%s/%s", consulGroup, version, crd.Spec.Names.Kind))
+		paths = append(paths, strings.ToLower(fmt.Sprintf("/apis/%s/%s/%s", consulGroup, version.Name, crd.Spec.Names.Kind)))
 	}
 	return paths
 }
