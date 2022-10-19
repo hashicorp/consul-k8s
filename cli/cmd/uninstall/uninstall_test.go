@@ -575,10 +575,13 @@ func TestUninstall(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
 			c := getInitializedCommand(t, buf)
+
 			k8s = fake.NewSimpleClientset()
 			c.kubernetes = k8s
+
 			mock := tc.helmActionsRunner
 			c.helmActionsRunner = mock
+
 			if tc.preProcessingFunc != nil {
 				tc.preProcessingFunc()
 			}

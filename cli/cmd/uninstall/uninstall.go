@@ -1,9 +1,12 @@
 package uninstall
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -19,6 +22,8 @@ import (
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -39,6 +44,9 @@ const (
 
 	flagContext    = "context"
 	flagKubeconfig = "kubeconfig"
+
+	crdPath     = "/apis/apiextensions.k8s.io/v1/customresourcedefinitions"
+	consulGroup = "consul.hashicorp.com"
 )
 
 type Command struct {
@@ -46,7 +54,10 @@ type Command struct {
 
 	helmActionsRunner helm.HelmActionsRunner
 
+	// Configuration for interacting with Kubernetes.
 	kubernetes kubernetes.Interface
+	client     client.Client
+	restClient rest.Interface
 
 	set *flag.Sets
 
@@ -174,6 +185,15 @@ func (c *Command) Run(args []string) int {
 		if err != nil {
 			c.UI.Output("initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
 			return 1
+		}
+		if c.restClient == nil {
+			c.restClient = c.kubernetes.CoreV1().RESTClient()
+		}
+		if c.client == nil {
+			if c.client, err = client.New(restConfig, client.Options{}); err != nil {
+				c.UI.Output("error creating Kubernetes client %v", err, terminal.WithErrorStyle())
+				return 1
+			}
 		}
 	}
 
@@ -379,17 +399,152 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	return nil
 }
 
+// crds is used to deserialize JSON returned from the
+// `/apis/apiextensions.k8s.io/v1/customresourcedefinitions` endpoint.
+type crds struct {
+	Items []crd `json:"items"`
+}
+
+// crd is used to deserialize the JSON definition of a single CRD.
+type crd struct {
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+	Spec struct {
+		Group string `json:"group"`
+		Names struct {
+			Kind string `json:"kind"`
+		} `json:"names"`
+		Versions []struct {
+			Name string `json:"name"`
+		} `json:"versions"`
+	} `json:"spec"`
+}
+
+// crs is used to deserialize JSON returned from the
+// `/apis/consul.hashicorp.com/<VERSION>/<CRD-NAME>` endpoint.
+type crs struct {
+	Items []cr `json:"items"`
+}
+
+// cr is used to deserialize the JSOn definition of a single CR.
+type cr struct {
+	Kind     string `json:"kind"`
+	Metadata struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+		Uid       string `json:"uid"`
+	} `json:"metadata"`
+}
+
+// deleteCustomResources gets a list of all custom resource definitions managed
+// by Consul. It then iterates over all custom resources matching these
+// definitions and deletes them. A timeout is attached to each deletion in order
+// to circumvent any deadlock issues which may arise.
 func (c *Command) deleteCustomResources() error {
-	for _, kind := range []string{"exported-services", "ingress-gateways", "meshes", "proxy-defaults", "service-defaults", "service-intentions", "service-resolvers", "service-routers", "service-splitters", "terminating-gateways"} {
-		out, err := exec.Command("kubectl", "delete", kind, "-A", "--all").Output()
-		c.UI.Output(string(out))
-		c.UI.Output(err.Error())
+	c.UI.Output("Deleting any Consul custom resources that may exist.", terminal.WithLibraryStyle())
+
+	raw, err := c.restClient.Get().AbsPath(crdPath).DoRaw(c.Ctx)
+	if err != nil {
+		return err
 	}
+	var crds crds
+	if err := json.Unmarshal(raw, &crds); err != nil {
+		return err
+	}
+
+	namespaces, err := c.kubernetes.CoreV1().Namespaces().List(c.Ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, crd := range crds.Items {
+		if crd.Spec.Group == "consul.hashicorp.com" {
+			for _, version := range crd.Spec.Versions {
+				for _, namespace := range namespaces.Items {
+					ctx, _ := context.WithTimeout(c.Ctx, time.Minute)
+
+					cr := &unstructured.Unstructured{}
+					cr.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   "consul.hashicorp.com",
+						Kind:    crd.Spec.Names.Kind,
+						Version: version.Name,
+					})
+					err = c.client.DeleteAllOf(ctx, cr, client.InNamespace(namespace.Name))
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
 func (c *Command) patchCustomResources() error {
+	c.UI.Output("Patching finalizers for Consul custom resources.", terminal.WithLibraryStyle())
+
+	// Get all custom resource definitions in the Kubernetes cluster.
+	raw, err := c.restClient.Get().AbsPath(crdPath).DoRaw(c.Ctx)
+	if err != nil {
+		return nil
+	}
+	var allCRDs crds
+	if err := json.Unmarshal(raw, &allCRDs); err != nil {
+		return err
+	}
+
+	// Filter only to CRDs managed by Consul.
+	var consulCRDs crds
+	for _, crd := range allCRDs.Items {
+		if crd.Spec.Group == consulGroup {
+			consulCRDs.Items = append(consulCRDs.Items, crd)
+		}
+	}
+	if len(consulCRDs.Items) == 0 {
+		return nil
+	}
+
+	// Get all custom resources for each custom resource definition.
+	var consulCRs []cr
+	for _, crd := range consulCRDs.Items {
+		for _, path := range crPaths(crd) {
+			raw, err := c.restClient.Get().AbsPath(path).DoRaw(c.Ctx)
+			if err != nil {
+				return err
+			}
+			var crs crs
+			if err := json.Unmarshal(raw, &crs); err != nil {
+				return err
+			}
+			consulCRs = append(consulCRs, crs.Items...)
+		}
+	}
+
+	// Patch the finalizers for each custom resource.
+	var target = &unstructured.Unstructured{}
+	for _, cr := range consulCRs {
+		target.SetNamespace(cr.Metadata.Namespace)
+		target.SetName(cr.Metadata.Name)
+		target.SetKind(cr.Kind)
+
+		if err := c.client.Patch(c.Ctx, target, common.NewFinalizer()); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+// crPaths returns a Kubernetes API path to the custom resources
+// for each version of the custom resource definition.
+func crPaths(crd crd) []string {
+	var paths []string
+	for _, version := range crd.Spec.Versions {
+		paths = append(paths, fmt.Sprintf("/apis/%s/%s/%s", consulGroup, version, crd.Spec.Names.Kind))
+	}
+	return paths
 }
 
 func (c *Command) Help() string {
