@@ -616,7 +616,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
