@@ -123,7 +123,6 @@ commands:
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
                           -enable-multi-cluster \
-                          ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -debug-directory="$TEST_RESULTS/debug" \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
