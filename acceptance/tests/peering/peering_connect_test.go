@@ -58,8 +58,7 @@ func TestPeering_Connect(t *testing.T) {
 			staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
 
 			commonHelmValues := map[string]string{
-				"global.imageK8S": "ndhanushkodi/consul-k8s-dev:pmgw1",
-				"global.image":    "ndhanushkodi/consul-dev:peermeshgw2",
+				"global.image": "ndhanushkodi/consul-dev:xdsfix2",
 
 				"global.peering.enabled": "true",
 
