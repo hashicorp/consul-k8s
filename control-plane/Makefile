@@ -24,7 +24,7 @@ CI_DEV_DOCKER_WORKDIR?=.
 CONSUL_K8S_IMAGE_VERSION?=latest
 ################
 
-# TODO: Remove this ci.dev-docker target once we move the acceptance tests to Github Actions.
+# TODO: Remove this ci.dev-docker target once we move the acceptance tests to Github Actions. This is a change
 # In CircleCI, the linux binary will be attached from a previous step at pkg/bin/linux_amd64/. This make target
 # should only run in CI and not locally.
 ci.dev-docker:
