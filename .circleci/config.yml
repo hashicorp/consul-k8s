@@ -582,7 +582,7 @@ jobs:
     steps:
       - checkout
       - install-prereqs
-      - create-kind-clusters:
+      - create-kind-cni-clusters:
           version: "v1.24.4"
       - restore_cache:
           keys:
