@@ -2,7 +2,6 @@ package uninstall
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
@@ -392,12 +391,12 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 				return err
 			}
 			if len(crs) != 0 {
-				return fmt.Errorf("%d custom resources remain after deletion request. Retrying deletion", len(crs))
+				return common.NewDeletionError(fmt.Sprintf("%d custom resources remain after deletion request. Retrying deletion", len(crs)))
 			}
 
 			return nil
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
-		if errors.IsTimeout(err) {
+		if common.IsDeletionError(err) {
 			crs, err := c.fetchCustomResources()
 			if err != nil {
 				return err
@@ -442,6 +441,9 @@ func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(crds.Items) == 0 {
+		return nil, nil
+	}
 
 	var crs []unstructured.Unstructured
 	for _, crd := range crds.Items {
@@ -468,6 +470,10 @@ func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
 // deleteCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to be deleted.
 func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
+	if len(crs) == 0 {
+		return nil
+	}
+
 	for _, cr := range crs {
 		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
 		group, version := apiVersion[0], apiVersion[1]
@@ -496,6 +502,10 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
 // patchCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to patch its finalizers to an empty list.
 func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
+	if len(crs) == 0 {
+		return nil
+	}
+
 	finalizerPatch := []byte(`[{
 		"op": "replace",
 		"path": "/metadata/finalizers",
