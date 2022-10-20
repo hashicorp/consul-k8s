@@ -520,7 +520,7 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          failfast: false
+          failfast: true
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
@@ -1065,7 +1065,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev -run TestPeering_Connect
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1296,21 +1296,6 @@ workflows:
 #          context: consul-ci
 #          requires:
 #            - dev-upload-docker
-      - cleanup-gcp-resources
-      - cleanup-azure-resources
-      - cleanup-eks-resources
-      - acceptance-gke-1-23:
-          requires:
-            - cleanup-gcp-resources
-            - dev-upload-docker
-      - acceptance-eks-1-21:
-          requires:
-            - cleanup-eks-resources
-            - dev-upload-docker
-      - acceptance-aks-1-22:
-          requires:
-            - cleanup-azure-resources
-            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:
