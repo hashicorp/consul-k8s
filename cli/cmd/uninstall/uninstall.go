@@ -2,6 +2,7 @@ package uninstall
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
@@ -44,8 +45,6 @@ const (
 
 	flagContext    = "context"
 	flagKubeconfig = "kubeconfig"
-
-	consulGroup = "consul.hashicorp.com"
 )
 
 type Command struct {
@@ -374,9 +373,9 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		}
 	}
 
-	// Delete any custom resources managed by Consul
+	// Delete any custom resources managed by Consul. If they cannot be deleted,
+	// patch the finalizers to be empty on each one.
 	if releaseType == common.ReleaseTypeConsul {
-		// TODO actually understand the backoff retry func
 		err := backoff.Retry(func() error {
 			crs, err := c.fetchCustomResources()
 			if err != nil {
@@ -388,13 +387,17 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 				return err
 			}
 
+			crs, err = c.fetchCustomResources()
+			if err != nil {
+				return err
+			}
+			if len(crs) != 0 {
+				return fmt.Errorf("%d custom resources remain after deletion request. Retrying deletion", len(crs))
+			}
+
 			return nil
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
-		if err != nil {
-			return err
-		}
-
-		err = backoff.Retry(func() error {
+		if errors.IsTimeout(err) {
 			crs, err := c.fetchCustomResources()
 			if err != nil {
 				return err
@@ -404,10 +407,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 			if err != nil {
 				return err
 			}
-
-			return nil
-		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
-		if err != nil {
+		} else if err != nil {
 			return err
 		}
 	}
