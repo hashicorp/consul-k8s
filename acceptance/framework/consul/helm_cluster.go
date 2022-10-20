@@ -144,7 +144,8 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		"--wait":    nil,
 		"--timeout": {"2min"},
 	}
-	_ = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	require.NoError(t, err)
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
