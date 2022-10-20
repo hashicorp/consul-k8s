@@ -1,6 +1,7 @@
 package common
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 )
@@ -80,4 +81,13 @@ func IsValidLabel(label string) bool {
 	}
 
 	return true
+}
+
+// IgnoreNotFoundError is a convenience function which takes an error and will
+// return it unless it represents a NotFound, 404 error.
+func IgnoreNotFoundError(err error) error {
+	if statusError, ok := err.(*errors.StatusError); ok && statusError.ErrStatus.Code == 404 {
+		return nil
+	}
+	return err
 }
