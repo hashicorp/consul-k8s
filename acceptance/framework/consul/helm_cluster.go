@@ -141,8 +141,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
 	h.helmOptions.ExtraArgs = map[string][]string{
-		"--wait":    nil,
-		"--timeout": {"2min"},
+		"--wait": nil,
 	}
 	err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 	require.NoError(t, err)
