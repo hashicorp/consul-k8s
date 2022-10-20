@@ -92,10 +92,6 @@ type Command struct {
 	flagInitContainerMemoryLimit   string
 	flagInitContainerMemoryRequest string
 
-	// Server address flags.
-	flagReadServerExposeService bool
-	flagTokenServerAddresses    []string
-
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
@@ -193,10 +189,6 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagReadServerExposeService, "read-server-expose-service", false,
-		"Enables polling the Consul servers' external service for its IP(s).")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagTokenServerAddresses), "token-server-address",
-		"An address of the Consul server(s) as saved in the peering token, formatted host:port, where host may be an IP or DNS name and port must be a gRPC port. May be specified multiple times for multiple addresses.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -454,16 +446,14 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagEnablePeering {
 		if err = (&connectinject.PeeringAcceptorController{
-			Client:                    mgr.GetClient(),
-			ConsulClientConfig:        consulConfig,
-			ConsulServerConnMgr:       watcher,
-			ExposeServersServiceName:  c.flagResourcePrefix + "-expose-servers",
-			ReadServerExternalService: c.flagReadServerExposeService,
-			TokenServerAddresses:      c.flagTokenServerAddresses,
-			ReleaseNamespace:          c.flagReleaseNamespace,
-			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),
-			Scheme:                    mgr.GetScheme(),
-			Context:                   ctx,
+			Client:                   mgr.GetClient(),
+			ConsulClientConfig:       consulConfig,
+			ConsulServerConnMgr:      watcher,
+			ExposeServersServiceName: c.flagResourcePrefix + "-expose-servers",
+			ReleaseNamespace:         c.flagReleaseNamespace,
+			Log:                      ctrl.Log.WithName("controller").WithName("peering-acceptor"),
+			Scheme:                   mgr.GetScheme(),
+			Context:                  ctx,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "peering-acceptor")
 			return 1
