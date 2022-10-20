@@ -292,7 +292,7 @@ jobs:
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane
           workdir: control-plane
-          redhat_tag: scan.connect.redhat.com/ospid-611ca2f89a9b407267837100/consul-k8s-control-plane:${{env.version}}-ubi
+          redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
 
   build-docker-ubi-dockerhub:
     name: Docker ${{ matrix.arch }} UBI build for DockerHub
