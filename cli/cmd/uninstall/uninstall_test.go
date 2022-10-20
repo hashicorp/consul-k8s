@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"os"
 	"testing"
 
@@ -23,8 +24,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	dynamicFake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -414,8 +417,41 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	assert.Equal(t, complete.PredictNothing, c)
 }
 
+func TestFetchCustomResources(t *testing.T) {
+	cases := map[string]struct {
+		crds     apiextv1.CustomResourceDefinitionList
+		crs      unstructured.UnstructuredList
+		expected unstructured.UnstructuredList
+	}{
+		"No custom resources deployed": {
+			crds:     apiextv1.CustomResourceDefinitionList{},
+			crs:      unstructured.UnstructuredList{},
+			expected: unstructured.UnstructuredList{},
+		},
+		"Custom resources deployed": {
+			crds:     apiextv1.CustomResourceDefinitionList{},
+			crs:      unstructured.UnstructuredList{},
+			expected: unstructured.UnstructuredList{},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := getInitializedCommand(t, nil)
+			c.apiext = apiextFake.NewSimpleClientset()
+			c.dynamic = dynamicFake.NewSimpleDynamicClient(nil)
+
+			actual, err := c.fetchCustomResources()
+			require.NoError(t, err)
+
+			for _, expected := range tc.expected.Items {
+				require.Contains(t, actual, expected)
+			}
+		})
+	}
+}
+
 func TestUninstall(t *testing.T) {
-	var k8s kubernetes.Interface
 	cases := map[string]struct {
 		input                                   []string
 		messages                                []string
@@ -469,7 +505,7 @@ func TestUninstall(t *testing.T) {
 			expectConsulUninstalled:                 false,
 			expectConsulDemoUninstalled:             false,
 		},
-		"uninstall with -wipe-data flag processes other rescource and returns success": {
+		"uninstall with -wipe-data flag processes other resource and returns success": {
 			input: []string{
 				"-wipe-data",
 			},
@@ -576,8 +612,9 @@ func TestUninstall(t *testing.T) {
 			buf := new(bytes.Buffer)
 			c := getInitializedCommand(t, buf)
 
-			k8s = fake.NewSimpleClientset()
-			c.kubernetes = k8s
+			c.kubernetes = fake.NewSimpleClientset()
+			c.dynamic = dynamicFake.NewSimpleDynamicClient(nil) // TODO mock this with scheme
+			c.apiext = apiextFake.NewSimpleClientset()
 
 			mock := tc.helmActionsRunner
 			c.helmActionsRunner = mock

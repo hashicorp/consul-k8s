@@ -1,8 +1,6 @@
 package uninstall
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -19,14 +17,13 @@ import (
 	"golang.org/x/text/language"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
+	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -48,7 +45,6 @@ const (
 	flagContext    = "context"
 	flagKubeconfig = "kubeconfig"
 
-	crdPath     = "/apis/apiextensions.k8s.io/v1/customresourcedefinitions"
 	consulGroup = "consul.hashicorp.com"
 )
 
@@ -58,10 +54,9 @@ type Command struct {
 	helmActionsRunner helm.HelmActionsRunner
 
 	// Configuration for interacting with Kubernetes.
-	kubernetes        kubernetes.Interface
-	dynamicKubernetes dynamic.Interface
-	client            client.Client
-	restClient        rest.Interface
+	kubernetes kubernetes.Interface
+	dynamic    dynamic.Interface
+	apiext     apiext.Interface
 
 	set *flag.Sets
 
@@ -176,36 +171,8 @@ func (c *Command) Run(args []string) int {
 		settings.KubeContext = c.flagKubeContext
 	}
 
-	// Set up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
-	// The Helm SDK will use settings.RESTClientGetter for its calls as well, so this will
-	// use a consistent method to target the right cluster for both Helm SDK and non Helm SDK calls.
-	if c.kubernetes == nil {
-		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
-		if err != nil {
-			c.UI.Output("retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
-			return 1
-		}
-		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
-		if err != nil {
-			c.UI.Output("initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
-			return 1
-		}
-
-		c.dynamicKubernetes, err = dynamic.NewForConfig(restConfig)
-		if err != nil {
-			c.UI.Output("initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
-			return 1
-		}
-
-		if c.restClient == nil {
-			c.restClient = c.kubernetes.CoreV1().RESTClient()
-		}
-		if c.client == nil {
-			if c.client, err = client.New(restConfig, client.Options{}); err != nil {
-				c.UI.Output("error creating Kubernetes client %v", err, terminal.WithErrorStyle())
-				return 1
-			}
-		}
+	if err := c.initKubernetes(settings); err != nil {
+		c.UI.Output("Could not initialize Kubernetes client: %v", err, terminal.WithErrorStyle())
 	}
 
 	// Setup logger to stream Helm library logs.
@@ -353,6 +320,36 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+// initKubernetes sets up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
+// The Helm SDK will use settings.RESTClientGetter for its calls as well, so this will
+// use a consistent method to target the right cluster for both Helm SDK and non Helm SDK calls.
+func (c *Command) initKubernetes(settings *helmCLI.EnvSettings) error {
+	restConfig, err := settings.RESTClientGetter().ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	if c.kubernetes == nil {
+		if c.kubernetes, err = kubernetes.NewForConfig(restConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.dynamic == nil {
+		if c.dynamic, err = dynamic.NewForConfig(restConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.apiext == nil {
+		if c.apiext, err = apiext.NewForConfig(restConfig); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType string, settings *helmCLI.EnvSettings,
 	uiLogger action.DebugLog, actionConfig *action.Configuration) error {
 	c.UI.Output(fmt.Sprintf("Existing %s installation found.", releaseType), terminal.WithSuccessStyle())
@@ -379,7 +376,38 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 
 	// Delete any custom resources managed by Consul
 	if releaseType == common.ReleaseTypeConsul {
-		if err := c.deleteCustomResources(); err != nil {
+		// TODO actually understand the backoff retry func
+		err := backoff.Retry(func() error {
+			crs, err := c.fetchCustomResources()
+			if err != nil {
+				return err
+			}
+
+			err = c.deleteCustomResources(crs)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
+		if err != nil {
+			return err
+		}
+
+		err = backoff.Retry(func() error {
+			crs, err := c.fetchCustomResources()
+			if err != nil {
+				return err
+			}
+
+			err = c.patchCustomResources(crs)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
+		if err != nil {
 			return err
 		}
 	}
@@ -401,146 +429,73 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		return nil
 	}
 
-	// Patch the finalizers on any remaining custom resources so that they get deleted.
-	if releaseType == common.ReleaseTypeConsul {
-		err := backoff.Retry(
-			func() error { return c.patchCustomResources() },
-			backoff.WithMaxRetries(backoff.NewConstantBackOff(100*time.Millisecond), 1800))
-		if err != nil {
-			return err
-		}
-	}
-
 	c.UI.Output(fmt.Sprintf("Successfully uninstalled %s Helm release.", releaseType), terminal.WithSuccessStyle())
 	return nil
 }
 
-// crds is used to deserialize JSON returned from the
-// `/apis/apiextensions.k8s.io/v1/customresourcedefinitions` endpoint.
-type crds struct {
-	Items []crd `json:"items"`
-}
-
-// crd is used to deserialize the JSON definition of a single CRD.
-type crd struct {
-	Metadata struct {
-		Name string `json:"name"`
-	} `json:"metadata"`
-	Spec struct {
-		Group string `json:"group"`
-		Names struct {
-			Kind string `json:"kind"`
-		} `json:"names"`
-		Versions []struct {
-			Name string `json:"name"`
-		} `json:"versions"`
-	} `json:"spec"`
-}
-
-// crs is used to deserialize JSON returned from the
-// `/apis/consul.hashicorp.com/<VERSION>/<CRD-NAME>` endpoint.
-type crs struct {
-	Items []cr `json:"items"`
-}
-
-// cr is used to deserialize the JSOn definition of a single CR.
-type cr struct {
-	ApiVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-	Metadata   struct {
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
-		Uid       string `json:"uid"`
-	} `json:"metadata"`
-}
-
-// deleteCustomResources gets a list of all custom resource definitions managed
-// by Consul. It then iterates over all custom resources matching these
-// definitions and deletes them. A timeout is attached to each deletion in order
-// to circumvent any deadlock issues which may arise.
-func (c *Command) deleteCustomResources() error {
-	c.UI.Output("Deleting any Consul custom resources that may exist.", terminal.WithLibraryStyle())
-
-	raw, err := c.restClient.Get().AbsPath(crdPath).DoRaw(c.Ctx)
+// fetchCustomResources gets a list of all custom resources deployed in the
+// cluster that are managed by Consul.
+func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
+	crds, err := c.apiext.ApiextensionsV1().CustomResourceDefinitions().List(c.Ctx, metav1.ListOptions{
+		LabelSelector: "app=consul",
+	})
 	if err != nil {
-		return err
-	}
-	var crds crds
-	if err := json.Unmarshal(raw, &crds); err != nil {
-		return err
+		return nil, err
 	}
 
-	namespaces, err := c.kubernetes.CoreV1().Namespaces().List(c.Ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
+	var crs []unstructured.Unstructured
 	for _, crd := range crds.Items {
-		if crd.Spec.Group == "consul.hashicorp.com" {
-			for _, version := range crd.Spec.Versions {
-				for _, namespace := range namespaces.Items {
-					ctx, _ := context.WithTimeout(c.Ctx, time.Minute)
-
-					cr := &unstructured.Unstructured{}
-					cr.SetGroupVersionKind(schema.GroupVersionKind{
-						Group:   "consul.hashicorp.com",
-						Kind:    crd.Spec.Names.Kind,
-						Version: version.Name,
-					})
-					err = c.client.DeleteAllOf(ctx, cr, client.InNamespace(namespace.Name))
-					if err != nil {
-						return err
-					}
-				}
+		for _, version := range crd.Spec.Versions {
+			target := schema.GroupVersionResource{
+				Group:    crd.Spec.Group,
+				Version:  version.Name,
+				Resource: crd.Spec.Names.Plural,
 			}
+
+			crList, err := c.dynamic.Resource(target).List(c.Ctx, metav1.ListOptions{})
+			if common.IgnoreNotFoundError(err) != nil {
+				return nil, err
+			}
+			if crList != nil {
+				crs = append(crs, crList.Items...)
+			}
+		}
+	}
+
+	return crs, nil
+}
+
+// deleteCustomResources takes a list of unstructured custom resources and
+// sends a request to each one to be deleted.
+func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
+	for _, cr := range crs {
+		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
+		group, version := apiVersion[0], apiVersion[1]
+		if group == "" || version == "" {
+			return fmt.Errorf("malformed api version: %s", apiVersion)
+		}
+
+		target := schema.GroupVersionResource{
+			Group:    group,
+			Version:  version,
+			Resource: strings.ToLower(cr.GetKind()),
+		}
+
+		err := c.dynamic.
+			Resource(target).
+			Namespace(cr.GetNamespace()).
+			Delete(c.Ctx, cr.GetName(), metav1.DeleteOptions{})
+		if common.IgnoreNotFoundError(err) != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-// patchCustomResources patches the finalizers on every custom resource
-// managed by Consul to be an empty list.
-func (c *Command) patchCustomResources() error {
-	c.UI.Output("Patching finalizers for Consul custom resources.", terminal.WithLibraryStyle())
-
-	// Get all custom resource definitions in the Kubernetes cluster.
-	raw, err := c.restClient.Get().AbsPath(crdPath).DoRaw(c.Ctx)
-	if err != nil {
-		return nil
-	}
-	var allCRDs crds
-	if err := json.Unmarshal(raw, &allCRDs); err != nil {
-		return err
-	}
-
-	// Filter only to CRDs managed by Consul.
-	var consulCRDs crds
-	for _, crd := range allCRDs.Items {
-		if crd.Spec.Group == consulGroup {
-			consulCRDs.Items = append(consulCRDs.Items, crd)
-		}
-	}
-	if len(consulCRDs.Items) == 0 {
-		return nil
-	}
-
-	// Get all custom resources for each custom resource definition.
-	var consulCRs []cr
-	for _, crd := range consulCRDs.Items {
-		for _, path := range crPaths(crd) {
-			raw, err := c.restClient.Get().AbsPath(path).DoRaw(c.Ctx)
-			if err != nil {
-				return err
-			}
-			var crs crs
-			if err := json.Unmarshal(raw, &crs); err != nil {
-				return err
-			}
-			consulCRs = append(consulCRs, crs.Items...)
-		}
-	}
-
+// patchCustomResources takes a list of unstructured custom resources and
+// sends a request to each one to patch its finalizers to an empty list.
+func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
 	finalizerPatch := []byte(`[{
 		"op": "replace",
 		"path": "/metadata/finalizers",
@@ -548,36 +503,28 @@ func (c *Command) patchCustomResources() error {
 	}]`)
 
 	// Patch the finalizers for each custom resource.
-	for _, cr := range consulCRs {
-		apiVersion := strings.Split(cr.ApiVersion, "/")
-		version := apiVersion[len(apiVersion)-1]
-
-		target := schema.GroupVersionResource{
-			Group:    consulGroup,
-			Version:  version,
-			Resource: strings.ToLower(cr.Kind),
+	for _, cr := range crs {
+		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
+		group, version := apiVersion[0], apiVersion[1]
+		if group == "" || version == "" {
+			return fmt.Errorf("malformed api version: %s", apiVersion)
 		}
 
-		_, err := c.dynamicKubernetes.
+		target := schema.GroupVersionResource{
+			Group:    group,
+			Version:  version,
+			Resource: strings.ToLower(cr.GetKind()),
+		}
+
+		_, err := c.dynamic.
 			Resource(target).
-			Namespace(cr.Metadata.Namespace).
-			Patch(c.Ctx, cr.Metadata.Name, types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
+			Namespace(cr.GetNamespace()).
+			Patch(c.Ctx, cr.GetName(), types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
-}
-
-// crPaths returns a Kubernetes API path to the custom resources
-// for each version of the custom resource definition.
-func crPaths(crd crd) []string {
-	var paths []string
-	for _, version := range crd.Spec.Versions {
-		paths = append(paths, strings.ToLower(fmt.Sprintf("/apis/%s/%s/%s", consulGroup, version.Name, crd.Spec.Names.Kind)))
-	}
-	return paths
 }
 
 func (c *Command) Help() string {
