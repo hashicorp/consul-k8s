@@ -73,6 +73,7 @@ func TestPeering_Connect(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+				"peering.tokenGeneration.serverAddresses.source": "consul",
 			}
 
 			staticServerPeerHelmValues := map[string]string{
@@ -90,8 +91,6 @@ func TestPeering_Connect(t *testing.T) {
 				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
-				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			releaseName := helpers.RandomName()
@@ -107,15 +106,13 @@ func TestPeering_Connect(t *testing.T) {
 			}
 
 			if !cfg.UseKind {
-				staticServerPeerHelmValues["server.replicas"] = "3"
+				staticClientPeerHelmValues["server.replicas"] = "3"
 			}
 
 			if cfg.UseKind {
 				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-				staticClientPeerHelmValues["server.exposeService.type"] = "NodePort"
-				staticClientPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
@@ -123,6 +120,20 @@ func TestPeering_Connect(t *testing.T) {
 			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
 			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
 			staticClientPeerCluster.Create(t)
+
+			// Create Mesh resource to use mesh gateways.
+			logger.Log(t, "creating mesh config")
+			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
+
+			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			})
+
+			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			})
 
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
@@ -261,6 +272,7 @@ func TestPeering_Connect(t *testing.T) {
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
+
 		})
 	}
 }

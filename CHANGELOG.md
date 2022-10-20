@@ -13,7 +13,8 @@ IMPROVEMENTS:
 ## 1.0.0-beta3 (October 12, 2022)
 
 FEATURES:
-* Peering: Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
+* Peering:
+  * Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
 
 BREAKING CHANGES:
 * Helm:
@@ -28,7 +29,10 @@ IMPROVEMENTS:
 
 ## 1.0.0-beta2 (October 7, 2022)
 BREAKING CHANGES:
-* Peering: Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
+* Peering:
+  * Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
+  * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
+    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
 * Helm 
   * `server.replicas` now defaults to `1`. Formerly, this defaulted to `3`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
   * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]

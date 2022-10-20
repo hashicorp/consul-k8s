@@ -4,8 +4,7 @@
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
-{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
-{{- if not (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") (eq .Values.global.peering.tokenGeneration.serverAddresses.source "consul"))) }}{{ fail "global.peering.tokenGeneration.serverAddresses.source must be one of empty string, 'consul' or 'static'" }}{{ end }}
+{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") .Values.global.adminPartitions.enabled)) -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
@@ -142,23 +141,6 @@ spec:
                 -enable-cni={{ .Values.connectInject.cni.enabled }} \
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
-                {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") }}
-                {{- if (and $serverEnabled $serverExposeServiceEnabled) }}
-                -read-server-expose-service=true \
-                {{- else }}
-                {{- if .Values.externalServers.enabled }}
-                {{- $port := .Values.externalServers.grpcPort }}
-                {{- range $h := .Values.externalServers.hosts }}
-                -token-server-address="{{ $h }}:{{ $port }}" \
-                {{- end }}
-                {{- end }}
-                {{- end }}
-                {{- end }}
-                {{- if (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") }}
-                {{- range $addr := .Values.global.peering.tokenGeneration.serverAddresses.static }}
-                -token-server-address="{{ $addr }}" \
-                {{- end }}
-                {{- end }}
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \

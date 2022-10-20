@@ -34,22 +34,6 @@ global:
     # If true, the Helm chart enables Cluster Peering for the cluster. This option enables peering controllers and
     # allows use of the PeeringAcceptor and PeeringDialer CRDs for establishing service mesh peerings.
     enabled: false
-    tokenGeneration:
-      serverAddresses:
-        # Source can be set to "","consul" or "static".
-        #
-        # "" is the default source. If servers are enabled, it will check if `server.exposeService` is enabled, and read
-        # the addresses from that service to use as the peering token server addresses. If using admin partitions and
-        # only Consul client agents are enabled, the addresses in `externalServers.hosts` and `externalServers.grpcPort`
-        # will be used.
-        #
-        # "consul" will use the Consul advertise addresses in the peering token.
-        #
-        # "static" will use the addresses specified in `global.peering.tokenGeneration.serverAddresses.static`.
-        source: ""
-        # Static addresses must be formatted "hostname|ip:port" where the port is the Consul server(s)' grpc port.
-        # @type: array<string>
-        static: []
 
   # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.
   # It additionally indicates that you are running Consul Enterprise v1.11+ with a valid Consul Enterprise
