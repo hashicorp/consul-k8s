@@ -6,7 +6,7 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/cimg/go:1.18.3
+      - image: docker.mirror.hashicorp.services/cimg/go:1.19.2
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
@@ -22,6 +22,8 @@ gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
 openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
+# This image is built from test/docker/Test.dockerfile
+consul-helm-test-image: &consul-helm-test-image docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
 
 commands:
   install-prereqs:
@@ -29,14 +31,14 @@ commands:
       - run:
           name: Install gotestsum, kind, kubectl, and helm
           command: |
-            wget https://golang.org/dl/go1.18.3.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.18.3.linux-amd64.tar.gz
-            rm go1.18.3.linux-amd64.tar.gz
+            wget https://golang.org/dl/go1.19.2.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.19.2.linux-amd64.tar.gz
+            rm go1.19.2.linux-amd64.tar.gz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
 
-            wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
-            sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
-            rm gotestsum_1.6.4_linux_amd64.tar.gz
+            wget https://github.com/gotestyourself/gotestsum/releases/download/v1.8.2/gotestsum_1.8.2_linux_amd64.tar.gz
+            sudo tar -C /usr/local/bin -xzf gotestsum_1.8.2_linux_amd64.tar.gz
+            rm gotestsum_1.8.2_linux_amd64.tar.gz
 
             curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.15.0/kind-linux-amd64
             chmod +x ./kind
@@ -485,7 +487,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -596,7 +598,7 @@ jobs:
   ##########################
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
@@ -614,7 +616,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
@@ -632,7 +634,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
     steps:
       - checkout
       - run:
@@ -659,8 +661,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - USE_GKE_GCLOUD_AUTH_PLUGIN: true
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - run:
@@ -728,8 +729,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - USE_GKE_GCLOUD_AUTH_PLUGIN: true
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - run:
@@ -796,8 +796,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -853,8 +852,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -909,8 +907,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -972,8 +969,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -1035,8 +1031,7 @@ jobs:
       TEST_RESULTS: /tmp/test-results
     parallelism: 1
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
