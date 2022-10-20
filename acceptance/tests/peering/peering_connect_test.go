@@ -53,13 +53,10 @@ func TestPeering_Connect(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fmt.Println("starting test")
 			staticServerPeerClusterContext := env.DefaultContext(t)
 			staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
 
 			commonHelmValues := map[string]string{
-				"global.image": "ndhanushkodi/consul-dev:xdsfix2",
-
 				"global.peering.enabled": "true",
 
 				"global.tls.enabled":   "true",
