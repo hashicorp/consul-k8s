@@ -1065,7 +1065,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=ndhanushkodi/consul-dev:peermeshgw2
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev -run TestPeering_Connect
 
       - store_test_results:
           path: /tmp/test-results
