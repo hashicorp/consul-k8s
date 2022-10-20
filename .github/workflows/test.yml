@@ -6,7 +6,7 @@ env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   CONSUL_VERSION: 1.13.1 # Consul's OSS version to use in tests
   CONSUL_ENT_VERSION: 1.13.1+ent # Consul's enterprise version to use in tests
-  GOTESTSUM_VERSION: 1.8.1 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
+  GOTESTSUM_VERSION: 1.8.2 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
 
 jobs:
   get-go-version:
@@ -74,7 +74,7 @@ jobs:
       - unit-helm-gen
     runs-on: ubuntu-latest
     container: 
-      image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
       options: --user 1001
     steps:
       - name: Checkout code
@@ -308,7 +308,7 @@ jobs:
 #      directory: acceptance/tests
 #      go-version: ${{ needs.get-go-version.outputs.go-version }}
 #      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy"
-#      gotestsum-version: 1.6.4
+#      gotestsum-version: 1.8.2
 #    secrets:
 #      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 #
@@ -321,7 +321,7 @@ jobs:
 #      directory: acceptance/tests
 #      go-version: ${{ needs.get-go-version.outputs.go-version }}
 #      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2"
-#      gotestsum-version: 1.6.4
+#      gotestsum-version: 1.8.2
 #    secrets:
 #      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 
