@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes/fake"
 	"os"
 	"testing"
 
@@ -27,8 +28,8 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestDeletePVCs(t *testing.T) {
@@ -439,7 +440,7 @@ func TestFetchCustomResources(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := getInitializedCommand(t, nil)
 			c.apiext = apiextFake.NewSimpleClientset()
-			c.dynamic = dynamicFake.NewSimpleDynamicClient(nil)
+			c.dynamic = dynamicFake.NewSimpleDynamicClient(runtime.NewScheme())
 
 			actual, err := c.fetchCustomResources()
 			require.NoError(t, err)
@@ -613,7 +614,7 @@ func TestUninstall(t *testing.T) {
 			c := getInitializedCommand(t, buf)
 
 			c.kubernetes = fake.NewSimpleClientset()
-			c.dynamic = dynamicFake.NewSimpleDynamicClient(nil) // TODO mock this with scheme
+			c.dynamic = dynamicFake.NewSimpleDynamicClient(runtime.NewScheme())
 			c.apiext = apiextFake.NewSimpleClientset()
 
 			mock := tc.helmActionsRunner
