@@ -63,6 +63,29 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# grpc
+
+@test "server/ConfigMap: if tls is disabled, grpc port is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .ports.grpc | tee /dev/stderr)
+
+  [ "${actual}" = "8502" ]
+}
+
+@test "server/ConfigMap: if tls is enabled, grpc_tls port is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .ports.grpc_tls | tee /dev/stderr)
+
+  [ "${actual}" = "8502" ]
+}
+
+#--------------------------------------------------------------------
 # serflan
 
 @test "server/ConfigMap: server.ports.serflan.port is set to 8301 by default" {
