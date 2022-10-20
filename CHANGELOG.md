@@ -1,7 +1,10 @@
 ## UNRELEASED
 
 FEATURES:
-* Peering: Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
+* Peering:
+  * Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
+  * move support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
+    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
 
 BREAKING CHANGES:
 * Helm:

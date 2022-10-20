@@ -521,7 +521,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: false
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=ndhanushkodi/consul-dev:peermeshgw2 -run TestPeering_Connect
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1296,6 +1296,21 @@ workflows:
 #          context: consul-ci
 #          requires:
 #            - dev-upload-docker
+      - cleanup-gcp-resources
+      - cleanup-azure-resources
+      - cleanup-eks-resources
+      - acceptance-gke-1-23:
+          requires:
+            - cleanup-gcp-resources
+            - dev-upload-docker
+      - acceptance-eks-1-21:
+          requires:
+            - cleanup-eks-resources
+            - dev-upload-docker
+      - acceptance-aks-1-22:
+          requires:
+            - cleanup-azure-resources
+            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:
