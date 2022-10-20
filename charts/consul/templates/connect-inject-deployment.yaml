@@ -4,8 +4,7 @@
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
-{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
-{{- if not (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "") (or (eq .Values.global.peering.tokenGeneration.serverAddresses.source "static") (eq .Values.global.peering.tokenGeneration.serverAddresses.source "consul"))) }}{{ fail "global.peering.tokenGeneration.serverAddresses.source must be one of empty string, 'consul' or 'static'" }}{{ end }}
+{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") .Values.global.adminPartitions.enabled)) -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 {{ template "consul.validateCloudConfiguration" . }}
 # The deployment for running the Connect sidecar injector

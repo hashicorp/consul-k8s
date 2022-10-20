@@ -37,11 +37,6 @@ type PeeringAcceptorController struct {
 	ConsulServerConnMgr *discovery.Watcher
 	// ExposeServersServiceName is the Kubernetes service name that the Consul servers are using.
 	ExposeServersServiceName string
-	// ReadServerExternalService indicates whether we should read the external Kubernetes service for the
-	// Consul servers.
-	ReadServerExternalService bool
-	// TokenServerAddresses are the addresses of the Consul servers to include in the peering token.
-	TokenServerAddresses []string
 	// ReleaseNamespace is the namespace where this controller is deployed.
 	ReleaseNamespace string
 	// Log is the logger for this controller
@@ -132,19 +127,6 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	// Scrape the address of the server service
-	var serverExternalAddresses []string
-	if r.ReadServerExternalService {
-		addrs, err := r.getExposeServersServiceAddresses()
-		if err != nil {
-			r.updateStatusError(ctx, acceptor, KubernetesError, err)
-			return ctrl.Result{}, err
-		}
-		serverExternalAddresses = addrs
-	} else if len(r.TokenServerAddresses) > 0 {
-		serverExternalAddresses = r.TokenServerAddresses
-	}
-
 	// existingSecret will be nil if it doesn't exist, and have the contents of the secret if it does exist.
 	existingSecret, err := r.getExistingSecret(ctx, acceptor.Secret().Name, acceptor.Namespace)
 	if err != nil {
@@ -174,7 +156,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
-		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name, serverExternalAddresses); err != nil {
+		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name); err != nil {
 			r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
 			return ctrl.Result{}, err
 		}
@@ -204,7 +186,7 @@ func (r *PeeringAcceptorController) Reconcile(ctx context.Context, req ctrl.Requ
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
 		r.Log.Info("generating new token for an existing peering")
-		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name, serverExternalAddresses); err != nil {
+		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name); err != nil {
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
@@ -363,12 +345,9 @@ func (r *PeeringAcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // generateToken is a helper function that calls the Consul api to generate a token for the peer.
-func (r *PeeringAcceptorController) generateToken(ctx context.Context, apiClient *api.Client, peerName string, serverExternalAddresses []string) (*api.PeeringGenerateTokenResponse, error) {
+func (r *PeeringAcceptorController) generateToken(ctx context.Context, apiClient *api.Client, peerName string) (*api.PeeringGenerateTokenResponse, error) {
 	req := api.PeeringGenerateTokenRequest{
 		PeerName: peerName,
-	}
-	if len(serverExternalAddresses) > 0 {
-		req.ServerExternalAddresses = serverExternalAddresses
 	}
 	resp, _, err := apiClient.Peerings().GenerateToken(ctx, req, nil)
 	if err != nil {
@@ -410,73 +389,6 @@ func (r *PeeringAcceptorController) requestsForPeeringTokens(object client.Objec
 		}
 	}
 	return []ctrl.Request{}
-}
-
-func (r *PeeringAcceptorController) getExposeServersServiceAddresses() ([]string, error) {
-	r.Log.Info("getting external address from expose-servers service", "name", r.ExposeServersServiceName)
-	var serverExternalAddresses []string
-
-	serverService := &corev1.Service{}
-	key := types.NamespacedName{
-		Name:      r.ExposeServersServiceName,
-		Namespace: r.ReleaseNamespace,
-	}
-	err := r.Client.Get(r.Context, key, serverService)
-	if err != nil {
-		return nil, err
-	}
-	switch serverService.Spec.Type {
-	case corev1.ServiceTypeNodePort:
-		nodes := corev1.NodeList{}
-		err := r.Client.List(r.Context, &nodes)
-		if err != nil {
-			return nil, err
-		}
-		if len(nodes.Items) == 0 {
-			return nil, fmt.Errorf("no nodes were found for scraping server addresses from expose-servers service")
-		}
-		var grpcNodePort int32
-		for _, port := range serverService.Spec.Ports {
-			if port.Name == "grpc" {
-				grpcNodePort = port.NodePort
-			}
-		}
-		if grpcNodePort == 0 {
-			return nil, fmt.Errorf("no grpc port was found for expose-servers service")
-		}
-		for _, node := range nodes.Items {
-			addrs := node.Status.Addresses
-			for _, addr := range addrs {
-				if addr.Type == corev1.NodeInternalIP {
-					serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%d", addr.Address, grpcNodePort))
-				}
-			}
-		}
-		if len(serverExternalAddresses) == 0 {
-			return nil, fmt.Errorf("no server addresses were scraped from expose-servers service")
-		}
-		return serverExternalAddresses, nil
-	case corev1.ServiceTypeLoadBalancer:
-		lbAddrs := serverService.Status.LoadBalancer.Ingress
-		if len(lbAddrs) < 1 {
-			return nil, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
-		}
-		for _, lbAddr := range lbAddrs {
-			// When the service is of type load balancer, the grpc port is hardcoded to 8502.
-			if lbAddr.IP != "" {
-				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.IP, "8502"))
-			}
-			if lbAddr.Hostname != "" {
-				serverExternalAddresses = append(serverExternalAddresses, fmt.Sprintf("%s:%s", lbAddr.Hostname, "8502"))
-			}
-		}
-		if len(serverExternalAddresses) == 0 {
-			return nil, fmt.Errorf("unable to find load balancer address for %s service, retrying", r.ExposeServersServiceName)
-		}
-	default:
-		return nil, fmt.Errorf("only NodePort and LoadBalancer service types are supported")
-	}
-	return serverExternalAddresses, nil
 }
 
 // filterPeeringAcceptors receives meta and object information for Kubernetes resources that are being watched,
