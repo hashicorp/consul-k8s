@@ -139,7 +139,7 @@ func (t *TestConfig) entImage() (string, error) {
 		return v.Global.Image, nil
 	}
 
-	// Otherwise, assume that we have an image tag with a version in it.
+	//// Otherwise, assume that we have an image tag with a version in it.
 	consulImageSplits := strings.Split(v.Global.Image, ":")
 	if len(consulImageSplits) != 2 {
 		return "", fmt.Errorf("could not determine consul version from global.image: %s", v.Global.Image)
@@ -154,7 +154,7 @@ func (t *TestConfig) entImage() (string, error) {
 		preRelease = fmt.Sprintf("-%s", split[1])
 	}
 
-	return fmt.Sprintf("hashicorp/consul-enterprise:%s-ent%s", consulImageVersion, preRelease), nil
+	return fmt.Sprintf("hashicorp/consul-enterprise:%s%s-ent", consulImageVersion, preRelease), nil
 }
 
 // setIfNotEmpty sets key to val in map m if value is not empty.

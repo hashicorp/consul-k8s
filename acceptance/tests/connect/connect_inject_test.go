@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/acceptance/framework/cli"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
@@ -19,47 +19,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
-
 // TestConnectInject tests that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
-	cases := map[string]struct {
-		clusterKind consul.ClusterKind
-		releaseName string
-		secure      bool
-	}{
-		"Helm install without secure": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-		},
-		"Helm install with secure": {
-			clusterKind: consul.Helm,
-			releaseName: helpers.RandomName(),
-			secure:      true,
-		},
-		"CLI install without secure": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-		},
-		"CLI install with secure": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-			secure:      true,
-		},
-	}
+	secureCases := []bool{false, true}
 
-	for name, c := range cases {
+	for _, secure := range secureCases {
+		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
-			cli, err := cli.NewCLI()
-			require.NoError(t, err)
-
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			connHelper := ConnectHelper{
-				ClusterKind: c.clusterKind,
-				Secure:      c.secure,
-				ReleaseName: c.releaseName,
+			releaseName := helpers.RandomName()
+			connHelper := connhelper.ConnectHelper{
+				ClusterKind: consul.Helm,
+				Secure:      secure,
+				ReleaseName: releaseName,
 				Ctx:         ctx,
 				Cfg:         cfg,
 			}
@@ -68,104 +42,11 @@ func TestConnectInject(t *testing.T) {
 
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
-			if c.secure {
+			if secure {
 				connHelper.TestConnectionFailureWithoutIntention(t)
 				connHelper.CreateIntention(t)
 			}
 
-			// Run proxy list and get the two results.
-			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list")
-			require.NoError(t, err)
-			logger.Log(t, string(listOut))
-			list := translateListOutput(listOut)
-			require.Equal(t, 2, len(list))
-			for _, proxyType := range list {
-				require.Equal(t, "Sidecar", proxyType)
-			}
-
-			// Run proxy read and check that the connection is present in the output.
-			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
-			retry.RunWith(retrier, t, func(r *retry.R) {
-				for podName := range list {
-					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
-					require.NoError(t, err)
-
-					output := string(out)
-					logger.Log(t, output)
-
-					// Both proxies must see their own local agent and app as clusters.
-					require.Regexp(r, "consul-dataplane.*STATIC", output)
-					require.Regexp(r, "local_app.*STATIC", output)
-
-					// Static Client must have Static Server as a cluster and endpoint.
-					if strings.Contains(podName, "static-client") {
-						require.Regexp(r, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
-						require.Regexp(r, ipv4RegEx+".*static-server", output)
-					}
-				}
-			})
-
-			connHelper.TestConnectionSuccess(t)
-			connHelper.TestConnectionFailureWhenUnhealthy(t)
-		})
-	}
-}
-
-// TestConnectInjectOnUpgrade tests that Connect works before and after an
-// upgrade is performed on the cluster.
-func TestConnectInjectOnUpgrade(t *testing.T) {
-	t.Skipf("skipping this test because it's not yet supported with agentless")
-	cases := map[string]struct {
-		clusterKind      consul.ClusterKind
-		releaseName      string
-		initial, upgrade map[string]string
-	}{
-		"CLI upgrade changes nothing": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-		},
-		"CLI upgrade to enable ingressGateway": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"ingressGateways.enabled":           "true",
-				"ingressGateways.defaults.replicas": "1",
-			},
-		},
-		"CLI upgrade to enable UI": {
-			clusterKind: consul.CLI,
-			releaseName: consul.CLIReleaseName,
-			initial:     map[string]string{},
-			upgrade: map[string]string{
-				"ui.enabled": "true",
-			},
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			cfg := suite.Config()
-			ctx := suite.Environment().DefaultContext(t)
-
-			connHelper := ConnectHelper{
-				ClusterKind: c.clusterKind,
-				HelmValues:  c.initial,
-				ReleaseName: c.releaseName,
-				Ctx:         ctx,
-				Cfg:         cfg,
-			}
-
-			connHelper.Setup(t)
-
-			connHelper.Install(t)
-			connHelper.DeployClientAndServer(t)
-			connHelper.TestConnectionSuccess(t)
-			connHelper.TestConnectionFailureWhenUnhealthy(t)
-
-			connHelper.HelmValues = c.upgrade
-
-			connHelper.Upgrade(t)
 			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
@@ -280,8 +161,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 						for _, token := range tokens {
 							require.NotContains(r, token.Description, multiport)
 							require.NotContains(r, token.Description, multiportAdmin)
-							require.NotContains(r, token.Description, StaticClientName)
-							require.NotContains(r, token.Description, staticServerName)
+							require.NotContains(r, token.Description, connhelper.StaticClientName)
+							require.NotContains(r, token.Description, connhelper.StaticServerName)
 						}
 					})
 				})
@@ -309,8 +190,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			if secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
-				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
-				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:2234")
+				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:2234")
 
 				logger.Log(t, fmt.Sprintf("creating intention for %s", multiport))
 				_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -318,7 +199,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 					Name: multiport,
 					Sources: []*api.SourceIntention{
 						{
-							Name:   StaticClientName,
+							Name:   connhelper.StaticClientName,
 							Action: api.IntentionActionAllow,
 						},
 					},
@@ -330,7 +211,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 					Name: multiportAdmin,
 					Sources: []*api.SourceIntention{
 						{
-							Name:   StaticClientName,
+							Name:   connhelper.StaticClientName,
 							Action: api.IntentionActionAllow,
 						},
 					},
@@ -339,10 +220,10 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			// Check connection from static-client to multiport.
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
 
 			// Check connection from static-client to multiport-admin.
-			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), StaticClientName, "hello world from 9090 admin", "http://localhost:2234")
+			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://localhost:2234")
 
 			// Now that we've checked inbound connections to a multi port pod, check outbound connection from multi port
 			// pod to static-server.
@@ -357,10 +238,10 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")
 
-				logger.Log(t, fmt.Sprintf("creating intention for %s", staticServerName))
+				logger.Log(t, fmt.Sprintf("creating intention for %s", connhelper.StaticServerName))
 				_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 					Kind: api.ServiceIntentions,
-					Name: staticServerName,
+					Name: connhelper.StaticServerName,
 					Sources: []*api.SourceIntention{
 						{
 							Name:   multiport,
@@ -387,27 +268,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// We are expecting a "connection reset by peer" error because in a case of health checks,
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
-			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
 		})
 	}
-}
-
-// translateListOutput takes the raw output from the proxy list command and
-// translates the table into a map.
-func translateListOutput(raw []byte) map[string]string {
-	formatted := make(map[string]string)
-	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[3:] {
-		row := strings.Split(strings.TrimSpace(pod), "\t")
-
-		var name string
-		if len(row) == 3 { // Handle the case where namespace is present
-			name = fmt.Sprintf("%s/%s", strings.TrimSpace(row[0]), strings.TrimSpace(row[1]))
-		} else if len(row) == 2 {
-			name = strings.TrimSpace(row[0])
-		}
-		formatted[name] = row[len(row)-1]
-	}
-
-	return formatted
 }

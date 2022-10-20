@@ -138,11 +138,11 @@ func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 		},
 		{
 			consulImage: "hashicorp/consul:1.8.5-rc1",
-			expImage:    "hashicorp/consul-enterprise:1.8.5-ent-rc1",
+			expImage:    "hashicorp/consul-enterprise:1.8.5-rc1-ent",
 		},
 		{
 			consulImage: "hashicorp/consul:1.7.0-beta3",
-			expImage:    "hashicorp/consul-enterprise:1.7.0-ent-beta3",
+			expImage:    "hashicorp/consul-enterprise:1.7.0-beta3-ent",
 		},
 		{
 			consulImage: "invalid",
@@ -173,7 +173,7 @@ func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 				require.EqualError(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Contains(t, values["global.image"], tt.expImage)
+				require.Equal(t, tt.expImage, values["global.image"])
 			}
 		})
 	}
