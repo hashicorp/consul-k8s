@@ -100,7 +100,6 @@ func TestPeering_Connect(t *testing.T) {
 
 			helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
-			fmt.Println("install first peer")
 			// Install the first peer where static-server will be deployed in the static-server kubernetes context.
 			staticServerPeerCluster := consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
 			staticServerPeerCluster.Create(t)
@@ -121,12 +120,10 @@ func TestPeering_Connect(t *testing.T) {
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
 
-			fmt.Println("install second (client) peer")
 			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
 			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
 			staticClientPeerCluster.Create(t)
 
-			fmt.Println("configure mesh resource so peering token will have mesh gateway addrs")
 			// Create Mesh resource to use mesh gateways.
 			logger.Log(t, "creating mesh config")
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
@@ -141,7 +138,6 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
 
-			fmt.Println("create acceptor on (client) peer")
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
@@ -156,13 +152,9 @@ func TestPeering_Connect(t *testing.T) {
 				require.NotEmpty(r, acceptorSecretName)
 			})
 
-			fmt.Println("copying secret from client peer to server peer, printing contents:")
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
-			resp, _ := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "secret", "api-token", "-o", "yaml")
-			fmt.Println(resp)
 
-			fmt.Println("creating peering dialer on server peer")
 			// Create the peering dialer on the server peer.
 			k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {

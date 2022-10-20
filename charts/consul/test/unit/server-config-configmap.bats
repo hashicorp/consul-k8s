@@ -78,6 +78,7 @@ load _helpers
 @test "server/ConfigMap: if tls is enabled, grpc_tls port is set" {
   cd `chart_dir`
   local actual=$(helm template \
+      --set 'global.tls.enabled=true' \
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .ports.grpc_tls | tee /dev/stderr)
