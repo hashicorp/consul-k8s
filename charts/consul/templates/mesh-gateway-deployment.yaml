@@ -237,7 +237,7 @@ spec:
             {{- if .Values.global.adminPartitions.enabled }}
             -service-partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
-            -log-level="trace" \
+            -log-level={{ default .Values.global.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
         livenessProbe:
           tcpSocket:
