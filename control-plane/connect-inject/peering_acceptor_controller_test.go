@@ -1486,22 +1486,3 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 		})
 	}
 }
-
-// createNode is a test helper to create Kubernetes nodes.
-func createNode(name, externalIP, internalIP string) *corev1.Node {
-	node := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Status: corev1.NodeStatus{
-			Addresses: []corev1.NodeAddress{},
-		},
-	}
-	if externalIP != "" {
-		node.Status.Addresses = append(node.Status.Addresses, corev1.NodeAddress{Type: corev1.NodeExternalIP, Address: externalIP})
-	}
-	if internalIP != "" {
-		node.Status.Addresses = append(node.Status.Addresses, corev1.NodeAddress{Type: corev1.NodeInternalIP, Address: internalIP})
-	}
-	return node
-}
