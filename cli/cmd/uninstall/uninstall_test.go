@@ -535,6 +535,7 @@ func TestUninstall(t *testing.T) {
 		messages                                []string
 		helmActionsRunner                       *helm.MockActionRunner
 		preProcessingFunc                       func()
+		withController                          bool
 		expectedReturnCode                      int
 		expectCheckedForConsulInstallations     bool
 		expectCheckedForConsulDemoInstallations bool
@@ -557,6 +558,29 @@ func TestUninstall(t *testing.T) {
 					}
 				},
 			},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 true,
+			expectConsulDemoUninstalled:             false,
+		},
+		"uninstall when consul installation exists returns success with controller deployed": {
+			input: []string{},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
+				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return false, "", "", nil
+					}
+				},
+			},
+			withController:                          true,
 			expectedReturnCode:                      0,
 			expectCheckedForConsulInstallations:     true,
 			expectCheckedForConsulDemoInstallations: true,
@@ -602,6 +626,32 @@ func TestUninstall(t *testing.T) {
 					}
 				},
 			},
+			expectedReturnCode:                      0,
+			expectCheckedForConsulInstallations:     true,
+			expectCheckedForConsulDemoInstallations: true,
+			expectConsulUninstalled:                 true,
+			expectConsulDemoUninstalled:             false,
+		},
+		"uninstall with -wipe-data flag processes other resource and returns success with controller deployed": {
+			input: []string{
+				"-wipe-data",
+			},
+			messages: []string{
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n    No existing Consul demo application installation found.\n",
+				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n",
+				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
+			},
+			helmActionsRunner: &helm.MockActionRunner{
+				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
+					if options.ReleaseName == "consul" {
+						return true, "consul", "consul", nil
+					} else {
+						return false, "", "", nil
+					}
+				},
+			},
+			withController:                          true,
 			expectedReturnCode:                      0,
 			expectCheckedForConsulInstallations:     true,
 			expectCheckedForConsulDemoInstallations: true,
@@ -699,46 +749,44 @@ func TestUninstall(t *testing.T) {
 	cr.SetFinalizers([]string{"consul.hashicorp.com"})
 
 	for name, tc := range cases {
-		for _, withController := range []bool{false, true} {
-			t.Run(name, func(t *testing.T) {
-				buf := new(bytes.Buffer)
-				c := getInitializedCommand(t, buf)
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := getInitializedCommand(t, buf)
 
-				c.kubernetes = fake.NewSimpleClientset()
+			c.kubernetes = fake.NewSimpleClientset()
 
-				c.apiext, c.dynamic = createClientsWithCrds()
-				if withController {
-					_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
-					require.NoError(t, err)
-				}
+			c.apiext, c.dynamic = createClientsWithCrds()
+			if tc.withController {
+				_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
 
-				mock := tc.helmActionsRunner
-				c.helmActionsRunner = mock
+			mock := tc.helmActionsRunner
+			c.helmActionsRunner = mock
 
-				if tc.preProcessingFunc != nil {
-					tc.preProcessingFunc()
-				}
-				input := append([]string{
-					"--auto-approve",
-				}, tc.input...)
-				returnCode := c.Run(input)
-				require.Equal(t, tc.expectedReturnCode, returnCode)
-				require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
-				require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
-				require.Equal(t, tc.expectConsulUninstalled, mock.ConsulUninstalled)
-				require.Equal(t, tc.expectConsulDemoUninstalled, mock.ConsulDemoUninstalled)
-				output := buf.String()
-				for _, msg := range tc.messages {
-					require.Contains(t, output, msg)
-				}
+			if tc.preProcessingFunc != nil {
+				tc.preProcessingFunc()
+			}
+			input := append([]string{
+				"--auto-approve",
+			}, tc.input...)
+			returnCode := c.Run(input)
+			require.Equal(t, tc.expectedReturnCode, returnCode)
+			require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
+			require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
+			require.Equal(t, tc.expectConsulUninstalled, mock.ConsulUninstalled)
+			require.Equal(t, tc.expectConsulDemoUninstalled, mock.ConsulDemoUninstalled)
+			output := buf.String()
+			for _, msg := range tc.messages {
+				require.Contains(t, output, msg)
+			}
 
-				if withController {
-					crs, err := c.fetchCustomResources()
-					require.NoError(t, err)
-					require.Len(t, crs, 0)
-				}
-			})
-		}
+			if tc.withController {
+				crs, err := c.fetchCustomResources()
+				require.NoError(t, err)
+				require.Len(t, crs, 0)
+			}
+		})
 	}
 }
 
