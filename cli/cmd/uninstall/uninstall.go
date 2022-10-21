@@ -375,6 +375,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	// Delete any custom resources managed by Consul. If they cannot be deleted,
 	// patch the finalizers to be empty on each one.
 	if releaseType == common.ReleaseTypeConsul {
+		c.UI.Output("Deleting custom resources managed by Consul.", terminal.WithLibraryStyle())
 		err := backoff.Retry(func() error {
 			crs, err := c.fetchCustomResources()
 			if err != nil {
@@ -399,6 +400,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 			return nil
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
 		if common.IsDeletionError(err) {
+			c.UI.Output("Patching finalizers on custom resources managed by Consul.", terminal.WithLibraryStyle())
 			crs, err := c.fetchCustomResources()
 			if err != nil {
 				return err
