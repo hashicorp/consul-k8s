@@ -29,7 +29,7 @@ commands:
   install-prereqs:
     steps:
       - run:
-          name: Install gotestsum, kind, kubectl, and helm
+          name: Install go, gotestsum, kind, kubectl, and helm
           command: |
             wget https://golang.org/dl/go1.19.2.linux-amd64.tar.gz
             sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.19.2.linux-amd64.tar.gz
@@ -73,6 +73,16 @@ commands:
             make kind-cni-calico
             kind create cluster --config=acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:<< parameters.version >>
             make kind-cni-calico
+  build-cli:
+    steps:
+      - run:
+          name: Build consul-k8s CLI
+          working_directory: *cli-path
+          command: |
+            go build -o ./bin/consul-k8s
+            sudo cp ./bin/consul-k8s /usr/local/go/bin/
+            consul-k8s version
+
   run-acceptance-tests:
     parameters:
       failfast:
@@ -520,6 +530,7 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
@@ -552,6 +563,7 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
@@ -584,6 +596,7 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
@@ -1127,6 +1140,7 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
@@ -1188,6 +1202,7 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
@@ -1209,6 +1224,7 @@ workflows:
       # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
       # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
       # be moved
+      # Run acceptance tests using the docker image built for the control plane
       - build-distro:
           OS: "linux"
           ARCH: "amd64 arm64"
@@ -1217,7 +1233,6 @@ workflows:
           context: consul-ci
           requires:
             - build-distros-linux
-      # Run acceptance tests using the docker image built for the control plane
       - acceptance:
           context: consul-ci
           requires:
