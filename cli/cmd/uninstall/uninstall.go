@@ -435,17 +435,15 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 // fetchCustomResources gets a list of all custom resources deployed in the
 // cluster that are managed by Consul.
 func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
+	crs := make([]unstructured.Unstructured, 0)
+
 	crds, err := c.apiext.ApiextensionsV1().CustomResourceDefinitions().List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "app=consul",
 	})
 	if err != nil {
-		return nil, err
-	}
-	if len(crds.Items) == 0 {
-		return nil, nil
+		return crs, err
 	}
 
-	var crs []unstructured.Unstructured
 	for _, crd := range crds.Items {
 		for _, version := range crd.Spec.Versions {
 			target := schema.GroupVersionResource{
@@ -470,10 +468,6 @@ func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
 // deleteCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to be deleted.
 func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
-	if len(crs) == 0 {
-		return nil
-	}
-
 	for _, cr := range crs {
 		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
 		group, version := apiVersion[0], apiVersion[1]
@@ -502,17 +496,12 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
 // patchCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to patch its finalizers to an empty list.
 func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
-	if len(crs) == 0 {
-		return nil
-	}
-
 	finalizerPatch := []byte(`[{
 		"op": "replace",
 		"path": "/metadata/finalizers",
 		"value": []
 	}]`)
 
-	// Patch the finalizers for each custom resource.
 	for _, cr := range crs {
 		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
 		group, version := apiVersion[0], apiVersion[1]
@@ -534,6 +523,7 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
 			return err
 		}
 	}
+
 	return nil
 }
 

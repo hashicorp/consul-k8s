@@ -7,8 +7,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/fake"
 	"os"
 	"testing"
@@ -31,6 +33,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
+)
+
+var (
+	serviceDefaultsGRV = schema.GroupVersionResource{
+		Group:    "consul.hashicorp.com",
+		Version:  "v1alpha1",
+		Resource: "servicedefaults",
+	}
+	nonConsulGRV = schema.GroupVersionResource{
+		Group:    "example.com",
+		Version:  "v1",
+		Resource: "examples",
+	}
 )
 
 func TestDeletePVCs(t *testing.T) {
@@ -420,62 +435,7 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 }
 
 func TestFetchCustomResources(t *testing.T) {
-	grvToListKind := map[schema.GroupVersionResource]string{
-		schema.GroupVersionResource{
-			Group:    "consul.hashicorp.com",
-			Version:  "v1alpha1",
-			Resource: "servicedefaults",
-		}: "ServiceDefaultsList",
-		schema.GroupVersionResource{
-			Group:    "google.com",
-			Version:  "v1",
-			Resource: "gateways",
-		}: "GatewaysList",
-	}
-	crds := apiextv1.CustomResourceDefinitionList{
-		Items: []apiextv1.CustomResourceDefinition{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "servicedefaults.consul.hashicorp.com",
-					Labels: map[string]string{
-						"app": "consul",
-					},
-				},
-				Spec: apiextv1.CustomResourceDefinitionSpec{
-					Group: "consul.hashicorp.com",
-					Names: apiextv1.CustomResourceDefinitionNames{
-						Plural:   "servicedefaults",
-						ListKind: "ServiceDefaultsList",
-					},
-					Scope: "Namespaced",
-					Versions: []apiextv1.CustomResourceDefinitionVersion{
-						{
-							Name: "v1alpha1",
-						},
-					},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "gateways.google.com",
-				},
-				Spec: apiextv1.CustomResourceDefinitionSpec{
-					Group: "google.com",
-					Names: apiextv1.CustomResourceDefinitionNames{
-						Plural:   "gateways",
-						ListKind: "GatewaysList",
-					},
-					Scope: "Namespaced",
-					Versions: []apiextv1.CustomResourceDefinitionVersion{
-						{
-							Name: "v1",
-						},
-					},
-				},
-			},
-		},
-	}
-	consulCr1 := unstructured.Unstructured{
+	cr := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "consul.hashicorp.com/v1alpha1",
 			"kind":       "ServiceDefaults",
@@ -485,48 +445,34 @@ func TestFetchCustomResources(t *testing.T) {
 			},
 		},
 	}
-	consulCr2 := unstructured.Unstructured{
+	nonConsulCR := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "consul.hashicorp.com/v1alpha1",
-			"kind":       "ServiceDefaults",
+			"apiVersion": "example.com/v1",
+			"kind":       "Example",
 			"metadata": map[string]interface{}{
-				"name":      "other-server",
-				"namespace": "other",
-			},
-		},
-	}
-	otherCr := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "google.com/v1",
-			"kind":       "Gateways",
-			"metadata": map[string]interface{}{
-				"name":      "google-gateway",
-				"namespace": "google",
+				"name":      "example-resource",
+				"namespace": "default",
 			},
 		},
 	}
 
 	c := getInitializedCommand(t, nil)
-	c.apiext = apiextFake.NewSimpleClientset(&crds)
-	c.dynamic = dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), grvToListKind, &consulCr1, &consulCr2, &otherCr)
+	c.apiext, c.dynamic = createClientsWithCrds()
+
+	_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.dynamic.Resource(nonConsulGRV).Namespace("default").Create(context.Background(), &nonConsulCR, metav1.CreateOptions{})
+	require.NoError(t, err)
 
 	actual, err := c.fetchCustomResources()
 	require.NoError(t, err)
-
-	require.Contains(t, actual, consulCr1)
-	require.Contains(t, actual, consulCr2)
-	require.NotContains(t, actual, otherCr)
+	require.Len(t, actual, 1)
+	require.Contains(t, actual, cr)
+	require.NotContains(t, actual, nonConsulCR)
 }
 
 func TestDeleteCustomResources(t *testing.T) {
-	grvToListKind := map[schema.GroupVersionResource]string{
-		schema.GroupVersionResource{
-			Group:    "consul.hashicorp.com",
-			Version:  "v1alpha1",
-			Resource: "servicedefaults",
-		}: "ServiceDefaultsList",
-	}
-	consulCr1 := unstructured.Unstructured{
+	cr := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "consul.hashicorp.com/v1alpha1",
 			"kind":       "ServiceDefaults",
@@ -536,26 +482,18 @@ func TestDeleteCustomResources(t *testing.T) {
 			},
 		},
 	}
-	consulCr2 := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "consul.hashicorp.com/v1alpha1",
-			"kind":       "ServiceDefaults",
-			"metadata": map[string]interface{}{
-				"name":      "other-server",
-				"namespace": "other",
-			},
-		},
-	}
 
 	c := getInitializedCommand(t, nil)
-	c.apiext = apiextFake.NewSimpleClientset()
-	c.dynamic = dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), grvToListKind, &consulCr1, &consulCr2)
+	c.apiext, c.dynamic = createClientsWithCrds()
+
+	_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
+	require.NoError(t, err)
 
 	actual, err := c.fetchCustomResources()
 	require.NoError(t, err)
-	require.Len(t, actual, 2)
+	require.Len(t, actual, 1)
 
-	err = c.deleteCustomResources([]unstructured.Unstructured{consulCr1, consulCr2})
+	err = c.deleteCustomResources([]unstructured.Unstructured{cr})
 	require.NoError(t, err)
 
 	actual, err = c.fetchCustomResources()
@@ -564,46 +502,30 @@ func TestDeleteCustomResources(t *testing.T) {
 }
 
 func TestPatchCustomResources(t *testing.T) {
-	grvToListKind := map[schema.GroupVersionResource]string{
-		schema.GroupVersionResource{
-			Group:    "consul.hashicorp.com",
-			Version:  "v1alpha1",
-			Resource: "servicedefaults",
-		}: "ServiceDefaultsList",
-	}
-	consulCr1 := unstructured.Unstructured{
+	cr := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "consul.hashicorp.com/v1alpha1",
 			"kind":       "ServiceDefaults",
 			"metadata": map[string]interface{}{
-				"name":       "server",
-				"namespace":  "default",
-				"finalizers": "[consul.hashicorp.com]",
+				"name":      "server",
+				"namespace": "default",
 			},
 		},
 	}
-	consulCr2 := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "consul.hashicorp.com/v1alpha1",
-			"kind":       "ServiceDefaults",
-			"metadata": map[string]interface{}{
-				"name":       "other-server",
-				"namespace":  "other",
-				"finalizers": "[consul.hashicorp.com]",
-			},
-		},
-	}
+	cr.SetFinalizers([]string{"consul.hashicorp.com"})
 
 	c := getInitializedCommand(t, nil)
-	c.apiext = apiextFake.NewSimpleClientset()
-	c.dynamic = dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), grvToListKind, &consulCr1, &consulCr2)
+	c.apiext, c.dynamic = createClientsWithCrds()
 
-	err := c.patchCustomResources([]unstructured.Unstructured{consulCr1, consulCr2})
+	_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	err = c.patchCustomResources([]unstructured.Unstructured{cr})
 	require.NoError(t, err)
 
 	actual, err := c.fetchCustomResources()
 	require.NoError(t, err)
-	require.Len(t, actual, 2)
+	require.Len(t, actual, 1)
 
 	// Finalizers for all CRs must be empty.
 	for _, cr := range actual {
@@ -767,34 +689,111 @@ func TestUninstall(t *testing.T) {
 			expectConsulDemoUninstalled:             false,
 		},
 	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			buf := new(bytes.Buffer)
-			c := getInitializedCommand(t, buf)
 
-			c.kubernetes = fake.NewSimpleClientset()
-			c.dynamic = dynamicFake.NewSimpleDynamicClient(runtime.NewScheme())
-			c.apiext = apiextFake.NewSimpleClientset()
-
-			mock := tc.helmActionsRunner
-			c.helmActionsRunner = mock
-
-			if tc.preProcessingFunc != nil {
-				tc.preProcessingFunc()
-			}
-			input := append([]string{
-				"--auto-approve",
-			}, tc.input...)
-			returnCode := c.Run(input)
-			require.Equal(t, tc.expectedReturnCode, returnCode)
-			require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
-			require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
-			require.Equal(t, tc.expectConsulUninstalled, mock.ConsulUninstalled)
-			require.Equal(t, tc.expectConsulDemoUninstalled, mock.ConsulDemoUninstalled)
-			output := buf.String()
-			for _, msg := range tc.messages {
-				require.Contains(t, output, msg)
-			}
-		})
+	cr := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+			"kind":       "ServiceDefaults",
+			"metadata": map[string]interface{}{
+				"name":      "server",
+				"namespace": "default",
+			},
+		},
 	}
+	cr.SetFinalizers([]string{"consul.hashicorp.com"})
+
+	for name, tc := range cases {
+		for _, withController := range []bool{false, true} {
+			t.Run(name, func(t *testing.T) {
+				buf := new(bytes.Buffer)
+				c := getInitializedCommand(t, buf)
+
+				c.kubernetes = fake.NewSimpleClientset()
+
+				if withController {
+					c.apiext, c.dynamic = createClientsWithCrds()
+					_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
+					require.NoError(t, err)
+				} else {
+					c.dynamic = dynamicFake.NewSimpleDynamicClient(runtime.NewScheme())
+					c.apiext = apiextFake.NewSimpleClientset()
+				}
+
+				mock := tc.helmActionsRunner
+				c.helmActionsRunner = mock
+
+				if tc.preProcessingFunc != nil {
+					tc.preProcessingFunc()
+				}
+				input := append([]string{
+					"--auto-approve",
+				}, tc.input...)
+				returnCode := c.Run(input)
+				require.Equal(t, tc.expectedReturnCode, returnCode)
+				require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
+				require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
+				require.Equal(t, tc.expectConsulUninstalled, mock.ConsulUninstalled)
+				require.Equal(t, tc.expectConsulDemoUninstalled, mock.ConsulDemoUninstalled)
+				output := buf.String()
+				for _, msg := range tc.messages {
+					require.Contains(t, output, msg)
+				}
+
+				if withController {
+
+				}
+			})
+		}
+	}
+}
+
+func createClientsWithCrds() (apiext.Interface, dynamic.Interface) {
+	grvToListKind := map[schema.GroupVersionResource]string{
+		serviceDefaultsGRV: "ServiceDefaultsList",
+		nonConsulGRV:       "ExamplesList",
+	}
+	crds := apiextv1.CustomResourceDefinitionList{
+		Items: []apiextv1.CustomResourceDefinition{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "servicedefaults.consul.hashicorp.com",
+					Labels: map[string]string{
+						"app": "consul",
+					},
+				},
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "consul.hashicorp.com",
+					Names: apiextv1.CustomResourceDefinitionNames{
+						Plural:   "servicedefaults",
+						ListKind: "ServiceDefaultsList",
+					},
+					Scope: "Namespaced",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "examples.example.com",
+				},
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.com",
+					Names: apiextv1.CustomResourceDefinitionNames{
+						Plural:   "examples",
+						ListKind: "ExamplesList",
+					},
+					Scope: "Namespaced",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+						},
+					},
+				},
+			},
+		},
+	}
+	return apiextFake.NewSimpleClientset(&crds), dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), grvToListKind)
 }
