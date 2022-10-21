@@ -203,35 +203,39 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, "-telemetry-prom-scrape-path="+prometheusScrapePath,
 			"-telemetry-prom-merge-port="+mergedMetricsPort)
 
-		serviceMetricsPath := pod.Annotations[annotationServiceMetricsPath]
-		serviceMetricsPort := pod.Annotations[annotationServiceMetricsPort]
+		serviceMetricsPath := w.MetricsConfig.serviceMetricsPath(pod)
+		serviceMetricsPort, err := w.MetricsConfig.serviceMetricsPort(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
+		}
+
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
 			cmd = append(cmd, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
 		}
 
 		// Pull the TLS config from the relevant annotations.
 		var prometheusCAFile string
-		if prometheusCAFile, ok := pod.Annotations[annotationPrometheusCAFile]; ok && prometheusCAFile != "" {
-			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile)
+		if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
+			prometheusCAFile = raw
 		}
 
 		var prometheusCAPath string
-		if prometheusCAPath, ok := pod.Annotations[annotationPrometheusCAPath]; ok && prometheusCAPath != "" {
-			cmd = append(cmd, "-telemetry-prom-ca-certs-path="+prometheusCAPath)
+		if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
+			prometheusCAPath = raw
 		}
 
 		var prometheusCertFile string
-		if prometheusCertFile, ok := pod.Annotations[annotationPrometheusCertFile]; ok && prometheusCertFile != "" {
-			cmd = append(cmd, "-telemetry-prom-cert-file="+prometheusCertFile)
+		if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
+			prometheusCertFile = raw
 		}
 
 		var prometheusKeyFile string
-		if prometheusKeyFile, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && prometheusKeyFile != "" {
-			cmd = append(cmd, "-telemetry-prom-key-file="+prometheusKeyFile)
+		if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
+			prometheusKeyFile = raw
 		}
 
 		// Validate required Prometheus TLS config is present if set.
-		if prometheusCertFile != "" || prometheusKeyFile != "" || prometheusCAFile != "" || prometheusCAPath != "" {
+		if prometheusCAFile != "" || prometheusCAPath != "" || prometheusCertFile != "" || prometheusKeyFile != "" {
 			if prometheusCAFile == "" && prometheusCAPath == "" {
 				return nil, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
 			}
@@ -241,6 +245,11 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 			if prometheusKeyFile == "" {
 				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
 			}
+			// TLS config has been validated, add them to the consul-dataplane cmd args
+			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile,
+				"-telemetry-prom-ca-certs-path="+prometheusCAPath,
+				"-telemetry-prom-cert-file="+prometheusCertFile,
+				"-telemetry-prom-key-file="+prometheusKeyFile)
 		}
 	}
 

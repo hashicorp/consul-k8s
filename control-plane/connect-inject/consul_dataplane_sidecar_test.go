@@ -167,7 +167,8 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				"/bin/sh", "-ec",
 				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
-					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs}
+					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs,
+			}
 			require.Equal(t, expCmd, container.Command)
 
 			if w.AuthMethod != "" {
@@ -884,6 +885,130 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 			} else {
 				require.NoError(err)
 				require.Equal(c.expResources, container.Resources)
+			}
+		})
+	}
+}
+
+func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
+	cases := []struct {
+		name       string
+		pod        corev1.Pod
+		expCmdArgs string
+		expErr     string
+	}{
+		{
+			name:       "default",
+			pod:        corev1.Pod{},
+			expCmdArgs: "",
+		},
+		{
+			name: "turning on merged metrics",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService:              "web",
+						annotationEnableMetrics:        "true",
+						annotationEnableMetricsMerging: "true",
+						annotationMergedMetricsPort:    "20100",
+						annotationPort:                 "1234",
+						annotationPrometheusScrapePath: "/scrape-path",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
+		},
+		{
+			name: "merged metrics with TLS enabled",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService:              "web",
+						annotationEnableMetrics:        "true",
+						annotationEnableMetricsMerging: "true",
+						annotationMergedMetricsPort:    "20100",
+						annotationPort:                 "1234",
+						annotationPrometheusScrapePath: "/scrape-path",
+						annotationPrometheusCAFile:     "/certs/ca.crt",
+						annotationPrometheusCAPath:     "/certs/ca",
+						annotationPrometheusCertFile:   "/certs/server.crt",
+						annotationPrometheusKeyFile:    "/certs/key.pem",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics -telemetry-prom-ca-certs-file=/certs/ca.crt -telemetry-prom-ca-certs-path=/certs/ca -telemetry-prom-cert-file=/certs/server.crt -telemetry-prom-key-file=/certs/key.pem",
+		},
+		{
+			name: "merge metrics with TLS enabled, missing CA gives an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService:              "web",
+						annotationEnableMetrics:        "true",
+						annotationEnableMetricsMerging: "true",
+						annotationMergedMetricsPort:    "20100",
+						annotationPort:                 "1234",
+						annotationPrometheusScrapePath: "/scrape-path",
+						annotationPrometheusCertFile:   "/certs/server.crt",
+						annotationPrometheusKeyFile:    "/certs/key.pem",
+					},
+				},
+			},
+			expCmdArgs: "",
+			expErr:     fmt.Sprintf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath),
+		},
+		{
+			name: "merge metrics with TLS enabled, missing cert gives an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService:              "web",
+						annotationEnableMetrics:        "true",
+						annotationEnableMetricsMerging: "true",
+						annotationMergedMetricsPort:    "20100",
+						annotationPort:                 "1234",
+						annotationPrometheusScrapePath: "/scrape-path",
+						annotationPrometheusCAFile:     "/certs/ca.crt",
+						annotationPrometheusKeyFile:    "/certs/key.pem",
+					},
+				},
+			},
+			expCmdArgs: "",
+			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile),
+		},
+		{
+			name: "merge metrics with TLS enabled, missing key file gives an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService:              "web",
+						annotationEnableMetrics:        "true",
+						annotationEnableMetricsMerging: "true",
+						annotationMergedMetricsPort:    "20100",
+						annotationPort:                 "1234",
+						annotationPrometheusScrapePath: "/scrape-path",
+						annotationPrometheusCAPath:     "/certs/ca",
+						annotationPrometheusCertFile:   "/certs/server.crt",
+					},
+				},
+			},
+			expCmdArgs: "",
+			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := MeshWebhook{
+				ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+			}
+			container, err := h.consulDataplaneSidecar(testNS, c.pod, multiPortInfo{})
+			if c.expErr != "" {
+				require.NotNil(t, err)
+				require.Contains(t, err.Error(), c.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Contains(t, container.Command[2], c.expCmdArgs)
 			}
 		})
 	}
