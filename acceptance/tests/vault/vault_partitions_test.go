@@ -346,11 +346,10 @@ func TestVault_Partitions(t *testing.T) {
 	// share the same node network (docker bridge), we can use
 	// a NodePort service so that we can access node(s) in a different Kind cluster.
 	if cfg.UseKind {
-		serverHelmValues["global.adminPartitions.service.type"] = "NodePort"
-		serverHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
 		serverHelmValues["meshGateway.service.type"] = "NodePort"
 		serverHelmValues["meshGateway.service.nodePort"] = "30100"
 		serverHelmValues["server.exposeService.type"] = "NodePort"
+		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
 	}
 
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)

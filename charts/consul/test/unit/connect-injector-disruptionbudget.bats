@@ -163,3 +163,35 @@ load _helpers
 # no flag to *remove* an API version so some Helm versions will always have
 # policy/v1 support and will always use that API version.
 
+
+#--------------------------------------------------------------------
+# minAvailable
+
+@test "connect-injector/DisruptionBudget: correct minAvailable when set" {
+  cd `chart_dir`
+  local tpl=$(helm template \
+      -s templates/connect-injector-disruptionbudget.yaml  \
+      --set 'connectInject.replicas=1' \
+      --set 'global.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.disruptionBudget.enabled=true' \
+      --set 'connectInject.disruptionBudget.minAvailable=1' \
+      . | tee /dev/stderr)
+  [ $(echo "$tpl" | yq '.spec.minAvailable') = "1" ]
+  [ $(echo "$tpl" | yq '.spec.maxUnavailable') = "null" ]
+}
+
+@test "connect-injector/DisruptionBudget: correct minAvailable when set with maxUnavailable" {
+  cd `chart_dir`
+  local tpl=$(helm template \
+      -s templates/connect-injector-disruptionbudget.yaml  \
+      --set 'connectInject.replicas=1' \
+      --set 'global.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.disruptionBudget.enabled=true' \
+      --set 'connectInject.disruptionBudget.minAvailable=1' \
+      --set 'connectInject.disruptionBudget.maxUnavailable=2' \
+      . | tee /dev/stderr)
+  [ $(echo "$tpl" | yq '.spec.minAvailable') = "1" ]
+  [ $(echo "$tpl" | yq '.spec.maxUnavailable') = "null" ]
+}
