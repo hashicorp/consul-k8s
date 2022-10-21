@@ -318,7 +318,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// initKubernetes sets up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
+// initKubernetes sets up the kubernetes clients to use for non Helm SDK calls to the Kubernetes API
 // The Helm SDK will use settings.RESTClientGetter for its calls as well, so this will
 // use a consistent method to target the right cluster for both Helm SDK and non Helm SDK calls.
 func (c *Command) initKubernetes(settings *helmCLI.EnvSettings) error {
@@ -380,9 +380,11 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 			if err != nil {
 				return err
 			}
+			if len(crs) == 0 {
+				return nil
+			}
 
-			err = c.deleteCustomResources(crs)
-			if err != nil {
+			if err = c.deleteCustomResources(crs); err != nil {
 				return err
 			}
 
@@ -402,8 +404,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 				return err
 			}
 
-			err = c.patchCustomResources(crs)
-			if err != nil {
+			if err = c.patchCustomResources(crs); err != nil {
 				return err
 			}
 		} else if err != nil {
@@ -453,7 +454,7 @@ func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
 			}
 
 			crList, err := c.dynamic.Resource(target).List(c.Ctx, metav1.ListOptions{})
-			if common.IgnoreNotFoundError(err) != nil {
+			if err != nil {
 				return nil, err
 			}
 			if crList != nil {

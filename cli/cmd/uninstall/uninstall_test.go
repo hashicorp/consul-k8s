@@ -526,11 +526,7 @@ func TestPatchCustomResources(t *testing.T) {
 	actual, err := c.fetchCustomResources()
 	require.NoError(t, err)
 	require.Len(t, actual, 1)
-
-	// Finalizers for all CRs must be empty.
-	for _, cr := range actual {
-		require.Len(t, cr.GetFinalizers(), 0)
-	}
+	require.Len(t, actual[0].GetFinalizers(), 0)
 }
 
 func TestUninstall(t *testing.T) {
@@ -710,13 +706,10 @@ func TestUninstall(t *testing.T) {
 
 				c.kubernetes = fake.NewSimpleClientset()
 
+				c.apiext, c.dynamic = createClientsWithCrds()
 				if withController {
-					c.apiext, c.dynamic = createClientsWithCrds()
 					_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
 					require.NoError(t, err)
-				} else {
-					c.dynamic = dynamicFake.NewSimpleDynamicClient(runtime.NewScheme())
-					c.apiext = apiextFake.NewSimpleClientset()
 				}
 
 				mock := tc.helmActionsRunner
@@ -740,7 +733,9 @@ func TestUninstall(t *testing.T) {
 				}
 
 				if withController {
-
+					crs, err := c.fetchCustomResources()
+					require.NoError(t, err)
+					require.Len(t, crs, 0)
 				}
 			})
 		}
