@@ -1,0 +1,49 @@
+name: run acceptance test
+description: Action to run acceptance tests
+
+inputs:
+    additional-flags:
+      description: Additional test run flags
+      required: false
+      default: ""
+    consul-k8s-image:
+      description: The Consul-K8s image
+      required: true
+    directory:
+      description: The testing directory
+      required: true
+    test-packages:
+      description: Space separated list of packages to test
+      required: true
+    test-results:
+      description: Where to store test results
+      required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Run acceptance tests ${{ matrix.runner }}
+      working-directory: ${{ inputs.directory }}
+      if: github.repository_owner == 'hashicorp' # This prevents running on forks
+      shell: bash
+      run: |
+        exit_code=0
+        echo "Running packages: ${{ inputs.test-packages }}"
+        for pkg in $(echo ${{ inputs.test-packages }})
+        do
+          fullpkg="github.com/hashicorp/consul-k8s/${{ inputs.directory }}/${pkg}"
+          echo "Testing package: ${fullpkg}"
+          if ! gotestsum --jsonfile=jsonfile-${pkg////-} -- ${fullpkg} -p 1 -timeout 2h -failfast \
+            ${{ inputs.additional-flags }} \
+            -enable-enterprise \
+            -enable-multi-cluster \
+            -debug-directory=${{ inputs.test-results }}/debug \
+            -consul-k8s-image=${{ inputs.consul-k8s-image }}
+          then
+            echo "Tests in ${pkg} failed, aborting early"
+            exit_code=1
+            break
+          fi
+        done
+        gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
+        exit $exit_code

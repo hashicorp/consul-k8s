@@ -1,0 +1,55 @@
+name: nightly-kind-acceptance
+on:
+  push:
+#  schedule:
+#    - cron: "0 0 * * *" # to debug on non main branch, replace schedule and chron with just push
+
+jobs:
+  # kind-acceptance tests:
+  # - the latest consul-k8s release branch against it's corresponding Consul release branch
+  # - the main consul-k8s branch against the consul main branch
+  # When a new release branch of Consul-K8s is created, a test for that release branch will be added alongside the
+  # latest release branch tests once this new version goes GA, then the previous latest release branch test is removed
+  kind-acceptance:
+    uses: ./.github/workflows/reusable-nightly-releases.yml
+    strategy:
+      matrix:
+        include:
+          # - { runner: "1.0.x", consul-k8s-branch: "release/1.0.x", build-name: "kind-nightly-1.0", consul-version: "1.13-dev", kind-version: "v1.23.0" } TODO: add suport for 1.0.0 after code freeze
+          - { runner: "main", consul-k8s-branch: "main", build-name: "kind-nightly-main", consul-version: "1.14-dev", kind-version: "v1.24.4" }
+      fail-fast: false
+    with:
+      name: ${{matrix.runner}}
+      directory: acceptance/tests
+      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -consul-image=hashicorppreview/consul-enterprise:${{ matrix.consul-version }}"
+      gotestsum-version: 1.8.2
+      checkout-ref: ${{ matrix.consul-k8s-branch }}
+      kind-version: ${{ matrix.kind-version }}
+    secrets:
+      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+      DOCKER_USER: ${{ secrets.DOCKER_USER }}
+      DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+
+#  gke-acceptance:
+#    uses: ./.github/workflows/reusable-nightly-cloud-releases.yml
+#    strategy:
+#      matrix:
+#        include:
+#          # - { runner: "1.0.x", consul-k8s-branch: "release/1.0.x", build-name: "kind-nightly-1.0", consul-version: "1.13-dev", kind-version: "v1.23.0" } TODO: add suport for 1.0.0 after code freeze
+#          - { runner: "main", consul-k8s-branch: "main", build-name: "kind-nightly-main", consul-version: "1.14-dev", kind-version: "v1.24.4" }
+#      fail-fast: false
+#    with:
+#      name: ${{ matrix.runner }}
+#      directory: acceptance/tests
+#      additional-flags: "-enable-pod-security-policies -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:${{ matrix.consul-version }}"
+#      gotestsum-version: 1.8.2
+#      checkout-ref: ${{ matrix.consul-k8s-branch }}
+#      debug_enabled: true
+#      debug_timeout_minutes: '5'
+#    secrets:
+#      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+#      DOCKER_USER: ${{ secrets.DOCKER_USER }}
+#      DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+#      CLOUDSDK_CORE_PROJECT: ${{ secrets.CLOUDSDK_CORE_PROJECT }}
+#      GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+

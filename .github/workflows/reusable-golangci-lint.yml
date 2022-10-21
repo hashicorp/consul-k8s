@@ -25,7 +25,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ inputs.go-version }}
-     
+
       - name: golangci-lint-${{inputs.directory}}
         uses: golangci/golangci-lint-action@v3.2.0
         with:

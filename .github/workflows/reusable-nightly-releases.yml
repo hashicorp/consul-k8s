@@ -1,0 +1,189 @@
+name: reusable-nightly-releases
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        required: true
+        type: string
+      additional-flags:
+        required: false
+        type: string
+        default: ""
+      directory:
+        required: true
+        type: string
+      gotestsum-version:
+        required: true
+        type: string
+      kind-version:
+        required: false
+        type: string
+        default: "v1.24.6"
+      checkout-ref:
+        required: false
+        type: string
+        default: ${{ github.sha }}
+    secrets:
+      CONSUL_ENT_LICENSE:
+        required: true
+      DOCKER_USER:
+        required: true
+      DOCKER_PASS:
+        required: true
+
+# Environment variables can only be used at the step level
+env:
+  TEST_RESULTS: /tmp/test-results # path to where test results are saved
+  CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+
+jobs:
+  get-go-version:
+    name: "Determine Go toolchain version"
+    runs-on: ubuntu-latest
+    env:
+      output-name: go-version
+    outputs:
+      go-version: ${{ steps.get-go-version.outputs.go-version }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.checkout-ref }}
+      - name: Determine Go version
+        id: get-go-version
+        # We use .go-version as our source of truth for current Go
+        # version, because "goenv" can react to it automatically.
+        run: |
+          echo "Building with Go $(cat .go-version)"
+          echo "::set-output name=${{env.output-name}}::$(cat .go-version)"
+
+  get-product-version:
+    runs-on: ubuntu-latest
+    outputs:
+      product-version: ${{ steps.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.checkout-ref }}
+      - name: get product version
+        id: get-product-version
+        run: |
+          make version
+          echo "::set-output name=product-version::$(make version)"
+
+  build-distros:
+    needs: [get-go-version, get-product-version]
+    runs-on: ubuntu-latest
+    env:
+      version: ${{needs.get-product-version.outputs.product-version}}
+    strategy:
+      matrix:
+        include:
+          # cli
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          # control-plane
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          # consul-cni
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+
+      fail-fast: true
+
+    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.checkout-ref }}
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        working-directory: ${{ matrix.component }}
+        run: |
+          mkdir -p dist out
+
+          export GIT_COMMIT=$(git rev-parse --short HEAD)
+          export GIT_DIRTY=$(test -n "$(git status --porcelain)" && echo "+CHANGES")
+          export GIT_IMPORT=github.com/hashicorp/consul-k8s/${{ matrix.component }}/version
+          export GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ env.version }}"
+
+
+          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
+          zip -r -j out/${{ matrix.pkg_name }}_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
+
+      - name: Upload built binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.pkg_name }}_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+
+  # upload dev docker image
+  dev-upload-docker:
+    if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
+    needs: [ get-product-version, build-distros ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: ["amd64"]
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.checkout-ref }}
+      - uses: actions/download-artifact@v3
+        with:
+          name: consul-cni_${{ env.version }}_linux_${{ matrix.arch }}.zip
+          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+      - uses: actions/download-artifact@v3
+        with:
+          name: consul-k8s-control-plane_${{ env.version }}_linux_${{ matrix.arch }}.zip
+          path: control-plane/dist/linux/${{ matrix.arch }}
+      - name: extract consul-cni zip
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+        run: |
+          cd "${ZIP_LOCATION}"
+          unzip -j *.zip
+      - name: extract control-plane zip
+        env:
+          ZIP_LOCATION: control-plane/dist/linux/${{ matrix.arch }}
+        run: |
+          cd "${ZIP_LOCATION}"
+          unzip -j *.zip
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASS }}
+      - name: Docker Build (Action)
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          context: control-plane
+          platforms: ${{ matrix.arch }}
+          target: release-default
+          tags: docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ inputs.name }}-${{ github.sha }}
+
+  acceptance:
+    needs: [ get-product-version, dev-upload-docker, get-go-version]
+    uses: ./.github/workflows/reusable-acceptance.yml
+    with:
+      name: acceptance
+      directory: acceptance/tests
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+      additional-flags: ${{ inputs.additional-flags }}
+      gotestsum-version: ${{ inputs.gotestsum-version }}
+      consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-${{ inputs.name }}-${{ github.sha }}
+      kind-version: ${{ inputs.kind-version }}
+      checkout-ref: ${{ inputs.checkout-ref }}
+    secrets:
+      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
