@@ -530,7 +530,7 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Patch(c.Ctx, cr.GetName(), types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
-		if err != nil {
+		if common.IgnoreNotFoundError(err) != nil {
 			return err
 		}
 	}
