@@ -1,3 +1,9 @@
+## UNRELEASED
+
+IMPROVEMENTS:
+* Helm:
+  * Add `tolerations` and `nodeSelector` to Server ACL init jobs and `nodeSelector` to Webhook cert manager. [[GH-1581](https://github.com/hashicorp/consul-k8s/pull/1581)]
+
 ## 0.49.0 (September 30, 2022)
 
 FEATURES:
