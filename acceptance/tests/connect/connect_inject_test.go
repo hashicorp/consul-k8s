@@ -19,12 +19,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TestConnectInject tests that Connect works in a default and a secure installation.
+// TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
 func TestConnectInject(t *testing.T) {
-	secureCases := []bool{false, true}
+	cases := map[string]struct {
+		secure bool
+	}{
+		"not-secure": {secure: false},
+		"secure":     {secure: true},
+	}
 
-	for _, secure := range secureCases {
-		name := fmt.Sprintf("secure: %t", secure)
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
@@ -32,7 +36,7 @@ func TestConnectInject(t *testing.T) {
 			releaseName := helpers.RandomName()
 			connHelper := connhelper.ConnectHelper{
 				ClusterKind: consul.Helm,
-				Secure:      secure,
+				Secure:      c.secure,
 				ReleaseName: releaseName,
 				Ctx:         ctx,
 				Cfg:         cfg,
@@ -42,7 +46,7 @@ func TestConnectInject(t *testing.T) {
 
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
-			if secure {
+			if c.secure {
 				connHelper.TestConnectionFailureWithoutIntention(t)
 				connHelper.CreateIntention(t)
 			}

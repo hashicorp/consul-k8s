@@ -139,7 +139,7 @@ func (t *TestConfig) entImage() (string, error) {
 		return v.Global.Image, nil
 	}
 
-	//// Otherwise, assume that we have an image tag with a version in it.
+	// Otherwise, assume that we have an image tag with a version in it.
 	consulImageSplits := strings.Split(v.Global.Image, ":")
 	if len(consulImageSplits) != 2 {
 		return "", fmt.Errorf("could not determine consul version from global.image: %s", v.Global.Image)

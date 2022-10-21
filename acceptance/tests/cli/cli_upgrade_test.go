@@ -35,7 +35,7 @@ func TestUpgrade(t *testing.T) {
 
 	connHelper.Upgrade(t)
 
-	t.Log("checking that the upgrade was successful")
+	t.Log("checking that the ingress gateway was install as a result of the upgrade")
 	k8sClient := ctx.KubernetesClient(t)
 	igwPods, err := k8sClient.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{LabelSelector: "component=ingress-gateway"})
 	require.NoError(t, err)

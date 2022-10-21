@@ -19,10 +19,14 @@ const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]
 // TestInstall tests that we can install consul service mesh with the CLI
 // and see that services can connect.
 func TestInstall(t *testing.T) {
-	secureCases := []bool{false, true}
+	cases := map[string]struct {
+		secure bool
+	}{
+		"not-secure": {secure: false},
+		"secure":     {secure: true},
+	}
 
-	for _, secure := range secureCases {
-		name := fmt.Sprintf("secure: %t", secure)
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cli, err := cli.NewCLI()
 			require.NoError(t, err)
@@ -32,7 +36,7 @@ func TestInstall(t *testing.T) {
 
 			connHelper := connhelper.ConnectHelper{
 				ClusterKind: consul.CLI,
-				Secure:      secure,
+				Secure:      c.secure,
 				ReleaseName: consul.CLIReleaseName,
 				Ctx:         ctx,
 				Cfg:         cfg,
@@ -42,7 +46,7 @@ func TestInstall(t *testing.T) {
 
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
-			if secure {
+			if c.secure {
 				connHelper.TestConnectionFailureWithoutIntention(t)
 				connHelper.CreateIntention(t)
 			}
