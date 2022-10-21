@@ -7,8 +7,11 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+)
+
+const (
+	cliBinaryName = "consul-k8s"
 )
 
 // CLI provides access to compile and execute commands with the `consul-k8s` CLI.
@@ -16,13 +19,9 @@ type CLI struct {
 	initialized bool
 }
 
-// NewCLI compiles the `consul-k8s` CLI and returns a handle to execute commands
-// with the binary.
+// NewCLI returns a handle to execute commands with the consul-k8s binary.
 func NewCLI() (*CLI, error) {
-	cmd := exec.Command("go", "install", ".")
-	cmd.Dir = config.CLIPath
-	_, err := cmd.Output()
-	return &CLI{true}, err
+	return &CLI{true}, nil
 }
 
 // Run runs the CLI with the given args.
@@ -40,6 +39,6 @@ func (c *CLI) Run(t *testing.T, options *k8s.KubectlOptions, args ...string) ([]
 	}
 
 	logger.Logf(t, "Running `consul-k8s %s`", strings.Join(args, " "))
-	cmd := exec.Command("cli", args...)
+	cmd := exec.Command(cliBinaryName, args...)
 	return cmd.Output()
 }
