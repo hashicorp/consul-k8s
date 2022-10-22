@@ -274,9 +274,9 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
-      - name: Copy LICENSE.md
+      - name: Copy LICENSE
         run:
-         cp LICENSE.md ./control-plane
+         cp LICENSE ./control-plane
       - uses: hashicorp/actions-docker-build@v1
         with:
           smoke_test: |
@@ -316,9 +316,9 @@ jobs:
         run: |
           cd ${ZIP_LOCATION}
           unzip -j *.zip
-      - name: Copy LICENSE.md
+      - name: Copy LICENSE
         run:
-          cp LICENSE.md ./control-plane
+          cp LICENSE ./control-plane
       - uses: hashicorp/actions-docker-build@v1
         with:
           smoke_test: |
