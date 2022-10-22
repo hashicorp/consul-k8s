@@ -11,9 +11,8 @@ on:
         type: string
         default: ""
       consul-k8s-image:
-        required: false 
+        required: false
         type: string
-        default: docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest
       directory:
         required: true
         type: string
@@ -26,7 +25,11 @@ on:
       kind-version:
         required: false
         type: string
-        default: "v1.22.4"
+        default: "v1.24.6"
+      checkout-ref:
+        required: false
+        type: string
+        default: ${{ github.sha }}
     secrets:
         CONSUL_ENT_LICENSE:
           required: true
@@ -34,32 +37,37 @@ on:
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }} 
+  CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+  CONSUL_K8S_IMAGE: ${{ inputs.consul-k8s-image }}
 
 jobs:
   job:
-    runs-on: ubuntu-latest
+    runs-on: [custom, linux, xl]
     strategy: 
       matrix:
-        include: # I am really sorry for this but I could not find a way to automatically split our tests into several runners. For now, split manually.
-          - {runner: "0", test-packages: "basic connect consul-dns"}
-          - {runner: "1", test-packages: "controller example ingress-gateway"}
-          - {runner: "2", test-packages: "mesh-gateway metrics"}
-          - {runner: "3", test-packages: "partitions sync terminating-gateway"}
-          - {runner: "4", test-packages: "vault"}
+        include:
+          - {runner: "0", test-packages: "basic consul-dns metrics"}
+          - {runner: "1", test-packages: "connect"}
+          - {runner: "2", test-packages: "controller example"}
+          - {runner: "3", test-packages: "ingress-gateway"}
+          - {runner: "4", test-packages: "partitions"}
+          - {runner: "5", test-packages: "peering"}
+          - {runner: "6", test-packages: "snapshot-agent sync terminating-gateway vault wan-federation"}
 
-      fail-fast: true
+      fail-fast: false
     steps:      
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.checkout-ref }}
       
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ inputs.go-version }}
 
       - name: Setup go mod cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
@@ -68,11 +76,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install gotestsum
+      - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
         run: |
-          wget https://github.com/gotestyourself/gotestsum/releases/download/v"${{ inputs.gotestsum-version }}"/gotestsum_"${{ inputs.gotestsum-version }}"_linux_amd64.tar.gz
-          sudo tar -C /usr/local/bin -xzf gotestsum_"${{ inputs.gotestsum-version }}"_linux_amd64.tar.gz
-          rm gotestsum_"${{ inputs.gotestsum-version }}"_linux_amd64.tar.gz
+          wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
+          rm gotestsum_1.6.4_linux_amd64.tar.gz
+
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.15.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+          curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+          wget https://get.helm.sh/helm-v3.9.4-linux-amd64.tar.gz
+          tar -zxvf helm-v3.9.4-linux-amd64.tar.gz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
 
       - run: mkdir -p ${{ env.TEST_RESULTS }}
 
@@ -84,6 +104,11 @@ jobs:
         run: |
           kind create cluster --name dc1 --image kindest/node:${{ inputs.kind-version }}
           kind create cluster --name dc2 --image kindest/node:${{ inputs.kind-version }}
+
+      - name: Build CLI
+        run: |
+          sudo make cli-dev
+          consul-k8s version
 
       # We have to run the tests for each package separately so that we can
       # exit early if any test fails (-failfast only works within a single
@@ -115,14 +140,14 @@ jobs:
     
       - name: Upload tests
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ inputs.name }}-${{ matrix.test-packages }}-gotestsum-report.xml
           path: ${{ env.TEST_RESULTS }}/gotestsum-report.xml
 
-      - name: Upload debug (on failure) 
+      - name: Upload debug (on failure)
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ inputs.name }}-${{ matrix.test-packages }}-debug-info
           path: ${{ env.TEST_RESULTS }}/debug

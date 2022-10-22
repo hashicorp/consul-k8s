@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -26,8 +27,14 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
 
-		// Create a directory for the test.
-		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)
+		// Create a directory for the test, first remove special characters from test name
+		reg, err := regexp.Compile("[^A-Za-z0-9/_-]+")
+		if err != nil {
+			logger.Log(t, "unable to generate regex for test name special character replacement", "err", err)
+		}
+		tn := reg.ReplaceAllString(t.Name(), "_")
+
+		testDebugDirectory := filepath.Join(debugDirectory, tn, contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
 		logger.Logf(t, "dumping logs, pod info, and envoy config for %s to %s", labelSelector, testDebugDirectory)
