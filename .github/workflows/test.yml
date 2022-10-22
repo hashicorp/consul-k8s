@@ -67,7 +67,7 @@ jobs:
   golangci-lint-helm-gen:
    needs:
     - get-go-version
-   uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml
+   uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
    with:
       directory: hack/helm-reference-gen
       go-version: ${{ needs.get-go-version.outputs.go-version }}
@@ -76,7 +76,7 @@ jobs:
 
   unit-helm-gen:
     needs: [get-go-version, golangci-lint-helm-gen, validate-helm-gen]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@main
     with:
       directory: hack/helm-reference-gen
       go-version: ${{ needs.get-go-version.outputs.go-version }}
@@ -118,7 +118,7 @@ jobs:
   golangci-lint-control-plane:
     needs:
       - get-go-version
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
     with:
       directory: control-plane
       go-version: ${{ needs.get-go-version.outputs.go-version }}
@@ -268,14 +268,14 @@ jobs:
   golangci-lint-acceptance:
     needs:
       - get-go-version
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
     with:
       directory:  acceptance 
       go-version: ${{ needs.get-go-version.outputs.go-version }} 
 
   unit-acceptance-framework:
     needs: [get-go-version, golangci-lint-acceptance]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@main
     with:
       directory: acceptance/framework
       go-version: ${{ needs.get-go-version.outputs.go-version }}
@@ -283,14 +283,14 @@ jobs:
   golangci-lint-cli:
     needs:
       - get-go-version
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-golangci-lint.yml@main
     with:
       directory: cli 
       go-version: ${{ needs.get-go-version.outputs.go-version }}
 
   unit-cli:
     needs: [get-go-version, golangci-lint-cli]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-unit.yml@main
     with:
       directory: cli 
       go-version: ${{ needs.get-go-version.outputs.go-version }}
@@ -348,7 +348,7 @@ jobs:
 #  acceptance-tproxy:
 #    #needs: [get-go-version, unit-cli, dev-upload-docker, unit-acceptance-framework, unit-test-helm-templates]
 #    needs: dev-upload-docker
-#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
 #    with:
 #      name: acceptance-tproxy
 #      directory: acceptance/tests
@@ -360,7 +360,7 @@ jobs:
 
   acceptance:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
     with:
       name: acceptance
       directory: acceptance/tests
@@ -374,7 +374,7 @@ jobs:
 # TODO (agentless): re-enable once tproxy is supported
 #  acceptance-cni:
 #    needs: dev-upload-docker
-#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
 #    with:
 #      name: acceptance
 #      directory: acceptance/tests
