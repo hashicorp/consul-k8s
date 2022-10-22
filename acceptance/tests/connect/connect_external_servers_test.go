@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
@@ -87,17 +88,17 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
+					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://static-server")
 				} else {
-					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
 				}
 
 				intention := &api.ServiceIntentionsConfigEntry{
 					Kind: api.ServiceIntentions,
-					Name: staticServerName,
+					Name: connhelper.StaticServerName,
 					Sources: []*api.SourceIntention{
 						{
-							Name:   StaticClientName,
+							Name:   connhelper.StaticClientName,
 							Action: api.IntentionActionAllow,
 						},
 					},
@@ -110,15 +111,15 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://static-server")
 			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
 			}
 
 			// Test that kubernetes readiness status is synced to Consul.
 			// Create the file so that the readiness probe of the static-server pod fails.
 			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+connhelper.StaticServerName, "--", "touch", "/tmp/unhealthy")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -127,9 +128,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", "http://static-server.%s")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", "http://static-server")
 			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}
 		})
 	}

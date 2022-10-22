@@ -1,4 +1,4 @@
-package connect
+package connhelper
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 
 const (
 	StaticClientName = "static-client"
-	staticServerName = "static-server"
+	StaticServerName = "static-server"
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -32,16 +32,13 @@ type ConnectHelper struct {
 	// Secure configures the Helm chart for the test to use ACL tokens.
 	Secure bool
 
-	// AutoEncrypt configures the Helm chart for the test to use AutoEncrypt.
-	AutoEncrypt bool
-
 	// HelmValues are the additional helm values to use when installing or
 	// upgrading the cluster beyond connectInject.enabled, global.tls.enabled,
-	// global.tls.enableAutoEncrypt, global.acls.mangageSystemACLs which are
+	// global.tls.enableAutoEncrypt, global.acls.manageSystemACLs which are
 	// set by the Secure and AutoEncrypt fields.
 	HelmValues map[string]string
 
-	// RelaseName is the name of the Consul cluster.
+	// ReleaseName is the name of the Consul cluster.
 	ReleaseName string
 
 	Ctx environment.TestContext
@@ -99,7 +96,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 				tokens, _, err := c.consulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
 				for _, token := range tokens {
-					require.NotContains(r, token.Description, staticServerName)
+					require.NotContains(r, token.Description, StaticServerName)
 					require.NotContains(r, token.Description, StaticClientName)
 				}
 			})
@@ -144,7 +141,7 @@ func (c *ConnectHelper) CreateIntention(t *testing.T) {
 	logger.Log(t, "creating intention")
 	_, _, err := c.consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 		Kind: api.ServiceIntentions,
-		Name: staticServerName,
+		Name: StaticServerName,
 		Sources: []*api.SourceIntention{
 			{
 				Name:   StaticClientName,
@@ -155,7 +152,7 @@ func (c *ConnectHelper) CreateIntention(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConnectionSuccessful ensures the static-server pod can connect to the
+// TestConnectionSuccess ensures the static-server pod can connect to the
 // static-client pod once the intention is set.
 func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
@@ -175,7 +172,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	// Create a file called "unhealthy" at "/tmp/" so that the readiness probe
 	// of the static-server pod fails.
 	logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
 
 	// The readiness probe should take a moment to be reflected in Consul,
 	// CheckStaticServerConnection will retry until Consul marks the service
@@ -200,7 +197,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	}
 
 	// Return the static-server to a "healthy state".
-	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+staticServerName, "--", "rm", "/tmp/unhealthy")
+	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
 }
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm
@@ -210,7 +207,6 @@ func (c *ConnectHelper) helmValues() map[string]string {
 	helmValues := map[string]string{
 		"connectInject.enabled":        "true",
 		"global.tls.enabled":           strconv.FormatBool(c.Secure),
-		"global.tls.enableAutoEncrypt": strconv.FormatBool(c.AutoEncrypt),
 		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
 	}
 
