@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -21,7 +22,6 @@ const StaticClientName = "static-client"
 // Test that prometheus metrics, when enabled, are accessible from the
 // endpoints that have been exposed on the server, client and gateways.
 func TestComponentMetrics(t *testing.T) {
-	t.Skipf("Skipping this test because it's not yet supported with agentless")
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -31,6 +31,10 @@ func TestComponentMetrics(t *testing.T) {
 		"global.datacenter":                 "dc1",
 		"global.metrics.enabled":            "true",
 		"global.metrics.enableAgentMetrics": "true",
+		// Agents have been removed but there could potentially be customers that are still running them. We
+		// are using client.enabled to cover that scenario and to make sure agent metrics still works with
+		// consul-dataplane.
+		"client.enabled": "true",
 
 		"connectInject.enabled": "true",
 		"controller.enabled":    "true",
@@ -77,20 +81,19 @@ func TestComponentMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
-	//// Ingress Gateway Metrics
-	//assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
-	//
-	//// Terminating Gateway Metrics
-	//assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
-	//
-	//// Mesh Gateway Metrics
-	//assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway"`)
+	logger.Log(t, "ingress gateway metrics")
+	assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
+
+	logger.Log(t, "terminating gateway metrics")
+	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
+
+	logger.Log(t, "mesh gateway metrics")
+	assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway"`)
 }
 
 // Test that merged service and envoy metrics are accessible from the
 // endpoints that have been exposed on the service.
 func TestAppMetrics(t *testing.T) {
-	t.Skipf("Skipping this test because it's not yet supported with agentless")
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -138,13 +141,13 @@ func TestAppMetrics(t *testing.T) {
 	})
 }
 
-//func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
-//	pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("component=%s", label)})
-//	require.NoError(t, err)
-//	for _, pod := range pods.Items {
-//		podIP := pod.Status.PodIP
-//		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
-//		require.NoError(t, err)
-//		require.Contains(t, metricsOutput, metricsAssertion)
-//	}
-//}
+func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
+	pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("component=%s", label)})
+	require.NoError(t, err)
+	for _, pod := range pods.Items {
+		podIP := pod.Status.PodIP
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
+		require.NoError(t, err)
+		require.Contains(t, metricsOutput, metricsAssertion)
+	}
+}
