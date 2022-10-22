@@ -296,8 +296,11 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 
 			// If the peering is supposed to already exist in Consul, then establish a peering with the existing token, so the peering will exist on the dialing side.
 			if tt.peeringExists {
-				_, _, err := dialerClient.Peerings().Establish(context.Background(), api.PeeringEstablishRequest{PeerName: tt.peeringName, PeeringToken: encodedPeeringToken}, nil)
-				require.NoError(t, err)
+				retry.Run(t, func(r *retry.R) {
+					_, _, err = dialerClient.Peerings().Establish(context.Background(), api.PeeringEstablishRequest{PeerName: tt.peeringName, PeeringToken: encodedPeeringToken}, nil)
+					require.NoError(r, err)
+				})
+
 				k8sObjects = append(k8sObjects, createSecret("dialer-token-old", "default", "token", "old-token"))
 				// Create a new token to be used by Reconcile(). The original token has already been
 				// used once to simulate establishing an existing peering.
@@ -424,9 +427,12 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 
 			// Create test consul server.
 			acceptorPeerServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				// We set the datacenter because the server name, typically formatted as "server.<datacenter>.<domain>"
+				// We set different cluster id for the connect CA because the server name,
+				// typically formatted as server.dc1.peering.<cluster_id>.consul
 				// must be unique on the acceptor and dialer peers.
-				c.Datacenter = "acceptor-dc"
+				c.Connect["ca_config"] = map[string]interface{}{
+					"cluster_id": "00000000-2222-3333-4444-555555555555",
+				}
 			})
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
@@ -499,8 +505,11 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			go watcher.Run()
 
 			// Establish a peering with the generated token.
-			_, _, err = dialerClient.Peerings().Establish(context.Background(), api.PeeringEstablishRequest{PeerName: "peering", PeeringToken: generatedToken.PeeringToken}, nil)
-			require.NoError(t, err)
+			retry.Run(t, func(r *retry.R) {
+				_, _, err = dialerClient.Peerings().Establish(context.Background(), api.PeeringEstablishRequest{PeerName: "peering", PeeringToken: generatedToken.PeeringToken}, nil)
+				require.NoError(r, err)
+			})
+
 			k8sObjects = append(k8sObjects, createSecret("dialer-token-old", "default", "token", "old-token"))
 
 			// Create a new token to be potentially used by Reconcile(). The original token has already been

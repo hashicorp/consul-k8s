@@ -564,7 +564,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			decodedTokenData, err := base64.StdEncoding.DecodeString(string(createdSecret.Data["data"]))
 			require.NoError(t, err)
 
-			require.Contains(t, string(decodedTokenData), "\"CA\":null")
+			require.Contains(t, string(decodedTokenData), "\"CA\":")
 			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
 			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.consul\"")
 
@@ -1101,7 +1101,6 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			require.Equal(t, tt.expStatus.SecretRef.Backend, acceptor.SecretRef().Backend)
 			require.Equal(t, tt.expStatus.SecretRef.ResourceVersion, acceptor.SecretRef().ResourceVersion)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, acceptor.Status.Conditions[0].Message)
-
 		})
 	}
 }
