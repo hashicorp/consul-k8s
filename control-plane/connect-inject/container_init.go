@@ -186,50 +186,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		volMounts = append(volMounts, saTokenVolumeMount)
 	}
 
-	// todo (agentless): this needs to be configured in consul-dataplane once it supports telemetry
-	//// This determines how to configure the consul connect envoy command: what
-	//// metrics backend to use and what path to expose on the
-	//// envoy_prometheus_bind_addr listener for scraping.
-	//metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
-	//if err != nil {
-	//	return corev1.Container{}, err
-	//}
-	//if metricsServer {
-	//	prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
-	//	mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
-	//	if err != nil {
-	//		return corev1.Container{}, err
-	//	}
-	//	data.PrometheusScrapePath = prometheusScrapePath
-	//	data.PrometheusBackendPort = mergedMetricsPort
-	//}
-	//// Pull the TLS config from the relevant annotations.
-	//if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
-	//	data.PrometheusCAFile = raw
-	//}
-	//if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
-	//	data.PrometheusCAPath = raw
-	//}
-	//if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
-	//	data.PrometheusCertFile = raw
-	//}
-	//if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
-	//	data.PrometheusKeyFile = raw
-	//}
-	//
-	//// Validate required Prometheus TLS config is present if set.
-	//if data.PrometheusCertFile != "" || data.PrometheusKeyFile != "" || data.PrometheusCAFile != "" || data.PrometheusCAPath != "" {
-	//	if data.PrometheusCAFile == "" && data.PrometheusCAPath == "" {
-	//		return corev1.Container{}, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
-	//	}
-	//	if data.PrometheusCertFile == "" {
-	//		return corev1.Container{}, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
-	//	}
-	//	if data.PrometheusKeyFile == "" {
-	//		return corev1.Container{}, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
-	//	}
-	//}
-
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(

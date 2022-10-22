@@ -240,7 +240,10 @@ spec:
             -service-partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
             -log-level={{ default .Values.global.logLevel }} \
-            -log-json={{ .Values.global.logJSON }}
+            -log-json={{ .Values.global.logJSON }} \
+            {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+            -telemetry-prom-scrape-path="/metrics"
+            {{- end }}
         livenessProbe:
           tcpSocket:
             port: {{ .Values.meshGateway.containerPort }}

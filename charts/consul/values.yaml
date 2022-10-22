@@ -574,28 +574,6 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
-  # For connect-injected pods, the consul sidecar is responsible for metrics merging. For ingress/mesh/terminating
-  # gateways, it additionally ensures the Consul services are always registered with their local Consul client.
-  # @type: map
-  consulSidecarContainer:
-    # Set default resources for consul sidecar. If null, that resource won't
-    # be set.
-    # These settings can be overridden on a per-pod basis via these annotations:
-    #
-    # - `consul.hashicorp.com/consul-sidecar-cpu-limit`
-    # - `consul.hashicorp.com/consul-sidecar-cpu-request`
-    # - `consul.hashicorp.com/consul-sidecar-memory-limit`
-    # - `consul.hashicorp.com/consul-sidecar-memory-request`
-    # @recurse: false
-    # @type: map
-    resources:
-      requests:
-        memory: "25Mi"
-        cpu: "20m"
-      limits:
-        memory: "50Mi"
-        cpu: "20m"
-
   # The name (and tag) of the Envoy Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
@@ -2073,18 +2051,18 @@ connectInject:
     # add a listener on the Envoy sidecar to expose metrics. The exposed
     # metrics will depend on whether metrics merging is enabled:
     #   - If metrics merging is enabled:
-    #     the Consul sidecar will run a merged metrics server
+    #     the consul-dataplane will run a merged metrics server
     #     combining Envoy sidecar and Connect service metrics,
     #     i.e. if your service exposes its own Prometheus metrics.
     #   - If metrics merging is disabled:
     #     the listener will just expose Envoy sidecar metrics.
     # This will inherit from `global.metrics.enabled`.
     defaultEnabled: "-"
-    # Configures the Consul sidecar to run a merged metrics server
+    # Configures the consul-dataplane to run a merged metrics server
     # to combine and serve both Envoy and Connect service metrics.
     # This feature is available only in Consul v1.10.0 or greater.
     defaultEnableMerging: false
-    # Configures the port at which the Consul sidecar will listen on to return
+    # Configures the port at which the consul-dataplane will listen on to return
     # combined metrics. This port only needs to be changed if it conflicts with
     # the application's ports.
     defaultMergedMetricsPort: 20100

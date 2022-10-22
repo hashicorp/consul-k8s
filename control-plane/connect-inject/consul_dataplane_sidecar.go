@@ -190,6 +190,69 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
 	}
 
+	metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine if merged metrics is enabled: %w", err)
+	}
+	if metricsServer {
+		prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
+		mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if merged metrics port: %w", err)
+		}
+		cmd = append(cmd, "-telemetry-prom-scrape-path="+prometheusScrapePath,
+			"-telemetry-prom-merge-port="+mergedMetricsPort)
+
+		serviceMetricsPath := w.MetricsConfig.serviceMetricsPath(pod)
+		serviceMetricsPort, err := w.MetricsConfig.serviceMetricsPort(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
+		}
+
+		if serviceMetricsPath != "" && serviceMetricsPort != "" {
+			cmd = append(cmd, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+		}
+
+		// Pull the TLS config from the relevant annotations.
+		var prometheusCAFile string
+		if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
+			prometheusCAFile = raw
+		}
+
+		var prometheusCAPath string
+		if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
+			prometheusCAPath = raw
+		}
+
+		var prometheusCertFile string
+		if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
+			prometheusCertFile = raw
+		}
+
+		var prometheusKeyFile string
+		if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
+			prometheusKeyFile = raw
+		}
+
+		// Validate required Prometheus TLS config is present if set.
+		if prometheusCAFile != "" || prometheusCAPath != "" || prometheusCertFile != "" || prometheusKeyFile != "" {
+			if prometheusCAFile == "" && prometheusCAPath == "" {
+				return nil, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
+			}
+			if prometheusCertFile == "" {
+				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
+			}
+			if prometheusKeyFile == "" {
+				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
+			}
+			// TLS config has been validated, add them to the consul-dataplane cmd args
+			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile,
+				"-telemetry-prom-ca-certs-path="+prometheusCAPath,
+				"-telemetry-prom-cert-file="+prometheusCertFile,
+				"-telemetry-prom-key-file="+prometheusKeyFile)
+		}
+	}
+
 	var envoyExtraArgs []string
 	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
 	// --base-id is an envoy arg rather than consul-dataplane, and so we need to make sure we're passing it
