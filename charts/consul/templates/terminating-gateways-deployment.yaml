@@ -283,7 +283,7 @@ spec:
                 -log-level={{ default $root.Values.global.logLevel }} \
                 -log-json={{ $root.Values.global.logJSON }} \
                 {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
-                -telemetry-prom-scrape-path={{ $root.Values.connectInject.metrics.defaultPrometheusScrapePath }}
+                -telemetry-prom-scrape-path="/metrics"
                 {{- end }}
           livenessProbe:
             tcpSocket:

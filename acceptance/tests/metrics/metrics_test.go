@@ -28,9 +28,6 @@ func TestComponentMetrics(t *testing.T) {
 	ns := ctx.KubectlOptions(t).Namespace
 
 	helmValues := map[string]string{
-		// Remove before merging
-		"global.imageConsulDataplane":       "curtbushko/consul-dataplane:latest",
-		"global.imageK8S":                   "curtbushko/consul-k8s-control-plane-dev:latest",
 		"global.datacenter":                 "dc1",
 		"global.metrics.enabled":            "true",
 		"global.metrics.enableAgentMetrics": "true",
@@ -103,11 +100,8 @@ func TestAppMetrics(t *testing.T) {
 	ns := ctx.KubectlOptions(t).Namespace
 
 	helmValues := map[string]string{
-		// Remove before merging
-		"global.imageConsulDataplane": "curtbushko/consul-dataplane:latest",
-		"global.imageK8S":             "curtbushko/consul-k8s-control-plane-dev:latest",
-		"global.datacenter":           "dc1",
-		"global.metrics.enabled":      "true",
+		"global.datacenter":      "dc1",
+		"global.metrics.enabled": "true",
 
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
@@ -137,7 +131,7 @@ func TestAppMetrics(t *testing.T) {
 
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
-	retry.RunWith(&retry.Counter{Count: 10, Wait: 1 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Count: 3, Wait: 1 * time.Second}, t, func(r *retry.R) {
 		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
 		require.NoError(r, err)
 		// This assertion represents the metrics from the envoy sidecar.
