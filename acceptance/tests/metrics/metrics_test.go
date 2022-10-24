@@ -103,6 +103,9 @@ func TestAppMetrics(t *testing.T) {
 		"global.datacenter":      "dc1",
 		"global.metrics.enabled": "true",
 
+		// todo (agentless): remove once we have consul-dataplane image with these changes.
+		"global.imageConsulDataplane": "curtbushko/consul-dataplane:latest",
+
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
 	}
