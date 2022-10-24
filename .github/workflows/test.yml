@@ -351,7 +351,7 @@ jobs:
       name: acceptance-tproxy
       directory: acceptance/tests
       go-version: ${{ needs.get-go-version.outputs.go-version }}
-      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev"
+      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
       gotestsum-version: 1.8.2
     secrets:
       CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
@@ -363,7 +363,7 @@ jobs:
       name: acceptance
       directory: acceptance/tests
       go-version: ${{ needs.get-go-version.outputs.go-version }}
-      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -consul-image=hashicorppreview/consul-enterprise:1.14-dev"
+      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
       gotestsum-version: 1.8.2
       consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
     secrets:
@@ -376,7 +376,7 @@ jobs:
       name: acceptance
       directory: acceptance/tests
       go-version: ${{ needs.get-go-version.outputs.go-version }}
-      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.14-dev"
+      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
       gotestsum-version: 1.8.2
     secrets:
       CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
