@@ -487,7 +487,7 @@ func (c *Command) Run(args []string) int {
 	mgr.GetWebhookServer().Register("/mutate",
 		&webhook.Admission{Handler: &connectinject.MeshWebhook{
 			Clientset:                    c.clientset,
-			ReleaseNamespace:              c.flagReleaseNamespace,
+			ReleaseNamespace:             c.flagReleaseNamespace,
 			ConsulConfig:                 consulConfig,
 			ConsulServerConnMgr:          watcher,
 			ImageConsul:                  c.flagConsulImage,

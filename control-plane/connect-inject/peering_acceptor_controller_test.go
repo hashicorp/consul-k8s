@@ -566,7 +566,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 
 			require.Contains(t, string(decodedTokenData), "\"CA\":")
 			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
-			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.consul\"")
+			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.peering.11111111-2222-3333-4444-555555555555.consul\"")
 
 			// Get the reconciled PeeringAcceptor and make assertions on the status
 			acceptor := &v1alpha1.PeeringAcceptor{}
