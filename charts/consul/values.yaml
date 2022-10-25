@@ -2928,6 +2928,8 @@ apiGateway:
     # This value defines the tolerations that will be assigned to a gateway pod
     # This should be a multi-line string matching the
     # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    #
+    # @type: string
     tolerations: null
 
     # This value defines the type of service created for gateways (e.g. LoadBalancer, ClusterIP)
@@ -3014,6 +3016,8 @@ apiGateway:
 
     # This value defines the tolerations for api-gateway-controller pod, this should be a multi-line string matching the
     # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    #
+    # @type: string
     tolerations: null
 
     # Configuration for the Service created for the api-gateway-controller
