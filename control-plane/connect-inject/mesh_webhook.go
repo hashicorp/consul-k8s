@@ -256,10 +256,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, containerEnvVars...)
 	}
 
-	// Add the init container which copies the Consul binary to /consul/connect-inject/.
-	initCopyContainer := w.initCopyContainer()
-	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
-
 	// A user can enable/disable tproxy for an entire namespace via a label.
 	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
 	if err != nil {
@@ -409,7 +405,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
 		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
-			// todo: update this error message
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}

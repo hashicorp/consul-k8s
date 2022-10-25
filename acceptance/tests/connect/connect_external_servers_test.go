@@ -20,7 +20,10 @@ import (
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
 func TestConnectInject_ExternalServers(t *testing.T) {
-	for _, secure := range []bool{false, true} {
+	for _, secure := range []bool{
+		false,
+		true,
+	} {
 		caseName := fmt.Sprintf("secure: %t", secure)
 		t.Run(caseName, func(t *testing.T) {
 			cfg := suite.Config()
@@ -30,8 +33,10 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 				"global.tls.enabled":           strconv.FormatBool(secure),
 
-				// This prevents controllers from being installed twice, causing a failure.
-				"controller.enabled": "false",
+				// Don't install injector, controller and cni on this cluster so that it's not installed twice.
+				"controller.enabled":        "false",
+				"connectInject.enabled":     "false",
+				"connectInject.cni.enabled": "false",
 			}
 			serverReleaseName := helpers.RandomName()
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)

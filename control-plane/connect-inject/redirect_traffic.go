@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/consul/sdk/iptables"
 	corev1 "k8s.io/api/core/v1"
 )
 
-// addRedirectTrafficConfigAnnotation creates an iptables.Config based on proxy configuration.
+// addRedirectTrafficConfigAnnotation creates an iptables.Config in JSON format based on proxy configuration.
 // iptables.Config:
 //
 //	ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
@@ -21,7 +22,7 @@ import (
 //	ExcludeOutboundPorts: pod annotations
 //	ExcludeOutboundCIDRs: pod annotations
 //	ExcludeUIDs: pod annotations
-func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
+func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
 	cfg := iptables.Config{
 		ProxyUserID: strconv.Itoa(sidecarUserAndGroupID),
 	}
@@ -33,22 +34,22 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 	cfg.ProxyOutboundPort = iptables.DefaultTProxyOutboundPort
 
 	// If metrics are enabled, get the prometheusScrapePort and exclude it from the inbound ports
-	enableMetrics, err := w.MetricsConfig.enableMetrics(*pod)
+	enableMetrics, err := w.MetricsConfig.enableMetrics(pod)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if enableMetrics {
-		prometheusScrapePort, err := w.MetricsConfig.prometheusScrapePort(*pod)
+		prometheusScrapePort, err := w.MetricsConfig.prometheusScrapePort(pod)
 		if err != nil {
-			return err
+			return "", err
 		}
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, prometheusScrapePort)
 	}
 
 	// Exclude any overwritten liveness/readiness/startup ports from redirection.
-	overwriteProbes, err := shouldOverwriteProbes(*pod, w.TProxyOverwriteProbes)
+	overwriteProbes, err := shouldOverwriteProbes(pod, w.TProxyOverwriteProbes)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if overwriteProbes {
@@ -70,27 +71,27 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 	}
 
 	// Inbound ports
-	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, *pod)
+	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod)
 	cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, excludeInboundPorts...)
 
 	// Outbound ports
-	excludeOutboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, *pod)
+	excludeOutboundPorts := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod)
 	cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts, excludeOutboundPorts...)
 
 	// Outbound CIDRs
-	excludeOutboundCIDRs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, *pod)
+	excludeOutboundCIDRs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod)
 	cfg.ExcludeOutboundCIDRs = append(cfg.ExcludeOutboundCIDRs, excludeOutboundCIDRs...)
 
 	// UIDs
-	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, *pod)
+	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod)
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, excludeUIDs...)
 
 	// Add init container user ID to exclude from traffic redirection.
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
 
-	dnsEnabled, err := consulDNSEnabled(ns, *pod, w.EnableConsulDNS)
+	dnsEnabled, err := consulDNSEnabled(ns, pod, w.EnableConsulDNS)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var consulDNSClusterIP string
@@ -100,17 +101,36 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
 		consulDNSClusterIP = os.Getenv(w.constructDNSServiceHostName())
 		if consulDNSClusterIP == "" {
-			return fmt.Errorf("environment variable %s not found", w.constructDNSServiceHostName())
+			return "", fmt.Errorf("environment variable %s not found", w.constructDNSServiceHostName())
 		}
 		cfg.ConsulDNSIP = consulDNSClusterIP
 	}
 
 	iptablesConfigJson, err := json.Marshal(&cfg)
 	if err != nil {
-		return fmt.Errorf("could not marshal iptables config: %w", err)
+		return "", fmt.Errorf("could not marshal iptables config: %w", err)
 	}
 
-	pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+	return string(iptablesConfigJson), nil
+}
+
+// addRedirectTrafficConfigAnnotation add the created iptables JSON config as an annotation on the provided pod.
+func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
+	iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+	if err != nil {
+		return err
+	}
+
+	pod.Annotations[annotationRedirectTraffic] = iptablesConfig
 
 	return nil
+}
+
+// constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
+// key of the env variable whose value is the cluster IP of the Consul DNS Service.
+// It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
+func (w *MeshWebhook) constructDNSServiceHostName() string {
+	upcaseResourcePrefix := strings.ToUpper(w.ResourcePrefix)
+	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
+	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
 }

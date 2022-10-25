@@ -52,7 +52,8 @@ jobs:
           - {runner: "3", test-packages: "ingress-gateway"}
           - {runner: "4", test-packages: "partitions"}
           - {runner: "5", test-packages: "peering"}
-          - {runner: "6", test-packages: "snapshot-agent sync terminating-gateway vault wan-federation"}
+          - {runner: "6", test-packages: "snapshot-agent vault wan-federation"}
+          - {runner: "7", test-packages: "cli sync terminating-gateway"}
 
       fail-fast: false
     steps:      

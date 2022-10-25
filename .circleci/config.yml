@@ -534,7 +534,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -567,7 +567,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -583,7 +583,7 @@ jobs:
     steps:
       - checkout
       - install-prereqs
-      - create-kind-clusters:
+      - create-kind-cni-clusters:
           version: "v1.24.4"
       - restore_cache:
           keys:
@@ -600,7 +600,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -717,7 +717,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -841,7 +841,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -958,7 +958,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1144,7 +1144,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION -enable-transparent-proxy
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1206,7 +1206,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION -enable-transparent-proxy
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1237,14 +1237,14 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
-#      - acceptance-tproxy-cni:
-#          context: consul-ci
-#          requires:
-#            - dev-upload-docker
-#      - acceptance-tproxy:
-#          context: consul-ci
-#          requires:
-#            - dev-upload-docker
+      - acceptance-tproxy-cni:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:
@@ -1272,26 +1272,23 @@ workflows:
           requires:
             - cleanup-gcp-resources
             - dev-upload-docker
-# TODO (agentless): re-enable once tproxy is supported
-#      - acceptance-gke-cni-1-23:
-#          requires:
-#            - acceptance-gke-1-23
+      - acceptance-gke-cni-1-23:
+          requires:
+            - acceptance-gke-1-23
       - acceptance-eks-1-21:
           requires:
             - cleanup-eks-resources
             - dev-upload-docker
-# TODO (agentless): re-enable once tproxy is supported
-#      - acceptance-eks-cni-1-21:
-#          requires:
-#            - acceptance-eks-1-21
+      - acceptance-eks-cni-1-21:
+          requires:
+            - acceptance-eks-1-21
       - acceptance-aks-1-22:
           requires:
             - cleanup-azure-resources
             - dev-upload-docker
-# TODO (agentless): re-enable once tproxy is supported
-#      - acceptance-aks-cni-1-22:
-#          requires:
-#            - acceptance-aks-1-22
+      - acceptance-aks-cni-1-22:
+          requires:
+            - acceptance-aks-1-22
 
   nightly-acceptance-tests-consul:
     triggers:
