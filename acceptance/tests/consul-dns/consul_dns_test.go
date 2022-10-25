@@ -14,8 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const podName = "dns-pod"
-
 func TestConsulDNS(t *testing.T) {
 	cfg := suite.Config()
 	if cfg.EnableCNI {
@@ -59,8 +57,9 @@ func TestConsulDNS(t *testing.T) {
 				serverIPs = append(serverIPs, serverPod.Status.PodIP)
 			}
 
+			dnsPodName := fmt.Sprintf("%s-dns-pod", releaseName)
 			dnsTestPodArgs := []string{
-				"run", "-i", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-i", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
@@ -68,7 +67,7 @@ func TestConsulDNS(t *testing.T) {
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these
 				// they should have different pod names.
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", podName)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsPodName)
 			})
 
 			retry.Run(t, func(r *retry.R) {

@@ -13,8 +13,7 @@ var suite testsuite.Suite
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
-	// todo(agentless): Re-enable tproxy tests once we support it for multi-cluster.
-	if suite.Config().EnableMultiCluster && !suite.Config().DisablePeering && !suite.Config().EnableTransparentProxy {
+	if suite.Config().EnableMultiCluster && !suite.Config().DisablePeering {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println("Skipping peering tests because either -enable-multi-cluster is not set or -disable-peering is set")

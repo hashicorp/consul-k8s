@@ -4,9 +4,10 @@ on:
 
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
-  CONSUL_VERSION: 1.13.1 # Consul's OSS version to use in tests
-  CONSUL_ENT_VERSION: 1.13.1+ent # Consul's enterprise version to use in tests
   GOTESTSUM_VERSION: 1.8.2 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
+  # We use docker images to copy the consul binary for unit tests.
+  CONSUL_OSS_DOCKER_IMAGE: hashicorppreview/consul:1.14-dev # Consul's OSS version to use in tests
+  CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.14-dev # Consul's enterprise version to use in tests
 
 jobs:
   get-go-version:
@@ -158,11 +159,9 @@ jobs:
         working-directory: control-plane
         run: |
           mkdir -p $HOME/bin
-          wget https://releases.hashicorp.com/consul/${{env.CONSUL_VERSION}}/consul_${{env.CONSUL_VERSION}}_linux_amd64.zip && \
-            unzip consul_${{env.CONSUL_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-            rm consul_${{env.CONSUL_VERSION}}_linux_amd64.zip
-          chmod +x $HOME/bin/consul
-
+          container_id=$(docker create ${{env.CONSUL_OSS_DOCKER_IMAGE}})
+          docker cp "$container_id:/bin/consul" $HOME/bin/consul
+          docker rm "$container_id"
       - name: Run go tests
         working-directory: control-plane
         run: |
@@ -207,10 +206,9 @@ jobs:
         working-directory: control-plane
         run: |
           mkdir -p $HOME/bin
-          wget https://releases.hashicorp.com/consul/${{env.CONSUL_ENT_VERSION}}/consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip && \
-            unzip consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip -d $HOME/bin && \
-            rm consul_${{env.CONSUL_ENT_VERSION}}_linux_amd64.zip
-          chmod +x $HOME/bin/consul
+          container_id=$(docker create ${{env.CONSUL_ENT_DOCKER_IMAGE}})
+          docker cp "$container_id:/bin/consul" $HOME/bin/consul
+          docker rm "$container_id"
 
       - name: Run go tests
         working-directory: control-plane

@@ -564,9 +564,9 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			decodedTokenData, err := base64.StdEncoding.DecodeString(string(createdSecret.Data["data"]))
 			require.NoError(t, err)
 
-			require.Contains(t, string(decodedTokenData), "\"CA\":null")
+			require.Contains(t, string(decodedTokenData), "\"CA\":")
 			require.Contains(t, string(decodedTokenData), "\"ServerAddresses\"")
-			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.consul\"")
+			require.Contains(t, string(decodedTokenData), "\"ServerName\":\"server.dc1.peering.11111111-2222-3333-4444-555555555555.consul\"")
 
 			// Get the reconciled PeeringAcceptor and make assertions on the status
 			acceptor := &v1alpha1.PeeringAcceptor{}
@@ -1016,7 +1016,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 					},
 				},
 				Conditions: v1alpha1.Conditions{
-					{
+					v1alpha1.Condition{
 						Type:   v1alpha1.ConditionSynced,
 						Status: corev1.ConditionTrue,
 					},
@@ -1059,7 +1059,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 					},
 				},
 				Conditions: v1alpha1.Conditions{
-					{
+					v1alpha1.Condition{
 						Type:   v1alpha1.ConditionSynced,
 						Status: corev1.ConditionTrue,
 					},
@@ -1101,7 +1101,6 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			require.Equal(t, tt.expStatus.SecretRef.Backend, acceptor.SecretRef().Backend)
 			require.Equal(t, tt.expStatus.SecretRef.ResourceVersion, acceptor.SecretRef().ResourceVersion)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, acceptor.Status.Conditions[0].Message)
-
 		})
 	}
 }
@@ -1133,7 +1132,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			reconcileErr: errors.New("this is an error"),
 			expStatus: v1alpha1.PeeringAcceptorStatus{
 				Conditions: v1alpha1.Conditions{
-					{
+					v1alpha1.Condition{
 						Type:    v1alpha1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
 						Reason:  InternalError,
