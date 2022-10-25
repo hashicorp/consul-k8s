@@ -312,10 +312,6 @@ spec:
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
-              
-              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
-              {{ template "consul.recursors" }}
-              {{- end }}
 
               {{ template "consul.extraconfig" }}
 
@@ -331,9 +327,6 @@ spec:
                 {{- else }}
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
-                {{- end }}
-                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
-                $recursor_flags \
                 {{- end }}
                 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.bootstrapToken.secretName }}
                 -config-file=/vault/secrets/bootstrap-token-config.hcl \
