@@ -1,6 +1,5 @@
 ## UNRELEASED
 
-
 BREAKING_CHANGES:
 * Helm:
   * Remove `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
