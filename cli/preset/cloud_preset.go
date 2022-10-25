@@ -214,6 +214,7 @@ global:
     %s
 server:
   replicas: %d
+  affinity: null
   serverCert: 
     secretName: %s
 connectInject:
