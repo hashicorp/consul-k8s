@@ -35,10 +35,14 @@ spec:
   image:
     consulAPIGateway: {{ .Values.apiGateway.image }}
     envoy: {{ .Values.global.imageEnvoy }}
-  {{- if .Values.apiGateway.nodeSelector }}
+  {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
   nodeSelector:
     {{ tpl .Values.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}
   {{- end }}
+  { { - if .Values.apiGateway.managedGatewayClass.tolerations } }
+  tolerations:
+    { { tpl .Values.apiGateway.managedGatewayClass.tolerations . | indent 4 | trim } }
+  { { - end } }
   {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
   copyAnnotations:
     service: 
