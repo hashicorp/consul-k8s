@@ -15,6 +15,7 @@ import (
 
 const (
 	ConsulCAFile               = "/consul/connect-inject/consul-ca.pem"
+	ConsulDataplaneDNSBindHost = "127.0.0.1"
 	ConsulDataplaneDNSBindPort = 8600
 )
 

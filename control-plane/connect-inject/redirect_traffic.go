@@ -96,7 +96,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		// If Consul DNS is enabled, we find the environment variable that has the value
 		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
-		cfg.ConsulDNSIP = "127.0.0.1"
+		cfg.ConsulDNSIP = ConsulDataplaneDNSBindHost
 		cfg.ConsulDNSPort = ConsulDataplaneDNSBindPort
 	}
 

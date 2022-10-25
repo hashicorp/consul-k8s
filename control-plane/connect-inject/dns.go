@@ -15,11 +15,14 @@ const (
 	defaultDNSOptionNdots    = 1
 	defaultDNSOptionTimeout  = 5
 	defaultDNSOptionAttempts = 2
+
+	// defaultEtcResolvConfFile is the default location of the /etc/resolv.conf file.
+	defaultEtcResolvConfFile = "/etc/resolv.conf"
 )
 
 func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 	// First, we need to determine the nameservers configured in this cluster from /etc/resolv.conf.
-	etcResolvConf := "/etc/resolv.conf"
+	etcResolvConf := defaultEtcResolvConfFile
 	if w.etcResolvFile != "" {
 		etcResolvConf = w.etcResolvFile
 	}
@@ -36,8 +39,7 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 	// configured in our /etc/resolv.conf. It's important to add Consul DNS as the first nameserver because
 	// if we put kube DNS first, it will return NXDOMAIN response and a DNS client will not fall back to other nameservers.
 	if pod.Spec.DNSConfig == nil {
-		consulDPAddress := "127.0.0.1"
-		nameservers := []string{consulDPAddress}
+		nameservers := []string{ConsulDataplaneDNSBindHost}
 		nameservers = append(nameservers, cfg.Servers...)
 		var options []corev1.PodDNSConfigOption
 		if cfg.Ndots != defaultDNSOptionNdots {
