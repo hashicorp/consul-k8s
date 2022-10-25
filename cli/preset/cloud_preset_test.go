@@ -487,6 +487,7 @@ global:
     enableAutoEncrypt: true
     enabled: true
 server:
+  affinity: null
   replicas: 3
   serverCert:
     secretName: consul-server-cert
@@ -524,6 +525,7 @@ global:
     enableAutoEncrypt: true
     enabled: true
 server:
+  affinity: null
   replicas: 3
   serverCert:
     secretName: consul-server-cert
