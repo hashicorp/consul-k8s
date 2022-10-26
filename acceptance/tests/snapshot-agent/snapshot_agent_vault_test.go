@@ -3,7 +3,6 @@ package snapshotagent
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
@@ -204,24 +204,16 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
 		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=server,release=%s", consulReleaseName)})
 	require.NoError(t, err)
-	require.True(t, len(podList.Items) > 0)
+	require.Len(t, podList.Items, 1, "expected to find only 1 consul server instance")
 
-	// Wait for 10 seconds to allow snapshot to write.
-	time.Sleep(10 * time.Second)
-
-	// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
-	hasSnapshots := false
-	for _, pod := range podList.Items {
+	// We need to give some extra time for ACLs to finish bootstrapping and for servers to come up.
+	timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
+		pod := podList.Items[0]
 		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
+		require.NoError(r, err)
 		logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
-		require.NoError(t, err)
-		if strings.Contains(snapshotFileListOutput, ".snap") {
-			logger.Logf(t, "Agent pod contains snapshot files")
-			hasSnapshots = true
-			break
-		} else {
-			logger.Logf(t, "Agent pod does not contain snapshot files")
-		}
-	}
-	require.True(t, hasSnapshots)
+		require.Contains(r, snapshotFileListOutput, ".snap", "Agent pod does not contain snapshot files")
+	})
 }
