@@ -464,7 +464,10 @@ func TestFetchCustomResources(t *testing.T) {
 	_, err = c.dynamic.Resource(nonConsulGRV).Namespace("default").Create(context.Background(), &nonConsulCR, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	actual, err := c.fetchCustomResources()
+	crds, err := c.fetchCustomResourceDefinitions()
+	require.NoError(t, err)
+
+	actual, err := c.fetchCustomResources(crds)
 	require.NoError(t, err)
 	require.Len(t, actual, 1)
 	require.Contains(t, actual, cr)
@@ -489,14 +492,17 @@ func TestDeleteCustomResources(t *testing.T) {
 	_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	actual, err := c.fetchCustomResources()
+	crds, err := c.fetchCustomResourceDefinitions()
+	require.NoError(t, err)
+
+	actual, err := c.fetchCustomResources(crds)
 	require.NoError(t, err)
 	require.Len(t, actual, 1)
 
-	err = c.deleteCustomResources([]unstructured.Unstructured{cr})
+	err = c.deleteCustomResources([]unstructured.Unstructured{cr}, mapCRKindToResourceName(crds))
 	require.NoError(t, err)
 
-	actual, err = c.fetchCustomResources()
+	actual, err = c.fetchCustomResources(crds)
 	require.NoError(t, err)
 	require.Len(t, actual, 0)
 }
@@ -520,10 +526,13 @@ func TestPatchCustomResources(t *testing.T) {
 	_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	err = c.patchCustomResources([]unstructured.Unstructured{cr})
+	crds, err := c.fetchCustomResourceDefinitions()
 	require.NoError(t, err)
 
-	actual, err := c.fetchCustomResources()
+	err = c.patchCustomResources([]unstructured.Unstructured{cr}, mapCRKindToResourceName(crds))
+	require.NoError(t, err)
+
+	actual, err := c.fetchCustomResources(crds)
 	require.NoError(t, err)
 	require.Len(t, actual, 1)
 	require.Len(t, actual[0].GetFinalizers(), 0)
@@ -535,7 +544,6 @@ func TestUninstall(t *testing.T) {
 		messages                                []string
 		helmActionsRunner                       *helm.MockActionRunner
 		preProcessingFunc                       func()
-		withController                          bool
 		expectedReturnCode                      int
 		expectCheckedForConsulInstallations     bool
 		expectCheckedForConsulDemoInstallations bool
@@ -547,7 +555,8 @@ func TestUninstall(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
+				"\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -558,29 +567,6 @@ func TestUninstall(t *testing.T) {
 					}
 				},
 			},
-			expectedReturnCode:                      0,
-			expectCheckedForConsulInstallations:     true,
-			expectCheckedForConsulDemoInstallations: true,
-			expectConsulUninstalled:                 true,
-			expectConsulDemoUninstalled:             false,
-		},
-		"uninstall when consul installation exists returns success with controller deployed": {
-			input: []string{},
-			messages: []string{
-				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
-				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
-			},
-			helmActionsRunner: &helm.MockActionRunner{
-				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
-					if options.ReleaseName == "consul" {
-						return true, "consul", "consul", nil
-					} else {
-						return false, "", "", nil
-					}
-				},
-			},
-			withController:                          true,
 			expectedReturnCode:                      0,
 			expectCheckedForConsulInstallations:     true,
 			expectCheckedForConsulDemoInstallations: true,
@@ -614,8 +600,10 @@ func TestUninstall(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n",
-				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
+				"\n ✓ Successfully uninstalled Consul Helm release.\n",
+				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul",
+				"\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -626,32 +614,6 @@ func TestUninstall(t *testing.T) {
 					}
 				},
 			},
-			expectedReturnCode:                      0,
-			expectCheckedForConsulInstallations:     true,
-			expectCheckedForConsulDemoInstallations: true,
-			expectConsulUninstalled:                 true,
-			expectConsulDemoUninstalled:             false,
-		},
-		"uninstall with -wipe-data flag processes other resource and returns success with controller deployed": {
-			input: []string{
-				"-wipe-data",
-			},
-			messages: []string{
-				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n    No existing Consul demo application installation found.\n",
-				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n",
-				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
-			},
-			helmActionsRunner: &helm.MockActionRunner{
-				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
-					if options.ReleaseName == "consul" {
-						return true, "consul", "consul", nil
-					} else {
-						return false, "", "", nil
-					}
-				},
-			},
-			withController:                          true,
 			expectedReturnCode:                      0,
 			expectCheckedForConsulInstallations:     true,
 			expectCheckedForConsulDemoInstallations: true,
@@ -662,9 +624,11 @@ func TestUninstall(t *testing.T) {
 			input: []string{},
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n ✓ Existing Consul demo application installation found.\n",
-				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo\n ✓ Successfully uninstalled Consul demo application Helm release.\n",
+				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo",
+				"\n ✓ Successfully uninstalled Consul demo application Helm release.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
+				"\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -686,7 +650,8 @@ func TestUninstall(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ! Helm returned an error.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
+				"\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -710,7 +675,8 @@ func TestUninstall(t *testing.T) {
 			input: []string{},
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n ✓ Existing Consul demo application installation found.\n",
-				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo\n ! Helm returned an error.\n",
+				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo",
+				"\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -756,10 +722,8 @@ func TestUninstall(t *testing.T) {
 			c.kubernetes = fake.NewSimpleClientset()
 
 			c.apiext, c.dynamic = createClientsWithCrds()
-			if tc.withController {
-				_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
-				require.NoError(t, err)
-			}
+			_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
+			require.NoError(t, err)
 
 			mock := tc.helmActionsRunner
 			c.helmActionsRunner = mock
@@ -771,18 +735,21 @@ func TestUninstall(t *testing.T) {
 				"--auto-approve",
 			}, tc.input...)
 			returnCode := c.Run(input)
-			require.Equal(t, tc.expectedReturnCode, returnCode)
+			output := buf.String()
+			require.Equal(t, tc.expectedReturnCode, returnCode, output)
+
 			require.Equal(t, tc.expectCheckedForConsulInstallations, mock.CheckedForConsulInstallations)
 			require.Equal(t, tc.expectCheckedForConsulDemoInstallations, mock.CheckedForConsulDemoInstallations)
 			require.Equal(t, tc.expectConsulUninstalled, mock.ConsulUninstalled)
 			require.Equal(t, tc.expectConsulDemoUninstalled, mock.ConsulDemoUninstalled)
-			output := buf.String()
 			for _, msg := range tc.messages {
 				require.Contains(t, output, msg)
 			}
 
-			if tc.withController {
-				crs, err := c.fetchCustomResources()
+			if tc.expectConsulUninstalled {
+				crds, err := c.fetchCustomResourceDefinitions()
+				require.NoError(t, err)
+				crs, err := c.fetchCustomResources(crds)
 				require.NoError(t, err)
 				require.Len(t, crs, 0)
 			}
@@ -807,8 +774,8 @@ func createClientsWithCrds() (apiext.Interface, dynamic.Interface) {
 				Spec: apiextv1.CustomResourceDefinitionSpec{
 					Group: "consul.hashicorp.com",
 					Names: apiextv1.CustomResourceDefinitionNames{
-						Plural:   "servicedefaults",
-						ListKind: "ServiceDefaultsList",
+						Plural: "servicedefaults",
+						Kind:   "ServiceDefaults",
 					},
 					Scope: "Namespaced",
 					Versions: []apiextv1.CustomResourceDefinitionVersion{
@@ -825,8 +792,8 @@ func createClientsWithCrds() (apiext.Interface, dynamic.Interface) {
 				Spec: apiextv1.CustomResourceDefinitionSpec{
 					Group: "example.com",
 					Names: apiextv1.CustomResourceDefinitionNames{
-						Plural:   "examples",
-						ListKind: "ExamplesList",
+						Plural: "examples",
+						Kind:   "Example",
 					},
 					Scope: "Namespaced",
 					Versions: []apiextv1.CustomResourceDefinitionVersion{
