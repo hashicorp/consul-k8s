@@ -12,11 +12,13 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+
 	"github.com/posener/complete"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -376,8 +378,13 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	// patch the finalizers to be empty on each one.
 	if releaseType == common.ReleaseTypeConsul {
 		c.UI.Output("Deleting custom resources managed by Consul", terminal.WithLibraryStyle())
-		err := backoff.Retry(func() error {
-			crs, err := c.fetchCustomResources()
+		crds, err := c.fetchCustomResourceDefinitions()
+		if err != nil {
+			return fmt.Errorf("unable to fetch Custom Resource Definitions for Consul deployment: %v", err)
+		}
+		kindToResource := mapCRKindToResourceName(crds)
+		err = backoff.Retry(func() error {
+			crs, err := c.fetchCustomResources(crds)
 			if err != nil {
 				return err
 			}
@@ -385,11 +392,11 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 				return nil
 			}
 
-			if err = c.deleteCustomResources(crs); err != nil {
+			if err = c.deleteCustomResources(crs, kindToResource); err != nil {
 				return err
 			}
 
-			crs, err = c.fetchCustomResources()
+			crs, err = c.fetchCustomResources(crds)
 			if err != nil {
 				return err
 			}
@@ -401,12 +408,12 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
 		if common.IsDeletionError(err) {
 			c.UI.Output("Patching finalizers on custom resources managed by Consul", terminal.WithLibraryStyle())
-			crs, err := c.fetchCustomResources()
+			crs, err := c.fetchCustomResources(crds)
 			if err != nil {
 				return err
 			}
 
-			if err = c.patchCustomResources(crs); err != nil {
+			if err = c.patchCustomResources(crs, kindToResource); err != nil {
 				return err
 			}
 		} else if err != nil {
@@ -435,18 +442,17 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	return nil
 }
 
-// fetchCustomResources gets a list of all custom resources deployed in the
-// cluster that are managed by Consul.
-func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
-	crs := make([]unstructured.Unstructured, 0)
-
-	crds, err := c.apiext.ApiextensionsV1().CustomResourceDefinitions().List(c.Ctx, metav1.ListOptions{
+// fetchCustomResourceDefinitions fetches all Custom Resource Definitions managed by Consul.
+func (c *Command) fetchCustomResourceDefinitions() (*apiextv1.CustomResourceDefinitionList, error) {
+	return c.apiext.ApiextensionsV1().CustomResourceDefinitions().List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "app=consul",
 	})
-	if err != nil {
-		return crs, err
-	}
+}
 
+// fetchCustomResources gets a list of all custom resources deployed in the
+// cluster that are managed by Consul.
+func (c *Command) fetchCustomResources(crds *apiextv1.CustomResourceDefinitionList) ([]unstructured.Unstructured, error) {
+	crs := make([]unstructured.Unstructured, 0)
 	for _, crd := range crds.Items {
 		for _, version := range crd.Spec.Versions {
 			target := schema.GroupVersionResource{
@@ -470,7 +476,7 @@ func (c *Command) fetchCustomResources() ([]unstructured.Unstructured, error) {
 
 // deleteCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to be deleted.
-func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
+func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string) error {
 	for _, cr := range crs {
 		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
 		group, version := apiVersion[0], apiVersion[1]
@@ -481,7 +487,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
 		target := schema.GroupVersionResource{
 			Group:    group,
 			Version:  version,
-			Resource: strings.ToLower(cr.GetKind()),
+			Resource: kindToResource[cr.GetKind()],
 		}
 
 		err := c.dynamic.
@@ -498,7 +504,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured) error {
 
 // patchCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to patch its finalizers to an empty list.
-func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
+func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string) error {
 	finalizerPatch := []byte(`[{
 		"op": "replace",
 		"path": "/metadata/finalizers",
@@ -515,7 +521,7 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured) error {
 		target := schema.GroupVersionResource{
 			Group:    group,
 			Version:  version,
-			Resource: strings.ToLower(cr.GetKind()),
+			Resource: kindToResource[cr.GetKind()],
 		}
 
 		_, err := c.dynamic.
@@ -813,4 +819,16 @@ func (c *Command) deleteClusterRoleBindings(foundReleaseName string) error {
 		c.UI.Output("Consul cluster role bindings deleted.", terminal.WithSuccessStyle())
 	}
 	return nil
+}
+
+// mapCRKindToResourceName takes the list of custom resource definitions and
+// creates a mapping from the "kind" of the CRD to its "resource" name.
+// This is needed for the dynamic API which finds custom resources by their
+// lowercase, plural resource name. (e.g. "ingressgateways" for "IngressGateway" kind).
+func mapCRKindToResourceName(crds *apiextv1.CustomResourceDefinitionList) map[string]string {
+	kindToResourceName := make(map[string]string)
+	for _, crd := range crds.Items {
+		kindToResourceName[crd.Spec.Names.Kind] = crd.Spec.Names.Plural
+	}
+	return kindToResourceName
 }
