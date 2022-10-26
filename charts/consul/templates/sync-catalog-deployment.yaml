@@ -55,7 +55,7 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       volumes:
       {{- if .Values.global.tls.enabled }}
-      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
       - name: consul-ca-cert
         secret:
           {{- if .Values.global.tls.caCert.secretName }}
@@ -102,9 +102,11 @@ spec:
             {{- end }}
           volumeMounts:
             {{- if .Values.global.tls.enabled }}
+            {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
             {{- end }}
           command:
             - "/bin/sh"

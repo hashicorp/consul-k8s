@@ -1289,7 +1289,7 @@ key2: value2' \
 
 @test "meshGateway/Deployment: vault tls annotations are set when tls is enabled" {
   cd `chart_dir`
-  local cmd=$(helm template \
+  local obj=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'meshGateway.enabled=true' \
@@ -1302,28 +1302,34 @@ key2: value2' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata' | tee /dev/stderr)
+      yq -r '.spec.template' | tee /dev/stderr)
 
-  local actual="$(echo $cmd |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
+  local actual="$(echo $obj |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
   local expected=$'{{- with secret \"pki_int/cert/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
-  local actual="$(echo $cmd |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
+  local actual="$(echo $obj |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
   [ "${actual}" = "pki_int/cert/ca" ]
 
-  local actual="$(echo $cmd |
-      yq -r '.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)"
+  local actual="$(echo $obj |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 
-  local actual="$(echo $cmd |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)"
+  local actual="$(echo $obj |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 
-  local actual="$(echo $cmd |
-      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
+  local actual="$(echo $obj |
+      yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
   [ "${actual}" = "test" ]
+
+  actual=$(echo $obj | jq -r '.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
+
+  actual=$(echo $obj | jq -r '.spec.containers[0].args | any(contains("-ca-certs=/vault/secrets/serverca.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

@@ -34,10 +34,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping because no t-proxy support")
-	}
-
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {

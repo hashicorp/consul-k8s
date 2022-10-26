@@ -137,7 +137,7 @@ spec:
           {{- end }}
       {{- end }}
       {{- if $root.Values.global.tls.enabled }}
-      {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+      {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
       - name: consul-ca-cert
         secret:
           {{- if $root.Values.global.tls.caCert.secretName }}
@@ -194,7 +194,7 @@ spec:
             - name: consul-service
               mountPath: /consul/service
             {{- if $root.Values.global.tls.enabled }}
-            {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+            {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
@@ -215,7 +215,7 @@ spec:
               mountPath: /consul/service
               readOnly: true
             {{- if $root.Values.global.tls.enabled }}
-            {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+            {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
@@ -265,7 +265,11 @@ spec:
           {{- end }}
           {{- if and $root.Values.global.tls.enabled }}
           {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+          {{- if $root.Values.global.secretsBackend.vault.enabled }}
+          - -ca-certs=/vault/secrets/serverca.crt
+          {{- else }}
           - -ca-certs=/consul/tls/ca/tls.crt
+          {{- end }}
           {{- end }}
           {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
           - -tls-server-name={{$root.Values.externalServers.tlsServerName }}
