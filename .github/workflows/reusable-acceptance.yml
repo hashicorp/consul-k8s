@@ -62,20 +62,17 @@ jobs:
         with:
           ref: ${{ inputs.checkout-ref }}
       
-      - name: Setup go
-        uses: actions/setup-go@v3
+      - name: Build Consul K8s CLI
+        uses: hashicorp/actions-go-build@v0.1.3
         with:
-          go-version: ${{ inputs.go-version }}
-
-      - name: Setup go mod cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          product_name: consul-k8s
+          go_version: ${{ inputs.go-version }}
+          os: linux
+          arch: amd64
+          reproducible: assert
+          instructions: |
+            sudo make cli-dev
+            consul-k8s version
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
         run: |
@@ -97,10 +94,6 @@ jobs:
 
       - run: mkdir -p ${{ env.TEST_RESULTS }}
 
-      - name: go mod download
-        working-directory: ${{ inputs.directory }}
-        run: go mod download
-      
       - name: Create kind clusters
         run: |
           kind create cluster --name dc1 --image kindest/node:${{ inputs.kind-version }}
