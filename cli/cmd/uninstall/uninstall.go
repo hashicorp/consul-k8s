@@ -42,7 +42,7 @@ const (
 	defaultWipeData = false
 
 	flagTimeout    = "timeout"
-	defaultTimeout = "10m"
+	defaultTimeout = 10 * time.Minute
 
 	flagContext    = "context"
 	flagKubeconfig = "kubeconfig"
@@ -64,8 +64,7 @@ type Command struct {
 	flagReleaseName string
 	flagAutoApprove bool
 	flagWipeData    bool
-	flagTimeout     string
-	timeoutDuration time.Duration
+	flagTimeout     time.Duration
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -101,7 +100,7 @@ func (c *Command) init() {
 		Default: defaultAnyReleaseName,
 		Usage:   "Name of the installation. This can be used to uninstall and/or delete the resources of a specific Helm release.",
 	})
-	f.StringVar(&flag.StringVar{
+	f.DurationVar(&flag.DurationVar{
 		Name:    flagTimeout,
 		Target:  &c.flagTimeout,
 		Default: defaultTimeout,
@@ -155,12 +154,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Can't set -wipe-data alone. Omit this flag to interactively uninstall, or use it with -auto-approve to wipe all data during the uninstall.", terminal.WithErrorStyle())
 		return 1
 	}
-	duration, err := time.ParseDuration(c.flagTimeout)
-	if err != nil {
-		c.UI.Output("unable to parse -%s: %s", flagTimeout, err, terminal.WithErrorStyle())
-		return 1
-	}
-	c.timeoutDuration = duration
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
 	settings := helmCLI.New()
@@ -182,7 +175,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	actionConfig := new(action.Configuration)
-	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err := helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -427,7 +420,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	}
 
 	uninstall := action.NewUninstall(actionConfig)
-	uninstall.Timeout = c.timeoutDuration
+	uninstall.Timeout = c.flagTimeout
 
 	res, err := c.helmActionsRunner.Uninstall(uninstall, releaseName)
 	if err != nil {
