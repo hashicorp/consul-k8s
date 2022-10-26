@@ -337,10 +337,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"mesh-gateway-policy",
 				"snapshot-agent-policy",
 				"enterprise-license-token",
-				resourcePrefix + "-igw-policy",
-				resourcePrefix + "-anotherigw-policy",
-				resourcePrefix + "-tgw-policy",
-				resourcePrefix + "-anothertgw-policy",
+				"igw-policy",
+				"anotherigw-policy",
+				"tgw-policy",
+				"anothertgw-policy",
 				"connect-inject-policy",
 				"controller-policy",
 			}
@@ -390,10 +390,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"cross-namespace-policy",
-				resourcePrefix + "-igw-policy",
-				resourcePrefix + "-anotherigw-policy",
-				resourcePrefix + "-tgw-policy",
-				resourcePrefix + "-anothertgw-policy",
+				"igw-policy",
+				"anotherigw-policy",
+				"tgw-policy",
+				"anothertgw-policy",
 				"controller-policy",
 				"partitions-token",
 			}
@@ -782,9 +782,9 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
 				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{resourcePrefix + "-ingress-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"ingress-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -831,9 +831,9 @@ partition "default" {
 			TokenFlags: []string{"-ingress-gateway-name=ingress.",
 				"-ingress-gateway-name=gateway.namespace1",
 				"-ingress-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{resourcePrefix + "-ingress-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"ingress-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -880,9 +880,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
 				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{resourcePrefix + "-terminating-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"terminating-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -920,9 +920,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating.",
 				"-terminating-gateway-name=gateway.namespace1",
 				"-terminating-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{resourcePrefix + "-terminating-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"terminating-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -1031,7 +1031,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 		{
 			ComponentName: "connect-injector",
 			TokenFlags:    []string{"-connect-inject"},
-			Roles:         []string{resourcePrefix + "-connect-injector-acl-role"},
+			Roles:         []string{resourcePrefix + "-connect-inject-acl-role"},
 			Namespace:     ns,
 			GlobalToken:   false,
 		},
@@ -1123,7 +1123,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 		{
 			ComponentName: "connect-injector",
 			TokenFlags:    []string{"-connect-inject"},
-			Roles:         []string{resourcePrefix + "-connect-injector-acl-role-dc2"},
+			Roles:         []string{resourcePrefix + "-connect-inject-acl-role-dc2"},
 			Namespace:     ns,
 			GlobalToken:   true,
 		},

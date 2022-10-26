@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,83 +31,76 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and snapshot agent is already tested with regular tproxy")
 	}
-	ctx := suite.Environment().DefaultContext(t)
-	kubectlOptions := ctx.KubectlOptions(t)
-	ns := kubectlOptions.Namespace
-	releaseName := helpers.RandomName()
 
-	// Generate a bootstrap token
-	bootstrapToken, err := uuid.GenerateUUID()
-	require.NoError(t, err)
-
-	bsSecretName := fmt.Sprintf("%s-acl-bootstrap-token", releaseName)
-	bsSecretKey := "token"
-	saSecretName := fmt.Sprintf("%s-snapshot-agent-config", releaseName)
-	saSecretKey := "token"
-
-	// Create cluster
-	helmValues := map[string]string{
-		"global.tls.enabled":                           "true",
-		"global.gossipEncryption.autoGenerate":         "true",
-		"global.acls.manageSystemACLs":                 "true",
-		"global.acls.bootstrapToken.secretName":        bsSecretName,
-		"global.acls.bootstrapToken.secretKey":         bsSecretKey,
-		"client.snapshotAgent.enabled":                 "true",
-		"client.snapshotAgent.configSecret.secretName": saSecretName,
-		"client.snapshotAgent.configSecret.secretKey":  saSecretKey,
+	cases := map[string]struct {
+		secure bool
+	}{
+		"non-secure": {secure: false},
+		"secure":     {secure: true},
 	}
 
-	// Get new cluster
-	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), cfg, releaseName)
-	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := suite.Environment().DefaultContext(t)
+			kubectlOptions := ctx.KubectlOptions(t)
+			ns := kubectlOptions.Namespace
+			releaseName := helpers.RandomName()
 
-	// Add bootstrap token secret
-	logger.Log(t, "Storing bootstrap token as a k8s secret")
-	consul.CreateK8sSecret(t, client, cfg, ns, bsSecretName, bsSecretKey, bootstrapToken)
+			saSecretName := fmt.Sprintf("%s-snapshot-agent-config", releaseName)
+			saSecretKey := "config"
 
-	// Add snapshot agent config secret
-	logger.Log(t, "Storing snapshot agent config as a k8s secret")
-	config := generateSnapshotAgentConfig(t, bootstrapToken)
-	logger.Logf(t, "Snapshot agent config: %s", config)
-	consul.CreateK8sSecret(t, client, cfg, ns, saSecretName, saSecretKey, config)
+			// Create cluster
+			helmValues := map[string]string{
+				"global.tls.enabled":                           strconv.FormatBool(c.secure),
+				"global.gossipEncryption.autoGenerate":         strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs":                 strconv.FormatBool(c.secure),
+				"server.snapshotAgent.enabled":                 "true",
+				"server.snapshotAgent.configSecret.secretName": saSecretName,
+				"server.snapshotAgent.configSecret.secretKey":  saSecretKey,
+				"connectInject.enabled":                        "false",
+				"controller.enabled":                           "false",
+			}
 
-	// Create cluster
-	consulCluster.Create(t)
-	// ----------------------------------
+			// Get new cluster
+			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), cfg, releaseName)
+			client := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
-	// Validate that consul snapshot agent is running correctly and is generating snapshot files
-	logger.Log(t, "Confirming that Consul Snapshot Agent is generating snapshot files")
-	// Create k8s client from kubectl options.
+			// Add snapshot agent config secret
+			logger.Log(t, "Storing snapshot agent config as a k8s secret")
+			config := generateSnapshotAgentConfig(t)
+			logger.Logf(t, "Snapshot agent config: %s", config)
+			consul.CreateK8sSecret(t, client, cfg, ns, saSecretName, saSecretKey, config)
 
-	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
-		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=client-snapshot-agent,release=%s", releaseName)})
-	require.NoError(t, err)
-	require.True(t, len(podList.Items) > 0)
+			// Create cluster
+			consulCluster.Create(t)
+			// ----------------------------------
 
-	// Wait for 10seconds to allow snapsot to write.
-	time.Sleep(10 * time.Second)
+			// Validate that consul snapshot agent is running correctly and is generating snapshot files
+			logger.Log(t, "Confirming that Consul Snapshot Agent is generating snapshot files")
+			// Create k8s client from kubectl options.
 
-	// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
-	hasSnapshots := false
-	for _, pod := range podList.Items {
-		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/")
-		logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
-		require.NoError(t, err)
-		if strings.Contains(snapshotFileListOutput, ".snap") {
-			logger.Logf(t, "Agent pod contains snapshot files")
-			hasSnapshots = true
-			break
-		} else {
-			logger.Logf(t, "Agent pod does not contain snapshot files")
-		}
+			podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
+				metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=server,release=%s", releaseName)})
+			require.NoError(t, err)
+			require.Len(t, podList.Items, 1, "expected to find only 1 consul server instance")
+
+			// We need to give some extra time for ACLs to finish bootstrapping and for servers to come up.
+			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			retry.RunWith(timer, t, func(r *retry.R) {
+				// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
+				pod := podList.Items[0]
+				snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
+				require.NoError(r, err)
+				logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
+				require.Contains(r, snapshotFileListOutput, ".snap", "Agent pod does not contain snapshot files")
+			})
+		})
 	}
-	require.True(t, hasSnapshots, ".snap")
 }
 
-func generateSnapshotAgentConfig(t *testing.T, token string) string {
+func generateSnapshotAgentConfig(t *testing.T) string {
 	config := map[string]interface{}{
 		"snapshot_agent": map[string]interface{}{
-			"token": token,
 			"log": map[string]interface{}{
 				"level":           "INFO",
 				"enable_syslog":   false,
@@ -124,7 +117,7 @@ func generateSnapshotAgentConfig(t *testing.T, token string) string {
 				"local_scratch_path": "",
 			},
 			"local_storage": map[string]interface{}{
-				"path": ".",
+				"path": "/tmp",
 			},
 		},
 	}

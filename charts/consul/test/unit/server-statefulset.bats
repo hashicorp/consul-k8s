@@ -1385,21 +1385,6 @@ load _helpers
   [[ "$output" =~ "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." ]]
 }
 
-@test "server/StatefulSet: fail when vault is enabled with tls but no consulCARole is provided" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true'  \
-      --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'global.server.serverCert.secretName=test' \
-      --set 'global.tls.caCert.secretName=test' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.tls.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
-}
-
 @test "server/StatefulSet: vault annotations not set by default" {
   cd `chart_dir`
   local object=$(helm template \
@@ -2291,4 +2276,472 @@ load _helpers
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
+}
+
+#--------------------------------------------------------------------
+# server.snapshotAgent
+
+@test "server/StatefulSet: snapshot-agent: snapshot agent container not added by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select(.name == "consul-snapshot-agent")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+
+@test "server/StatefulSet: snapshot-agent: snapshot agent container added with server.snapshotAGent.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name == "consul-snapshot-agent") | .name' | tee /dev/stderr)
+  [ "${actual}" = "consul-snapshot-agent" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: when server.snapshotAgent.configSecret.secretKey!=null and server.snapshotAgent.configSecret.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=' \
+      --set 'server.snapshotAgent.configSecret.secretKey=bar' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.snapshotAgent.configSecret.secretKey and server.snapshotAgent.configSecret.secretName must both be specified." ]]
+}
+
+@test "server/StatefulSet: snapshot-agent: when server.snapshotAgent.configSecret.secretName!=null and server.snapshotAgent.configSecret.secretKey=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml  \
+        --set 'server.snapshotAgent.enabled=true' \
+        --set 'server.snapshotAgent.configSecret.secretName=foo' \
+        --set 'server.snapshotAgent.configSecret.secretKey=' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.snapshotAgent.configSecret.secretKey and server.snapshotAgent.configSecret.secretName must both be specified." ]]
+}
+
+@test "server/StatefulSet: snapshot-agent: adds volume for snapshot agent config secret when secret is configured" {
+  cd `chart_dir`
+  local vol=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'server.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "snapshot-agent-user-config")' | tee /dev/stderr)
+  local actual
+  actual=$(echo $vol | jq -r '. .name' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-agent-user-config' ]
+
+  actual=$(echo $vol | jq -r '. .secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = 'a/b/c/d' ]
+
+  actual=$(echo $vol | jq -r '. .secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-agent-config' ]
+
+  actual=$(echo $vol | jq -r '. .secret.items[0].path' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-config.json' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: adds volume mount to snapshot container for snapshot agent config secret when secret is configured" {
+  cd `chart_dir`
+  local vol=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'server.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "snapshot-agent-user-config")' | tee /dev/stderr)
+  local actual
+  actual=$(echo $vol | jq -r '. .name' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-agent-user-config' ]
+
+  actual=$(echo $vol | jq -r '. .readOnly' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  actual=$(echo $vol | jq -r '. .mountPath' | tee /dev/stderr)
+  [ "${actual}" = '/consul/user-config' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: set config-dir argument on snapshot agent command to volume mount" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'server.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].command[2] | contains("-config-dir=/consul/user-config")' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: does not configure snapshot agent login config secret when acls are disabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.acls.manageSystemACLs=false' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec' | tee /dev/stderr)
+  actual=$(echo $spec | yq -r '.volumes[] | select(.name == "snapshot-agent-config")')
+  [ "${actual}" = "" ]
+
+  actual=$(echo $spec | yq -r '.containers[1].volumeMounts')
+  [ "${actual}" = "null" ]
+
+  actual=$(echo $spec | yq -r '.containers[1].command[2] | contains("-config-file=/consul/config/snapshot-login.json")')
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: adds volume for snapshot agent login config secret when acls are enabled" {
+  cd `chart_dir`
+  local vol=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "snapshot-agent-config")' | tee /dev/stderr)
+  local actual
+  actual=$(echo $vol | jq -r '. .name' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-agent-config' ]
+
+  actual=$(echo $vol | jq -r '. .configMap.name' | tee /dev/stderr)
+  [ "${actual}" = 'release-name-consul-snapshot-agent-config' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: adds volume mount to snapshot container for snapshot agent login config secret when acls are enabled" {
+  cd `chart_dir`
+  local vol=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "snapshot-agent-config")' | tee /dev/stderr)
+  local actual
+  actual=$(echo $vol | jq -r '. .name' | tee /dev/stderr)
+  [ "${actual}" = 'snapshot-agent-config' ]
+
+  actual=$(echo $vol | jq -r '. .readOnly' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  actual=$(echo $vol | jq -r '. .mountPath' | tee /dev/stderr)
+  [ "${actual}" = '/consul/config' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: set config-file argument on snapshot agent command to login config when acls are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].command[2] | contains("-config-file=/consul/config/snapshot-login.json")' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: uses default consul addr when TLS is disabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'http://127.0.0.1:8500' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: sets TLS env vars when global.tls.enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'https://127.0.0.1:8501' ]
+
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: populates container volumeMounts when global.tls.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "consul-ca-cert") | .name' | tee /dev/stderr)
+  [ "${actual}" = "consul-ca-cert" ]
+}
+
+#--------------------------------------------------------------------
+# server.snapshotAgent.resources
+
+@test "server/StatefulSet: snapshot-agent: default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[1].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: can set resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.resources.requests.memory=100Mi' \
+      --set 'server.snapshotAgent.resources.requests.cpu=100m' \
+      --set 'server.snapshotAgent.resources.limits.memory=200Mi' \
+      --set 'server.snapshotAgent.resources.limits.cpu=200m' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[1].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"200m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
+}
+
+#--------------------------------------------------------------------
+# server.snapshotAgent.caCert
+
+@test "server/StatefulSet: snapshot-agent: if caCert is set command is modified correctly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].command[2] | contains("cat <<EOF > /extra-ssl-certs/custom-ca.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: if caCert is set extra-ssl-certs volumeMount is added" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.volumes[] | select(.name == "extra-ssl-certs") | .name' | tee /dev/stderr)
+  [ "${actual}" = "extra-ssl-certs" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: if caCert is set SSL_CERT_DIR env var is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec.containers[1].env[] | select(.name == "SSL_CERT_DIR")' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "SSL_CERT_DIR" ]
+  local actual=$(echo $object | jq -r '.value' | tee /dev/stderr)
+  [ "${actual}" = "/etc/ssl/certs:/extra-ssl-certs" ]
+}
+
+
+#--------------------------------------------------------------------
+# snapshotAgent license-autoload
+
+@test "server/StatefulSet: snapshot-agent: adds volume mount for license secret when enterprise license secret name and key are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = '{"name":"consul-license","mountPath":"/consul/license","readOnly":true}' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: adds env var for license path when enterprise license secret name and key are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+      [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]
+}
+
+@test "server/StatefulSet: snapshot-agent: does not add license secret volume mount if manageSystemACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: does not add license env if manageSystemACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+#--------------------------------------------------------------------
+# snapshotAgent Vault
+
+@test "server/StatefulSet: snapshot-agent: vault CONSUL_LICENSE_PATH is set to /vault/secrets/enterpriselicense.txt" {
+  cd `chart_dir`
+  local env=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'server.enabled=true' \
+    --set 'server.snapshotAgent.enabled=true' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+
+  local actual
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LICENSE_PATH") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/enterpriselicense.txt" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: vault does not add volume mount for license secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+      --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: vault snapshot agent config annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'server.enabled=true' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'server.snapshotAgent.enabled=true' \
+    --set 'server.snapshotAgent.configSecret.secretName=path/to/secret' \
+    --set 'server.snapshotAgent.configSecret.secretKey=config' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.json"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+
+  actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.config -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  actual=$(echo $object | jq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "test" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: vault does not add volume for snapshot agent config secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'server.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "snapshot-agent-user-config")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: vault does not add volume mount for snapshot agent config secret" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'server.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "snapshot-agent-user-config")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: vault sets config-file argument on snapshot agent command to config downloaded by vault agent injector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.configSecret.secretName=a/b/c/d' \
+      --set 'server.snapshotAgent.configSecret.secretKey=snapshot-agent-config' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].command[2] | contains("-config-file=/vault/secrets/snapshot-agent-config.json")' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+#--------------------------------------------------------------------
+# snapshotAgent Interval
+
+@test "server/StatefulSet: snapshot-agent: interval defaults to 1h" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].command[2] | contains("-interval=1h")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: interval can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.interval=10h34m5s' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }

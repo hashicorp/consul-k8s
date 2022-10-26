@@ -3,6 +3,12 @@
 BREAKING_CHANGES:
 * Helm:
   * Remove `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
+  * Consul snapshot-agent now runs as a sidecar with Consul servers. [[GH-1620](https://github.com/hashicorp/consul-k8s/pull/1620)]
+    This results in the following changes to Helm values:
+    * Move `client.snapshotAgent` values to `server.snapshotAgent`, with the exception of the following values:
+      * `client.snaphostAgent.replicas`
+      * `client.snaphostAgent.serviceAccount`
+    * Remove `global.secretsBackend.vault.consulSnapshotAgentRole` value. You should now use the `global.secretsBackend.vault.consulServerRole` for access to any Vault secrets. 
 
 FEATURES:
 * Consul-dataplane:
