@@ -538,6 +538,60 @@ func TestPatchCustomResources(t *testing.T) {
 	require.Len(t, actual[0].GetFinalizers(), 0)
 }
 
+func TestMapKindToResource(t *testing.T) {
+	crds := apiextv1.CustomResourceDefinitionList{
+		Items: []apiextv1.CustomResourceDefinition{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "servicedefaults.consul.hashicorp.com",
+					Labels: map[string]string{
+						"app": "consul",
+					},
+				},
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "consul.hashicorp.com",
+					Names: apiextv1.CustomResourceDefinitionNames{
+						Plural: "servicedefaults",
+						Kind:   "ServiceDefaults",
+					},
+					Scope: "Namespaced",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "examples.example.com",
+				},
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.com",
+					Names: apiextv1.CustomResourceDefinitionNames{
+						Plural: "examples",
+						Kind:   "Example",
+					},
+					Scope: "Namespaced",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expected := map[string]string{
+		"ServiceDefaults": "servicedefaults",
+		"Example":         "examples",
+	}
+
+	actual := mapCRKindToResourceName(&crds)
+	require.Equal(t, expected, actual)
+}
+
 func TestUninstall(t *testing.T) {
 	cases := map[string]struct {
 		input                                   []string
