@@ -2444,6 +2444,19 @@ load _helpers
   [ "${actual}" = 'true' ]
 }
 
+@test "server/StatefulSet: snapshot-agent: uses default consul addr when TLS is disabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'http://127.0.0.1:8500' ]
+}
+
 @test "server/StatefulSet: snapshot-agent: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
