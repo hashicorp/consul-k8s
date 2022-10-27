@@ -9,6 +9,10 @@ BREAKING_CHANGES:
       * `client.snaphostAgent.replicas`
       * `client.snaphostAgent.serviceAccount`
     * Remove `global.secretsBackend.vault.consulSnapshotAgentRole` value. You should now use the `global.secretsBackend.vault.consulServerRole` for access to any Vault secrets. 
+* Peering:
+  * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
+    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+  * Enabling peering requires `tls.enabled`. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
 
 FEATURES:
 * Consul-dataplane:
@@ -47,8 +51,6 @@ IMPROVEMENTS:
 BREAKING CHANGES:
 * Peering:
   * Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
-  * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
-    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
 * Helm 
   * `server.replicas` now defaults to `1`. Formerly, this defaulted to `3`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
   * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
