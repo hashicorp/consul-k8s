@@ -66,6 +66,7 @@ jobs:
         uses: hashicorp/actions-go-build@v0.1.3
         with:
           product_name: consul-k8s
+          product_version: ${{ needs.get-product-version.outputs.product-version }}
           go_version: ${{ inputs.go-version }}
           os: linux
           arch: amd64
