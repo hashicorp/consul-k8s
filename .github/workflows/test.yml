@@ -344,7 +344,11 @@ jobs:
 
   acceptance:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
+<<<<<<< HEAD
     uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
+=======
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@536f034d6647fdadca8892036d0b06e28d1c9a57    
+>>>>>>> d5d87e8c (Change uses to point to Git hash)
     with:
       name: acceptance
       directory: acceptance/tests
