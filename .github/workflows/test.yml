@@ -344,7 +344,7 @@ jobs:
 
   acceptance:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@aa8685c32943e59812197f29024840a56503e543
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@e6a67089a7edaeb19c8b831716be0847f7935f81
     with:
       name: acceptance
       directory: acceptance/tests
@@ -357,7 +357,7 @@ jobs:
 
   acceptance-tproxy:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@aa8685c32943e59812197f29024840a56503e543
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@e6a67089a7edaeb19c8b831716be0847f7935f81
     with:
       name: acceptance-tproxy
       directory: acceptance/tests
@@ -370,7 +370,7 @@ jobs:
 
   acceptance-cni:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@aa8685c32943e59812197f29024840a56503e543
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@e6a67089a7edaeb19c8b831716be0847f7935f81
     with:
       name: acceptance
       directory: acceptance/tests
