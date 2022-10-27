@@ -71,9 +71,8 @@ jobs:
           os: linux
           arch: amd64
           reproducible: assert
-          instructions: |
-            sudo make cli-dev
-            consul-k8s version
+          work_dir: ./cli
+          instructions: CGO_ENABLED=0 go build -trimpath -buildvcs=false
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
         run: |
