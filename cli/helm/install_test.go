@@ -26,7 +26,7 @@ func TestInstallDemoApp(t *testing.T) {
 			messages: []string{
 				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: default\n    \n    \n",
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul-namespace\".\n",
-				"\n==> Accessing Consul Demo Application UI\n    kubectl port-forward deploy/frontend 8080:80 --namespace consul-namespace\n    Browse to http://localhost:8080.\n",
+				"\n==> Accessing Consul Demo Application UI\n    kubectl port-forward service/nginx 8080:80 --namespace consul-namespace\n    Browse to http://localhost:8080.\n",
 			},
 			helmActionsRunner: &MockActionRunner{},
 		},
