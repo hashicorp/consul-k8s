@@ -66,13 +66,16 @@ jobs:
         uses: hashicorp/actions-go-build@v0.1.6
         with:
           product_name: consul-k8s
-          product_version: 1.0.0-dev
+          product_version: ${{ needs.get-product-version.outputs.product-version }}
           go_version: ${{ inputs.go-version }}
           os: linux
           arch: amd64
-          reproducible: assert
           work_dir: ./cli
-          instructions: CGO_ENABLED=0 go build -trimpath -buildvcs=false
+          # Build and add to GOPATH
+          instructions: |
+            go build -o ./dist/consul-k8s
+            cp ./dist/consul-k8s ${GOPATH}/bin/
+
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
         run: |
