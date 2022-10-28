@@ -1,11 +1,3 @@
-# WARNING: The HashiCups files have been copied directly from
-# https://github.com/hashicorp/learn-consul-kubernetes/tree/main/layer7-observability/hashicups
-# Any modifications begin with the comment # BEGIN CONSUL-K8S MODIFICATION
-# and end with the comment # BEGIN CONSUL-K8S MODIFICATION.
-# If keeping these files manually up to date with their upstream source,
-# the files will need to be copied from the above repo and transferred here.
-# Once transferred, all modifications will need to be reapplied.
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -48,32 +40,47 @@ spec:
       labels:
         service: public-api
         app: public-api
-      # BEGIN CONSUL-K8S MODIFICATION
       annotations:
-        'consul.hashicorp.com/connect-inject': 'true'
-      # END CONSUL-K8S MODIFICATION
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9102"
+        consul.hashicorp.com/connect-inject: "true"
+        # BEGIN CONSUL-K8S MODIFICATION
+        consul.hashicorp.com/connect-service-upstreams: 'products-api:9090, payments:1800'
+        # END CONSUL-K8S MODIFICATION
     spec:
       serviceAccountName: public-api
       containers:
         - name: public-api
-          image: hashicorpdemoapp/public-api:v0.0.3
+          image: hashicorpdemoapp/public-api:v0.0.6
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
             - name: BIND_ADDRESS
               value: ":8080"
             - name: PRODUCT_API_URI
-              # BEGIN CONSUL-K8S MODIFICATION
-              value: "http://product-api.{{ .Release.Namespace }}.svc.cluster.local:9090"
-              # END CONSUL-K8S MODIFICATION
----
-apiVersion: consul.hashicorp.com/v1alpha1
-kind: ServiceIntentions
-metadata:
-  name: public-api-to-product-api
-spec:
-  destination:
-    name: product-api
-  sources:
-    - name: public-api
-      action: allow
+              value: "http://localhost:9090"
+            - name: PAYMENT_API_URI
+              value: "http://localhost:1800"
+        - name: jaeger-agent
+          image: jaegertracing/jaeger-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5775
+              name: zk-compact-trft
+              protocol: UDP
+            - containerPort: 5778
+              name: config-rest
+              protocol: TCP
+            - containerPort: 6831
+              name: jg-compact-trft
+              protocol: UDP
+            - containerPort: 6832
+              name: jg-binary-trft
+              protocol: UDP
+            - containerPort: 14271
+              name: admin-http
+              protocol: TCP
+          args:
+            - --reporter.grpc.host-port=dns:///jaeger-collector-headless.default:14250
+            - --reporter.type=grpc
