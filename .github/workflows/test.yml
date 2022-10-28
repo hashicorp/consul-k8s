@@ -344,9 +344,10 @@ jobs:
 
   acceptance:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@06c1af5ff933c320389d1a4381cc5a4b40038dc0
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@fa87bb03e102475235e58011da736eddfecb0371
     with:
       name: acceptance
+      product-version: 1.0.0-dev
       directory: acceptance/tests
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
@@ -357,9 +358,10 @@ jobs:
 
   acceptance-tproxy:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@06c1af5ff933c320389d1a4381cc5a4b40038dc0
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@fa87bb03e102475235e58011da736eddfecb0371
     with:
       name: acceptance-tproxy
+      product-version: 1.0.0-dev
       directory: acceptance/tests
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
@@ -370,9 +372,10 @@ jobs:
 
   acceptance-cni:
     needs: [ get-product-version, dev-upload-docker, get-go-version ]
-    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@06c1af5ff933c320389d1a4381cc5a4b40038dc0
+    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@fa87bb03e102475235e58011da736eddfecb0371
     with:
       name: acceptance
+      product-version: 1.0.0-dev
       directory: acceptance/tests
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
