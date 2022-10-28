@@ -74,7 +74,7 @@ jobs:
           # Build and add to GOPATH
           instructions: |
             go build -o ./dist/consul-k8s
-            cp ./dist/consul-k8s ${GOPATH}/bin/
+            "export PATH=./dist/consul-k8s:$PATH"
 
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
