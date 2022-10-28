@@ -19,9 +19,6 @@ on:
       directory:
         required: true
         type: string
-      go-version:
-        required: true
-        type: string
       gotestsum-version:
         required: true
         type: string
@@ -64,20 +61,17 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.checkout-ref }}
-      
-      - name: Build Consul K8s CLI
-        uses: hashicorp/actions-go-build@v0.1.6
-        with:
-          product_name: consul-k8s
-          product_version: ${{ inputs.product-version }}
-          go_version: ${{ inputs.go-version }}
-          os: linux
-          arch: amd64
-          work_dir: ./cli
-          instructions: go build -o ./dist/consul-k8s
 
-      - name: Add CLI to path
-        run: export PATH=./consul-k8s/dist/consul-k8s:$PATH
+      - name: Download CLI bin
+        uses: actions/download-artifact@v3
+        with:
+          name: consul-k8s_${{ input.product-version }}_linux_amd64.zip
+          path: ./
+
+      - name: Extract CLI and add to PATH
+        run: |
+          unzip -j consul-k8s_${{ input.product-version }}_linux_amd64.zip
+          ls -a
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
         run: |
