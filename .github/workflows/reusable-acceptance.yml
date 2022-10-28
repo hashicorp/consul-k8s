@@ -6,6 +6,9 @@ on:
       name:
         required: true
         type: string
+      product-version:
+        required: true
+        type: string
       additional-flags:
         required: false
         type: string
@@ -66,12 +69,11 @@ jobs:
         uses: hashicorp/actions-go-build@v0.1.6
         with:
           product_name: consul-k8s
-          product_version: ${{ needs.get-product-version.outputs.product-version }}
+          product_version: ${{ inputs.product-version }}
           go_version: ${{ inputs.go-version }}
           os: linux
           arch: amd64
           work_dir: ./cli
-          # Build and add to GOPATH
           instructions: go build -o ./dist/consul-k8s
 
       - name: Add CLI to path
