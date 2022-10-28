@@ -1,10 +1,3 @@
-# WARNING: The HashiCups files have been copied directly from
-# https://github.com/hashicorp/learn-consul-kubernetes/tree/main/layer7-observability/hashicups
-# Any modifications begin with the comment # BEGIN CONSUL-K8S MODIFICATION
-# and end with the comment # BEGIN CONSUL-K8S MODIFICATION.
-# If keeping these files manually up to date with their upstream source,
-# the files will need to be copied from the above repo and transferred here.
-# Once transferred, all modifications will need to be reapplied.
 ---
 apiVersion: v1
 kind: Service
@@ -13,10 +6,10 @@ metadata:
   labels:
     app: postgres
 spec:
-  type: ClusterIP
   ports:
     - port: 5432
       targetPort: 5432
+      protocol: TCP
   selector:
     app: postgres
 ---
@@ -31,7 +24,7 @@ kind: ServiceDefaults
 metadata:
   name: postgres
 spec:
-  protocol: tcp
+  protocol: "tcp"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -48,15 +41,16 @@ spec:
       labels:
         service: postgres
         app: postgres
-      # BEGIN CONSUL-K8S MODIFICATION
       annotations:
-        'consul.hashicorp.com/connect-inject': 'true'
-      # END CONSUL-K8S MODIFICATION
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9102"
+        consul.hashicorp.com/connect-inject: "true"
     spec:
       serviceAccountName: postgres
       containers:
         - name: postgres
-          image: hashicorpdemoapp/product-api-db:v0.0.11
+          image: hashicorpdemoapp/product-api-db:v0.0.21
+          imagePullPolicy: Always
           ports:
             - containerPort: 5432
           env:
@@ -66,8 +60,6 @@ spec:
               value: postgres
             - name: POSTGRES_PASSWORD
               value: password
-          # only listen on loopback so only access is via connect proxy
-          args: ["-c", "listen_addresses=127.0.0.1"]
           volumeMounts:
             - mountPath: "/var/lib/postgresql/data"
               name: "pgdata"
