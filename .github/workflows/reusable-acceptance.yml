@@ -70,7 +70,7 @@ jobs:
 
       - name: Extract CLI and add to PATH
         run: |
-          unzip -j consul-k8s_${{ input.product-version }}_linux_amd64.zip
+          unzip -j consul-k8s_1.0.0-dev_linux_amd64.zip
           ls -a
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
