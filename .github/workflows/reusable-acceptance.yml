@@ -72,10 +72,10 @@ jobs:
           arch: amd64
           work_dir: ./cli
           # Build and add to GOPATH
-          instructions: |
-            go build -o ./dist/consul-k8s
-            "export PATH=./dist/consul-k8s:$PATH"
+          instructions: go build -o ./dist/consul-k8s
 
+      - name: Add CLI to path
+        run: export PATH=./consul-k8s/dist/consul-k8s:$PATH
 
       - name: Install pre-requisites # Install gotestsum, kind, kubectl, and helm
         run: |
