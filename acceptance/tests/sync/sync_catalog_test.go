@@ -2,6 +2,7 @@ package sync
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -22,45 +23,25 @@ func TestSyncCatalog(t *testing.T) {
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and sync catalog is already tested with regular tproxy")
 	}
-	cases := []struct {
-		name       string
-		helmValues map[string]string
-		secure     bool
+
+	cases := map[string]struct {
+		secure bool
 	}{
-		{
-			"Default installation",
-			map[string]string{
-				"syncCatalog.enabled": "true",
-			},
-			false,
-		},
-		{
-			"Secure installation (with TLS and ACLs enabled)",
-			map[string]string{
-				"syncCatalog.enabled":          "true",
-				"global.tls.enabled":           "true",
-				"global.acls.manageSystemACLs": "true",
-			},
-			true,
-		},
-		{
-			"Secure installation (with TLS with auto-encrypt and ACLs enabled)",
-			map[string]string{
-				"syncCatalog.enabled":          "true",
-				"global.tls.enabled":           "true",
-				"global.tls.enableAutoEncrypt": "true",
-				"global.acls.manageSystemACLs": "true",
-			},
-			true,
-		},
+		"non-secure": {secure: false},
+		"secure":     {secure: true},
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
+			helmValues := map[string]string{
+				"syncCatalog.enabled":          "true",
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+			}
 
 			releaseName := helpers.RandomName()
-			consulCluster := consul.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
 
 			consulCluster.Create(t)
 

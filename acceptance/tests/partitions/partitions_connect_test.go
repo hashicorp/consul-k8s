@@ -32,10 +32,6 @@ func TestPartitions_Connect(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping because no t-proxy support")
-	}
-
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"

@@ -94,7 +94,7 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
 			ctx := context.Background()
 
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
 
@@ -210,7 +210,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
 			ctx := context.Background()
 
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
@@ -347,7 +347,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
 
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
 

@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	toconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -16,27 +17,20 @@ import (
 // Test that the source works with services registered before hand.
 func TestSource_initServices(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-	defer a.Stop()
-
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(err)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
 
 	// Create services before the source is running
-	_, err = client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
-	require.NoError(err)
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	_, sink, closer := testSource(client)
+	_, sink, closer := testSource(testClient.Cfg, testClient.Watcher)
 	defer closer()
 
 	var actual map[string]string
@@ -54,36 +48,29 @@ func TestSource_initServices(t *testing.T) {
 		"svcA":   "svcA.service.test",
 		"svcB":   "svcB.service.test",
 	}
-	require.Equal(expected, actual)
+	require.Equal(t, expected, actual)
 }
 
 // Test that we can specify a prefix to prepend to all destination services.
 func TestSource_prefix(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-	defer a.Stop()
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
 
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(err)
-
-	_, sink, closer := testSourceWithConfig(client, func(s *Source) {
+	_, sink, closer := testSourceWithConfig(testClient.Cfg, testClient.Watcher, func(s *Source) {
 		s.Prefix = "foo-"
 	})
 	defer closer()
 
 	// Create services before the source is running
-	_, err = client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
-	require.NoError(err)
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	var actual map[string]string
 	retry.Run(t, func(r *retry.R) {
@@ -100,33 +87,26 @@ func TestSource_prefix(t *testing.T) {
 		"foo-svcA":   "svcA.service.test",
 		"foo-svcB":   "svcB.service.test",
 	}
-	require.Equal(expected, actual)
+	require.Equal(t, expected, actual)
 }
 
 // Test that the source ignores K8S services.
 func TestSource_ignoreK8S(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-	defer a.Stop()
-
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(err)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
 
 	// Create services before the source is running
-	_, err = client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
-	require.NoError(err)
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{toconsul.TestConsulK8STag}), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	_, sink, closer := testSource(client)
+	_, sink, closer := testSource(testClient.Cfg, testClient.Watcher)
 	defer closer()
 
 	var actual map[string]string
@@ -143,34 +123,27 @@ func TestSource_ignoreK8S(t *testing.T) {
 		"consul": "consul.service.test",
 		"svcA":   "svcA.service.test",
 	}
-	require.Equal(expected, actual)
+	require.Equal(t, expected, actual)
 }
 
 // Test that the source deletes services properly.
 func TestSource_deleteService(t *testing.T) {
 	// Unable to be run in parallel with other tests that
 	// check for the existence of `consul.service.test`
-	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-	defer a.Stop()
-
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(err)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
 
 	// Create services before the source is running
-	_, err = client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
-	require.NoError(err)
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	_, sink, closer := testSource(client)
+	_, sink, closer := testSource(testClient.Cfg, testClient.Watcher)
 	defer closer()
 
 	var actual map[string]string
@@ -186,7 +159,7 @@ func TestSource_deleteService(t *testing.T) {
 	// Delete the service
 	_, err = client.Catalog().Deregister(&api.CatalogDeregistration{
 		Node: "hostB", ServiceID: "svcB"}, nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	retry.Run(t, func(r *retry.R) {
 		sink.Lock()
@@ -203,7 +176,7 @@ func TestSource_deleteService(t *testing.T) {
 		"consul": "consul.service.test",
 		"svcA":   "svcA.service.test",
 	}
-	require.Equal(expected, actual)
+	require.Equal(t, expected, actual)
 }
 
 // Test that the source deletes services properly. This case tests
@@ -211,27 +184,20 @@ func TestSource_deleteService(t *testing.T) {
 // anything.
 func TestSource_deleteServiceInstance(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-	defer a.Stop()
-
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(err)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
 
 	// Create services before the source is running
-	_, err = client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
-	require.NoError(err)
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	_, sink, closer := testSource(client)
+	_, sink, closer := testSource(testClient.Cfg, testClient.Watcher)
 	defer closer()
 
 	var actual map[string]string
@@ -247,7 +213,7 @@ func TestSource_deleteServiceInstance(t *testing.T) {
 	// Delete the service
 	_, err = client.Catalog().Deregister(&api.CatalogDeregistration{
 		Node: "hostB", ServiceID: "svcA"}, nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	retry.Run(t, func(r *retry.R) {
 		sink.Lock()
@@ -272,20 +238,21 @@ func testRegistration(node, service string, tags []string) *api.CatalogRegistrat
 }
 
 // testSource creates a Source and Sink for testing.
-func testSource(client *api.Client) (*Source, *TestSink, func()) {
-	return testSourceWithConfig(client, func(source *Source) {})
+func testSource(clientCfg *consul.Config, connMgr consul.ServerConnectionManager) (*Source, *TestSink, func()) {
+	return testSourceWithConfig(clientCfg, connMgr, func(source *Source) {})
 }
 
 // testSourceWithConfig starts a Source that can be configured
 // prior to starting via the configurator method.
-func testSourceWithConfig(client *api.Client, configurator func(*Source)) (*Source, *TestSink, func()) {
+func testSourceWithConfig(clientCfg *consul.Config, connMgr consul.ServerConnectionManager, configurator func(*Source)) (*Source, *TestSink, func()) {
 	sink := &TestSink{}
 	s := &Source{
-		Client:       client,
-		Domain:       "test",
-		Sink:         sink,
-		Log:          hclog.Default(),
-		ConsulK8STag: toconsul.TestConsulK8STag,
+		ConsulClientConfig:  clientCfg,
+		ConsulServerConnMgr: connMgr,
+		Domain:              "test",
+		Sink:                sink,
+		Log:                 hclog.Default(),
+		ConsulK8STag:        toconsul.TestConsulK8STag,
 	}
 	configurator(s)
 

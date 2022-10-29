@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +87,7 @@ type EndpointsController struct {
 	// ConsulClientConfig is the config for the Consul API client.
 	ConsulClientConfig *consul.Config
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
-	ConsulServerConnMgr *discovery.Watcher
+	ConsulServerConnMgr consul.ServerConnectionManager
 	// Only endpoints in the AllowK8sNamespacesSet are reconciled.
 	AllowK8sNamespacesSet mapset.Set
 	// Endpoints in the DenyK8sNamespacesSet are ignored.

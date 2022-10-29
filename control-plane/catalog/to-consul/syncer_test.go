@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -23,19 +26,13 @@ const (
 
 func TestConsulSyncer_register(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	// Set up server, client, syncer
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-	defer a.Stop()
+	// Create test consulServer server.
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
 
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(err)
-
-	s, closer := testConsulSyncer(client)
+	s, closer := testConsulSyncer(testClient)
 	defer closer()
 
 	// Sync
@@ -57,9 +54,9 @@ func TestConsulSyncer_register(t *testing.T) {
 	})
 
 	// Verify the settings
-	require.Equal("k8s-sync", service.Node)
-	require.Equal("bar", service.ServiceName)
-	require.Equal("127.0.0.1", service.Address)
+	require.Equal(t, "k8s-sync", service.Node)
+	require.Equal(t, "bar", service.ServiceName)
+	require.Equal(t, "127.0.0.1", service.Address)
 }
 
 // Test that the syncer reaps individual invalid service instances.
@@ -69,19 +66,11 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	for _, node := range []string{ConsulSyncNodeName, "test-node"} {
 		name := fmt.Sprintf("consul node name: %s", node)
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
-
 			// Set up server, client, syncer
-			a, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(err)
-			defer a.Stop()
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			client := testClient.APIClient
 
-			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPAddr,
-			})
-			require.NoError(err)
-
-			s, closer := testConsulSyncer(client)
+			s, closer := testConsulSyncer(testClient)
 			defer closer()
 
 			// Sync
@@ -91,7 +80,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 
 			// Wait for the first service
 			retry.Run(t, func(r *retry.R) {
-				services, _, err := client.Catalog().Service("bar", "", nil)
+				services, _, err := client.Catalog().Service("bar", s.ConsulK8STag, nil)
 				if err != nil {
 					r.Fatalf("err: %s", err)
 				}
@@ -103,13 +92,14 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 			// Create an invalid service directly in Consul
 			svc := testRegistration(node, "bar", "default")
 			svc.Service.ID = serviceID(node, "bar2")
-			_, err = client.Catalog().Register(svc, nil)
-			require.NoError(err)
+			fmt.Println("invalid service id", svc.Service.ID)
+			_, err := client.Catalog().Register(svc, nil)
+			require.NoError(t, err)
 
 			// Valid service should exist
 			var service *api.CatalogService
 			retry.Run(t, func(r *retry.R) {
-				services, _, err := client.Catalog().Service("bar", "", nil)
+				services, _, err := client.Catalog().Service("bar", s.ConsulK8STag, nil)
 				if err != nil {
 					r.Fatalf("err: %s", err)
 				}
@@ -120,10 +110,10 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 			})
 
 			// Verify the settings
-			require.Equal(serviceID(node, "bar"), service.ServiceID)
-			require.Equal(node, service.Node)
-			require.Equal("bar", service.ServiceName)
-			require.Equal("127.0.0.1", service.Address)
+			require.Equal(t, serviceID(node, "bar"), service.ServiceID)
+			require.Equal(t, node, service.Node)
+			require.Equal(t, "bar", service.ServiceName)
+			require.Equal(t, "127.0.0.1", service.Address)
 		})
 	}
 }
@@ -136,17 +126,10 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	sourceK8sNamespaceAnnotations := []string{"", "other", "default"}
 	for _, k8sNS := range sourceK8sNamespaceAnnotations {
 		t.Run(k8sNS, func(tt *testing.T) {
-			// Set up server, client, syncer
-			a, err := testutil.NewTestServerConfigT(tt, nil)
-			require.NoError(tt, err)
-			defer a.Stop()
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			client := testClient.APIClient
 
-			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPAddr,
-			})
-			require.NoError(tt, err)
-
-			s, closer := testConsulSyncer(client)
+			s, closer := testConsulSyncer(testClient)
 			defer closer()
 
 			// Run the sync with a test service
@@ -158,7 +141,7 @@ func TestConsulSyncer_reapService(t *testing.T) {
 			// expect it to be deleted.
 			svc := testRegistration(ConsulSyncNodeName, "baz", "default")
 			svc.Service.Meta[ConsulK8SNS] = k8sNS
-			_, err = client.Catalog().Register(svc, nil)
+			_, err := client.Catalog().Register(svc, nil)
 			require.NoError(tt, err)
 
 			retry.Run(tt, func(r *retry.R) {
@@ -185,14 +168,9 @@ func TestConsulSyncer_reapService(t *testing.T) {
 func TestConsulSyncer_noReapingUntilInitialSync(t *testing.T) {
 	t.Parallel()
 
-	a, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
-	defer a.Stop()
-	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
-	})
-	require.NoError(t, err)
-	s, closer := testConsulSyncerWithConfig(client, func(s *ConsulSyncer) {
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	client := testClient.APIClient
+	s, closer := testConsulSyncerWithConfig(testClient, func(s *ConsulSyncer) {
 		// Set the sync period to 5ms so we know it will have run at least once
 		// after we wait 100ms.
 		s.SyncPeriod = 5 * time.Millisecond
@@ -203,7 +181,7 @@ func TestConsulSyncer_noReapingUntilInitialSync(t *testing.T) {
 	// synthetic sync node and has the sync-associated tag, we expect
 	// it to be deleted but not until the initial sync is performed.
 	svc := testRegistration(ConsulSyncNodeName, "baz", "default")
-	_, err = client.Catalog().Register(svc, nil)
+	_, err := client.Catalog().Register(svc, nil)
 	require.NoError(t, err)
 
 	// We wait until the syncer has had the time to delete the service.
@@ -220,7 +198,7 @@ func TestConsulSyncer_noReapingUntilInitialSync(t *testing.T) {
 	s.Sync(nil)
 	// The service should get deleted.
 	retry.Run(t, func(r *retry.R) {
-		bazInstances, _, err := client.Catalog().Service("baz", "", nil)
+		bazInstances, _, err = client.Catalog().Service("baz", "", nil)
 		require.NoError(r, err)
 		require.Len(r, bazInstances, 0)
 	})
@@ -244,12 +222,19 @@ func TestConsulSyncer_stopsGracefully(t *testing.T) {
 	}))
 	defer consulServer.Close()
 
-	// Start the syncer.
-	client, err := api.NewClient(&api.Config{
-		Address: consulServer.URL,
-	})
+	parsedURL, err := url.Parse(consulServer.URL)
 	require.NoError(t, err)
-	s, closer := testConsulSyncer(client)
+
+	port, err := strconv.Atoi(parsedURL.Port())
+	require.NoError(t, err)
+
+	testClient := &test.TestServerClient{
+		Cfg:     &consul.Config{APIClientConfig: &api.Config{}, HTTPPort: port},
+		Watcher: test.MockConnMgrForIPAndPort(parsedURL.Host, port),
+	}
+
+	// Start the syncer.
+	s, closer := testConsulSyncer(testClient)
 
 	// Sync
 	s.Sync([]*api.CatalogRegistration{
@@ -282,23 +267,21 @@ func testRegistration(node, service, k8sSrcNamespace string) *api.CatalogRegistr
 	}
 }
 
-func testConsulSyncer(client *api.Client) (*ConsulSyncer, func()) {
-	return testConsulSyncerWithConfig(client, func(syncer *ConsulSyncer) {})
+func testConsulSyncer(testClient *test.TestServerClient) (*ConsulSyncer, func()) {
+	return testConsulSyncerWithConfig(testClient, func(syncer *ConsulSyncer) {})
 }
 
 // testConsulSyncerWithConfig starts a consul syncer that can be configured
 // prior to starting via the configurator method.
-func testConsulSyncerWithConfig(client *api.Client, configurator func(*ConsulSyncer)) (*ConsulSyncer, func()) {
+func testConsulSyncerWithConfig(testClient *test.TestServerClient, configurator func(*ConsulSyncer)) (*ConsulSyncer, func()) {
 	s := &ConsulSyncer{
-		Client:            client,
-		Log:               hclog.Default(),
-		SyncPeriod:        200 * time.Millisecond,
-		ServicePollPeriod: 50 * time.Millisecond,
-		ConsulK8STag:      TestConsulK8STag,
-		ConsulNodeName:    ConsulSyncNodeName,
-		ConsulNodeServicesClient: &PreNamespacesNodeServicesClient{
-			Client: client,
-		},
+		ConsulClientConfig:  testClient.Cfg,
+		ConsulServerConnMgr: testClient.Watcher,
+		Log:                 hclog.Default(),
+		SyncPeriod:          200 * time.Millisecond,
+		ServicePollPeriod:   50 * time.Millisecond,
+		ConsulK8STag:        TestConsulK8STag,
+		ConsulNodeName:      ConsulSyncNodeName,
 	}
 	configurator(s)
 	s.init()

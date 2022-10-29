@@ -3,12 +3,12 @@ package synccatalog
 import (
 	"context"
 	"os"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -55,8 +55,7 @@ func TestRun_FlagValidation(t *testing.T) {
 func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	t.Parallel()
 
-	k8s, testServer := completeSetup(t)
-	defer testServer.Stop()
+	k8s, testClient := completeSetup(t)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -67,11 +66,12 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 			Name:  t.Name(),
 			Level: hclog.Debug,
 		}),
+		connMgr: testClient.Watcher,
 	}
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
-		"-http-addr", testServer.HTTPAddr,
-		"-consul-api-timeout", "5s",
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -92,8 +92,7 @@ func TestRun_ExitCleanlyOnSignals(t *testing.T) {
 
 func testSignalHandling(sig os.Signal) func(*testing.T) {
 	return func(t *testing.T) {
-		k8s, testServer := completeSetup(t)
-		defer testServer.Stop()
+		k8s, testClient := completeSetup(t)
 
 		// Run the command.
 		ui := cli.NewMockUi()
@@ -104,11 +103,12 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 				Name:  t.Name(),
 				Level: hclog.Debug,
 			}),
+			connMgr: testClient.Watcher,
 		}
 
 		exitChan := runCommandAsynchronously(&cmd, []string{
-			"-http-addr", testServer.HTTPAddr,
-			"-consul-api-timeout", "5s",
+			"-addresses", "127.0.0.1",
+			"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 		})
 		cmd.sendSignal(sig)
 
@@ -132,32 +132,29 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	t.Parallel()
 
-	k8s, testServer := completeSetup(t)
-	defer testServer.Stop()
-
-	consulClient, err := api.NewClient(&api.Config{
-		Address: testServer.HTTPAddr,
-	})
-	require.NoError(t, err)
+	k8s, testClient := completeSetup(t)
+	consulClient := testClient.APIClient
 
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		clientset:    k8s,
-		consulClient: consulClient,
+		UI:        ui,
+		clientset: k8s,
 		logger: hclog.New(&hclog.LoggerOptions{
 			Name:  t.Name(),
 			Level: hclog.Debug,
 		}),
 		flagAllowK8sNamespacesList: []string{"*"},
+		connMgr:                    testClient.Watcher,
 	}
 
 	// create a service in k8s
-	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 		// change the write interval, so we can see changes in Consul quicker
 		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
@@ -177,32 +174,30 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	t.Parallel()
 
-	k8s, testServer := completeSetup(t)
-	defer testServer.Stop()
+	k8s, testClient := completeSetup(t)
 
-	consulClient, err := api.NewClient(&api.Config{
-		Address: testServer.HTTPAddr,
-	})
-	require.NoError(t, err)
+	consulClient := testClient.APIClient
 
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		clientset:    k8s,
-		consulClient: consulClient,
+		UI:        ui,
+		clientset: k8s,
 		logger: hclog.New(&hclog.LoggerOptions{
 			Name:  t.Name(),
 			Level: hclog.Debug,
 		}),
 		flagAllowK8sNamespacesList: []string{"*"},
+		connMgr:                    testClient.Watcher,
 	}
 
 	// create a service in k8s
-	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 		"-consul-write-interval", "100ms",
 	})
 
@@ -217,6 +212,8 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 
 	// restart sync with -add-k8s-namespace-suffix
 	exitChan = runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
@@ -237,35 +234,33 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T) {
 	t.Parallel()
 
-	k8s, testServer := completeSetup(t)
-	defer testServer.Stop()
+	k8s, testClient := completeSetup(t)
 
-	consulClient, err := api.NewClient(&api.Config{
-		Address: testServer.HTTPAddr,
-	})
-	require.NoError(t, err)
+	consulClient := testClient.APIClient
 
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		clientset:    k8s,
-		consulClient: consulClient,
+		UI:        ui,
+		clientset: k8s,
 		logger: hclog.New(&hclog.LoggerOptions{
 			Name:  t.Name(),
 			Level: hclog.Debug,
 		}),
 		flagAllowK8sNamespacesList: []string{"*"},
+		connMgr:                    testClient.Watcher,
 	}
 
 	// create two services in k8s
-	_, err = k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+	_, err := k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
@@ -331,17 +326,13 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testServer := completeSetup(tt)
-			defer testServer.Stop()
+			k8s, testClient := completeSetup(tt)
 
-			consulClient, err := api.NewClient(&api.Config{
-				Address: testServer.HTTPAddr,
-			})
-			require.NoError(t, err)
+			consulClient := testClient.APIClient
 
 			// Create two services in k8s in default and foo namespaces.
 			{
-				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
+				_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
 				_, err = k8s.CoreV1().Namespaces().Create(
 					context.Background(),
@@ -357,6 +348,8 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 			}
 
 			flags := []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "100ms",
 				"-log-level=debug",
 			}
@@ -370,13 +363,13 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 			// Run the command
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:           ui,
-				clientset:    k8s,
-				consulClient: consulClient,
+				UI:        ui,
+				clientset: k8s,
 				logger: hclog.New(&hclog.LoggerOptions{
 					Name:  tt.Name(),
 					Level: hclog.Debug,
 				}),
+				connMgr: testClient.Watcher,
 			}
 			exitChan := runCommandAsynchronously(&cmd, flags)
 			defer stopCommand(tt, &cmd, exitChan)
@@ -480,17 +473,15 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testServer := completeSetup(tt)
-			defer testServer.Stop()
+			k8s, testClient := completeSetup(tt)
 
-			consulClient, err := api.NewClient(&api.Config{
-				Address: testServer.HTTPAddr,
-			})
-			require.NoError(t, err)
+			consulClient := testClient.APIClient
 
 			ui := cli.NewMockUi()
 
 			commonArgs := []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "100ms",
 				"-log-level=debug",
 			}
@@ -515,13 +506,13 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 			// Run the first command.
 			{
 				firstCmd := Command{
-					UI:           ui,
-					clientset:    k8s,
-					consulClient: consulClient,
+					UI:        ui,
+					clientset: k8s,
 					logger: hclog.New(&hclog.LoggerOptions{
 						Name:  tt.Name() + "-firstrun",
 						Level: hclog.Debug,
 					}),
+					connMgr: testClient.Watcher,
 				}
 				exitChan := runCommandAsynchronously(&firstCmd, append(commonArgs, c.FirstRunFlags...))
 
@@ -541,13 +532,13 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 			// Run the second command.
 			{
 				secondCmd := Command{
-					UI:           ui,
-					clientset:    k8s,
-					consulClient: consulClient,
+					UI:        ui,
+					clientset: k8s,
 					logger: hclog.New(&hclog.LoggerOptions{
 						Name:  tt.Name() + "-secondrun",
 						Level: hclog.Debug,
 					}),
+					connMgr: testClient.Watcher,
 				}
 				exitChan := runCommandAsynchronously(&secondCmd, append(commonArgs, c.SecondRunFlags...))
 				defer stopCommand(tt, &secondCmd, exitChan)
@@ -577,13 +568,12 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 }
 
 // Set up test consul agent and fake kubernetes cluster client.
-func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
+func completeSetup(t *testing.T) (*fake.Clientset, *test.TestServerClient) {
 	k8s := fake.NewSimpleClientset()
 
-	svr, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 
-	return k8s, svr
+	return k8s, testClient
 }
 
 // This function starts the command asynchronously and returns a non-blocking chan.

@@ -291,7 +291,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			}
 
 			// Create test consul server.
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			dialerClient := testClient.APIClient
 
 			// If the peering is supposed to already exist in Consul, then establish a peering with the existing token, so the peering will exist on the dialing side.
@@ -741,7 +741,7 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 	// Create test consul server.
-	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
@@ -13,12 +14,15 @@ import (
 // Source is the source for the sync that watches Consul services and
 // updates a Sink whenever the set of services to register changes.
 type Source struct {
-	Client       *api.Client  // Consul API client
-	Domain       string       // Consul DNS domain
-	Sink         Sink         // Sink is the sink to update with services
-	Prefix       string       // Prefix is a prefix to prepend to services
-	Log          hclog.Logger // Logger
-	ConsulK8STag string       // The tag value for services registered
+	// ConsulClientConfig is the config for the Consul API client.
+	ConsulClientConfig *consul.Config
+	// ConsulServerConnMgr is the watcher for the Consul server addresses.
+	ConsulServerConnMgr consul.ServerConnectionManager
+	Domain              string       // Consul DNS domain
+	Sink                Sink         // Sink is the sink to update with services
+	Prefix              string       // Prefix is a prefix to prepend to services
+	Log                 hclog.Logger // Logger
+	ConsulK8STag        string       // The tag value for services registered
 }
 
 // Run is the long-running runloop for watching Consul services and
@@ -30,12 +34,17 @@ func (s *Source) Run(ctx context.Context) {
 		WaitTime:   1 * time.Minute,
 	}).WithContext(ctx)
 	for {
+		consulClient, err := consul.NewClientFromConnMgr(s.ConsulClientConfig, s.ConsulServerConnMgr)
+		if err != nil {
+			s.Log.Error("failed to create Consul API client", "err", err)
+			return
+		}
+
 		// Get all services with tags.
 		var serviceMap map[string][]string
 		var meta *api.QueryMeta
-		err := backoff.Retry(func() error {
-			var err error
-			serviceMap, meta, err = s.Client.Catalog().Services(opts)
+		err = backoff.Retry(func() error {
+			serviceMap, meta, err = consulClient.Catalog().Services(opts)
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 

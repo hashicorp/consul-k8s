@@ -493,7 +493,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 					continue
 				}
 
-				if _, ok := seen[addr]; ok {
+				if _, ok = seen[addr]; ok {
 					continue
 				}
 				seen[addr] = struct{}{}
