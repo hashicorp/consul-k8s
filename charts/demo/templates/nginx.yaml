@@ -1,0 +1,124 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  selector:
+    app: nginx
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx
+automountServiceAccountToken: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: nginx
+spec:
+  protocol: "http"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configmap
+data:
+  config: |
+
+    # /etc/nginx/conf.d/default.conf
+      proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=STATIC:10m inactive=7d use_temp_path=off;
+
+      upstream frontend_upstream {
+        server localhost:3000;
+      }
+
+      server {
+        listen 80;
+        server_name  localhost;
+
+        server_tokens off;
+
+        gzip on;
+        gzip_proxied any;
+        gzip_comp_level 4;
+        gzip_types text/css application/javascript image/svg+xml;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+
+        location /_next/static {
+          proxy_cache STATIC;
+          proxy_pass http://frontend_upstream;
+
+          # For testing cache - remove before deploying to production
+          # add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /static {
+          proxy_cache STATIC;
+          proxy_ignore_headers Cache-Control;
+          proxy_cache_valid 60m;
+          proxy_pass http://frontend_upstream;
+
+          # For testing cache - remove before deploying to production
+          # add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location / {
+          proxy_pass http://frontend_upstream;
+        }
+
+        location /api {
+          proxy_pass http://localhost:8080;
+        }
+      }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        # BEGIN CONSUL-K8S MODIFICATION
+        consul.hashicorp.com/connect-service-upstreams: 'public-api:8080, frontend:3000'
+        # END CONSUL-K8S MODIFICATION
+    spec:
+      serviceAccountName: nginx
+      volumes:
+        - name: config
+          configMap:
+            name: nginx-configmap
+            items:
+              - key: config
+                path: default.conf
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
