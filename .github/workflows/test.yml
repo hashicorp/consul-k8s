@@ -342,43 +342,44 @@ jobs:
           target: release-default
           tags: docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-pr-${{ github.sha }}
 
-  # acceptance:
-  #   needs: [ get-product-version, dev-upload-docker, get-go-version ]
-  #   uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
-  #   with:
-  #     name: acceptance
-  #     directory: acceptance/tests
-  #     go-version: ${{ needs.get-go-version.outputs.go-version }}
-  #     additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
-  #     gotestsum-version: 1.8.2
-  #     consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
-  #   secrets:
-  #     CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
-
-  # acceptance-tproxy:
-  #   needs: [ get-product-version, dev-upload-docker, get-go-version ]
-  #   uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
-  #   with:
-  #     name: acceptance-tproxy
-  #     directory: acceptance/tests
-  #     go-version: ${{ needs.get-go-version.outputs.go-version }}
-  #     additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
-  #     gotestsum-version: 1.8.2
-  #     consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
-  #   secrets:
-  #     CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
-
-  # acceptance-cni:
-  #   needs: [ get-product-version, dev-upload-docker, get-go-version ]
-  #   uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
-  #   with:
-  #     name: acceptance
-  #     directory: acceptance/tests
-  #     go-version: ${{ needs.get-go-version.outputs.go-version }}
-  #     additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
-  #     gotestsum-version: 1.8.2
-  #     consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
-  #   secrets:
-  #     CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+# Disable GHA acceptance tests until GHA formally supported
+#  acceptance:
+#    needs: [ get-product-version, dev-upload-docker, get-go-version ]
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
+#    with:
+#      name: acceptance
+#      directory: acceptance/tests
+#      go-version: ${{ needs.get-go-version.outputs.go-version }}
+#      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
+#      gotestsum-version: 1.8.2
+#      consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
+#    secrets:
+#      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+#
+#  acceptance-tproxy:
+#    needs: [ get-product-version, dev-upload-docker, get-go-version ]
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
+#    with:
+#      name: acceptance-tproxy
+#      directory: acceptance/tests
+#      go-version: ${{ needs.get-go-version.outputs.go-version }}
+#      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
+#      gotestsum-version: 1.8.2
+#      consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
+#    secrets:
+#      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+#
+#  acceptance-cni:
+#    needs: [ get-product-version, dev-upload-docker, get-go-version ]
+#    uses: hashicorp/consul-k8s/.github/workflows/reusable-acceptance.yml@main
+#    with:
+#      name: acceptance
+#      directory: acceptance/tests
+#      go-version: ${{ needs.get-go-version.outputs.go-version }}
+#      additional-flags: "-use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev"
+#      gotestsum-version: 1.8.2
+#      consul-k8s-image: docker.io/hashicorppreview/${{ github.event.repository.name }}-control-plane:${{ needs.get-product-version.outputs.product-version }}-pr-${{ github.sha }}
+#    secrets:
+#      CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
 
 
