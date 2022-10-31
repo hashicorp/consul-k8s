@@ -41,8 +41,8 @@ spec:
   {{- end }}
   {{ - if .Values.apiGateway.managedGatewayClass.tolerations }}
   tolerations:
-    { { tpl .Values.apiGateway.managedGatewayClass.tolerations . | indent 4 | trim } }
-  { { - end } }
+    {{ tpl .Values.apiGateway.managedGatewayClass.tolerations . | indent 4 | trim }}
+  {{ - end }}
   {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
   copyAnnotations:
     service: 
