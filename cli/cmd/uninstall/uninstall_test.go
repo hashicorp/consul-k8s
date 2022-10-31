@@ -609,8 +609,7 @@ func TestUninstall(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
-				"\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n --> Deleting custom resources managed by Consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -654,8 +653,7 @@ func TestUninstall(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
-				"\n ✓ Successfully uninstalled Consul Helm release.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n --> Deleting custom resources managed by Consul\n ✓ Successfully uninstalled Consul Helm release.\n",
 				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul",
 				"\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
 			},
@@ -681,8 +679,7 @@ func TestUninstall(t *testing.T) {
 				"\n==> Consul Demo Application Uninstall Summary\n    Name: consul-demo\n    Namespace: consul-demo",
 				"\n ✓ Successfully uninstalled Consul demo application Helm release.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
-				"\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n --> Deleting custom resources managed by Consul\n ✓ Successfully uninstalled Consul Helm release.\n ✓ Skipping deleting PVCs, secrets, and service accounts.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -704,8 +701,7 @@ func TestUninstall(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
-				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul",
-				"\n ! Helm returned an error.\n",
+				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n --> Deleting custom resources managed by Consul\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
