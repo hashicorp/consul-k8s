@@ -3,7 +3,6 @@ package connectinject
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"testing"
 
@@ -23,9 +22,6 @@ import (
 const (
 	defaultPodName   = "fakePod"
 	defaultNamespace = "default"
-	resourcePrefix   = "CONSUL"
-	dnsEnvVariable   = "CONSUL_DNS_SERVICE_HOST"
-	dnsIP            = "10.0.34.16"
 )
 
 func TestAddRedirectTrafficConfig(t *testing.T) {
@@ -344,7 +340,6 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				},
 			},
 			expCfg: iptables.Config{
-				ConsulDNSIP:          "",
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     proxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
@@ -354,85 +349,9 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				ExcludeUIDs:          []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
 			},
 		},
-		{
-			name:       "dns enabled",
-			dnsEnabled: true,
-			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				ResourcePrefix:        resourcePrefix,
-			},
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: defaultNamespace,
-					Name:      defaultPodName,
-					Annotations: map[string]string{
-						keyConsulDNS: "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name: "test",
-						},
-					},
-				},
-			},
-			expCfg: iptables.Config{
-				ConsulDNSIP:       dnsIP,
-				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:  proxyDefaultInboundPort,
-				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
-				ExcludeUIDs:       []string{strconv.Itoa(initContainersUserAndGroupID)},
-			},
-		},
-		{
-			name:       "dns enabled set but consul dns host environment variable missing",
-			dnsEnabled: false,
-			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				ResourcePrefix:        resourcePrefix,
-			},
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: defaultNamespace,
-					Name:      defaultPodName,
-					Annotations: map[string]string{
-						keyConsulDNS: "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name: "test",
-						},
-					},
-				},
-			},
-			expCfg: iptables.Config{
-				ConsulDNSIP:       dnsIP,
-				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:  proxyDefaultInboundPort,
-				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
-				ExcludeUIDs:       []string{strconv.Itoa(initContainersUserAndGroupID)},
-			},
-			expErr: fmt.Errorf("environment variable %s not found", dnsEnvVariable),
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if c.dnsEnabled {
-				err = os.Setenv(dnsEnvVariable, dnsIP)
-				require.NoError(t, err)
-				t.Cleanup(func() {
-					_ = os.Unsetenv(dnsEnvVariable)
-				})
-			}
 			err = c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
 			// Only compare annotation and iptables config on successful runs
@@ -499,14 +418,8 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 			w := MeshWebhook{
 				EnableConsulDNS:        c.globalEnabled,
 				EnableTransparentProxy: true,
-				ResourcePrefix:         "consul",
 				ConsulConfig:           &consul.Config{HTTPPort: 8500},
 			}
-			err := os.Setenv(dnsEnvVariable, dnsIP)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(dnsEnvVariable)
-			})
 
 			pod := minimal()
 			pod.Annotations = c.annotations
@@ -520,37 +433,11 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 			err = json.Unmarshal([]byte(iptablesConfig), &actualConfig)
 			require.NoError(t, err)
 			if c.expectConsulDNSConfig {
-				require.Equal(t, dnsIP, actualConfig.ConsulDNSIP)
+				require.Equal(t, "127.0.0.1", actualConfig.ConsulDNSIP)
+				require.Equal(t, 8600, actualConfig.ConsulDNSPort)
 			} else {
 				require.Empty(t, actualConfig.ConsulDNSIP)
 			}
-		})
-	}
-}
-
-func TestHandler_constructDNSServiceHostName(t *testing.T) {
-	cases := []struct {
-		prefix string
-		result string
-	}{
-		{
-			prefix: "consul-consul",
-			result: "CONSUL_CONSUL_DNS_SERVICE_HOST",
-		},
-		{
-			prefix: "release",
-			result: "RELEASE_DNS_SERVICE_HOST",
-		},
-		{
-			prefix: "consul-dc1",
-			result: "CONSUL_DC1_DNS_SERVICE_HOST",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.prefix, func(t *testing.T) {
-			w := MeshWebhook{ResourcePrefix: c.prefix}
-			require.Equal(t, c.result, w.constructDNSServiceHostName())
 		})
 	}
 }

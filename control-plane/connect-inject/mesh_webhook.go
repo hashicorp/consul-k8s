@@ -163,14 +163,13 @@ type MeshWebhook struct {
 	// from mesh services.
 	EnableConsulDNS bool
 
-	// ResourcePrefix is the prefix used for the installation which is used to determine the Service
-	// name of the Consul DNS service.
-	ResourcePrefix string
-
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow
 	// those containers to be created otherwise.
 	EnableOpenShift bool
+
+	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
+	ReleaseNamespace string
 
 	// Log
 	Log logr.Logger
@@ -179,6 +178,8 @@ type MeshWebhook struct {
 	LogJSON  bool
 
 	decoder *admission.Decoder
+	// etcResolvFile is only used in tests to stub out /etc/resolv.conf file.
+	etcResolvFile string
 }
 type multiPortInfo struct {
 	serviceIndex int
@@ -369,9 +370,18 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	}
 
 	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
-	// to determine if it should traffic redirect or not
+	// to determine if it should traffic redirect or not.
 	if tproxyEnabled {
 		pod.Annotations[keyTransparentProxyStatus] = enabled
+	}
+
+	// If tproxy with DNS redirection is enabled, we want to configure dns on the pod.
+	if tproxyEnabled && w.EnableConsulDNS {
+		if err = w.configureDNS(&pod, req.Namespace); err != nil {
+			w.Log.Error(err, "error configuring DNS on the pod", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring DNS on the pod: %s", err))
+		}
+
 	}
 
 	// Add annotations for metrics.

@@ -208,6 +208,8 @@ func (c *ConnectHelper) helmValues() map[string]string {
 		"connectInject.enabled":        "true",
 		"global.tls.enabled":           strconv.FormatBool(c.Secure),
 		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
+		"dns.enabled":                  "true",
+		"dns.enableRedirection":        "true",
 	}
 
 	helpers.MergeMaps(helmValues, c.HelmValues)

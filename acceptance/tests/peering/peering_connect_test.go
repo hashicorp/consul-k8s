@@ -31,10 +31,6 @@ func TestPeering_Connect(t *testing.T) {
 		t.Skipf("skipping this test because peering is not supported in version %v", cfg.ConsulVersion.String())
 	}
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping because no t-proxy support")
-	}
-
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
 	cases := []struct {

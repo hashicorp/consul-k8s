@@ -138,17 +138,6 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
-      # [Enterprise Only] The Vault role for the Consul client snapshot agent.
-      # The role must be connected to the Consul client snapshot agent's service account.
-      # The role must also have a policy with read capabilities for the snapshot agent config
-      # defined by the `client.snapshotAgent.configSecret.secretName` value.
-      # To discover the service account name of the Consul client, run
-      # ```shell-session
-      # $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
-      # ```
-      # and check the name of `metadata.name`.
-      consulSnapshotAgentRole: ""
-
       # A Vault role for the Consul `server-acl-init` job, which manages setting ACLs so that clients and components can obtain ACL tokens.
       # The role must be connected to the `server-acl-init` job's service account.
       # The role must also have a policy with read and write capabilities for the bootstrap, replication or partition tokens
@@ -1090,6 +1079,56 @@ server:
   # @type: map
   extraEnvironmentVars: {}
 
+  # [Enterprise Only] Values for setting up and running snapshot agents
+  # (https://consul.io/commands/snapshot/agent)
+  # within the Consul clusters. They run as a sidecar with Consul servers.
+  snapshotAgent:
+    # If true, the chart will install resources necessary to run the snapshot agent.
+    enabled: false
+
+    # Interval at which to perform snapshots.
+    # See https://www.consul.io/commands/snapshot/agent#interval
+    # @type: string
+    interval: 1h
+
+    # A Kubernetes or Vault secret that should be manually created to contain the entire
+    # config to be used on the snapshot agent.
+    # This is the preferred method of configuration since there are usually storage
+    # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)
+    # for details.
+    configSecret:
+      # The name of the Kubernetes secret or Vault secret path that holds the snapshot agent config.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret or Vault secret key that holds the snapshot agent config.
+      # @type: string
+      secretKey: null
+
+    # The resource settings for snapshot agent pods.
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+
+    # Optional PEM-encoded CA certificate that will be added to the trusted system CAs.
+    # Useful if using an S3-compatible storage exposing a self-signed certificate.
+    #
+    # Example:
+    #
+    # ```yaml
+    # caCert: |
+    #   -----BEGIN CERTIFICATE-----
+    #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
+    #   ...
+    # ```
+    # @type: string
+    caCert: null
+
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
 # if setting `global.tls.enableAutoEncrypt` to true
@@ -1422,73 +1461,6 @@ client:
   #
   # @type: string
   updateStrategy: null
-
-  # [Enterprise Only] Values for setting up and running snapshot agents
-  # (https://consul.io/commands/snapshot/agent)
-  # within the Consul clusters. They are required to be co-located with Consul clients,
-  # so will inherit the clients' nodeSelector, tolerations and affinity.
-  snapshotAgent:
-    # If true, the chart will install resources necessary to run the snapshot agent.
-    enabled: false
-
-    # The number of snapshot agents to run.
-    replicas: 2
-
-    # Interval at which to perform snapshots.
-    # See https://www.consul.io/commands/snapshot/agent#interval
-    # @type: string
-    interval: 1h
-
-    # A Kubernetes or Vault secret that should be manually created to contain the entire
-    # config to be used on the snapshot agent.
-    # This is the preferred method of configuration since there are usually storage
-    # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)
-    # for details.
-    configSecret:
-      # The name of the Kubernetes secret or Vault secret path that holds the snapshot agent config.
-      # @type: string
-      secretName: null
-      # The key within the Kubernetes secret or Vault secret key that holds the snapshot agent config.
-      # @type: string
-      secretKey: null
-
-    serviceAccount:
-      # This value defines additional annotations for the snapshot agent service account. This should be formatted as a
-      # multi-line string.
-      #
-      # ```yaml
-      # annotations: |
-      #   "sample/annotation1": "foo"
-      #   "sample/annotation2": "bar"
-      # ```
-      #
-      # @type: string
-      annotations: null
-
-    # The resource settings for snapshot agent pods.
-    # @recurse: false
-    # @type: map
-    resources:
-      requests:
-        memory: "50Mi"
-        cpu: "50m"
-      limits:
-        memory: "50Mi"
-        cpu: "50m"
-
-    # Optional PEM-encoded CA certificate that will be added to the trusted system CAs.
-    # Useful if using an S3-compatible storage exposing a self-signed certificate.
-    #
-    # Example:
-    #
-    # ```yaml
-    # caCert: |
-    #   -----BEGIN CERTIFICATE-----
-    #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
-    #   ...
-    # ```
-    # @type: string
-    caCert: null
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)

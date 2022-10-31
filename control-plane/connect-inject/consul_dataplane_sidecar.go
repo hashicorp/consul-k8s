@@ -13,7 +13,11 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-const ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+const (
+	ConsulCAFile               = "/consul/connect-inject/consul-ca.pem"
+	ConsulDataplaneDNSBindHost = "127.0.0.1"
+	ConsulDataplaneDNSBindPort = 8600
+)
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	resources, err := w.sidecarResources(pod)
@@ -251,6 +255,12 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 				"-telemetry-prom-cert-file="+prometheusCertFile,
 				"-telemetry-prom-key-file="+prometheusKeyFile)
 		}
+	}
+
+	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
+	// for Consul DNS in the pod.
+	if w.EnableConsulDNS {
+		cmd = append(cmd, "-consul-dns-bind-port="+strconv.Itoa(ConsulDataplaneDNSBindPort))
 	}
 
 	var envoyExtraArgs []string

@@ -272,6 +272,26 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 	}
 }
 
+func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
+	h := MeshWebhook{
+		ConsulConfig:    &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+		EnableConsulDNS: true,
+	}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+	require.NoError(t, err)
+	require.Contains(t, container.Command[2], "-consul-dns-bind-port=8600")
+}
+
 func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 	for _, aclsEnabled := range []bool{false, true} {
 		name := fmt.Sprintf("acls enabled: %t", aclsEnabled)

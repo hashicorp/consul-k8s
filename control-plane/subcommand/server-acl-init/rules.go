@@ -179,9 +179,6 @@ func (c *Command) meshGatewayRules() (string, error) {
 	// that its ACL token has access to. So, in the case of
 	// Consul namespaces, it needs access to all namespaces.
 	meshGatewayRulesTpl := `mesh = "write"
-agent_prefix "" {
-  policy = "read"
-}
 {{- if .EnableNamespaces }}
 namespace "default" {
 {{- end }}
