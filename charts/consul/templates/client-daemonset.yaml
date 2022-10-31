@@ -271,9 +271,6 @@ spec:
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
-              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
-              {{ template "consul.recursors" }}
-              {{- end }}
 
               {{ template "consul.extraconfig" }}
 
@@ -378,9 +375,6 @@ spec:
                 {{- end }}
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
-                {{- end }}
-                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
-                $recursor_flags \
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -domain={{ .Values.global.domain }}

@@ -13,8 +13,7 @@ var suite testsuite.Suite
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
-	// todo(agentless): Re-enable tproxy tests once we support it for multi-cluster.
-	if suite.Config().EnableMultiCluster && !suite.Config().EnableTransparentProxy {
+	if suite.Config().EnableMultiCluster {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println("Skipping wan federation tests because -enable-multi-cluster is not set")

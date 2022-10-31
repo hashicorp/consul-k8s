@@ -3,9 +3,7 @@ package connectinject
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/hashicorp/consul/sdk/iptables"
 	corev1 "k8s.io/api/core/v1"
@@ -94,16 +92,12 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		return "", err
 	}
 
-	var consulDNSClusterIP string
 	if dnsEnabled {
 		// If Consul DNS is enabled, we find the environment variable that has the value
 		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
-		consulDNSClusterIP = os.Getenv(w.constructDNSServiceHostName())
-		if consulDNSClusterIP == "" {
-			return "", fmt.Errorf("environment variable %s not found", w.constructDNSServiceHostName())
-		}
-		cfg.ConsulDNSIP = consulDNSClusterIP
+		cfg.ConsulDNSIP = ConsulDataplaneDNSBindHost
+		cfg.ConsulDNSPort = ConsulDataplaneDNSBindPort
 	}
 
 	iptablesConfigJson, err := json.Marshal(&cfg)
@@ -124,13 +118,4 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 	pod.Annotations[annotationRedirectTraffic] = iptablesConfig
 
 	return nil
-}
-
-// constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
-// key of the env variable whose value is the cluster IP of the Consul DNS Service.
-// It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
-func (w *MeshWebhook) constructDNSServiceHostName() string {
-	upcaseResourcePrefix := strings.ToUpper(w.ResourcePrefix)
-	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
-	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
 }

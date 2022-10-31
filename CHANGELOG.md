@@ -1,22 +1,43 @@
 ## UNRELEASED
 
+BREAKING_CHANGES:
+* Helm:
+  * Remove `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
+  * Consul snapshot-agent now runs as a sidecar with Consul servers. [[GH-1620](https://github.com/hashicorp/consul-k8s/pull/1620)]
+    This results in the following changes to Helm values:
+    * Move `client.snapshotAgent` values to `server.snapshotAgent`, with the exception of the following values:
+      * `client.snaphostAgent.replicas`
+      * `client.snaphostAgent.serviceAccount`
+    * Remove `global.secretsBackend.vault.consulSnapshotAgentRole` value. You should now use the `global.secretsBackend.vault.consulServerRole` for access to any Vault secrets. 
+* Peering:
+  * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
+    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+  * Enabling peering requires `tls.enabled`. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+
+FEATURES:
+* Consul-dataplane:
+  * Support merged metrics with consul-dataplane. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
+  * Support transparent proxying when using consul-dataplane. [[GH-1625](https://github.com/hashicorp/consul-k8s/pull/1478),[GH-1632](https://github.com/hashicorp/consul-k8s/pull/1632)]
+
 IMPROVEMENTS:
 * CLI
   * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
 * Control Plane
   * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
+  * Remove unneeded `agent:read` ACL permissions from mesh gateway policy. [[GH-1255](https://github.com/hashicorp/consul-k8s/pull/1255)]
 * Helm:
   * Remove deprecated annotation `service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"` in the `server-service` template. [[GH-1619](https://github.com/hashicorp/consul-k8s/pull/1619)]
   * Support `minAvailable` on connect injector `PodDisruptionBudget`. [[GH-1557](https://github.com/hashicorp/consul-k8s/pull/1557)]
   * Add `tolerations` and `nodeSelector` to Server ACL init jobs and `nodeSelector` to Webhook cert manager. [[GH-1581](https://github.com/hashicorp/consul-k8s/pull/1581)]
   * API Gateway: Add `tolerations` to `apiGateway.managedGatewayClass` and `apiGateway.controller` [[GH-1650](https://github.com/hashicorp/consul-k8s/pull/1650)]
-* Control plane
-  * Support merged metrics with consul-dataplane. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
 
-BREAKING_CHANGES:
+## 1.0.0-beta4 (October 28, 2022)
 
-* Helm:
-  * Removal of `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
+IMPROVEMENTS:
+
+CLI:
+
+* Update demo charts and CLI command to not presume tproxy when using HCP preset. Also, use the most recent version of hashicups. [[GH-1657](https://github.com/hashicorp/consul-k8s/pull/1657)]
 
 ## 1.0.0-beta3 (October 12, 2022)
 
@@ -39,8 +60,6 @@ IMPROVEMENTS:
 BREAKING CHANGES:
 * Peering:
   * Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
-  * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
-    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
 * Helm 
   * `server.replicas` now defaults to `1`. Formerly, this defaulted to `3`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
   * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]

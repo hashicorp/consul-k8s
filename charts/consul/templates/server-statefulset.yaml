@@ -10,11 +10,13 @@
 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.secretsBackend.vault.consulServerRole)) }}{{ fail "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
 {{- if (and .Values.server.serverCert.secretName (not .Values.global.tls.caCert.secretName)) }}{{ fail "If server.serverCert.secretName is provided, global.tls.caCert.secretName must also be provided" }}{{ end }}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
-{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.secretsBackend.vault.consulCARole)) }}{{ fail "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 {{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
+{{- if .Values.server.snapshotAgent.enabled -}}
+{{- if or (and .Values.server.snapshotAgent.configSecret.secretName (not .Values.server.snapshotAgent.configSecret.secretKey)) (and (not .Values.server.snapshotAgent.configSecret.secretName) .Values.server.snapshotAgent.configSecret.secretKey) }}{{fail "server.snapshotAgent.configSecret.secretKey and server.snapshotAgent.configSecret.secretName must both be specified." }}{{ end -}}
+{{- end -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
 # StatefulSet to run the actual Consul server cluster.
@@ -96,6 +98,12 @@ spec:
         "vault.hashicorp.com/agent-inject-template-enterpriselicense.txt": {{ template "consul.vaultSecretTemplate" . }}
         {{- end }}
         {{- end }}
+        {{- if .Values.server.snapshotAgent.configSecret.secretName }}
+        {{- with .Values.server.snapshotAgent.configSecret }}
+        "vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.json": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
@@ -163,6 +171,26 @@ spec:
             items:
               - key: {{ .Values.global.secretsBackend.vault.ca.secretKey }}
                 path: tls.crt
+        {{- end }}
+        {{- if .Values.server.snapshotAgent.enabled }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: snapshot-agent-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-snapshot-agent-config
+        {{- end }}
+        {{- if (and .Values.server.snapshotAgent.configSecret.secretName .Values.server.snapshotAgent.configSecret.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
+        - name: snapshot-agent-user-config
+          secret:
+            secretName: {{ .Values.server.snapshotAgent.configSecret.secretName }}
+            items:
+              - key: {{ .Values.server.snapshotAgent.configSecret.secretKey }}
+                path: snapshot-config.json
+        {{- end }}
+        {{- if .Values.server.snapshotAgent.caCert }}
+        - name: extra-ssl-certs
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
         {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
@@ -312,10 +340,6 @@ spec:
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
-              
-              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
-              {{ template "consul.recursors" }}
-              {{- end }}
 
               {{ template "consul.extraconfig" }}
 
@@ -331,9 +355,6 @@ spec:
                 {{- else }}
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
-                {{- end }}
-                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
-                $recursor_flags \
                 {{- end }}
                 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.bootstrapToken.secretName }}
                 -config-file=/vault/secrets/bootstrap-token-config.hcl \
@@ -467,6 +488,87 @@ spec:
           {{- if .Values.server.extraContainers }}
           {{ toYaml .Values.server.extraContainers | nindent 8 }}
           {{- end }}
+        {{- if .Values.server.snapshotAgent.enabled }}
+        - name: consul-snapshot-agent
+          image: "{{ default .Values.global.image .Values.server.image }}"
+          env:
+            {{- if .Values.server.snapshotAgent.caCert }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/extra-ssl-certs"
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://127.0.0.1:8501
+            - name: CONSUL_CACERT
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/serverca.crt
+              {{- else }}
+              value: /consul/tls/ca/tls.crt
+              {{- end }}
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://127.0.0.1:8500
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            - name: CONSUL_LICENSE_PATH
+              {{- if  .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
+              value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
+            {{- end }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              {{- if .Values.server.snapshotAgent.caCert }}
+              cat <<EOF > /extra-ssl-certs/custom-ca.pem
+              {{- .Values.server.snapshotAgent.caCert | nindent 14 }}
+              EOF
+              {{- end }}
+              exec /bin/consul snapshot agent \
+                -interval={{ .Values.server.snapshotAgent.interval }} \
+                {{- if .Values.global.acls.manageSystemACLs }}
+                -config-file=/consul/config/snapshot-login.json \
+                {{- end }}
+                {{- if (and .Values.server.snapshotAgent.configSecret.secretName .Values.server.snapshotAgent.configSecret.secretKey) }}
+                {{- if  .Values.global.secretsBackend.vault.enabled }}
+                -config-file=/vault/secrets/snapshot-agent-config.json \
+                {{- else }}
+                -config-dir=/consul/user-config \
+                {{- end }}
+                {{- end }}
+          volumeMounts:
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: snapshot-agent-config
+              mountPath: /consul/config
+              readOnly: true
+            {{- end }}
+            {{- if .Values.server.snapshotAgent.caCert }}
+            - name: extra-ssl-certs
+              mountPath: /extra-ssl-certs
+              readOnly: false
+            {{- end }}
+            {{- if (and .Values.server.snapshotAgent.configSecret.secretName .Values.server.snapshotAgent.configSecret.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
+            - name: snapshot-agent-user-config
+              mountPath: /consul/user-config
+              readOnly: true
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.acls.manageSystemACLs))}}
+            - name: consul-license
+              mountPath: /consul/license
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+          {{- with .Values.server.snapshotAgent.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
       {{- if .Values.server.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}

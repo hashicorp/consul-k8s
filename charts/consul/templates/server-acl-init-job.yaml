@@ -257,7 +257,7 @@ spec:
                 -create-enterprise-license-token=true \
                 {{- end }}
 
-                {{- if .Values.client.snapshotAgent.enabled }}
+                {{- if .Values.server.snapshotAgent.enabled }}
                 -snapshot-agent=true \
                 {{- end }}
 

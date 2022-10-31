@@ -17,7 +17,6 @@ const (
 	sidecarUserAndGroupID        = 5995
 	initContainersUserAndGroupID = 5996
 	netAdminCapability           = "NET_ADMIN"
-	dnsServiceHostEnvSuffix      = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {

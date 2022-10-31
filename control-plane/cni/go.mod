@@ -48,6 +48,6 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace github.com/hashicorp/consul/sdk v0.9.0 => github.com/hashicorp/consul/sdk v0.4.1-0.20220531155537-364758ef2f50
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20221021205723-cc843c4be892
 
 go 1.19

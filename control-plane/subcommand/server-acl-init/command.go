@@ -578,7 +578,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagSnapshotAgent {
-		serviceAccountName := c.withPrefix("snapshot-agent")
+		serviceAccountName := c.withPrefix("server")
 		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -818,7 +818,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 		// the words "ingress-gateway" or "terminating-gateway". We need to create unique names for tokens
 		// across all gateway types and so must suffix with either `-ingress-gateway` of `-terminating-gateway`.
 		serviceAccountName := c.withPrefix(name)
-		err = c.createACLPolicyRoleAndBindingRule(serviceAccountName, rules,
+		err = c.createACLPolicyRoleAndBindingRule(name, rules,
 			gatewayParams.ConsulDC, gatewayParams.PrimaryDC, localPolicy,
 			gatewayParams.Primary, gatewayParams.AuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
