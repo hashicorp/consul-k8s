@@ -42,7 +42,7 @@ spec:
   {{- if .Values.apiGateway.managedGatewayClass.tolerations }}
   tolerations:
     {{ tpl .Values.apiGateway.managedGatewayClass.tolerations . | indent 4 | trim }}
-  {{ - end }}
+  {{- end }}
   {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
   copyAnnotations:
     service: 
