@@ -239,6 +239,6 @@ spec:
       {{- end }}
       {{ - if .Values.apiGateway.controller.tolerations }}
       tolerations:
-        { { tpl .Values.apiGateway.controller.tolerations . | indent 8 | trim } }
-      { { - end } }
+        {{ tpl .Values.apiGateway.controller.tolerations . | indent 8 | trim }}
+      {{ - end }}
 {{- end }}
