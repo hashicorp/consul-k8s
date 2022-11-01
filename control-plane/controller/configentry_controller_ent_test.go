@@ -193,7 +193,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
 				ctx := context.Background()
 
-				testClient := test.TestServerWithConnMgrWatcher(t, nil)
+				testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 				testClient.TestServer.WaitForServiceIntentions(t)
 				consulClient := testClient.APIClient
 
@@ -455,7 +455,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
 				ctx := context.Background()
 
-				testClient := test.TestServerWithConnMgrWatcher(t, nil)
+				testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 				testClient.TestServer.WaitForServiceIntentions(t)
 				consulClient := testClient.APIClient
 
@@ -704,7 +704,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				s := runtime.NewScheme()
 				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
 
-				testClient := test.TestServerWithConnMgrWatcher(t, nil)
+				testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 				testClient.TestServer.WaitForServiceIntentions(t)
 				consulClient := testClient.APIClient
 

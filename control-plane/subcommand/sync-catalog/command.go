@@ -15,11 +15,12 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,7 @@ type Command struct {
 	UI cli.Ui
 
 	flags                     *flag.FlagSet
-	http                      *flags.HTTPFlags
+	consul                    *flags.ConsulFlags
 	k8s                       *flags.K8SFlags
 	flagListen                string
 	flagToConsul              bool
@@ -63,13 +64,17 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
-	consulClient *api.Client
-	clientset    kubernetes.Interface
+	clientset kubernetes.Interface
 
-	once   sync.Once
-	sigCh  chan os.Signal
-	help   string
-	logger hclog.Logger
+	// ready indicates whether this controller is ready to sync services. This will be changed to true once the
+	// consul-server-connection-manager has finished initial initialization.
+	ready bool
+
+	once    sync.Once
+	sigCh   chan os.Signal
+	help    string
+	logger  hclog.Logger
+	connMgr consul.ServerConnectionManager
 }
 
 func (c *Command) init() {
@@ -143,9 +148,9 @@ func (c *Command) init() {
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
-	c.http = &flags.HTTPFlags{}
+	c.consul = &flags.ConsulFlags{}
 	c.k8s = &flags.K8SFlags{}
-	flags.Merge(c.flags, c.http.Flags())
+	flags.Merge(c.flags, c.consul.Flags())
 	flags.Merge(c.flags, c.k8s.Flags())
 
 	c.help = flags.Usage(help, c.flags)
@@ -190,16 +195,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Setup Consul client
-	if c.consulClient == nil {
-		var err error
-		c.consulClient, err = c.http.APIClient()
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
-			return 1
-		}
-	}
-
 	// Set up logging
 	if c.logger == nil {
 		var err error
@@ -209,6 +204,39 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
+
+	// Create Consul API config object.
+	consulConfig := c.consul.ConsulClientConfig()
+
+	// Create a context to be used by the processes started in this command.
+	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancelFunc()
+
+	if c.connMgr == nil {
+		// Start Consul server Connection manager.
+		serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
+			return 1
+		}
+		c.connMgr, err = discovery.NewWatcher(ctx, serverConnMgrCfg, c.logger.Named("consul-server-connection-manager"))
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to create Consul server watcher: %s", err))
+			return 1
+		}
+
+		go c.connMgr.Run()
+		defer c.connMgr.Stop()
+	}
+
+	// This is a blocking command that is run in order to ensure we only start the
+	// sync-catalog controllers only after we have access to the Consul server.
+	_, err := c.connMgr.State()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to start Consul server watcher: %s", err))
+		return 1
+	}
+	c.ready = true
 
 	// Convert allow/deny lists to sets
 	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
@@ -227,31 +255,17 @@ func (c *Command) Run(args []string) int {
 	// Start the K8S-to-Consul syncer
 	var toConsulCh chan struct{}
 	if c.flagToConsul {
-		// If namespaces are enabled we need to use a new Consul API endpoint
-		// to list node services. This endpoint is only available in Consul
-		// 1.7+. To preserve backwards compatibility, when namespaces are not
-		// enabled we use a client that queries the older API endpoint.
-		var svcsClient catalogtoconsul.ConsulNodeServicesClient
-		if c.flagEnableNamespaces {
-			svcsClient = &catalogtoconsul.NamespacesNodeServicesClient{
-				Client: c.consulClient,
-			}
-		} else {
-			svcsClient = &catalogtoconsul.PreNamespacesNodeServicesClient{
-				Client: c.consulClient,
-			}
-		}
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
-			Client:                   c.consulClient,
-			Log:                      c.logger.Named("to-consul/sink"),
-			EnableNamespaces:         c.flagEnableNamespaces,
-			CrossNamespaceACLPolicy:  c.flagCrossNamespaceACLPolicy,
-			SyncPeriod:               c.flagConsulWritePeriod,
-			ServicePollPeriod:        c.flagConsulWritePeriod * 2,
-			ConsulK8STag:             c.flagConsulK8STag,
-			ConsulNodeName:           c.flagConsulNodeName,
-			ConsulNodeServicesClient: svcsClient,
+			ConsulClientConfig:      consulConfig,
+			ConsulServerConnMgr:     c.connMgr,
+			Log:                     c.logger.Named("to-consul/sink"),
+			EnableNamespaces:        c.flagEnableNamespaces,
+			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+			SyncPeriod:              c.flagConsulWritePeriod,
+			ServicePollPeriod:       c.flagConsulWritePeriod * 2,
+			ConsulK8STag:            c.flagConsulK8STag,
+			ConsulNodeName:          c.flagConsulNodeName,
 		}
 		go syncer.Run(ctx)
 
@@ -298,12 +312,13 @@ func (c *Command) Run(args []string) int {
 		}
 
 		source := &catalogtok8s.Source{
-			Client:       c.consulClient,
-			Domain:       c.flagConsulDomain,
-			Sink:         sink,
-			Prefix:       c.flagK8SServicePrefix,
-			Log:          c.logger.Named("to-k8s/source"),
-			ConsulK8STag: c.flagConsulK8STag,
+			ConsulClientConfig:  consulConfig,
+			ConsulServerConnMgr: c.connMgr,
+			Domain:              c.flagConsulDomain,
+			Sink:                sink,
+			Prefix:              c.flagK8SServicePrefix,
+			Log:                 c.logger.Named("to-k8s/source"),
+			ConsulK8STag:        c.flagConsulK8STag,
 		}
 		go source.Run(ctx)
 
@@ -363,12 +378,9 @@ func (c *Command) Run(args []string) int {
 	}
 }
 
-func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
-	// The main readiness check is whether sync can talk to
-	// the consul cluster, in this case querying for the leader
-	_, err := c.consulClient.Status().Leader()
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("[GET /health/ready] Error getting leader status: %s", err))
+func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {
+	if !c.ready {
+		c.UI.Error("[GET /health/ready] sync catalog controller is not yet ready")
 		rw.WriteHeader(500)
 		return
 	}

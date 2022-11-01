@@ -18,6 +18,7 @@ FEATURES:
 * Consul-dataplane:
   * Support merged metrics with consul-dataplane. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
   * Support transparent proxying when using consul-dataplane. [[GH-1625](https://github.com/hashicorp/consul-k8s/pull/1478),[GH-1632](https://github.com/hashicorp/consul-k8s/pull/1632)]
+  * Enable sync-catalog to only talk to Consul servers. [[GH-1659](https://github.com/hashicorp/consul-k8s/pull/1659)]
 
 IMPROVEMENTS:
 * CLI

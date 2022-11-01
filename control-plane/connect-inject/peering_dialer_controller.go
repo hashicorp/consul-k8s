@@ -10,7 +10,6 @@ import (
 	"github.com/go-logr/logr"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +33,7 @@ type PeeringDialerController struct {
 	// ConsulClientConfig is the config to create a Consul API client.
 	ConsulClientConfig *consul.Config
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
-	ConsulServerConnMgr *discovery.Watcher
+	ConsulServerConnMgr consul.ServerConnectionManager
 	// Log is the logger for this controller.
 	Log logr.Logger
 	// Scheme is the API scheme that this controller should have.

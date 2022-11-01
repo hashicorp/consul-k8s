@@ -1,7 +1,6 @@
 package partitions
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -16,13 +15,10 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
 func TestPartitions_Sync(t *testing.T) {
-	t.Skipf("currently unsupported in agentless")
-
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -84,8 +80,6 @@ func TestPartitions_Sync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			primaryClusterContext := env.DefaultContext(t)
 			secondaryClusterContext := env.Context(t, environment.SecondaryContextName)
-
-			ctx := context.Background()
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
@@ -163,10 +157,6 @@ func TestPartitions_Sync(t *testing.T) {
 				"externalServers.enabled":       "true",
 				"externalServers.hosts[0]":      partitionSvcAddress,
 				"externalServers.tlsServerName": "server.dc1.consul",
-
-				"client.enabled":           "true",
-				"client.exposeGossipPorts": "true",
-				"client.join[0]":           partitionSvcAddress,
 			}
 
 			if c.ACLsEnabled {
@@ -189,15 +179,6 @@ func TestPartitions_Sync(t *testing.T) {
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)
-
-			// Ensure consul clients are created.
-			agentPodList, err := secondaryClusterContext.KubernetesClient(t).CoreV1().Pods(secondaryClusterContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
-			require.NoError(t, err)
-			require.NotEmpty(t, agentPodList.Items)
-
-			output, err := k8s.RunKubectlAndGetOutputE(t, secondaryClusterContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", secondaryClusterContext.KubectlOptions(t).Namespace)
-			require.NoError(t, err)
-			require.Contains(t, output, "Partition: 'secondary'")
 
 			primaryStaticServerOpts := &terratestk8s.KubectlOptions{
 				ContextName: primaryClusterContext.KubectlOptions(t).ContextName,
@@ -292,7 +273,6 @@ func TestPartitions_Sync(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(service))
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
-
 		})
 	}
 }

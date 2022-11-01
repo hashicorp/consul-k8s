@@ -5,10 +5,12 @@ package synccatalog
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -43,20 +45,15 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(tt *testing.T) {
-			k8s, testServer := completeSetupEnterprise(tt)
-			defer testServer.Stop()
+			k8s, testClient := completeSetup(tt)
+			consulClient := testClient.APIClient
 
 			// Run the command.
 			ui := cli.NewMockUi()
-			consulClient, err := api.NewClient(&api.Config{
-				Address: testServer.HTTPAddr,
-			})
-			require.NoError(tt, err)
-
 			cmd := Command{
-				UI:           ui,
-				clientset:    k8s,
-				consulClient: consulClient,
+				UI:        ui,
+				clientset: k8s,
+				connMgr:   testClient.Watcher,
 				logger: hclog.New(&hclog.LoggerOptions{
 					Name:  tt.Name(),
 					Level: hclog.Debug,
@@ -64,7 +61,7 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 			}
 
 			// Create two services in k8s in default and foo namespaces.
-			_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
+			_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
 			_, err = k8s.CoreV1().Namespaces().Create(
 				context.Background(),
@@ -79,6 +76,8 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 			require.NoError(tt, err)
 
 			exitChan := runCommandAsynchronously(&cmd, []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "500ms",
 				"-add-k8s-namespace-suffix",
 				"-log-level=debug",
@@ -181,20 +180,16 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testServer := completeSetupEnterprise(tt)
-			defer testServer.Stop()
+			k8s, testClient := completeSetup(tt)
+
+			consulClient := testClient.APIClient
 
 			// Run the command.
 			ui := cli.NewMockUi()
-			consulClient, err := api.NewClient(&api.Config{
-				Address: testServer.HTTPAddr,
-			})
-			require.NoError(tt, err)
-
 			cmd := Command{
-				UI:           ui,
-				clientset:    k8s,
-				consulClient: consulClient,
+				UI:        ui,
+				clientset: k8s,
+				connMgr:   testClient.Watcher,
 				logger: hclog.New(&hclog.LoggerOptions{
 					Name:  tt.Name(),
 					Level: hclog.Debug,
@@ -202,7 +197,7 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 			}
 
 			// Create two services in k8s in default and foo namespaces.
-			_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
+			_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
 			_, err = k8s.CoreV1().Namespaces().Create(
 				context.Background(),
@@ -217,6 +212,8 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 			require.NoError(tt, err)
 
 			args := append([]string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "500ms",
 				"-add-k8s-namespace-suffix",
 				"-log-level=debug",
@@ -455,15 +452,13 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testServer := completeSetupEnterprise(tt)
-			defer testServer.Stop()
-			ui := cli.NewMockUi()
-			consulClient, err := api.NewClient(&api.Config{
-				Address: testServer.HTTPAddr,
-			})
-			require.NoError(tt, err)
+			k8s, testClient := completeSetup(tt)
+			consulClient := testClient.APIClient
 
+			ui := cli.NewMockUi()
 			commonArgs := []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "500ms",
 				"-log-level=debug",
 				"-allow-k8s-namespace=*",
@@ -471,7 +466,7 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 
 			// Create two services in k8s in default and foo namespaces.
 			{
-				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
+				_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
 				_, err = k8s.CoreV1().Namespaces().Create(
 					context.Background(),
@@ -489,9 +484,9 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 			// Run the first command.
 			{
 				firstCmd := Command{
-					UI:           ui,
-					clientset:    k8s,
-					consulClient: consulClient,
+					UI:        ui,
+					clientset: k8s,
+					connMgr:   testClient.Watcher,
 					logger: hclog.New(&hclog.LoggerOptions{
 						Name:  tt.Name() + "-firstrun",
 						Level: hclog.Debug,
@@ -519,9 +514,9 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 			// Run the second command.
 			{
 				secondCmd := Command{
-					UI:           ui,
-					clientset:    k8s,
-					consulClient: consulClient,
+					UI:        ui,
+					clientset: k8s,
+					connMgr:   testClient.Watcher,
 					logger: hclog.New(&hclog.LoggerOptions{
 						Name:  tt.Name() + "-secondrun",
 						Level: hclog.Debug,
@@ -564,7 +559,7 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 }
 
 // Tests that the cross-namespace ACL policy is correctly
-// attached to all created namespaces. Specific teste for
+// attached to all created namespaces. Specific test for
 // services and their destinations are covered in other tests.
 func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 	cases := []struct {
@@ -622,37 +617,17 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 			require.NoError(tt, err)
 
 			// Set up consul server
-			a, err := testutil.NewTestServerConfigT(tt, func(client *testutil.TestServerConfig) {
-				client.ACL.Enabled = true
+			bootToken := "74044c72-03c8-42b0-b57f-728bb22ca7fb"
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				c.ACL.Enabled = true
+				c.ACL.Tokens.InitialManagement = bootToken
 			})
-			require.NoError(tt, err)
-			defer a.Stop()
-
-			// Set up a client for bootstrapping
-			bootClient, err := api.NewClient(&api.Config{
-				Address: a.HTTPAddr,
-			})
-			require.NoError(tt, err)
-
-			// Bootstrap the server and get the bootstrap token
-			var bootstrapResp *api.ACLToken
-			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-			retry.RunWith(timer, tt, func(r *retry.R) {
-				bootstrapResp, _, err = bootClient.ACL().Bootstrap()
-				require.NoError(r, err)
-			})
-			bootstrapToken := bootstrapResp.SecretID
-			require.NotEmpty(tt, bootstrapToken)
 
 			// Set up consul client
-			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPAddr,
-				Token:   bootstrapToken,
-			})
-			require.NoError(tt, err)
+			client := testClient.APIClient
 
 			// Create cross namespace policy
-			// This would have been created by the acl bootstrapper in the
+			// This would have been created by the server-acl-init in the
 			// default namespace to be attached to all created namespaces.
 			crossNamespaceRules := `namespace_prefix "" {
   service_prefix "" {
@@ -675,9 +650,9 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 			// Set up the sync command
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:           ui,
-				clientset:    k8s,
-				consulClient: client,
+				UI:        ui,
+				clientset: k8s,
+				connMgr:   testClient.Watcher,
 				logger: hclog.New(&hclog.LoggerOptions{
 					Name:  tt.Name(),
 					Level: hclog.Debug,
@@ -686,6 +661,9 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 
 			// Set flags and run the command
 			commonArgs := []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+				"-token", bootToken,
 				"-consul-write-interval", "500ms",
 				"-log-level=debug",
 				"-allow-k8s-namespace=*",
@@ -696,7 +674,7 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 			defer stopCommand(tt, &cmd, exitChan)
 
 			// Check the namespaces are created correctly
-			timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 			retry.RunWith(timer, tt, func(r *retry.R) {
 				// Check that we have the right number of namespaces
 				namespaces, _, err := client.Namespaces().List(&api.QueryOptions{})
@@ -729,16 +707,7 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 					}
 
 				}
-
 			})
 		})
 	}
-}
-
-// Set up test consul agent and fake kubernetes cluster client
-func completeSetupEnterprise(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
-	k8s := fake.NewSimpleClientset()
-	svr, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
-	return k8s, svr
 }

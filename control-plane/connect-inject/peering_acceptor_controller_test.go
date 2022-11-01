@@ -502,7 +502,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 
 			if tt.initialConsulPeerName != "" {
@@ -624,7 +624,7 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 
 	// Create test consulServer server
 	// Create test consul server.
-	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.
@@ -769,7 +769,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 
 			_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-created"}, nil)
