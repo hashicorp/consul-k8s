@@ -50,6 +50,7 @@ func TestBasicInstallation(t *testing.T) {
 				"global.tls.enabled":                   strconv.FormatBool(c.secure),
 				"global.gossipEncryption.autoGenerate": strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt":         strconv.FormatBool(c.autoEncrypt),
+				"client.enabled":                       "true",
 			}
 			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 

@@ -48,7 +48,7 @@ require (
 	github.com/Azure/go-autorest/autorest/validation v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/armon/go-metrics v0.3.10 // indirect
+	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.25.41 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -133,4 +133,6 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-go 1.18
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20221021205723-cc843c4be892
+
+go 1.19

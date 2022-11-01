@@ -93,10 +93,6 @@ type Command struct {
 	flagInitContainerMemoryLimit   string
 	flagInitContainerMemoryRequest string
 
-	// Server address flags.
-	flagReadServerExposeService bool
-	flagTokenServerAddresses    []string
-
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
@@ -157,7 +153,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
-		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.") //todo: rename this to be more specific?
+		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.") // todo: rename this to be more specific?
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -197,10 +193,6 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagReadServerExposeService, "read-server-expose-service", false,
-		"Enables polling the Consul servers' external service for its IP(s).")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagTokenServerAddresses), "token-server-address",
-		"An address of the Consul server(s) as saved in the peering token, formatted host:port, where host may be an IP or DNS name and port must be a gRPC port. May be specified multiple times for multiple addresses.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -312,7 +304,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Validate resource request/limit flags and parse into corev1.ResourceRequirements
-	initResources, consulSidecarResources, err := c.parseAndValidateResourceFlags()
+	initResources, err := c.parseAndValidateResourceFlags()
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -467,16 +459,14 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagEnablePeering {
 		if err = (&connectinject.PeeringAcceptorController{
-			Client:                    mgr.GetClient(),
-			ConsulClientConfig:        consulConfig,
-			ConsulServerConnMgr:       watcher,
-			ExposeServersServiceName:  c.flagResourcePrefix + "-expose-servers",
-			ReadServerExternalService: c.flagReadServerExposeService,
-			TokenServerAddresses:      c.flagTokenServerAddresses,
-			ReleaseNamespace:          c.flagReleaseNamespace,
-			Log:                       ctrl.Log.WithName("controller").WithName("peering-acceptor"),
-			Scheme:                    mgr.GetScheme(),
-			Context:                   ctx,
+			Client:                   mgr.GetClient(),
+			ConsulClientConfig:       consulConfig,
+			ConsulServerConnMgr:      watcher,
+			ExposeServersServiceName: c.flagResourcePrefix + "-expose-servers",
+			ReleaseNamespace:         c.flagReleaseNamespace,
+			Log:                      ctrl.Log.WithName("controller").WithName("peering-acceptor"),
+			Scheme:                   mgr.GetScheme(),
+			Context:                  ctx,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "peering-acceptor")
 			return 1
@@ -509,55 +499,54 @@ func (c *Command) Run(args []string) int {
 
 	mgr.GetWebhookServer().Register("/mutate",
 		&webhook.Admission{Handler: &connectinject.MeshWebhook{
-			Clientset:                     c.clientset,
-			ConsulConfig:                  consulConfig,
-			ConsulServerConnMgr:           watcher,
-			ImageConsul:                   c.flagConsulImage,
-			ImageConsulDataplane:          c.flagConsulDataplaneImage,
-			EnvoyExtraArgs:                c.flagEnvoyExtraArgs,
-			ImageConsulK8S:                c.flagConsulK8sImage,
-			RequireAnnotation:             !c.flagDefaultInject,
-			AuthMethod:                    c.flagACLAuthMethod,
-			ConsulCACert:                  string(caCertPem),
-			TLSEnabled:                    c.consul.UseTLS,
-			ConsulAddress:                 c.consul.Addresses,
-			ConsulTLSServerName:           c.consul.TLSServerName,
-			DefaultProxyCPURequest:        sidecarProxyCPURequest,
-			DefaultProxyCPULimit:          sidecarProxyCPULimit,
-			DefaultProxyMemoryRequest:     sidecarProxyMemoryRequest,
-			DefaultProxyMemoryLimit:       sidecarProxyMemoryLimit,
-			DefaultEnvoyProxyConcurrency:  c.flagDefaultEnvoyProxyConcurrency,
-			MetricsConfig:                 metricsConfig,
-			InitContainerResources:        initResources,
-			DefaultConsulSidecarResources: consulSidecarResources,
-			ConsulPartition:               c.consul.Partition,
-			AllowK8sNamespacesSet:         allowK8sNamespaces,
-			DenyK8sNamespacesSet:          denyK8sNamespaces,
-			EnableNamespaces:              c.flagEnableNamespaces,
-			ConsulDestinationNamespace:    c.flagConsulDestinationNamespace,
-			EnableK8SNSMirroring:          c.flagEnableK8SNSMirroring,
-			K8SNSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:       c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:        c.flagDefaultEnableTransparentProxy,
-			EnableCNI:                     c.flagEnableCNI,
-			TProxyOverwriteProbes:         c.flagTransparentProxyDefaultOverwriteProbes,
-			EnableConsulDNS:               c.flagEnableConsulDNS,
-			ResourcePrefix:                c.flagResourcePrefix,
-			EnableOpenShift:               c.flagEnableOpenShift,
-			Log:                           ctrl.Log.WithName("handler").WithName("connect"),
-			LogLevel:                      c.flagLogLevel,
-			LogJSON:                       c.flagLogJSON,
+			Clientset:                    c.clientset,
+			ReleaseNamespace:             c.flagReleaseNamespace,
+			ConsulConfig:                 consulConfig,
+			ConsulServerConnMgr:          watcher,
+			ImageConsul:                  c.flagConsulImage,
+			ImageConsulDataplane:         c.flagConsulDataplaneImage,
+			EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
+			ImageConsulK8S:               c.flagConsulK8sImage,
+			RequireAnnotation:            !c.flagDefaultInject,
+			AuthMethod:                   c.flagACLAuthMethod,
+			ConsulCACert:                 string(caCertPem),
+			TLSEnabled:                   c.consul.UseTLS,
+			ConsulAddress:                c.consul.Addresses,
+			ConsulTLSServerName:          c.consul.TLSServerName,
+			DefaultProxyCPURequest:       sidecarProxyCPURequest,
+			DefaultProxyCPULimit:         sidecarProxyCPULimit,
+			DefaultProxyMemoryRequest:    sidecarProxyMemoryRequest,
+			DefaultProxyMemoryLimit:      sidecarProxyMemoryLimit,
+			DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
+			MetricsConfig:                metricsConfig,
+			InitContainerResources:       initResources,
+			ConsulPartition:              c.consul.Partition,
+			AllowK8sNamespacesSet:        allowK8sNamespaces,
+			DenyK8sNamespacesSet:         denyK8sNamespaces,
+			EnableNamespaces:             c.flagEnableNamespaces,
+			ConsulDestinationNamespace:   c.flagConsulDestinationNamespace,
+			EnableK8SNSMirroring:         c.flagEnableK8SNSMirroring,
+			K8SNSMirroringPrefix:         c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:      c.flagCrossNamespaceACLPolicy,
+			EnableTransparentProxy:       c.flagDefaultEnableTransparentProxy,
+			EnableCNI:                    c.flagEnableCNI,
+			TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
+			EnableConsulDNS:              c.flagEnableConsulDNS,
+			EnableOpenShift:              c.flagEnableOpenShift,
+			Log:                          ctrl.Log.WithName("handler").WithName("connect"),
+			LogLevel:                     c.flagLogLevel,
+			LogJSON:                      c.flagLogJSON,
 		}})
 
 	if c.flagEnableWebhookCAUpdate {
-		err := c.updateWebhookCABundle(ctx)
+		err = c.updateWebhookCABundle(ctx)
 		if err != nil {
 			setupLog.Error(err, "problem getting CA Cert")
 			return 1
 		}
 	}
 
-	if err := mgr.Start(ctx); err != nil {
+	if err = mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		return 1
 	}
@@ -578,10 +567,10 @@ func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 	}
 	return nil
 }
+
 func (c *Command) validateFlags() error {
 	if c.flagConsulK8sImage == "" {
 		return errors.New("-consul-k8s-image must be set")
-
 	}
 	if c.flagConsulImage == "" {
 		return errors.New("-consul-image must be set")
@@ -604,39 +593,40 @@ func (c *Command) validateFlags() error {
 
 	return nil
 }
-func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, corev1.ResourceRequirements, error) {
+
+func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, error) {
 	// Init container
 	var initContainerCPULimit, initContainerCPURequest, initContainerMemoryLimit, initContainerMemoryRequest resource.Quantity
 
 	// Parse and validate the initContainer resources.
 	initContainerCPURequest, err := resource.ParseQuantity(c.flagInitContainerCPURequest)
 	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+		return corev1.ResourceRequirements{},
 			fmt.Errorf("-init-container-cpu-request '%s' is invalid: %s", c.flagInitContainerCPURequest, err)
 	}
 	initContainerCPULimit, err = resource.ParseQuantity(c.flagInitContainerCPULimit)
 	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+		return corev1.ResourceRequirements{},
 			fmt.Errorf("-init-container-cpu-limit '%s' is invalid: %s", c.flagInitContainerCPULimit, err)
 	}
 	if initContainerCPULimit.Value() != 0 && initContainerCPURequest.Cmp(initContainerCPULimit) > 0 {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
+		return corev1.ResourceRequirements{}, fmt.Errorf(
 			"request must be <= limit: -init-container-cpu-request value of %q is greater than the -init-container-cpu-limit value of %q",
 			c.flagInitContainerCPURequest, c.flagInitContainerCPULimit)
 	}
 
 	initContainerMemoryRequest, err = resource.ParseQuantity(c.flagInitContainerMemoryRequest)
 	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+		return corev1.ResourceRequirements{},
 			fmt.Errorf("-init-container-memory-request '%s' is invalid: %s", c.flagInitContainerMemoryRequest, err)
 	}
 	initContainerMemoryLimit, err = resource.ParseQuantity(c.flagInitContainerMemoryLimit)
 	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+		return corev1.ResourceRequirements{},
 			fmt.Errorf("-init-container-memory-limit '%s' is invalid: %s", c.flagInitContainerMemoryLimit, err)
 	}
 	if initContainerMemoryLimit.Value() != 0 && initContainerMemoryRequest.Cmp(initContainerMemoryLimit) > 0 {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
+		return corev1.ResourceRequirements{}, fmt.Errorf(
 			"request must be <= limit: -init-container-memory-request value of %q is greater than the -init-container-memory-limit value of %q",
 			c.flagInitContainerMemoryRequest, c.flagInitContainerMemoryLimit)
 	}
@@ -653,55 +643,7 @@ func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, 
 		},
 	}
 
-	// Consul sidecar
-	var consulSidecarCPULimit, consulSidecarCPURequest, consulSidecarMemoryLimit, consulSidecarMemoryRequest resource.Quantity
-
-	// Parse and validate the Consul sidecar resources
-	consulSidecarCPURequest, err = resource.ParseQuantity(c.flagDefaultConsulSidecarCPURequest)
-	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-default-consul-sidecar-cpu-request '%s' is invalid: %s", c.flagDefaultConsulSidecarCPURequest, err)
-	}
-	consulSidecarCPULimit, err = resource.ParseQuantity(c.flagDefaultConsulSidecarCPULimit)
-	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-default-consul-sidecar-cpu-limit '%s' is invalid: %s", c.flagDefaultConsulSidecarCPULimit, err)
-	}
-	if consulSidecarCPULimit.Value() != 0 && consulSidecarCPURequest.Cmp(consulSidecarCPULimit) > 0 {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
-			"request must be <= limit: -default-consul-sidecar-cpu-request value of %q is greater than the -default-consul-sidecar-cpu-limit value of %q",
-			c.flagDefaultConsulSidecarCPURequest, c.flagDefaultConsulSidecarCPULimit)
-	}
-
-	consulSidecarMemoryRequest, err = resource.ParseQuantity(c.flagDefaultConsulSidecarMemoryRequest)
-	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-default-consul-sidecar-memory-request '%s' is invalid: %s", c.flagDefaultConsulSidecarMemoryRequest, err)
-	}
-	consulSidecarMemoryLimit, err = resource.ParseQuantity(c.flagDefaultConsulSidecarMemoryLimit)
-	if err != nil {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
-			fmt.Errorf("-default-consul-sidecar-memory-limit '%s' is invalid: %s", c.flagDefaultConsulSidecarMemoryLimit, err)
-	}
-	if consulSidecarMemoryLimit.Value() != 0 && consulSidecarMemoryRequest.Cmp(consulSidecarMemoryLimit) > 0 {
-		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
-			"request must be <= limit: -default-consul-sidecar-memory-request value of %q is greater than the -default-consul-sidecar-memory-limit value of %q",
-			c.flagDefaultConsulSidecarMemoryRequest, c.flagDefaultConsulSidecarMemoryLimit)
-	}
-
-	// Put into corev1.ResourceRequirements form
-	consulSidecarResources := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    consulSidecarCPURequest,
-			corev1.ResourceMemory: consulSidecarMemoryRequest,
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    consulSidecarCPULimit,
-			corev1.ResourceMemory: consulSidecarMemoryLimit,
-		},
-	}
-
-	return initResources, consulSidecarResources, nil
+	return initResources, nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }
@@ -710,10 +652,12 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Inject the proxy sidecar, run endpoints controller and peering controllers."
-const help = `
+const (
+	synopsis = "Inject the proxy sidecar, run endpoints controller and peering controllers."
+	help     = `
 Usage: consul-k8s-control-plane inject-connect [options]
 
   Run the admission webhook server for injecting the sidecar proxy,
   the endpoints controller, and the peering controllers.
 `
+)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
@@ -66,7 +67,6 @@ func TestConnectInjectNamespaces(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
-			cfg := suite.Config()
 
 			helmValues := map[string]string{
 				"global.enableConsulNamespaces": "true",
@@ -129,13 +129,13 @@ func TestConnectInjectNamespaces(t *testing.T) {
 							tokens, _, err := consulClient.ACL().TokenList(serverQueryOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
-								require.NotContains(r, token.Description, staticServerName)
+								require.NotContains(r, token.Description, connhelper.StaticServerName)
 							}
 
 							tokens, _, err = consulClient.ACL().TokenList(clientQueryOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
-								require.NotContains(r, token.Description, StaticClientName)
+								require.NotContains(r, token.Description, connhelper.StaticClientName)
 							}
 						})
 					}
@@ -166,29 +166,29 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// Kubernetes namespace.
 			// If a single destination namespace is set, we expect all services
 			// to be registered in that destination Consul namespace.
-			services, _, err := consulClient.Catalog().Service(staticServerName, "", serverQueryOpts)
+			services, _, err := consulClient.Catalog().Service(connhelper.StaticServerName, "", serverQueryOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
-			services, _, err = consulClient.Catalog().Service(StaticClientName, "", clientQueryOpts)
+			services, _, err = consulClient.Catalog().Service(connhelper.StaticClientName, "", clientQueryOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, connhelper.StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 				} else {
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, StaticClientName, "http://localhost:1234")
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, connhelper.StaticClientName, "http://localhost:1234")
 				}
 
 				intention := &api.ServiceIntentionsConfigEntry{
 					Kind:      api.ServiceIntentions,
-					Name:      staticServerName,
+					Name:      connhelper.StaticServerName,
 					Namespace: staticServerNamespace,
 					Sources: []*api.SourceIntention{
 						{
-							Name:      StaticClientName,
+							Name:      connhelper.StaticClientName,
 							Namespace: StaticClientNamespace,
 							Action:    api.IntentionActionAllow,
 						},
@@ -209,15 +209,15 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, connhelper.StaticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, StaticClientName, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, connhelper.StaticClientName, "http://localhost:1234")
 			}
 
 			// Test that kubernetes readiness status is synced to Consul.
 			// Create the file so that the readiness probe of the static-server pod fails.
 			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-			k8s.RunKubectl(t, staticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+			k8s.RunKubectl(t, staticServerOpts, "exec", "deploy/"+connhelper.StaticServerName, "--", "touch", "/tmp/unhealthy")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -226,9 +226,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}
 		})
 	}

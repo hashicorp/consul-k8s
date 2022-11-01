@@ -1,10 +1,12 @@
 package connectinit
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -730,6 +733,160 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRun_TrafficRedirection(t *testing.T) {
+	cases := map[string]struct {
+		proxyConfig           map[string]interface{}
+		tproxyConfig          api.TransparentProxyConfig
+		registerProxyDefaults bool
+		expIptablesParamsFunc func(actual iptables.Config) (bool, string)
+	}{
+		"no extra proxy config provided": {},
+		"envoy bind port is provided in service proxy config": {
+			proxyConfig: map[string]interface{}{"bind_port": "21000"},
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyInboundPort == 21000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+				}
+			},
+		},
+		// This test is to make sure that we use merge-central-config parameter when we query the service
+		// so that we get all config merged into the proxy configuration on the service.
+		"envoy bind port is provided in a config entry": {
+			proxyConfig:           map[string]interface{}{"bind_port": "21000"},
+			registerProxyDefaults: true,
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyInboundPort == 21000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+				}
+			},
+		},
+		"tproxy outbound listener port is provided in service proxy config": {
+			tproxyConfig: api.TransparentProxyConfig{OutboundListenerPort: 16000},
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyOutboundPort == 16000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+				}
+			},
+		},
+		"tproxy outbound listener port is provided in a config entry": {
+			tproxyConfig:          api.TransparentProxyConfig{OutboundListenerPort: 16000},
+			registerProxyDefaults: true,
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyOutboundPort == 16000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+				}
+			},
+		},
+		"envoy stats addr is provided in service proxy config": {
+			proxyConfig: map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+				}
+			},
+		},
+		"envoy stats addr is provided in a config entry": {
+			proxyConfig:           map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
+			registerProxyDefaults: true,
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+				}
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				_ = os.Remove(proxyFile)
+			})
+
+			// Start Consul server.
+			var serverCfg *testutil.TestServerConfig
+			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				serverCfg = c
+			})
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				_ = server.Stop()
+			})
+			server.WaitForLeader(t)
+			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+			require.NoError(t, err)
+
+			// Add additional proxy configuration either to a config entry or to the service itself.
+			if c.registerProxyDefaults {
+				_, _, err = consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
+					Name:             api.ProxyConfigGlobal,
+					Kind:             api.ProxyDefaults,
+					TransparentProxy: &c.tproxyConfig,
+					Config:           c.proxyConfig,
+				}, nil)
+				require.NoError(t, err)
+			} else {
+				consulCountingSvcSidecar.Proxy.TransparentProxy = &c.tproxyConfig
+				consulCountingSvcSidecar.Proxy.Config = c.proxyConfig
+			}
+			// Register Consul services.
+			testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
+			for _, svc := range testConsulServices {
+				serviceRegistration := &api.CatalogRegistration{
+					Node:    connectinject.ConsulNodeName,
+					Address: "127.0.0.1",
+					Service: &svc,
+				}
+				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				require.NoError(t, err)
+			}
+			ui := cli.NewMockUi()
+
+			iptablesProvider := &fakeIptablesProvider{}
+			iptablesCfg := iptables.Config{
+				ProxyUserID:      "5995",
+				ProxyInboundPort: 20000,
+			}
+			cmd := Command{
+				UI:                                 ui,
+				serviceRegistrationPollingAttempts: 3,
+				iptablesProvider:                   iptablesProvider,
+			}
+			iptablesCfgJSON, err := json.Marshal(iptablesCfg)
+			require.NoError(t, err)
+			flags := []string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-consul-node-name", connectinject.ConsulNodeName,
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
+				"-proxy-id-file", proxyFile,
+				"-redirect-traffic-config", string(iptablesCfgJSON),
+			}
+			code := cmd.Run(flags)
+			require.Equal(t, 0, code, ui.ErrorWriter.String())
+			require.Truef(t, iptablesProvider.applyCalled, "redirect traffic rules were not applied")
+			if c.expIptablesParamsFunc != nil {
+				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.iptablesConfig)
+				require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
+			}
+		})
+	}
+}
+
 const (
 	metaKeyPodName         = "pod-name"
 	metaKeyKubeNS          = "k8s-namespace"
@@ -757,8 +914,6 @@ var (
 		Proxy: &api.AgentServiceConnectProxyConfig{
 			DestinationServiceName: "counting",
 			DestinationServiceID:   "counting-counting",
-			Config:                 nil,
-			Upstreams:              nil,
 		},
 		Port:    9999,
 		Address: "127.0.0.1",
@@ -785,8 +940,6 @@ var (
 		Proxy: &api.AgentServiceConnectProxyConfig{
 			DestinationServiceName: "counting-admin",
 			DestinationServiceID:   "counting-admin-id",
-			Config:                 nil,
-			Upstreams:              nil,
 		},
 		Port:    9999,
 		Address: "127.0.0.1",
@@ -797,3 +950,21 @@ var (
 		},
 	}
 )
+
+type fakeIptablesProvider struct {
+	applyCalled bool
+	rules       []string
+}
+
+func (f *fakeIptablesProvider) AddRule(_ string, args ...string) {
+	f.rules = append(f.rules, strings.Join(args, " "))
+}
+
+func (f *fakeIptablesProvider) ApplyRules() error {
+	f.applyCalled = true
+	return nil
+}
+
+func (f *fakeIptablesProvider) Rules() []string {
+	return f.rules
+}

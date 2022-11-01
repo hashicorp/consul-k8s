@@ -34,22 +34,6 @@ global:
     # If true, the Helm chart enables Cluster Peering for the cluster. This option enables peering controllers and
     # allows use of the PeeringAcceptor and PeeringDialer CRDs for establishing service mesh peerings.
     enabled: false
-    tokenGeneration:
-      serverAddresses:
-        # Source can be set to "","consul" or "static".
-        #
-        # "" is the default source. If servers are enabled, it will check if `server.exposeService` is enabled, and read
-        # the addresses from that service to use as the peering token server addresses. If using admin partitions and
-        # only Consul client agents are enabled, the addresses in `externalServers.hosts` and `externalServers.grpcPort`
-        # will be used.
-        #
-        # "consul" will use the Consul advertise addresses in the peering token.
-        #
-        # "static" will use the addresses specified in `global.peering.tokenGeneration.serverAddresses.static`.
-        source: ""
-        # Static addresses must be formatted "hostname|ip:port" where the port is the Consul server(s)' grpc port.
-        # @type: array<string>
-        static: []
 
   # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.
   # It additionally indicates that you are running Consul Enterprise v1.11+ with a valid Consul Enterprise
@@ -187,17 +171,6 @@ global:
       # ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
-
-      # [Enterprise Only] The Vault role for the Consul client snapshot agent.
-      # The role must be connected to the Consul client snapshot agent's service account.
-      # The role must also have a policy with read capabilities for the snapshot agent config
-      # defined by the `client.snapshotAgent.configSecret.secretName` value.
-      # To discover the service account name of the Consul client, run
-      # ```shell-session
-      # $ helm template --show-only templates/client-snapshot-agent-serviceaccount.yaml --set client.snapshotAgent.enabled=true <release-name> hashicorp/consul
-      # ```
-      # and check the name of `metadata.name`.
-      consulSnapshotAgentRole: ""
 
       # A Vault role for the Consul `server-acl-init` job, which manages setting ACLs so that clients and components can obtain ACL tokens.
       # The role must be connected to the `server-acl-init` job's service account.
@@ -623,28 +596,6 @@ global:
     # will have Prometheus scrape annotations. Only applicable if `global.metrics.enabled` is true.
     # @type: boolean
     enableGatewayMetrics: true
-
-  # For connect-injected pods, the consul sidecar is responsible for metrics merging. For ingress/mesh/terminating
-  # gateways, it additionally ensures the Consul services are always registered with their local Consul client.
-  # @type: map
-  consulSidecarContainer:
-    # Set default resources for consul sidecar. If null, that resource won't
-    # be set.
-    # These settings can be overridden on a per-pod basis via these annotations:
-    #
-    # - `consul.hashicorp.com/consul-sidecar-cpu-limit`
-    # - `consul.hashicorp.com/consul-sidecar-cpu-request`
-    # - `consul.hashicorp.com/consul-sidecar-memory-limit`
-    # - `consul.hashicorp.com/consul-sidecar-memory-request`
-    # @recurse: false
-    # @type: map
-    resources:
-      requests:
-        memory: "25Mi"
-        cpu: "20m"
-      limits:
-        memory: "50Mi"
-        cpu: "20m"
 
   # The name (and tag) of the Envoy Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
@@ -1162,6 +1113,56 @@ server:
   # @type: map
   extraEnvironmentVars: {}
 
+  # [Enterprise Only] Values for setting up and running snapshot agents
+  # (https://consul.io/commands/snapshot/agent)
+  # within the Consul clusters. They run as a sidecar with Consul servers.
+  snapshotAgent:
+    # If true, the chart will install resources necessary to run the snapshot agent.
+    enabled: false
+
+    # Interval at which to perform snapshots.
+    # See https://www.consul.io/commands/snapshot/agent#interval
+    # @type: string
+    interval: 1h
+
+    # A Kubernetes or Vault secret that should be manually created to contain the entire
+    # config to be used on the snapshot agent.
+    # This is the preferred method of configuration since there are usually storage
+    # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)
+    # for details.
+    configSecret:
+      # The name of the Kubernetes secret or Vault secret path that holds the snapshot agent config.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret or Vault secret key that holds the snapshot agent config.
+      # @type: string
+      secretKey: null
+
+    # The resource settings for snapshot agent pods.
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+
+    # Optional PEM-encoded CA certificate that will be added to the trusted system CAs.
+    # Useful if using an S3-compatible storage exposing a self-signed certificate.
+    #
+    # Example:
+    #
+    # ```yaml
+    # caCert: |
+    #   -----BEGIN CERTIFICATE-----
+    #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
+    #   ...
+    # ```
+    # @type: string
+    caCert: null
+
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
 # if setting `global.tls.enableAutoEncrypt` to true
@@ -1494,73 +1495,6 @@ client:
   #
   # @type: string
   updateStrategy: null
-
-  # [Enterprise Only] Values for setting up and running snapshot agents
-  # (https://consul.io/commands/snapshot/agent)
-  # within the Consul clusters. They are required to be co-located with Consul clients,
-  # so will inherit the clients' nodeSelector, tolerations and affinity.
-  snapshotAgent:
-    # If true, the chart will install resources necessary to run the snapshot agent.
-    enabled: false
-
-    # The number of snapshot agents to run.
-    replicas: 2
-
-    # Interval at which to perform snapshots.
-    # See https://www.consul.io/commands/snapshot/agent#interval
-    # @type: string
-    interval: 1h
-
-    # A Kubernetes or Vault secret that should be manually created to contain the entire
-    # config to be used on the snapshot agent.
-    # This is the preferred method of configuration since there are usually storage
-    # credentials present. Please see Snapshot agent config (https://consul.io/commands/snapshot/agent#config-file-options)
-    # for details.
-    configSecret:
-      # The name of the Kubernetes secret or Vault secret path that holds the snapshot agent config.
-      # @type: string
-      secretName: null
-      # The key within the Kubernetes secret or Vault secret key that holds the snapshot agent config.
-      # @type: string
-      secretKey: null
-
-    serviceAccount:
-      # This value defines additional annotations for the snapshot agent service account. This should be formatted as a
-      # multi-line string.
-      #
-      # ```yaml
-      # annotations: |
-      #   "sample/annotation1": "foo"
-      #   "sample/annotation2": "bar"
-      # ```
-      #
-      # @type: string
-      annotations: null
-
-    # The resource settings for snapshot agent pods.
-    # @recurse: false
-    # @type: map
-    resources:
-      requests:
-        memory: "50Mi"
-        cpu: "50m"
-      limits:
-        memory: "50Mi"
-        cpu: "50m"
-
-    # Optional PEM-encoded CA certificate that will be added to the trusted system CAs.
-    # Useful if using an S3-compatible storage exposing a self-signed certificate.
-    #
-    # Example:
-    #
-    # ```yaml
-    # caCert: |
-    #   -----BEGIN CERTIFICATE-----
-    #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
-    #   ...
-    # ```
-    # @type: string
-    caCert: null
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
@@ -2123,18 +2057,18 @@ connectInject:
     # add a listener on the Envoy sidecar to expose metrics. The exposed
     # metrics will depend on whether metrics merging is enabled:
     #   - If metrics merging is enabled:
-    #     the Consul sidecar will run a merged metrics server
+    #     the consul-dataplane will run a merged metrics server
     #     combining Envoy sidecar and Connect service metrics,
     #     i.e. if your service exposes its own Prometheus metrics.
     #   - If metrics merging is disabled:
     #     the listener will just expose Envoy sidecar metrics.
     # This will inherit from `global.metrics.enabled`.
     defaultEnabled: "-"
-    # Configures the Consul sidecar to run a merged metrics server
+    # Configures the consul-dataplane to run a merged metrics server
     # to combine and serve both Envoy and Connect service metrics.
     # This feature is available only in Consul v1.10.0 or greater.
     defaultEnableMerging: false
-    # Configures the port at which the Consul sidecar will listen on to return
+    # Configures the port at which the consul-dataplane will listen on to return
     # combined metrics. This port only needs to be changed if it conflicts with
     # the application's ports.
     defaultMergedMetricsPort: 20100
@@ -3010,8 +2944,9 @@ apiGateway:
       # Example:
       #
       # ```yaml
-      # service: |
-      # - external-dns.alpha.kubernetes.io/hostname
+      # service:
+      #   annotations: |
+      #   - external-dns.alpha.kubernetes.io/hostname
       # ```
       #
       # @type: string

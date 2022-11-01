@@ -2,9 +2,11 @@ package connectinit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -19,8 +21,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -33,14 +37,15 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagConsulNodeName     string
-	flagPodName            string // Pod name.
-	flagPodNamespace       string // Pod namespace.
-	flagServiceAccountName string // Service account name.
-	flagServiceName        string // Service name.
-	flagGatewayKind        string
-	flagLogLevel           string
-	flagLogJSON            bool
+	flagConsulNodeName        string
+	flagPodName               string // Pod name.
+	flagPodNamespace          string // Pod namespace.
+	flagServiceAccountName    string // Service account name.
+	flagServiceName           string // Service name.
+	flagGatewayKind           string
+	flagRedirectTrafficConfig string
+	flagLogLevel              string
+	flagLogJSON               bool
 
 	flagProxyIDFile string // Location to write the output proxyID. Default is defaultProxyIDFile.
 	flagMultiPort   bool
@@ -57,6 +62,10 @@ type Command struct {
 	watcher *discovery.Watcher
 
 	nonRetryableError error
+
+	// Only used in tests.
+	iptablesProvider iptables.Provider
+	iptablesConfig   iptables.Config
 }
 
 func (c *Command) init() {
@@ -69,6 +78,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
 	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of gateway that is being registered: ingress-gateway, terminating-gateway, or mesh-gateway.")
+	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure iptables for this pod.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -149,6 +159,7 @@ func (c *Command) Run(args []string) int {
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
 	}
+	proxyService := &api.AgentService{}
 	if c.flagGatewayKind != "" {
 		err = backoff.Retry(c.getGatewayRegistration(consulClient), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 		if err != nil {
@@ -160,7 +171,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	} else {
-		err = backoff.Retry(c.getConnectServiceRegistrations(consulClient), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
+		var err = backoff.Retry(c.getConnectServiceRegistrations(consulClient, proxyService), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 		if err != nil {
 			c.logger.Error("Timed out waiting for service registration", "error", err)
 			return 1
@@ -179,11 +190,19 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.flagRedirectTrafficConfig != "" {
+		err = c.applyTrafficRedirectionRules(proxyService)
+		if err != nil {
+			c.logger.Error("error applying traffic redirection rules", "err", err)
+			return 1
+		}
+	}
+
 	c.logger.Info("Connect initialization completed")
 	return 0
 }
 
-func (c *Command) getConnectServiceRegistrations(consulClient *api.Client) backoff.Operation {
+func (c *Command) getConnectServiceRegistrations(consulClient *api.Client, proxyService *api.AgentService) backoff.Operation {
 	var proxyID string
 	registrationRetryCount := 0
 	return func() error {
@@ -195,7 +214,8 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client) backo
 			// this one Pod. If so, we want to ensure the service and proxy matching our expected name is registered.
 			filter += fmt.Sprintf(` and (Service == %q or Service == "%s-sidecar-proxy")`, c.flagServiceName, c.flagServiceName)
 		}
-		serviceList, _, err := consulClient.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter})
+		serviceList, _, err := consulClient.Catalog().NodeServiceList(c.flagConsulNodeName,
+			&api.QueryOptions{Filter: filter, MergeCentralConfig: true})
 		if err != nil {
 			c.logger.Error("Unable to get services", "error", err)
 			return err
@@ -235,6 +255,7 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client) backo
 			if svc.Kind == api.ServiceKindConnectProxy {
 				// This is the proxy service ID.
 				proxyID = svc.ID
+				*proxyService = *svc
 			}
 		}
 
@@ -247,7 +268,7 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client) backo
 		}
 
 		// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
-		if err := common.WriteFileWithPerms(c.flagProxyIDFile, proxyID, os.FileMode(0444)); err != nil {
+		if err = common.WriteFileWithPerms(c.flagProxyIDFile, proxyID, os.FileMode(0444)); err != nil {
 			// Save an error but return nil so that we don't retry this step.
 			c.nonRetryableError = err
 			return nil
@@ -337,6 +358,58 @@ func (c *Command) Synopsis() string { return synopsis }
 func (c *Command) Help() string {
 	c.once.Do(c.init)
 	return c.help
+}
+
+// This below implementation is loosely based on
+// https://github.com/hashicorp/consul/blob/fe2d41ddad9ba2b8ff86cbdebbd8f05855b1523c/command/connect/redirecttraffic/redirect_traffic.go#L136.
+
+// trafficRedirectProxyConfig is a snippet of xds/config.go
+// with only the configuration values that we need to parse from Proxy.Config
+// to apply traffic redirection rules.
+type trafficRedirectProxyConfig struct {
+	BindPort      int    `mapstructure:"bind_port"`
+	StatsBindAddr string `mapstructure:"envoy_stats_bind_addr"`
+}
+
+func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
+	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
+	if err != nil {
+		return err
+	}
+	if c.iptablesProvider != nil {
+		c.iptablesConfig.IptablesProvider = c.iptablesProvider
+	}
+
+	if svc.Proxy.TransparentProxy != nil && svc.Proxy.TransparentProxy.OutboundListenerPort != 0 {
+		c.iptablesConfig.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
+	}
+
+	// Decode proxy's opaque config so that we can use it later to configure
+	// traffic redirection with iptables.
+	var trCfg trafficRedirectProxyConfig
+	if err = mapstructure.WeakDecode(svc.Proxy.Config, &trCfg); err != nil {
+		return fmt.Errorf("failed parsing Proxy.Config: %s", err)
+	}
+	if trCfg.BindPort != 0 {
+		c.iptablesConfig.ProxyInboundPort = trCfg.BindPort
+	}
+
+	if trCfg.StatsBindAddr != "" {
+		_, port, err := net.SplitHostPort(trCfg.StatsBindAddr)
+		if err != nil {
+			return fmt.Errorf("failed parsing host and port from envoy_stats_bind_addr: %s", err)
+		}
+
+		c.iptablesConfig.ExcludeInboundPorts = append(c.iptablesConfig.ExcludeInboundPorts, port)
+	}
+
+	// Configure any relevant information from the proxy service
+	err = iptables.Setup(c.iptablesConfig)
+	if err != nil {
+		return err
+	}
+	c.logger.Info("Successfully applied traffic redirection rules")
+	return nil
 }
 
 const synopsis = "Inject connect init command."

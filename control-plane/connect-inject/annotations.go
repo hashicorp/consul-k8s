@@ -115,12 +115,6 @@ const (
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
 
-	// annotations for consul sidecar resource limits.
-	annotationConsulSidecarCPULimit      = "consul.hashicorp.com/consul-sidecar-cpu-limit"
-	annotationConsulSidecarCPURequest    = "consul.hashicorp.com/consul-sidecar-cpu-request"
-	annotationConsulSidecarMemoryLimit   = "consul.hashicorp.com/consul-sidecar-memory-limit"
-	annotationConsulSidecarMemoryRequest = "consul.hashicorp.com/consul-sidecar-memory-request"
-
 	// annotations for sidecar volumes.
 	annotationConsulSidecarUserVolume      = "consul.hashicorp.com/consul-sidecar-user-volume"
 	annotationConsulSidecarUserVolumeMount = "consul.hashicorp.com/consul-sidecar-user-volume-mount"
@@ -139,14 +133,11 @@ const (
 	annotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
 	annotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
 
-	// todo (agentless): uncomment once consul-dataplane supports metrics
-	/*
-		annotations for configuring TLS for Prometheus.
-		annotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
-		annotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
-		annotationPrometheusCertFile = "consul.hashicorp.com/prometheus-cert-file"
-		annotationPrometheusKeyFile  = "consul.hashicorp.com/prometheus-key-file"
-	*/
+	// annotations for configuring TLS for Prometheus.
+	annotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
+	annotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
+	annotationPrometheusCertFile = "consul.hashicorp.com/prometheus-cert-file"
+	annotationPrometheusKeyFile  = "consul.hashicorp.com/prometheus-key-file"
 
 	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
 	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli

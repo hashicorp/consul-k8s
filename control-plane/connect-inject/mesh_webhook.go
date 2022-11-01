@@ -163,16 +163,16 @@ type MeshWebhook struct {
 	// from mesh services.
 	EnableConsulDNS bool
 
-	// ResourcePrefix is the prefix used for the installation which is used to determine the Service
-	// name of the Consul DNS service.
-	ResourcePrefix string
-
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
+	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
+	ReleaseNamespace string
+
 	SecurityContext *corev1.SecurityContext
+
 	// Log
 	Log logr.Logger
 	// Log settings for consul-dataplane and connect-init containers.
@@ -180,6 +180,8 @@ type MeshWebhook struct {
 	LogJSON  bool
 
 	decoder *admission.Decoder
+	// etcResolvFile is only used in tests to stub out /etc/resolv.conf file.
+	etcResolvFile string
 }
 type multiPortInfo struct {
 	serviceIndex int
@@ -256,10 +258,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	for i := range pod.Spec.Containers {
 		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, containerEnvVars...)
 	}
-
-	// Add the init container which copies the Consul binary to /consul/connect-inject/.
-	initCopyContainer := w.initCopyContainer()
-	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
 	// A user can enable/disable tproxy for an entire namespace via a label.
 	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
@@ -363,26 +361,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
-	// Now that the consul-sidecar no longer needs to re-register services periodically
-	// (that functionality lives in the endpoints-controller),
-	// we only need the consul sidecar to run the metrics merging server.
-	// First, determine if we need to run the metrics merging server.
-	shouldRunMetricsMerging, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
-	if err != nil {
-		w.Log.Error(err, "error determining if metrics merging server should be run", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if metrics merging server should be run: %s", err))
-	}
-
-	// Add the consul-sidecar only if we need to run the metrics merging server.
-	if shouldRunMetricsMerging {
-		consulSidecar, err := w.consulSidecar(pod)
-		if err != nil {
-			w.Log.Error(err, "error configuring consul sidecar container", "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
-		}
-		pod.Spec.Containers = append(pod.Spec.Containers, consulSidecar)
-	}
-
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[keyInjectStatus] = injected
@@ -394,9 +372,18 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	}
 
 	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
-	// to determine if it should traffic redirect or not
+	// to determine if it should traffic redirect or not.
 	if tproxyEnabled {
 		pod.Annotations[keyTransparentProxyStatus] = enabled
+	}
+
+	// If tproxy with DNS redirection is enabled, we want to configure dns on the pod.
+	if tproxyEnabled && w.EnableConsulDNS {
+		if err = w.configureDNS(&pod, req.Namespace); err != nil {
+			w.Log.Error(err, "error configuring DNS on the pod", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring DNS on the pod: %s", err))
+		}
+
 	}
 
 	// Add annotations for metrics.
@@ -430,7 +417,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
 		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
-			// todo: update this error message
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}

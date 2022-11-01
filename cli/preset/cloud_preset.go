@@ -214,10 +214,13 @@ global:
     %s
 server:
   replicas: %d
+  affinity: null
   serverCert: 
     secretName: %s
 connectInject:
   enabled: true
+  transparentProxy:
+    defaultEnabled: false
 controller:
   enabled: true
 `, cfg.BootstrapResponse.Cluster.ID, secretNameServerCA, corev1.TLSCertKey,

@@ -6,7 +6,7 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/cimg/go:1.18.3
+      - image: docker.mirror.hashicorp.services/cimg/go:1.19.2
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
@@ -22,21 +22,23 @@ gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
 openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
+# This image is built from test/docker/Test.dockerfile
+consul-helm-test-image: &consul-helm-test-image docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
 
 commands:
   install-prereqs:
     steps:
       - run:
-          name: Install gotestsum, kind, kubectl, and helm
+          name: Install go, gotestsum, kind, kubectl, and helm
           command: |
-            wget https://golang.org/dl/go1.18.3.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.18.3.linux-amd64.tar.gz
-            rm go1.18.3.linux-amd64.tar.gz
+            wget https://golang.org/dl/go1.19.2.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.19.2.linux-amd64.tar.gz
+            rm go1.19.2.linux-amd64.tar.gz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
 
-            wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
-            sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
-            rm gotestsum_1.6.4_linux_amd64.tar.gz
+            wget https://github.com/gotestyourself/gotestsum/releases/download/v1.8.2/gotestsum_1.8.2_linux_amd64.tar.gz
+            sudo tar -C /usr/local/bin -xzf gotestsum_1.8.2_linux_amd64.tar.gz
+            rm gotestsum_1.8.2_linux_amd64.tar.gz
 
             curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.15.0/kind-linux-amd64
             chmod +x ./kind
@@ -71,6 +73,16 @@ commands:
             make kind-cni-calico
             kind create cluster --config=acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:<< parameters.version >>
             make kind-cni-calico
+  build-cli:
+    steps:
+      - run:
+          name: Build consul-k8s CLI
+          working_directory: *cli-path
+          command: |
+            go build -o ./bin/consul-k8s
+            sudo cp ./bin/consul-k8s /usr/local/go/bin/
+            consul-k8s version
+
   run-acceptance-tests:
     parameters:
       failfast:
@@ -485,7 +497,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -518,10 +530,11 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -550,10 +563,11 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -569,7 +583,7 @@ jobs:
     steps:
       - checkout
       - install-prereqs
-      - create-kind-clusters:
+      - create-kind-cni-clusters:
           version: "v1.24.4"
       - restore_cache:
           keys:
@@ -582,10 +596,11 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -596,7 +611,7 @@ jobs:
   ##########################
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
@@ -614,7 +629,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
@@ -632,7 +647,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
     steps:
       - checkout
       - run:
@@ -659,8 +674,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - USE_GKE_GCLOUD_AUTH_PLUGIN: true
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - run:
@@ -703,7 +717,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -728,8 +742,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
       - USE_GKE_GCLOUD_AUTH_PLUGIN: true
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - run:
@@ -796,8 +809,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -829,7 +841,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -853,8 +865,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -909,8 +920,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -948,7 +958,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -consul-image=hashicorppreview/consul-enterprise:1.14-dev
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.14-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -972,8 +982,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -1035,8 +1044,7 @@ jobs:
       TEST_RESULTS: /tmp/test-results
     parallelism: 1
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.14.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -1132,10 +1140,11 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION -enable-transparent-proxy
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1193,10 +1202,11 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           consul-k8s-image: $CONSUL_K8S_IMAGE
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_IMAGE -consul-version="1.13" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION -enable-transparent-proxy
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -1214,6 +1224,7 @@ workflows:
       # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
       # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
       # be moved
+      # Run acceptance tests using the docker image built for the control plane
       - build-distro:
           OS: "linux"
           ARCH: "amd64 arm64"
@@ -1222,19 +1233,18 @@ workflows:
           context: consul-ci
           requires:
             - build-distros-linux
-      # Run acceptance tests using the docker image built for the control plane
       - acceptance:
           context: consul-ci
           requires:
             - dev-upload-docker
-#      - acceptance-tproxy-cni:
-#          context: consul-ci
-#          requires:
-#            - dev-upload-docker
-#      - acceptance-tproxy:
-#          context: consul-ci
-#          requires:
-#            - dev-upload-docker
+      - acceptance-tproxy-cni:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
+      - acceptance-tproxy:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
   nightly-acceptance-tests:
     triggers:
       - schedule:
@@ -1262,26 +1272,23 @@ workflows:
           requires:
             - cleanup-gcp-resources
             - dev-upload-docker
-# TODO (agentless): re-enable once tproxy is supported
-#      - acceptance-gke-cni-1-23:
-#          requires:
-#            - acceptance-gke-1-23
+      - acceptance-gke-cni-1-23:
+          requires:
+            - acceptance-gke-1-23
       - acceptance-eks-1-21:
           requires:
             - cleanup-eks-resources
             - dev-upload-docker
-# TODO (agentless): re-enable once tproxy is supported
-#      - acceptance-eks-cni-1-21:
-#          requires:
-#            - acceptance-eks-1-21
+      - acceptance-eks-cni-1-21:
+          requires:
+            - acceptance-eks-1-21
       - acceptance-aks-1-22:
           requires:
             - cleanup-azure-resources
             - dev-upload-docker
-# TODO (agentless): re-enable once tproxy is supported
-#      - acceptance-aks-cni-1-22:
-#          requires:
-#            - acceptance-aks-1-22
+      - acceptance-aks-cni-1-22:
+          requires:
+            - acceptance-aks-1-22
 
   nightly-acceptance-tests-consul:
     triggers:

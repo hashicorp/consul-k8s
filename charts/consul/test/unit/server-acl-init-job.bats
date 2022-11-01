@@ -228,7 +228,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'client.snapshotAgent.enabled=true' \
+      --set 'server.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-snapshot-agent"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]

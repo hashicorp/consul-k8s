@@ -448,6 +448,8 @@ func TestGetHelmConfigWithMapSecretNames(t *testing.T) {
 
 	const expectedFull = `connectInject:
   enabled: true
+  transparentProxy:
+    defaultEnabled: false
 controller:
   enabled: true
 global:
@@ -487,6 +489,7 @@ global:
     enableAutoEncrypt: true
     enabled: true
 server:
+  affinity: null
   replicas: 3
   serverCert:
     secretName: consul-server-cert
@@ -494,6 +497,8 @@ server:
 
 	const expectedWithoutOptional = `connectInject:
   enabled: true
+  transparentProxy:
+    defaultEnabled: false
 controller:
   enabled: true
 global:
@@ -524,6 +529,7 @@ global:
     enableAutoEncrypt: true
     enabled: true
 server:
+  affinity: null
   replicas: 3
   serverCert:
     secretName: consul-server-cert

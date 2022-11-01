@@ -13,7 +13,11 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-const ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+const (
+	ConsulCAFile               = "/consul/connect-inject/consul-ca.pem"
+	ConsulDataplaneDNSBindHost = "127.0.0.1"
+	ConsulDataplaneDNSBindPort = 8600
+)
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	resources, err := w.sidecarResources(pod)
@@ -188,6 +192,75 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 
 	if mpi.serviceName != "" {
 		cmd = append(cmd, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
+	}
+
+	metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine if merged metrics is enabled: %w", err)
+	}
+	if metricsServer {
+		prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
+		mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if merged metrics port: %w", err)
+		}
+		cmd = append(cmd, "-telemetry-prom-scrape-path="+prometheusScrapePath,
+			"-telemetry-prom-merge-port="+mergedMetricsPort)
+
+		serviceMetricsPath := w.MetricsConfig.serviceMetricsPath(pod)
+		serviceMetricsPort, err := w.MetricsConfig.serviceMetricsPort(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
+		}
+
+		if serviceMetricsPath != "" && serviceMetricsPort != "" {
+			cmd = append(cmd, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+		}
+
+		// Pull the TLS config from the relevant annotations.
+		var prometheusCAFile string
+		if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
+			prometheusCAFile = raw
+		}
+
+		var prometheusCAPath string
+		if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
+			prometheusCAPath = raw
+		}
+
+		var prometheusCertFile string
+		if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
+			prometheusCertFile = raw
+		}
+
+		var prometheusKeyFile string
+		if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
+			prometheusKeyFile = raw
+		}
+
+		// Validate required Prometheus TLS config is present if set.
+		if prometheusCAFile != "" || prometheusCAPath != "" || prometheusCertFile != "" || prometheusKeyFile != "" {
+			if prometheusCAFile == "" && prometheusCAPath == "" {
+				return nil, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
+			}
+			if prometheusCertFile == "" {
+				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
+			}
+			if prometheusKeyFile == "" {
+				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
+			}
+			// TLS config has been validated, add them to the consul-dataplane cmd args
+			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile,
+				"-telemetry-prom-ca-certs-path="+prometheusCAPath,
+				"-telemetry-prom-cert-file="+prometheusCertFile,
+				"-telemetry-prom-key-file="+prometheusKeyFile)
+		}
+	}
+
+	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
+	// for Consul DNS in the pod.
+	if w.EnableConsulDNS {
+		cmd = append(cmd, "-consul-dns-bind-port="+strconv.Itoa(ConsulDataplaneDNSBindPort))
 	}
 
 	var envoyExtraArgs []string

@@ -140,7 +140,11 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
-	_ = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"--wait": nil,
+	}
+	err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	require.NoError(t, err)
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.

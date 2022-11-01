@@ -3,12 +3,12 @@ package connectinject
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -22,9 +22,6 @@ import (
 const (
 	defaultPodName   = "fakePod"
 	defaultNamespace = "default"
-	resourcePrefix   = "CONSUL"
-	dnsEnvVariable   = "CONSUL_DNS_SERVICE_HOST"
-	dnsIP            = "127.0.0.1"
 )
 
 func TestAddRedirectTrafficConfig(t *testing.T) {
@@ -343,7 +340,6 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				},
 			},
 			expCfg: iptables.Config{
-				ConsulDNSIP:          "",
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     proxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
@@ -353,94 +349,94 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				ExcludeUIDs:          []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
 			},
 		},
-		{
-			name:       "dns enabled",
-			dnsEnabled: true,
-			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				ResourcePrefix:        resourcePrefix,
-			},
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: defaultNamespace,
-					Name:      defaultPodName,
-					Annotations: map[string]string{
-						keyConsulDNS: "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name: "test",
-						},
-					},
-				},
-			},
-			expCfg: iptables.Config{
-				ConsulDNSIP:       dnsIP,
-				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:  proxyDefaultInboundPort,
-				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
-				ExcludeUIDs:       []string{strconv.Itoa(initContainersUserAndGroupID)},
-			},
-		},
-		{
-			name:       "dns annotation set but environment variable missing",
-			dnsEnabled: false,
-			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				ResourcePrefix:        resourcePrefix,
-			},
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: defaultNamespace,
-					Name:      defaultPodName,
-					Annotations: map[string]string{
-						keyConsulDNS: "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name: "test",
-						},
-					},
-				},
-			},
-			expCfg: iptables.Config{
-				ConsulDNSIP:       dnsIP,
-				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:  proxyDefaultInboundPort,
-				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
-				ExcludeUIDs:       []string{strconv.Itoa(initContainersUserAndGroupID)},
-			},
-			expErr: fmt.Errorf("environment variable %s not found", dnsEnvVariable),
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if c.dnsEnabled {
-				os.Setenv(dnsEnvVariable, dnsIP)
-			} else {
-				os.Setenv(dnsEnvVariable, "")
-			}
-			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
-			require.Equal(t, c.expErr, err)
+			err = c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
 			// Only compare annotation and iptables config on successful runs
 			if c.expErr == nil {
+				require.NoError(t, err)
 				anno, ok := c.pod.Annotations[annotationRedirectTraffic]
 				require.Equal(t, ok, true)
 
 				actualConfig := iptables.Config{}
-				json.Unmarshal([]byte(anno), &actualConfig)
+				err = json.Unmarshal([]byte(anno), &actualConfig)
+				require.NoError(t, err)
 				require.Equal(t, c.expCfg, actualConfig)
+			} else {
+				require.EqualError(t, err, c.expErr.Error())
+			}
+		})
+	}
+}
+
+func TestRedirectTraffic_consulDNS(t *testing.T) {
+	cases := map[string]struct {
+		globalEnabled         bool
+		annotations           map[string]string
+		namespaceLabel        map[string]string
+		expectConsulDNSConfig bool
+	}{
+		"enabled globally, ns not set, annotation not provided": {
+			globalEnabled:         true,
+			expectConsulDNSConfig: true,
+		},
+		"enabled globally, ns not set, annotation is false": {
+			globalEnabled:         true,
+			annotations:           map[string]string{keyConsulDNS: "false"},
+			expectConsulDNSConfig: false,
+		},
+		"enabled globally, ns not set, annotation is true": {
+			globalEnabled:         true,
+			annotations:           map[string]string{keyConsulDNS: "true"},
+			expectConsulDNSConfig: true,
+		},
+		"disabled globally, ns not set, annotation not provided": {
+			expectConsulDNSConfig: false,
+		},
+		"disabled globally, ns not set, annotation is false": {
+			annotations:           map[string]string{keyConsulDNS: "false"},
+			expectConsulDNSConfig: false,
+		},
+		"disabled globally, ns not set, annotation is true": {
+			annotations:           map[string]string{keyConsulDNS: "true"},
+			expectConsulDNSConfig: true,
+		},
+		"disabled globally, ns enabled, annotation not set": {
+			namespaceLabel:        map[string]string{keyConsulDNS: "true"},
+			expectConsulDNSConfig: true,
+		},
+		"enabled globally, ns disabled, annotation not set": {
+			globalEnabled:         true,
+			namespaceLabel:        map[string]string{keyConsulDNS: "false"},
+			expectConsulDNSConfig: false,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := MeshWebhook{
+				EnableConsulDNS:        c.globalEnabled,
+				EnableTransparentProxy: true,
+				ConsulConfig:           &consul.Config{HTTPPort: 8500},
+			}
+
+			pod := minimal()
+			pod.Annotations = c.annotations
+
+			ns := testNS
+			ns.Labels = c.namespaceLabel
+			iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+			require.NoError(t, err)
+
+			actualConfig := iptables.Config{}
+			err = json.Unmarshal([]byte(iptablesConfig), &actualConfig)
+			require.NoError(t, err)
+			if c.expectConsulDNSConfig {
+				require.Equal(t, "127.0.0.1", actualConfig.ConsulDNSIP)
+				require.Equal(t, 8600, actualConfig.ConsulDNSPort)
+			} else {
+				require.Empty(t, actualConfig.ConsulDNSIP)
 			}
 		})
 	}
