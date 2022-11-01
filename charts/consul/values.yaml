@@ -2897,7 +2897,7 @@ apiGateway:
     # @type: string
     nodeSelector: null
 
-    # This value defines the tolerations that will be assigned to a gateway pod
+    # This value defines the tolerations that will be assigned to a gateway pod.
     # This should be a multi-line string matching the
     # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     #
