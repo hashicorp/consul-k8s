@@ -489,7 +489,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToR
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Delete(c.Ctx, cr.GetName(), metav1.DeleteOptions{})
-		if common.IgnoreNotFoundError(err) != nil {
+		if err != nil && !k8serrors.IsNotFound(err) {
 			return err
 		}
 	}
