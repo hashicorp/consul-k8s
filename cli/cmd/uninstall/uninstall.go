@@ -371,48 +371,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	// Delete any custom resources managed by Consul. If they cannot be deleted,
 	// patch the finalizers to be empty on each one.
 	if releaseType == common.ReleaseTypeConsul {
-		uiLogger("Deleting custom resources managed by Consul")
-		crds, err := c.fetchCustomResourceDefinitions()
-		if err != nil {
-			return fmt.Errorf("unable to fetch Custom Resource Definitions for Consul deployment: %v", err)
-		}
-		kindToResource := mapCRKindToResourceName(crds)
-		err = backoff.Retry(func() error {
-			crs, err := c.fetchCustomResources(crds)
-			if err != nil {
-				return err
-			}
-			if len(crs) == 0 {
-				return nil
-			}
-
-			if err = c.deleteCustomResources(crs, kindToResource); err != nil {
-				return err
-			}
-
-			crs, err = c.fetchCustomResources(crds)
-			if err != nil {
-				return err
-			}
-			if len(crs) != 0 {
-				return common.NewDeletionError(fmt.Sprintf("%d custom resources remain after deletion request. Retrying deletion", len(crs)))
-			}
-
-			return nil
-		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
-		if common.IsDeletionError(err) {
-			uiLogger("Patching finalizers on custom resources managed by Consul")
-			crs, err := c.fetchCustomResources(crds)
-			if err != nil {
-				return err
-			}
-
-			if err = c.patchCustomResources(crs, kindToResource); err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		}
+		c.removeCustomResources(uiLogger)
 	}
 
 	actionConfig, err := helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
@@ -433,6 +392,60 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	}
 
 	c.UI.Output(fmt.Sprintf("Successfully uninstalled %s Helm release.", releaseType), terminal.WithSuccessStyle())
+	return nil
+}
+
+func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
+	uiLogger("Deleting custom resources managed by Consul")
+
+	crds, err := c.fetchCustomResourceDefinitions()
+	if err != nil {
+		return fmt.Errorf("unable to fetch Custom Resource Definitions for Consul deployment: %v", err)
+	}
+	kindToResource := mapCRKindToResourceName(crds)
+
+	crs, err := c.fetchCustomResources(crds)
+	if err != nil {
+		return err
+	}
+	if err = c.deleteCustomResources(crs, kindToResource, uiLogger); err != nil {
+		return err
+	}
+
+	err = backoff.Retry(func() error {
+		crs, err := c.fetchCustomResources(crds)
+		if err != nil {
+			return err
+		}
+		if len(crs) != 0 {
+			return common.NewDeletionError(fmt.Sprintf("%d custom resources remain after deletion request. Retrying deletion", len(crs)))
+		}
+		return nil
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
+	if common.IsDeletionError(err) {
+		uiLogger("Patching finalizers on custom resources managed by Consul")
+
+		crs, err := c.fetchCustomResources(crds)
+		if err != nil {
+			return err
+		}
+
+		if err = c.patchCustomResources(crs, kindToResource, uiLogger); err != nil {
+			return err
+		}
+
+		crs, err = c.fetchCustomResources(crds)
+		if err != nil {
+			return err
+		}
+
+		if len(crs) != 0 {
+			c.UI.Output("Unable to remove all custom resources managed by Consul. %d custom resources remain and will need to be removed manually.", len(crs), terminal.WithErrorStyle())
+		}
+	} else if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -470,7 +483,7 @@ func (c *Command) fetchCustomResources(crds *apiextv1.CustomResourceDefinitionLi
 
 // deleteCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to be deleted.
-func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string) error {
+func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string, uiLogger action.DebugLog) error {
 	for _, cr := range crs {
 		gv, err := schema.ParseGroupVersion(cr.GetAPIVersion())
 		if err != nil {
@@ -483,6 +496,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToR
 			Resource: kindToResource[cr.GetKind()],
 		}
 
+		uiLogger(fmt.Sprintf("Starting delete for \"%s\" %s", cr.GetName(), cr.GetKind()))
 		err = c.dynamicK8sClient.
 			Resource(target).
 			Namespace(cr.GetNamespace()).
@@ -497,7 +511,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToR
 
 // patchCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to patch its finalizers to an empty list.
-func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string) error {
+func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string, uiLogger action.DebugLog) error {
 	finalizerPatch := []byte(`[{
 		"op": "replace",
 		"path": "/metadata/finalizers",
@@ -516,6 +530,7 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToRe
 			Resource: kindToResource[cr.GetKind()],
 		}
 
+		uiLogger(fmt.Sprintf("Patching finalizers for \"%s\" %s", cr.GetName(), cr.GetKind()))
 		_, err = c.dynamicK8sClient.
 			Resource(target).
 			Namespace(cr.GetNamespace()).
