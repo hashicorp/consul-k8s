@@ -687,6 +687,7 @@ jobs:
 
       - checkout
 
+      - build-cli
       - run:
           name: terraform init & apply
           working_directory: *gke-terraform-path
@@ -755,6 +756,7 @@ jobs:
 
       - checkout
 
+      - build-cli
       - run:
           name: terraform init & apply
           working_directory: *gke-terraform-path
@@ -814,6 +816,7 @@ jobs:
     steps:
       - checkout
 
+      - build-cli
       - run:
           name: terraform init & apply
           working_directory: *aks-terraform-path
@@ -870,6 +873,7 @@ jobs:
     steps:
       - checkout
 
+      - build-cli
       - run:
           name: terraform init & apply
           working_directory: *aks-terraform-path
@@ -925,6 +929,7 @@ jobs:
     steps:
       - checkout
 
+      - build-cli
       - run:
           name: configure aws
           command: |
@@ -987,6 +992,7 @@ jobs:
     steps:
       - checkout
 
+      - build-cli
       - run:
           name: configure aws
           command: |
@@ -1048,6 +1054,7 @@ jobs:
 
     steps:
       - checkout
+      - build-cli
       - run:
           name: terraform init & apply
           working_directory: *openshift-terraform-path
