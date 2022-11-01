@@ -9,7 +9,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 )
 
 // ServiceRouterController is the controller for ServiceRouter resources.
@@ -24,7 +24,7 @@ type ServiceRouterController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters/status,verbs=get;update;patch
 
 func (r *ServiceRouterController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ServiceRouter{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1.ServiceRouter{})
 }
 
 func (r *ServiceRouterController) Logger(name types.NamespacedName) logr.Logger {
@@ -36,5 +36,5 @@ func (r *ServiceRouterController) UpdateStatus(ctx context.Context, obj client.O
 }
 
 func (r *ServiceRouterController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.ServiceRouter{}, r)
+	return setupWithManager(mgr, &consulv1.ServiceRouter{}, r)
 }

@@ -137,7 +137,7 @@ func TestValidateExportedServices(t *testing.T) {
 				Partition:         otherPartition,
 			},
 			expAllow:      false,
-			expErrMessage: "exportedservices.consul.hashicorp.com \"other\" is invalid: spec.services: Invalid value: []v1alpha1.ExportedService(nil): at least one service must be exported",
+			expErrMessage: "exportedservices.consul.hashicorp.com \"other\" is invalid: spec.services: Invalid value: []v1.ExportedService(nil): at least one service must be exported",
 		},
 		"service with no consumers": {
 			existingResources: []runtime.Object{},
@@ -161,7 +161,7 @@ func TestValidateExportedServices(t *testing.T) {
 				Partition:         otherPartition,
 			},
 			expAllow:      false,
-			expErrMessage: "exportedservices.consul.hashicorp.com \"other\" is invalid: spec.services[0]: Invalid value: []v1alpha1.ServiceConsumer(nil): service must have at least 1 consumer.",
+			expErrMessage: "exportedservices.consul.hashicorp.com \"other\" is invalid: spec.services[0]: Invalid value: []v1.ServiceConsumer(nil): service must have at least 1 consumer.",
 		},
 	}
 	for name, c := range cases {

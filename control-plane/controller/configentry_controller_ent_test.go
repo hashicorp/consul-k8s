@@ -11,7 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
@@ -90,12 +90,12 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 		}{
 			"namespaced": {
 				ConsulKind: capi.ServiceDefaults,
-				KubeResource: &v1alpha1.ServiceDefaults{
+				KubeResource: &consulv1.ServiceDefaults{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "foo",
 						Namespace: c.SourceKubeNS,
 					},
-					Spec: v1alpha1.ServiceDefaultsSpec{
+					Spec: consulv1.ServiceDefaultsSpec{
 						Protocol: "http",
 					},
 				},
@@ -118,13 +118,13 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 			},
 			"global": {
 				ConsulKind: capi.ProxyDefaults,
-				KubeResource: &v1alpha1.ProxyDefaults{
+				KubeResource: &consulv1.ProxyDefaults{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      common.Global,
 						Namespace: c.SourceKubeNS,
 					},
-					Spec: v1alpha1.ProxyDefaultsSpec{
-						MeshGateway: v1alpha1.MeshGateway{
+					Spec: consulv1.ProxyDefaultsSpec{
+						MeshGateway: consulv1.MeshGateway{
 							Mode: "remote",
 						},
 					},
@@ -148,18 +148,18 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 			},
 			"intentions": {
 				ConsulKind: capi.ServiceIntentions,
-				KubeResource: &v1alpha1.ServiceIntentions{
+				KubeResource: &consulv1.ServiceIntentions{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "foo",
 						Namespace: c.SourceKubeNS,
 					},
-					Spec: v1alpha1.ServiceIntentionsSpec{
-						Destination: v1alpha1.IntentionDestination{
+					Spec: consulv1.ServiceIntentionsSpec{
+						Destination: consulv1.IntentionDestination{
 							Name:      "test",
 							Namespace: c.ExpConsulNS,
 						},
-						Sources: v1alpha1.SourceIntentions{
-							&v1alpha1.SourceIntention{
+						Sources: consulv1.SourceIntentions{
+							&consulv1.SourceIntention{
 								Name:      "baz",
 								Namespace: "bar",
 								Action:    "allow",
@@ -190,7 +190,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 			tt.Run(fmt.Sprintf("%s : %s", name, kind), func(t *testing.T) {
 				req := require.New(t)
 				s := runtime.NewScheme()
-				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
+				s.AddKnownTypes(consulv1.GroupVersion, in.KubeResource)
 				ctx := context.Background()
 
 				testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -303,13 +303,13 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 		}{
 			"namespaced": {
 				ConsulKind: capi.ServiceDefaults,
-				KubeResource: &v1alpha1.ServiceDefaults{
+				KubeResource: &consulv1.ServiceDefaults{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "foo",
 						Namespace:  c.SourceKubeNS,
 						Finalizers: []string{controller.FinalizerName},
 					},
-					Spec: v1alpha1.ServiceDefaultsSpec{
+					Spec: consulv1.ServiceDefaultsSpec{
 						Protocol: "http",
 					},
 				},
@@ -331,7 +331,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					return err
 				},
 				UpdateResourceFunc: func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error {
-					svcDefault := in.(*v1alpha1.ServiceDefaults)
+					svcDefault := in.(*consulv1.ServiceDefaults)
 					svcDefault.Spec.Protocol = "tcp"
 					return client.Update(ctx, svcDefault)
 				},
@@ -345,14 +345,14 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 			},
 			"global": {
 				ConsulKind: capi.ProxyDefaults,
-				KubeResource: &v1alpha1.ProxyDefaults{
+				KubeResource: &consulv1.ProxyDefaults{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       common.Global,
 						Namespace:  c.SourceKubeNS,
 						Finalizers: []string{controller.FinalizerName},
 					},
-					Spec: v1alpha1.ProxyDefaultsSpec{
-						MeshGateway: v1alpha1.MeshGateway{
+					Spec: consulv1.ProxyDefaultsSpec{
+						MeshGateway: consulv1.MeshGateway{
 							Mode: "remote",
 						},
 					},
@@ -377,7 +377,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					return err
 				},
 				UpdateResourceFunc: func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error {
-					proxyDefaults := in.(*v1alpha1.ProxyDefaults)
+					proxyDefaults := in.(*consulv1.ProxyDefaults)
 					proxyDefaults.Spec.MeshGateway.Mode = "local"
 					return client.Update(ctx, proxyDefaults)
 				},
@@ -391,19 +391,19 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 			},
 			"intentions": {
 				ConsulKind: capi.ServiceIntentions,
-				KubeResource: &v1alpha1.ServiceIntentions{
+				KubeResource: &consulv1.ServiceIntentions{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "test",
 						Namespace:  c.SourceKubeNS,
 						Finalizers: []string{controller.FinalizerName},
 					},
-					Spec: v1alpha1.ServiceIntentionsSpec{
-						Destination: v1alpha1.IntentionDestination{
+					Spec: consulv1.ServiceIntentionsSpec{
+						Destination: consulv1.IntentionDestination{
 							Name:      "foo",
 							Namespace: c.ExpConsulNS,
 						},
-						Sources: v1alpha1.SourceIntentions{
-							&v1alpha1.SourceIntention{
+						Sources: consulv1.SourceIntentions{
+							&consulv1.SourceIntention{
 								Name:      "bar",
 								Namespace: "baz",
 								Action:    "deny",
@@ -435,7 +435,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					return err
 				},
 				UpdateResourceFunc: func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error {
-					svcIntention := in.(*v1alpha1.ServiceIntentions)
+					svcIntention := in.(*consulv1.ServiceIntentions)
 					svcIntention.Spec.Sources[0].Action = "allow"
 					return client.Update(ctx, svcIntention)
 				},
@@ -452,7 +452,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 			tt.Run(fmt.Sprintf("%s : %s", name, kind), func(t *testing.T) {
 				req := require.New(t)
 				s := runtime.NewScheme()
-				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
+				s.AddKnownTypes(consulv1.GroupVersion, in.KubeResource)
 				ctx := context.Background()
 
 				testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -581,14 +581,14 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				ConsulKind: capi.ServiceDefaults,
 				// Create it with the deletion timestamp set to mimic that it's already
 				// been marked for deletion.
-				KubeResource: &v1alpha1.ServiceDefaults{
+				KubeResource: &consulv1.ServiceDefaults{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "foo",
 						Namespace:         c.SourceKubeNS,
 						Finalizers:        []string{controller.FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
-					Spec: v1alpha1.ServiceDefaultsSpec{
+					Spec: consulv1.ServiceDefaultsSpec{
 						Protocol: "http",
 					},
 				},
@@ -614,15 +614,15 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				ConsulKind: capi.ProxyDefaults,
 				// Create it with the deletion timestamp set to mimic that it's already
 				// been marked for deletion.
-				KubeResource: &v1alpha1.ProxyDefaults{
+				KubeResource: &consulv1.ProxyDefaults{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              common.Global,
 						Namespace:         c.SourceKubeNS,
 						Finalizers:        []string{controller.FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
-					Spec: v1alpha1.ProxyDefaultsSpec{
-						MeshGateway: v1alpha1.MeshGateway{
+					Spec: consulv1.ProxyDefaultsSpec{
+						MeshGateway: consulv1.MeshGateway{
 							Mode: "remote",
 						},
 					},
@@ -651,20 +651,20 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				ConsulKind: capi.ServiceIntentions,
 				// Create it with the deletion timestamp set to mimic that it's already
 				// been marked for deletion.
-				KubeResource: &v1alpha1.ServiceIntentions{
+				KubeResource: &consulv1.ServiceIntentions{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "foo",
 						Namespace:         c.SourceKubeNS,
 						Finalizers:        []string{controller.FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
-					Spec: v1alpha1.ServiceIntentionsSpec{
-						Destination: v1alpha1.IntentionDestination{
+					Spec: consulv1.ServiceIntentionsSpec{
+						Destination: consulv1.IntentionDestination{
 							Name:      "test",
 							Namespace: c.ExpConsulNS,
 						},
-						Sources: v1alpha1.SourceIntentions{
-							&v1alpha1.SourceIntention{
+						Sources: consulv1.SourceIntentions{
+							&consulv1.SourceIntention{
 								Name:      "bar",
 								Namespace: "baz",
 								Action:    "deny",
@@ -702,7 +702,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				req := require.New(t)
 
 				s := runtime.NewScheme()
-				s.AddKnownTypes(v1alpha1.GroupVersion, in.KubeResource)
+				s.AddKnownTypes(consulv1.GroupVersion, in.KubeResource)
 
 				testClient := test.TestServerWithConnMgrWatcher(t, nil)
 				testClient.TestServer.WaitForServiceIntentions(t)

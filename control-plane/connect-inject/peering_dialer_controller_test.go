@@ -7,7 +7,7 @@ import (
 	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -36,20 +36,20 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		expectedConsulPeerings *api.Peering
 		peeringSecret          func(token string) *corev1.Secret
 		expErr                 string
-		expectedStatus         *v1alpha1.PeeringDialerStatus
+		expectedStatus         *consulv1.PeeringDialerStatus
 		expectDeletedK8sSecret *types.NamespacedName
 		peeringExists          bool
 	}{
 		"Errors when Secret set on the spec does not exist in the cluster": {
 			k8sObjects: func() []runtime.Object {
-				dialer := &v1alpha1.PeeringDialer{
+				dialer := &consulv1.PeeringDialer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "peering",
 						Namespace: "default",
 					},
-					Spec: v1alpha1.PeeringDialerSpec{
-						Peer: &v1alpha1.Peer{
-							Secret: &v1alpha1.Secret{
+					Spec: consulv1.PeeringDialerSpec{
+						Peer: &consulv1.Peer{
+							Secret: &consulv1.Secret{
 								Name:    "dialer",
 								Key:     "token",
 								Backend: "kubernetes",
@@ -65,14 +65,14 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		"Initiates peering when status secret is nil": {
 			peeringName: "peering",
 			k8sObjects: func() []runtime.Object {
-				dialer := &v1alpha1.PeeringDialer{
+				dialer := &consulv1.PeeringDialer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "peering",
 						Namespace: "default",
 					},
-					Spec: v1alpha1.PeeringDialerSpec{
-						Peer: &v1alpha1.Peer{
-							Secret: &v1alpha1.Secret{
+					Spec: consulv1.PeeringDialerSpec{
+						Peer: &consulv1.Peer{
+							Secret: &consulv1.Secret{
 								Name:    "dialer-token",
 								Key:     "token",
 								Backend: "kubernetes",
@@ -89,9 +89,9 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			peeringSecret: func(token string) *corev1.Secret {
 				return createSecret("dialer-token", "default", "token", token)
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -102,23 +102,23 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		"Initiates peering when status secret is set but peering is not found in Consul": {
 			peeringName: "peering",
 			k8sObjects: func() []runtime.Object {
-				dialer := &v1alpha1.PeeringDialer{
+				dialer := &consulv1.PeeringDialer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "peering",
 						Namespace: "default",
 					},
-					Spec: v1alpha1.PeeringDialerSpec{
-						Peer: &v1alpha1.Peer{
-							Secret: &v1alpha1.Secret{
+					Spec: consulv1.PeeringDialerSpec{
+						Peer: &consulv1.Peer{
+							Secret: &consulv1.Secret{
 								Name:    "dialer-token",
 								Key:     "token",
 								Backend: "kubernetes",
 							},
 						},
 					},
-					Status: v1alpha1.PeeringDialerStatus{
-						SecretRef: &v1alpha1.SecretRefStatus{
-							Secret: v1alpha1.Secret{
+					Status: consulv1.PeeringDialerStatus{
+						SecretRef: &consulv1.SecretRefStatus{
+							Secret: consulv1.Secret{
 								Name:    "dialer-token",
 								Key:     "token",
 								Backend: "kubernetes",
@@ -136,9 +136,9 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			peeringSecret: func(token string) *corev1.Secret {
 				return createSecret("dialer-token", "default", "token", token)
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -149,23 +149,23 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		"Initiates peering when status secret is set, peering is found, but out of date": {
 			peeringName: "peering",
 			k8sObjects: func() []runtime.Object {
-				dialer := &v1alpha1.PeeringDialer{
+				dialer := &consulv1.PeeringDialer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "peering",
 						Namespace: "default",
 					},
-					Spec: v1alpha1.PeeringDialerSpec{
-						Peer: &v1alpha1.Peer{
-							Secret: &v1alpha1.Secret{
+					Spec: consulv1.PeeringDialerSpec{
+						Peer: &consulv1.Peer{
+							Secret: &consulv1.Secret{
 								Name:    "dialer-token",
 								Key:     "token",
 								Backend: "kubernetes",
 							},
 						},
 					},
-					Status: v1alpha1.PeeringDialerStatus{
-						SecretRef: &v1alpha1.SecretRefStatus{
-							Secret: v1alpha1.Secret{
+					Status: consulv1.PeeringDialerStatus{
+						SecretRef: &consulv1.SecretRefStatus{
+							Secret: consulv1.Secret{
 								Name:    "dialer-token-old",
 								Key:     "token",
 								Backend: "kubernetes",
@@ -183,9 +183,9 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			peeringSecret: func(token string) *corev1.Secret {
 				return createSecret("dialer-token", "default", "token", token)
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -197,7 +197,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 		"Initiates peering when version annotation is set": {
 			peeringName: "peering",
 			k8sObjects: func() []runtime.Object {
-				dialer := &v1alpha1.PeeringDialer{
+				dialer := &consulv1.PeeringDialer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "peering",
 						Namespace: "default",
@@ -205,18 +205,18 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 							annotationPeeringVersion: "2",
 						},
 					},
-					Spec: v1alpha1.PeeringDialerSpec{
-						Peer: &v1alpha1.Peer{
-							Secret: &v1alpha1.Secret{
+					Spec: consulv1.PeeringDialerSpec{
+						Peer: &consulv1.Peer{
+							Secret: &consulv1.Secret{
 								Name:    "dialer-token",
 								Key:     "token",
 								Backend: "kubernetes",
 							},
 						},
 					},
-					Status: v1alpha1.PeeringDialerStatus{
-						SecretRef: &v1alpha1.SecretRefStatus{
-							Secret: v1alpha1.Secret{
+					Status: consulv1.PeeringDialerStatus{
+						SecretRef: &consulv1.SecretRefStatus{
+							Secret: consulv1.Secret{
 								Name:    "dialer-token",
 								Key:     "token",
 								Backend: "kubernetes",
@@ -234,9 +234,9 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			peeringSecret: func(token string) *corev1.Secret {
 				return createSecret("dialer-token", "default", "token", token)
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -308,7 +308,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				k8sObjects = append(k8sObjects, secret)
 			}
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			s.AddKnownTypes(consulv1.GroupVersion, &consulv1.PeeringDialer{}, &consulv1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create the peering dialer controller
@@ -342,7 +342,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				require.NotEmpty(t, peering.ID)
 
 				// Get the reconciled PeeringDialer and make assertions on the status
-				dialer := &v1alpha1.PeeringDialer{}
+				dialer := &consulv1.PeeringDialer{}
 				err = fakeClient.Get(context.Background(), namespacedName, dialer)
 				require.NoError(t, err)
 				if tt.expectedStatus != nil {
@@ -365,7 +365,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 	cases := map[string]struct {
 		annotations    map[string]string
 		expErr         string
-		expectedStatus *v1alpha1.PeeringDialerStatus
+		expectedStatus *consulv1.PeeringDialerStatus
 	}{
 		"fails if annotation is not a number": {
 			annotations: map[string]string{
@@ -377,9 +377,9 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			annotations: map[string]string{
 				annotationPeeringVersion: "2",
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -392,9 +392,9 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			annotations: map[string]string{
 				annotationPeeringVersion: "3",
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -407,9 +407,9 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			annotations: map[string]string{
 				annotationPeeringVersion: "4",
 			},
-			expectedStatus: &v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expectedStatus: &consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-token",
 						Key:     "token",
 						Backend: "kubernetes",
@@ -439,24 +439,24 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 
 			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-			dialer := &v1alpha1.PeeringDialer{
+			dialer := &consulv1.PeeringDialer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "peering",
 					Namespace:   "default",
 					Annotations: tt.annotations,
 				},
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "dialer-token",
 							Key:     "token",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "dialer-token",
 							Key:     "token",
 							Backend: "kubernetes",
@@ -512,7 +512,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			k8sObjects = append(k8sObjects, secret)
 
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			s.AddKnownTypes(consulv1.GroupVersion, &consulv1.PeeringDialer{}, &consulv1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create the peering dialer controller
@@ -538,7 +538,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 				require.False(t, resp.Requeue)
 
 				// Get the reconciled PeeringDialer and make assertions on the status
-				dialer := &v1alpha1.PeeringDialer{}
+				dialer := &consulv1.PeeringDialer{}
 				err = fakeClient.Get(context.Background(), namespacedName, dialer)
 				require.NoError(t, err)
 				if tt.expectedStatus != nil {
@@ -558,24 +558,24 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 func TestSpecStatusSecretsDifferent(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
-		dialer      *v1alpha1.PeeringDialer
+		dialer      *consulv1.PeeringDialer
 		secret      *corev1.Secret
 		isDifferent bool
 	}{
 		"different secret name in spec and status": {
-			dialer: &v1alpha1.PeeringDialer{
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+			dialer: &consulv1.PeeringDialer{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "bar",
 							Key:     "token",
 							Backend: "kubernetes",
@@ -587,19 +587,19 @@ func TestSpecStatusSecretsDifferent(t *testing.T) {
 			isDifferent: true,
 		},
 		"different secret key in spec and status": {
-			dialer: &v1alpha1.PeeringDialer{
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+			dialer: &consulv1.PeeringDialer{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "foo",
 							Key:     "key",
 							Backend: "kubernetes",
@@ -611,19 +611,19 @@ func TestSpecStatusSecretsDifferent(t *testing.T) {
 			isDifferent: true,
 		},
 		"different secret backend in spec and status": {
-			dialer: &v1alpha1.PeeringDialer{
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+			dialer: &consulv1.PeeringDialer{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "vault",
@@ -635,19 +635,19 @@ func TestSpecStatusSecretsDifferent(t *testing.T) {
 			isDifferent: true,
 		},
 		"different secret ref in status and saved secret": {
-			dialer: &v1alpha1.PeeringDialer{
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+			dialer: &consulv1.PeeringDialer{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
@@ -664,19 +664,19 @@ func TestSpecStatusSecretsDifferent(t *testing.T) {
 			isDifferent: true,
 		},
 		"same secret ref in status and saved secret": {
-			dialer: &v1alpha1.PeeringDialer{
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+			dialer: &consulv1.PeeringDialer{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "foo",
 							Key:     "token",
 							Backend: "kubernetes",
@@ -709,15 +709,15 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	// Add the default namespace.
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 
-	dialer := &v1alpha1.PeeringDialer{
+	dialer := &consulv1.PeeringDialer{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "dialer-deleted",
 			Namespace:         "default",
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
 			Finalizers:        []string{FinalizerName},
 		},
-		Spec: v1alpha1.PeeringDialerSpec{
-			Peer: &v1alpha1.Peer{
+		Spec: consulv1.PeeringDialerSpec{
+			Peer: &consulv1.Peer{
 				Secret: nil,
 			},
 		},
@@ -728,7 +728,7 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 
 	// Add peering types to the scheme.
 	s := scheme.Scheme
-	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+	s.AddKnownTypes(consulv1.GroupVersion, &consulv1.PeeringDialer{}, &consulv1.PeeringDialerList{})
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
 	// Create test consul server.
@@ -774,20 +774,20 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 func TestDialerUpdateStatus(t *testing.T) {
 	cases := []struct {
 		name            string
-		peeringDialer   *v1alpha1.PeeringDialer
+		peeringDialer   *consulv1.PeeringDialer
 		resourceVersion string
-		expStatus       v1alpha1.PeeringDialerStatus
+		expStatus       consulv1.PeeringDialerStatus
 	}{
 		{
 			name: "updates status when there's no existing status",
-			peeringDialer: &v1alpha1.PeeringDialer{
+			peeringDialer: &consulv1.PeeringDialer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dialer",
 					Namespace: "default",
 				},
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "dialer-secret",
 							Key:     "data",
 							Backend: "kubernetes",
@@ -796,18 +796,18 @@ func TestDialerUpdateStatus(t *testing.T) {
 				},
 			},
 			resourceVersion: "1234",
-			expStatus: v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expStatus: consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-secret",
 						Key:     "data",
 						Backend: "kubernetes",
 					},
 					ResourceVersion: "1234",
 				},
-				Conditions: v1alpha1.Conditions{
+				Conditions: consulv1.Conditions{
 					{
-						Type:   v1alpha1.ConditionSynced,
+						Type:   consulv1.ConditionSynced,
 						Status: corev1.ConditionTrue,
 					},
 				},
@@ -815,23 +815,23 @@ func TestDialerUpdateStatus(t *testing.T) {
 		},
 		{
 			name: "updates status when there is an existing status",
-			peeringDialer: &v1alpha1.PeeringDialer{
+			peeringDialer: &consulv1.PeeringDialer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dialer",
 					Namespace: "default",
 				},
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "dialer-secret",
 							Key:     "data",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					SecretRef: &v1alpha1.SecretRefStatus{
-						Secret: v1alpha1.Secret{
+				Status: consulv1.PeeringDialerStatus{
+					SecretRef: &consulv1.SecretRefStatus{
+						Secret: consulv1.Secret{
 							Name:    "old-name",
 							Key:     "old-key",
 							Backend: "kubernetes",
@@ -841,18 +841,18 @@ func TestDialerUpdateStatus(t *testing.T) {
 				},
 			},
 			resourceVersion: "1234",
-			expStatus: v1alpha1.PeeringDialerStatus{
-				SecretRef: &v1alpha1.SecretRefStatus{
-					Secret: v1alpha1.Secret{
+			expStatus: consulv1.PeeringDialerStatus{
+				SecretRef: &consulv1.SecretRefStatus{
+					Secret: consulv1.Secret{
 						Name:    "dialer-secret",
 						Key:     "data",
 						Backend: "kubernetes",
 					},
 					ResourceVersion: "1234",
 				},
-				Conditions: v1alpha1.Conditions{
+				Conditions: consulv1.Conditions{
 					{
-						Type:   v1alpha1.ConditionSynced,
+						Type:   consulv1.ConditionSynced,
 						Status: corev1.ConditionTrue,
 					},
 				},
@@ -869,7 +869,7 @@ func TestDialerUpdateStatus(t *testing.T) {
 
 			// Add peering types to the scheme.
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			s.AddKnownTypes(consulv1.GroupVersion, &consulv1.PeeringDialer{}, &consulv1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
@@ -881,7 +881,7 @@ func TestDialerUpdateStatus(t *testing.T) {
 			err := controller.updateStatus(context.Background(), types.NamespacedName{Name: tt.peeringDialer.Name, Namespace: tt.peeringDialer.Namespace}, tt.resourceVersion)
 			require.NoError(t, err)
 
-			dialer := &v1alpha1.PeeringDialer{}
+			dialer := &consulv1.PeeringDialer{}
 			dialerName := types.NamespacedName{
 				Name:      "dialer",
 				Namespace: "default",
@@ -900,20 +900,20 @@ func TestDialerUpdateStatus(t *testing.T) {
 func TestDialerUpdateStatusError(t *testing.T) {
 	cases := []struct {
 		name         string
-		dialer       *v1alpha1.PeeringDialer
+		dialer       *consulv1.PeeringDialer
 		reconcileErr error
-		expStatus    v1alpha1.PeeringDialerStatus
+		expStatus    consulv1.PeeringDialerStatus
 	}{
 		{
 			name: "updates status when there's no existing status",
-			dialer: &v1alpha1.PeeringDialer{
+			dialer: &consulv1.PeeringDialer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dialer",
 					Namespace: "default",
 				},
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "dialer-secret",
 							Key:     "data",
 							Backend: "kubernetes",
@@ -922,10 +922,10 @@ func TestDialerUpdateStatusError(t *testing.T) {
 				},
 			},
 			reconcileErr: errors.New("this is an error"),
-			expStatus: v1alpha1.PeeringDialerStatus{
-				Conditions: v1alpha1.Conditions{
+			expStatus: consulv1.PeeringDialerStatus{
+				Conditions: consulv1.Conditions{
 					{
-						Type:    v1alpha1.ConditionSynced,
+						Type:    consulv1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
 						Reason:  InternalError,
 						Message: "this is an error",
@@ -935,34 +935,34 @@ func TestDialerUpdateStatusError(t *testing.T) {
 		},
 		{
 			name: "updates status when there is an existing status",
-			dialer: &v1alpha1.PeeringDialer{
+			dialer: &consulv1.PeeringDialer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dialer",
 					Namespace: "default",
 				},
-				Spec: v1alpha1.PeeringDialerSpec{
-					Peer: &v1alpha1.Peer{
-						Secret: &v1alpha1.Secret{
+				Spec: consulv1.PeeringDialerSpec{
+					Peer: &consulv1.Peer{
+						Secret: &consulv1.Secret{
 							Name:    "dialer-secret",
 							Key:     "data",
 							Backend: "kubernetes",
 						},
 					},
 				},
-				Status: v1alpha1.PeeringDialerStatus{
-					Conditions: v1alpha1.Conditions{
+				Status: consulv1.PeeringDialerStatus{
+					Conditions: consulv1.Conditions{
 						{
-							Type:   v1alpha1.ConditionSynced,
+							Type:   consulv1.ConditionSynced,
 							Status: corev1.ConditionTrue,
 						},
 					},
 				},
 			},
 			reconcileErr: errors.New("this is an error"),
-			expStatus: v1alpha1.PeeringDialerStatus{
-				Conditions: v1alpha1.Conditions{
+			expStatus: consulv1.PeeringDialerStatus{
+				Conditions: consulv1.Conditions{
 					{
-						Type:    v1alpha1.ConditionSynced,
+						Type:    consulv1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
 						Reason:  InternalError,
 						Message: "this is an error",
@@ -981,7 +981,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 
 			// Add peering types to the scheme.
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			s.AddKnownTypes(consulv1.GroupVersion, &consulv1.PeeringDialer{}, &consulv1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
@@ -992,7 +992,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 
 			controller.updateStatusError(context.Background(), tt.dialer, InternalError, tt.reconcileErr)
 
-			dialer := &v1alpha1.PeeringDialer{}
+			dialer := &consulv1.PeeringDialer{}
 			dialerName := types.NamespacedName{
 				Name:      "dialer",
 				Namespace: "default",
@@ -1071,7 +1071,7 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		secret  *corev1.Secret
-		dialers v1alpha1.PeeringDialerList
+		dialers consulv1.PeeringDialerList
 		result  []reconcile.Request
 	}{
 		"secret matches existing acceptor": {
@@ -1081,16 +1081,16 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 					Namespace: "test",
 				},
 			},
-			dialers: v1alpha1.PeeringDialerList{
-				Items: []v1alpha1.PeeringDialer{
+			dialers: consulv1.PeeringDialerList{
+				Items: []consulv1.PeeringDialer{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "peering",
 							Namespace: "test",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1116,16 +1116,16 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 					Namespace: "test",
 				},
 			},
-			dialers: v1alpha1.PeeringDialerList{
-				Items: []v1alpha1.PeeringDialer{
+			dialers: consulv1.PeeringDialerList{
+				Items: []consulv1.PeeringDialer{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "peering",
 							Namespace: "test",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test",
 									Key:     "test",
 									Backend: "vault",
@@ -1144,16 +1144,16 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 					Namespace: "test",
 				},
 			},
-			dialers: v1alpha1.PeeringDialerList{
-				Items: []v1alpha1.PeeringDialer{
+			dialers: consulv1.PeeringDialerList{
+				Items: []consulv1.PeeringDialer{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "peering-1",
 							Namespace: "test",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1166,9 +1166,9 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 							Name:      "peering-2",
 							Namespace: "test-2",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1181,9 +1181,9 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 							Name:      "peering-3",
 							Namespace: "test",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test-2",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1209,16 +1209,16 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 					Namespace: "test",
 				},
 			},
-			dialers: v1alpha1.PeeringDialerList{
-				Items: []v1alpha1.PeeringDialer{
+			dialers: consulv1.PeeringDialerList{
+				Items: []consulv1.PeeringDialer{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "peering-1",
 							Namespace: "test",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "fest",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1231,9 +1231,9 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 							Name:      "peering-2",
 							Namespace: "test-2",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1246,9 +1246,9 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 							Name:      "peering-3",
 							Namespace: "test",
 						},
-						Spec: v1alpha1.PeeringDialerSpec{
-							Peer: &v1alpha1.Peer{
-								Secret: &v1alpha1.Secret{
+						Spec: consulv1.PeeringDialerSpec{
+							Peer: &consulv1.Peer{
+								Secret: &consulv1.Secret{
 									Name:    "test-2",
 									Key:     "test",
 									Backend: "kubernetes",
@@ -1265,7 +1265,7 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := scheme.Scheme
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
+			s.AddKnownTypes(consulv1.GroupVersion, &consulv1.PeeringDialer{}, &consulv1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.dialers).Build()
 			controller := PeeringDialerController{
 				Client: fakeClient,

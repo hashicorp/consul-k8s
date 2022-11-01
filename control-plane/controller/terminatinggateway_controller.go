@@ -9,7 +9,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 )
 
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
@@ -24,7 +24,7 @@ type TerminatingGatewayController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=terminatinggateways/status,verbs=get;update;patch
 
 func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.TerminatingGateway{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1.TerminatingGateway{})
 }
 
 func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Logger {
@@ -36,5 +36,5 @@ func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj cli
 }
 
 func (r *TerminatingGatewayController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
+	return setupWithManager(mgr, &consulv1.TerminatingGateway{}, r)
 }

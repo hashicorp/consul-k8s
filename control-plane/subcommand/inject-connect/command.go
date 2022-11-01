@@ -12,7 +12,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -131,8 +131,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	// We need v1alpha1 here to add the peering api to the scheme
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	// We need consulv1 here to add the peering api to the scheme
+	utilruntime.Must(consulv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -480,13 +480,13 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
-			&webhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
+		mgr.GetWebhookServer().Register("/mutate-v1-peeringacceptors",
+			&webhook.Admission{Handler: &consulv1.PeeringAcceptorWebhook{
 				Client: mgr.GetClient(),
 				Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
 			}})
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
-			&webhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
+		mgr.GetWebhookServer().Register("/mutate-v1-peeringdialers",
+			&webhook.Admission{Handler: &consulv1.PeeringDialerWebhook{
 				Client: mgr.GetClient(),
 				Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
 			}})

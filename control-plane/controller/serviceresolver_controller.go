@@ -9,7 +9,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 )
 
 // ServiceResolverController is the controller for ServiceResolver resources.
@@ -24,7 +24,7 @@ type ServiceResolverController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=serviceresolvers/status,verbs=get;update;patch
 
 func (r *ServiceResolverController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ServiceResolver{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1.ServiceResolver{})
 }
 
 func (r *ServiceResolverController) Logger(name types.NamespacedName) logr.Logger {
@@ -36,5 +36,5 @@ func (r *ServiceResolverController) UpdateStatus(ctx context.Context, obj client
 }
 
 func (r *ServiceResolverController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.ServiceResolver{}, r)
+	return setupWithManager(mgr, &consulv1.ServiceResolver{}, r)
 }

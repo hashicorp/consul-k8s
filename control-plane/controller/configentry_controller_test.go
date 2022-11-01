@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -47,12 +47,12 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryResource: &v1alpha1.ServiceDefaults{
+			configEntryResource: &consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol:              "http",
 					MaxInboundConnections: 100,
 				},
@@ -78,13 +78,13 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryResource: &v1alpha1.ServiceResolver{
+			configEntryResource: &consulv1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceResolverSpec{
-					Redirect: &v1alpha1.ServiceResolverRedirect{
+				Spec: consulv1.ServiceResolverSpec{
+					Redirect: &consulv1.ServiceResolverRedirect{
 						Service: "redirect",
 					},
 				},
@@ -109,13 +109,13 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ProxyDefaults",
 			consulKind: capi.ProxyDefaults,
-			configEntryResource: &v1alpha1.ProxyDefaults{
+			configEntryResource: &consulv1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      common.Global,
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGateway{
+				Spec: consulv1.ProxyDefaultsSpec{
+					MeshGateway: consulv1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -140,13 +140,13 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "Mesh",
 			consulKind: capi.MeshConfig,
-			configEntryResource: &v1alpha1.Mesh{
+			configEntryResource: &consulv1.Mesh{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      common.Mesh,
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.MeshSpec{
-					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
+				Spec: consulv1.MeshSpec{
+					TransparentProxy: consulv1.TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
 				},
@@ -178,16 +178,16 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceRouter{
+			configEntryResource: &consulv1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceRouterSpec{
-					Routes: []v1alpha1.ServiceRoute{
+				Spec: consulv1.ServiceRouterSpec{
+					Routes: []consulv1.ServiceRoute{
 						{
-							Match: &v1alpha1.ServiceRouteMatch{
-								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+							Match: &consulv1.ServiceRouteMatch{
+								HTTP: &consulv1.ServiceRouteHTTPMatch{
 									PathPrefix: "/admin",
 								},
 							},
@@ -222,13 +222,13 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceSplitter{
+			configEntryResource: &consulv1.ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceSplitterSpec{
-					Splits: []v1alpha1.ServiceSplit{
+				Spec: consulv1.ServiceSplitterSpec{
+					Splits: []consulv1.ServiceSplit{
 						{
 							Weight: 100,
 						},
@@ -272,33 +272,33 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceIntentions{
+			configEntryResource: &consulv1.ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "some-name",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.IntentionDestination{
+				Spec: consulv1.ServiceIntentionsSpec{
+					Destination: consulv1.IntentionDestination{
 						Name: "foo",
 					},
-					Sources: v1alpha1.SourceIntentions{
-						&v1alpha1.SourceIntention{
+					Sources: consulv1.SourceIntentions{
+						&consulv1.SourceIntention{
 							Name:   "bar",
 							Action: "allow",
 						},
-						&v1alpha1.SourceIntention{
+						&consulv1.SourceIntention{
 							Name:   "baz",
 							Action: "deny",
 						},
-						&v1alpha1.SourceIntention{
+						&consulv1.SourceIntention{
 							Name: "bax",
-							Permissions: v1alpha1.IntentionPermissions{
-								&v1alpha1.IntentionPermission{
+							Permissions: consulv1.IntentionPermissions{
+								&consulv1.IntentionPermission{
 									Action: "allow",
-									HTTP: &v1alpha1.IntentionHTTPPermission{
+									HTTP: &consulv1.IntentionHTTPPermission{
 										PathExact: "/path",
-										Header: v1alpha1.IntentionHTTPHeaderPermissions{
-											v1alpha1.IntentionHTTPHeaderPermission{
+										Header: consulv1.IntentionHTTPHeaderPermissions{
+											consulv1.IntentionHTTPHeaderPermission{
 												Name:    "auth",
 												Present: true,
 											},
@@ -341,20 +341,20 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "IngressGateway",
 			consulKind: capi.IngressGateway,
-			configEntryResource: &v1alpha1.IngressGateway{
+			configEntryResource: &consulv1.IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.IngressGatewaySpec{
-					TLS: v1alpha1.GatewayTLSConfig{
+				Spec: consulv1.IngressGatewaySpec{
+					TLS: consulv1.GatewayTLSConfig{
 						Enabled: true,
 					},
-					Listeners: []v1alpha1.IngressListener{
+					Listeners: []consulv1.IngressListener{
 						{
 							Port:     80,
 							Protocol: "http",
-							Services: []v1alpha1.IngressService{
+							Services: []consulv1.IngressService{
 								{
 									Name: "*",
 								},
@@ -386,13 +386,13 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "TerminatingGateway",
 			consulKind: capi.TerminatingGateway,
-			configEntryResource: &v1alpha1.TerminatingGateway{
+			configEntryResource: &consulv1.TerminatingGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.TerminatingGatewaySpec{
-					Services: []v1alpha1.LinkedService{
+				Spec: consulv1.TerminatingGatewaySpec{
+					Services: []consulv1.LinkedService{
 						{
 							Name:     "name",
 							CAFile:   "caFile",
@@ -433,7 +433,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			s.AddKnownTypes(consulv1.GroupVersion, c.configEntryResource)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -489,12 +489,12 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryResource: &v1alpha1.ServiceDefaults{
+			configEntryResource: &consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol: "http",
 				},
 			},
@@ -510,7 +510,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				svcDefaults := resource.(*v1alpha1.ServiceDefaults)
+				svcDefaults := resource.(*consulv1.ServiceDefaults)
 				svcDefaults.Spec.Protocol = "tcp"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -522,13 +522,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryResource: &v1alpha1.ServiceResolver{
+			configEntryResource: &consulv1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceResolverSpec{
-					Redirect: &v1alpha1.ServiceResolverRedirect{
+				Spec: consulv1.ServiceResolverSpec{
+					Redirect: &consulv1.ServiceResolverRedirect{
 						Service: "redirect",
 					},
 				},
@@ -545,7 +545,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				svcResolver := resource.(*v1alpha1.ServiceResolver)
+				svcResolver := resource.(*consulv1.ServiceResolver)
 				svcResolver.Spec.Redirect.Service = "different_redirect"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -557,13 +557,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ProxyDefaults",
 			consulKind: capi.ProxyDefaults,
-			configEntryResource: &v1alpha1.ProxyDefaults{
+			configEntryResource: &consulv1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      common.Global,
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGateway{
+				Spec: consulv1.ProxyDefaultsSpec{
+					MeshGateway: consulv1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -580,7 +580,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				proxyDefault := resource.(*v1alpha1.ProxyDefaults)
+				proxyDefault := resource.(*consulv1.ProxyDefaults)
 				proxyDefault.Spec.MeshGateway.Mode = "local"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -592,13 +592,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "Mesh",
 			consulKind: capi.MeshConfig,
-			configEntryResource: &v1alpha1.Mesh{
+			configEntryResource: &consulv1.Mesh{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      common.Mesh,
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.MeshSpec{
-					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
+				Spec: consulv1.MeshSpec{
+					TransparentProxy: consulv1.TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
 				},
@@ -615,7 +615,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				mesh := resource.(*v1alpha1.Mesh)
+				mesh := resource.(*consulv1.Mesh)
 				mesh.Spec.TransparentProxy.MeshDestinationsOnly = false
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -639,13 +639,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceSplitter{
+			configEntryResource: &consulv1.ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceSplitterSpec{
-					Splits: []v1alpha1.ServiceSplit{
+				Spec: consulv1.ServiceSplitterSpec{
+					Splits: []consulv1.ServiceSplit{
 						{
 							Weight: 100,
 						},
@@ -664,8 +664,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				serviceSplitter := resource.(*v1alpha1.ServiceSplitter)
-				serviceSplitter.Spec.Splits = []v1alpha1.ServiceSplit{
+				serviceSplitter := resource.(*consulv1.ServiceSplitter)
+				serviceSplitter.Spec.Splits = []consulv1.ServiceSplit{
 					{
 						Weight: 80,
 					},
@@ -693,16 +693,16 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceRouter{
+			configEntryResource: &consulv1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceRouterSpec{
-					Routes: []v1alpha1.ServiceRoute{
+				Spec: consulv1.ServiceRouterSpec{
+					Routes: []consulv1.ServiceRoute{
 						{
-							Match: &v1alpha1.ServiceRouteMatch{
-								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+							Match: &consulv1.ServiceRouteMatch{
+								HTTP: &consulv1.ServiceRouteHTTPMatch{
 									PathPrefix: "/admin",
 								},
 							},
@@ -722,7 +722,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				svcRouter := resource.(*v1alpha1.ServiceRouter)
+				svcRouter := resource.(*consulv1.ServiceRouter)
 				svcRouter.Spec.Routes[0].Match.HTTP.PathPrefix = "/different_path"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -746,29 +746,29 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceIntentions{
+			configEntryResource: &consulv1.ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-name",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.IntentionDestination{
+				Spec: consulv1.ServiceIntentionsSpec{
+					Destination: consulv1.IntentionDestination{
 						Name: "foo",
 					},
-					Sources: v1alpha1.SourceIntentions{
-						&v1alpha1.SourceIntention{
+					Sources: consulv1.SourceIntentions{
+						&consulv1.SourceIntention{
 							Name:   "bar",
 							Action: "allow",
 						},
-						&v1alpha1.SourceIntention{
+						&consulv1.SourceIntention{
 							Name: "baz",
-							Permissions: v1alpha1.IntentionPermissions{
-								&v1alpha1.IntentionPermission{
+							Permissions: consulv1.IntentionPermissions{
+								&consulv1.IntentionPermission{
 									Action: "allow",
-									HTTP: &v1alpha1.IntentionHTTPPermission{
+									HTTP: &consulv1.IntentionHTTPPermission{
 										PathExact: "/path",
-										Header: v1alpha1.IntentionHTTPHeaderPermissions{
-											v1alpha1.IntentionHTTPHeaderPermission{
+										Header: consulv1.IntentionHTTPHeaderPermissions{
+											consulv1.IntentionHTTPHeaderPermission{
 												Name:    "auth",
 												Present: true,
 											},
@@ -796,7 +796,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				svcIntentions := resource.(*v1alpha1.ServiceIntentions)
+				svcIntentions := resource.(*consulv1.ServiceIntentions)
 				svcIntentions.Spec.Sources[0].Action = "deny"
 				svcIntentions.Spec.Sources[1].Permissions[0].Action = "deny"
 			},
@@ -810,20 +810,20 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "IngressGateway",
 			consulKind: capi.IngressGateway,
-			configEntryResource: &v1alpha1.IngressGateway{
+			configEntryResource: &consulv1.IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.IngressGatewaySpec{
-					TLS: v1alpha1.GatewayTLSConfig{
+				Spec: consulv1.IngressGatewaySpec{
+					TLS: consulv1.GatewayTLSConfig{
 						Enabled: true,
 					},
-					Listeners: []v1alpha1.IngressListener{
+					Listeners: []consulv1.IngressListener{
 						{
 							Port:     80,
 							Protocol: "http",
-							Services: []v1alpha1.IngressService{
+							Services: []consulv1.IngressService{
 								{
 									Name: "*",
 								},
@@ -844,7 +844,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				igw := resource.(*v1alpha1.IngressGateway)
+				igw := resource.(*consulv1.IngressGateway)
 				igw.Spec.TLS.Enabled = false
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -859,13 +859,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "TerminatingGateway",
 			consulKind: capi.TerminatingGateway,
-			configEntryResource: &v1alpha1.TerminatingGateway{
+			configEntryResource: &consulv1.TerminatingGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.TerminatingGatewaySpec{
-					Services: []v1alpha1.LinkedService{
+				Spec: consulv1.TerminatingGatewaySpec{
+					Services: []consulv1.LinkedService{
 						{
 							Name:     "name",
 							CAFile:   "caFile",
@@ -888,7 +888,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				igw := resource.(*v1alpha1.TerminatingGateway)
+				igw := resource.(*consulv1.TerminatingGateway)
 				igw.Spec.Services[0].SNI = "new-sni"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -910,7 +910,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			s.AddKnownTypes(consulv1.GroupVersion, c.configEntryResource)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -977,14 +977,14 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryResourceWithDeletion: &v1alpha1.ServiceDefaults{
+			configEntryResourceWithDeletion: &consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol: "http",
 				},
 			},
@@ -1003,15 +1003,15 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryResourceWithDeletion: &v1alpha1.ServiceResolver{
+			configEntryResourceWithDeletion: &consulv1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ServiceResolverSpec{
-					Redirect: &v1alpha1.ServiceResolverRedirect{
+				Spec: consulv1.ServiceResolverSpec{
+					Redirect: &consulv1.ServiceResolverRedirect{
 						Service: "redirect",
 					},
 				},
@@ -1031,15 +1031,15 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ProxyDefaults",
 			consulKind: capi.ProxyDefaults,
-			configEntryResourceWithDeletion: &v1alpha1.ProxyDefaults{
+			configEntryResourceWithDeletion: &consulv1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              common.Global,
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGateway{
+				Spec: consulv1.ProxyDefaultsSpec{
+					MeshGateway: consulv1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -1059,15 +1059,15 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "Mesh",
 			consulKind: capi.MeshConfig,
-			configEntryResourceWithDeletion: &v1alpha1.Mesh{
+			configEntryResourceWithDeletion: &consulv1.Mesh{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              common.Global,
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.MeshSpec{
-					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
+				Spec: consulv1.MeshSpec{
+					TransparentProxy: consulv1.TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
 				},
@@ -1094,18 +1094,18 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResourceWithDeletion: &v1alpha1.ServiceRouter{
+			configEntryResourceWithDeletion: &consulv1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ServiceRouterSpec{
-					Routes: []v1alpha1.ServiceRoute{
+				Spec: consulv1.ServiceRouterSpec{
+					Routes: []consulv1.ServiceRoute{
 						{
-							Match: &v1alpha1.ServiceRouteMatch{
-								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+							Match: &consulv1.ServiceRouteMatch{
+								HTTP: &consulv1.ServiceRouteHTTPMatch{
 									PathPrefix: "/admin",
 								},
 							},
@@ -1136,15 +1136,15 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResourceWithDeletion: &v1alpha1.ServiceSplitter{
+			configEntryResourceWithDeletion: &consulv1.ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ServiceSplitterSpec{
-					Splits: []v1alpha1.ServiceSplit{
+				Spec: consulv1.ServiceSplitterSpec{
+					Splits: []consulv1.ServiceSplit{
 						{
 							Weight: 100,
 						},
@@ -1178,31 +1178,31 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			configEntryResourceWithDeletion: &v1alpha1.ServiceIntentions{
+			configEntryResourceWithDeletion: &consulv1.ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-name",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.IntentionDestination{
+				Spec: consulv1.ServiceIntentionsSpec{
+					Destination: consulv1.IntentionDestination{
 						Name: "foo",
 					},
-					Sources: v1alpha1.SourceIntentions{
-						&v1alpha1.SourceIntention{
+					Sources: consulv1.SourceIntentions{
+						&consulv1.SourceIntention{
 							Name:   "bar",
 							Action: "allow",
 						},
-						&v1alpha1.SourceIntention{
+						&consulv1.SourceIntention{
 							Name: "baz",
-							Permissions: v1alpha1.IntentionPermissions{
-								&v1alpha1.IntentionPermission{
+							Permissions: consulv1.IntentionPermissions{
+								&consulv1.IntentionPermission{
 									Action: "allow",
-									HTTP: &v1alpha1.IntentionHTTPPermission{
+									HTTP: &consulv1.IntentionHTTPPermission{
 										PathExact: "/path",
-										Header: v1alpha1.IntentionHTTPHeaderPermissions{
-											v1alpha1.IntentionHTTPHeaderPermission{
+										Header: consulv1.IntentionHTTPHeaderPermissions{
+											consulv1.IntentionHTTPHeaderPermission{
 												Name:    "auth",
 												Present: true,
 											},
@@ -1233,22 +1233,22 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "IngressGateway",
 			consulKind: capi.IngressGateway,
-			configEntryResourceWithDeletion: &v1alpha1.IngressGateway{
+			configEntryResourceWithDeletion: &consulv1.IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.IngressGatewaySpec{
-					TLS: v1alpha1.GatewayTLSConfig{
+				Spec: consulv1.IngressGatewaySpec{
+					TLS: consulv1.GatewayTLSConfig{
 						Enabled: true,
 					},
-					Listeners: []v1alpha1.IngressListener{
+					Listeners: []consulv1.IngressListener{
 						{
 							Port:     80,
 							Protocol: "http",
-							Services: []v1alpha1.IngressService{
+							Services: []consulv1.IngressService{
 								{
 									Name: "*",
 								},
@@ -1272,15 +1272,15 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "TerminatingGateway",
 			consulKind: capi.TerminatingGateway,
-			configEntryResourceWithDeletion: &v1alpha1.TerminatingGateway{
+			configEntryResourceWithDeletion: &consulv1.TerminatingGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.TerminatingGatewaySpec{
-					Services: []v1alpha1.LinkedService{
+				Spec: consulv1.TerminatingGatewaySpec{
+					Services: []consulv1.LinkedService{
 						{
 							Name:     "name",
 							CAFile:   "caFile",
@@ -1310,7 +1310,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			req := require.New(t)
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
+			s.AddKnownTypes(consulv1.GroupVersion, c.configEntryResourceWithDeletion)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -1360,18 +1360,18 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 
 	req := require.New(t)
 	ctx := context.Background()
-	svcDefaults := &v1alpha1.ServiceDefaults{
+	svcDefaults := &consulv1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: kubeNS,
 		},
-		Spec: v1alpha1.ServiceDefaultsSpec{
+		Spec: consulv1.ServiceDefaultsSpec{
 			Protocol: "http",
 		},
 	}
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
+	s.AddKnownTypes(consulv1.GroupVersion, svcDefaults)
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
 	testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -1425,24 +1425,24 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 	s := runtime.NewScheme()
-	svcDefaults := &v1alpha1.ServiceDefaults{
+	svcDefaults := &consulv1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: kubeNS,
 		},
-		Spec: v1alpha1.ServiceDefaultsSpec{
+		Spec: consulv1.ServiceDefaultsSpec{
 			Protocol: "http",
 		},
-		Status: v1alpha1.Status{
-			Conditions: v1alpha1.Conditions{
+		Status: consulv1.Status{
+			Conditions: consulv1.Conditions{
 				{
-					Type:   v1alpha1.ConditionSynced,
+					Type:   consulv1.ConditionSynced,
 					Status: corev1.ConditionUnknown,
 				},
 			},
 		},
 	}
-	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
+	s.AddKnownTypes(consulv1.GroupVersion, svcDefaults)
 
 	// The config entry exists in kube but its status will be nil.
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
@@ -1507,16 +1507,16 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			svcDefaults := &v1alpha1.ServiceDefaults{
+			svcDefaults := &consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol: "http",
 				},
 			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
+			s.AddKnownTypes(consulv1.GroupVersion, svcDefaults)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -1589,18 +1589,18 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			svcDefaultsWithDeletion := &v1alpha1.ServiceDefaults{
+			svcDefaultsWithDeletion := &consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol: "http",
 				},
 			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaultsWithDeletion)
+			s.AddKnownTypes(consulv1.GroupVersion, svcDefaultsWithDeletion)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaultsWithDeletion).Build()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -1643,7 +1643,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				req.Equal(entry.GetMeta()[common.DatacenterKey], datacenter)
 
 				// Check that the resource is deleted from cluster.
-				svcDefault := &v1alpha1.ServiceDefaults{}
+				svcDefault := &consulv1.ServiceDefaults{}
 				_ = fakeClient.Get(ctx, namespacedName, svcDefault)
 				require.Empty(t, svcDefault.Finalizers())
 			}
@@ -1656,25 +1656,25 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	kubeNS := "default"
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{}, &v1alpha1.ServiceSplitter{})
+	s.AddKnownTypes(consulv1.GroupVersion, &consulv1.ServiceDefaults{}, &consulv1.ServiceSplitter{})
 
-	defaults := &v1alpha1.ServiceDefaults{
+	defaults := &consulv1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "service",
 			Namespace: "default",
 		},
-		Spec: v1alpha1.ServiceDefaultsSpec{
+		Spec: consulv1.ServiceDefaultsSpec{
 			Protocol: "http",
 		},
 	}
 
-	splitter := &v1alpha1.ServiceSplitter{
+	splitter := &consulv1.ServiceSplitter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "service",
 			Namespace: "default",
 		},
-		Spec: v1alpha1.ServiceSplitterSpec{
-			Splits: v1alpha1.ServiceSplits{
+		Spec: consulv1.ServiceSplitterSpec{
+			Splits: consulv1.ServiceSplits{
 				{
 					Weight:  100,
 					Service: "service",
@@ -1745,14 +1745,14 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure the status of the resource is updated to display failure reason.
-	syncCondition := defaults.GetCondition(v1alpha1.ConditionSynced)
-	expectedCondition := &v1alpha1.Condition{
-		Type:    v1alpha1.ConditionSynced,
+	syncCondition := defaults.GetCondition(consulv1.ConditionSynced)
+	expectedCondition := &consulv1.Condition{
+		Type:    consulv1.ConditionSynced,
 		Status:  corev1.ConditionFalse,
 		Reason:  ConsulAgentError,
 		Message: "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)",
 	}
-	require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
+	require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(consulv1.Condition{}, "LastTransitionTime")))
 }
 
 // Test that if the resource already exists in Consul but the Kube resource
@@ -1763,12 +1763,12 @@ func TestConfigEntryController_Migration(t *testing.T) {
 	cfgEntryName := "service"
 
 	cases := map[string]struct {
-		KubeResource   v1alpha1.ServiceDefaults
+		KubeResource   consulv1.ServiceDefaults
 		ConsulResource capi.ServiceConfigEntry
 		ExpErr         string
 	}{
 		"identical resources should be migrated successfully": {
-			KubeResource: v1alpha1.ServiceDefaults{
+			KubeResource: consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cfgEntryName,
 					Namespace: kubeNS,
@@ -1776,7 +1776,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 						common.MigrateEntryKey: "true",
 					},
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol: protocol,
 				},
 			},
@@ -1787,7 +1787,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			},
 		},
 		"different resources (protocol) should not be migrated": {
-			KubeResource: v1alpha1.ServiceDefaults{
+			KubeResource: consulv1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cfgEntryName,
 					Namespace: kubeNS,
@@ -1795,7 +1795,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 						common.MigrateEntryKey: "true",
 					},
 				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
+				Spec: consulv1.ServiceDefaultsSpec{
 					Protocol: "tcp",
 				},
 			},
@@ -1813,7 +1813,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
+			s.AddKnownTypes(consulv1.GroupVersion, &consulv1.ServiceDefaults{})
 
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.KubeResource).Build()
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -1852,11 +1852,11 @@ func TestConfigEntryController_Migration(t *testing.T) {
 				require.False(t, resp.Requeue)
 			}
 
-			entryAfterReconcile := &v1alpha1.ServiceDefaults{}
+			entryAfterReconcile := &consulv1.ServiceDefaults{}
 			err = fakeClient.Get(ctx, defaultsNamespacedName, entryAfterReconcile)
 			require.NoError(t, err)
 
-			syncCondition := entryAfterReconcile.GetCondition(v1alpha1.ConditionSynced)
+			syncCondition := entryAfterReconcile.GetCondition(consulv1.ConditionSynced)
 			if c.ExpErr != "" {
 				// Ensure the status of the resource is migration failed.
 				require.Equal(t, corev1.ConditionFalse, syncCondition.Status)
@@ -1870,11 +1870,11 @@ func TestConfigEntryController_Migration(t *testing.T) {
 				require.Equal(t, protocol, entry.(*capi.ServiceConfigEntry).Protocol)
 			} else {
 				// Ensure the status of the resource is synced.
-				expectedCondition := &v1alpha1.Condition{
-					Type:   v1alpha1.ConditionSynced,
+				expectedCondition := &consulv1.Condition{
+					Type:   consulv1.ConditionSynced,
 					Status: corev1.ConditionTrue,
 				}
-				require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
+				require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(consulv1.Condition{}, "LastTransitionTime")))
 
 				// Ensure the Consul resource has the expected metadata.
 				entry, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, cfgEntryName, nil)

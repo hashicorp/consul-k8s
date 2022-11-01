@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
@@ -51,7 +51,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 	r.Log.Info("received request for PeeringDialer:", "name", req.Name, "ns", req.Namespace)
 
 	// Get the PeeringDialer resource.
-	dialer := &consulv1alpha1.PeeringDialer{}
+	dialer := &consulv1.PeeringDialer{}
 	err := r.Client.Get(ctx, req.NamespacedName, dialer)
 
 	// This can be safely ignored as a resource will only ever be not found if it has never been reconciled
@@ -201,7 +201,7 @@ func (r *PeeringDialerController) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *PeeringDialerController) specStatusSecretsDifferent(dialer *consulv1alpha1.PeeringDialer, existingSpecSecret *corev1.Secret) bool {
+func (r *PeeringDialerController) specStatusSecretsDifferent(dialer *consulv1.PeeringDialer, existingSpecSecret *corev1.Secret) bool {
 	if dialer.SecretRef().Name != dialer.Secret().Name {
 		return true
 	}
@@ -215,11 +215,11 @@ func (r *PeeringDialerController) specStatusSecretsDifferent(dialer *consulv1alp
 }
 
 func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey types.NamespacedName, resourceVersion string) error {
-	dialer := &consulv1alpha1.PeeringDialer{}
+	dialer := &consulv1.PeeringDialer{}
 	if err := r.Client.Get(ctx, dialerObjKey, dialer); err != nil {
 		return fmt.Errorf("error fetching dialer resource before status update: %w", err)
 	}
-	dialer.Status.SecretRef = &consulv1alpha1.SecretRefStatus{
+	dialer.Status.SecretRef = &consulv1.SecretRefStatus{
 		Secret:          *dialer.Spec.Peer.Secret,
 		ResourceVersion: resourceVersion,
 	}
@@ -242,7 +242,7 @@ func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey
 	return err
 }
 
-func (r *PeeringDialerController) updateStatusError(ctx context.Context, dialer *consulv1alpha1.PeeringDialer, reason string, reconcileErr error) {
+func (r *PeeringDialerController) updateStatusError(ctx context.Context, dialer *consulv1.PeeringDialer, reason string, reconcileErr error) {
 	dialer.SetSyncedCondition(corev1.ConditionFalse, reason, reconcileErr.Error())
 	err := r.Status().Update(ctx, dialer)
 	if err != nil {
@@ -267,7 +267,7 @@ func (r *PeeringDialerController) getSecret(ctx context.Context, name string, na
 // SetupWithManager sets up the controller with the Manager.
 func (r *PeeringDialerController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.PeeringDialer{}).
+		For(&consulv1.PeeringDialer{}).
 		Watches(
 			&source.Kind{Type: &corev1.Secret{}},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForPeeringTokens),
@@ -299,7 +299,7 @@ func (r *PeeringDialerController) deletePeering(ctx context.Context, apiClient *
 	return nil
 }
 
-func (r *PeeringDialerController) versionAnnotationUpdated(dialer *consulv1alpha1.PeeringDialer) (bool, error) {
+func (r *PeeringDialerController) versionAnnotationUpdated(dialer *consulv1.PeeringDialer) (bool, error) {
 	if peeringVersionString, ok := dialer.Annotations[annotationPeeringVersion]; ok {
 		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
 		if err != nil {
@@ -321,7 +321,7 @@ func (r *PeeringDialerController) requestsForPeeringTokens(object client.Object)
 	r.Log.Info("received update for Peering Token Secret", "name", object.GetName(), "namespace", object.GetNamespace())
 
 	// Get the list of all dialers.
-	var dialerList consulv1alpha1.PeeringDialerList
+	var dialerList consulv1.PeeringDialerList
 	if err := r.Client.List(r.Context, &dialerList); err != nil {
 		r.Log.Error(err, "failed to list PeeringDialers")
 		return []ctrl.Request{}

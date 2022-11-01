@@ -10,7 +10,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
@@ -73,17 +73,17 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 		tt.Run(name, func(t *testing.T) {
 			req := require.New(t)
 			s := runtime.NewScheme()
-			exportedServices := &v1alpha1.ExportedServices{
+			exportedServices := &consulv1.ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default",
 					Namespace: c.SourceKubeNS,
 				},
-				Spec: v1alpha1.ExportedServicesSpec{
-					Services: []v1alpha1.ExportedService{
+				Spec: consulv1.ExportedServicesSpec{
+					Services: []consulv1.ExportedService{
 						{
 							Name:      "frontend",
 							Namespace: "front",
-							Consumers: []v1alpha1.ServiceConsumer{
+							Consumers: []consulv1.ServiceConsumer{
 								{Partition: "foo"},
 								{Partition: "bar"},
 							},
@@ -91,7 +91,7 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 					},
 				},
 			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
+			s.AddKnownTypes(consulv1.GroupVersion, exportedServices)
 			ctx := context.Background()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -188,18 +188,18 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 		tt.Run(name, func(t *testing.T) {
 			req := require.New(t)
 			s := runtime.NewScheme()
-			exportedServices := &v1alpha1.ExportedServices{
+			exportedServices := &consulv1.ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "default",
 					Namespace:  c.SourceKubeNS,
 					Finalizers: []string{controller.FinalizerName},
 				},
-				Spec: v1alpha1.ExportedServicesSpec{
-					Services: []v1alpha1.ExportedService{
+				Spec: consulv1.ExportedServicesSpec{
+					Services: []consulv1.ExportedService{
 						{
 							Name:      "frontend",
 							Namespace: "front",
-							Consumers: []v1alpha1.ServiceConsumer{
+							Consumers: []consulv1.ServiceConsumer{
 								{Partition: "foo"},
 								{Partition: "bar"},
 							},
@@ -207,7 +207,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 					},
 				},
 			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
+			s.AddKnownTypes(consulv1.GroupVersion, exportedServices)
 			ctx := context.Background()
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
@@ -325,19 +325,19 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 		tt.Run(name, func(t *testing.T) {
 			req := require.New(t)
 			s := runtime.NewScheme()
-			exportedServices := &v1alpha1.ExportedServices{
+			exportedServices := &consulv1.ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "default",
 					Namespace:         c.SourceKubeNS,
 					Finalizers:        []string{controller.FinalizerName},
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 				},
-				Spec: v1alpha1.ExportedServicesSpec{
-					Services: []v1alpha1.ExportedService{
+				Spec: consulv1.ExportedServicesSpec{
+					Services: []consulv1.ExportedService{
 						{
 							Name:      "frontend",
 							Namespace: "front",
-							Consumers: []v1alpha1.ServiceConsumer{
+							Consumers: []consulv1.ServiceConsumer{
 								{Partition: "foo"},
 								{Partition: "bar"},
 							},
@@ -345,7 +345,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 					},
 				},
 			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, exportedServices)
+			s.AddKnownTypes(consulv1.GroupVersion, exportedServices)
 
 			testClient := test.TestServerWithConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)

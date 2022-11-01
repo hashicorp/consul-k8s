@@ -9,7 +9,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	consulv1 "github.com/hashicorp/consul-k8s/control-plane/api/v1"
 )
 
 // ProxyDefaultsController reconciles a ProxyDefaults object.
@@ -24,7 +24,7 @@ type ProxyDefaultsController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=proxydefaults/status,verbs=get;update;patch
 
 func (r *ProxyDefaultsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ProxyDefaults{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1.ProxyDefaults{})
 }
 
 func (r *ProxyDefaultsController) Logger(name types.NamespacedName) logr.Logger {
@@ -36,5 +36,5 @@ func (r *ProxyDefaultsController) UpdateStatus(ctx context.Context, obj client.O
 }
 
 func (r *ProxyDefaultsController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.ProxyDefaults{}, r)
+	return setupWithManager(mgr, &consulv1.ProxyDefaults{}, r)
 }
