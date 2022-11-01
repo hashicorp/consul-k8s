@@ -513,7 +513,7 @@ func TestDeleteCustomResources(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, actual, 1)
 
-	err = c.deleteCustomResources([]unstructured.Unstructured{cr}, mapCRKindToResourceName(crds))
+	err = c.deleteCustomResources([]unstructured.Unstructured{cr}, mapCRKindToResourceName(crds), fakeUILogger)
 	require.NoError(t, err)
 
 	actual, err = c.fetchCustomResources(crds)
@@ -543,7 +543,7 @@ func TestPatchCustomResources(t *testing.T) {
 	crds, err := c.fetchCustomResourceDefinitions()
 	require.NoError(t, err)
 
-	err = c.patchCustomResources([]unstructured.Unstructured{cr}, mapCRKindToResourceName(crds))
+	err = c.patchCustomResources([]unstructured.Unstructured{cr}, mapCRKindToResourceName(crds), fakeUILogger)
 	require.NoError(t, err)
 
 	actual, err := c.fetchCustomResources(crds)
@@ -868,3 +868,5 @@ func createClientsWithCrds() (apiext.Interface, dynamic.Interface) {
 	}
 	return apiextFake.NewSimpleClientset(&crds), dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), grvToListKind)
 }
+
+func fakeUILogger(s string, i ...interface{}) {}
