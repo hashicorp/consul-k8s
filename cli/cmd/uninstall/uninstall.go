@@ -314,7 +314,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// initKubernetes sets up the kubernetes clients to use for non Helm SDK calls to the Kubernetes API
+// initKubernetes sets up the kubernetes clients to use for non Helm SDK calls to the Kubernetes API.
 // The Helm SDK will use settings.RESTClientGetter for its calls as well, so this will
 // use a consistent method to target the right cluster for both Helm SDK and non Helm SDK calls.
 func (c *Command) initKubernetes(settings *helmCLI.EnvSettings) error {
