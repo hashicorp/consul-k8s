@@ -49,6 +49,8 @@ spec:
       {{- end }}
       containers:
         - name: tls-init
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           image: "{{ .Values.global.imageK8S }}"
           env:
             - name: NAMESPACE

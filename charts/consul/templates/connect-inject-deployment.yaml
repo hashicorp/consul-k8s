@@ -75,10 +75,14 @@ spec:
         {{- end }}
         {{- end }}
     spec:
+      securityContext:
+        {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 8 }}
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           ports:
           - containerPort: 8080
             name: webhook-server
@@ -174,6 +178,7 @@ spec:
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \
                 {{- end }}
+                -pod-security-standards='{{ .Values.global.podSecurityStandards.securityContext | toJson }}' \
                 {{- if (or (and (ne (.Values.connectInject.metrics.defaultEnabled | toString) "-") .Values.connectInject.metrics.defaultEnabled) (and (eq (.Values.connectInject.metrics.defaultEnabled | toString) "-") .Values.global.metrics.enabled)) }}
                 -default-enable-metrics=true \
                 {{- else }}

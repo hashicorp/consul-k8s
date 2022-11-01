@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -113,10 +114,13 @@ type Command struct {
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
 
-	flagEnableOpenShift bool
+	flagEnableOpenShift     bool
+	flagPodSecurityStandard string
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
+
+	podSecurityStandard *corev1.PodSecurityContext
 
 	clientset kubernetes.Interface
 
@@ -224,6 +228,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryRequest, "default-consul-sidecar-memory-request", "25Mi", "Default consul sidecar memory request.")
 	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryLimit, "default-consul-sidecar-memory-limit", "50Mi", "Default consul sidecar memory limit.")
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
+
+	c.flagSet.StringVar(&c.flagPodSecurityStandard, "pod-security-standards", "", "Default pod security standard to be applied to sidecars.")
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -369,6 +375,12 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	securityContext := &corev1.SecurityContext{}
+	if c.flagPodSecurityStandard != "" {
+		if err := json.Unmarshal([]byte(c.flagPodSecurityStandard), securityContext); err != nil {
+			return 1
+		}
+	}
 	// Create a context to be used by the processes started in this command.
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
@@ -441,6 +453,7 @@ func (c *Command) Run(args []string) int {
 		Scheme:                     mgr.GetScheme(),
 		ReleaseName:                c.flagReleaseName,
 		ReleaseNamespace:           c.flagReleaseNamespace,
+		SecurityContext:            securityContext,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})

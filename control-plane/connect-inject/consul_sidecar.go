@@ -43,8 +43,9 @@ func (w *MeshWebhook) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		Command:   command,
-		Resources: resources,
+		Command:         command,
+		Resources:       resources,
+		SecurityContext: w.SecurityContext,
 	}, nil
 }
 

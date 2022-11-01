@@ -506,7 +506,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.24.4"
+          version: "v1.25.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}

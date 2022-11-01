@@ -41,6 +41,8 @@ spec:
       {{- end }}
       containers:
         - name: gossip-encryption-autogen
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           image: "{{ .Values.global.imageK8S }}"
           command:
             - "/bin/sh"

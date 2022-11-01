@@ -169,6 +169,8 @@ spec:
       # ingress-gateway-init registers the ingress gateway service with Consul.
       - name: ingress-gateway-init
         image: {{ $root.Values.global.imageK8S }}
+        securityContext:
+          {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -220,6 +222,8 @@ spec:
       containers:
       - name: ingress-gateway
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
+        securityContext:
+          {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
         {{- if (default $defaults.resources .resources) }}
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}

@@ -56,12 +56,21 @@ func TestConnectInject(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
+			helmvals := map[string]string{
+				"global.podSecurityStandards.securityContext.runAsNonRoot":             "true",
+				"global.podSecurityStandards.securityContext.allowPrivilegeEscalation": "false",
+				"global.podSecurityStandards.securityContext.capabilities.drop":        "{ALL}",
+				"global.podSecurityStandards.securityContext.seccompProfile.type":      "RuntimeDefault",
+				"global.imageK8S": "kyleschochenmaier/consul-k8s",
+			}
+
 			connHelper := ConnectHelper{
 				ClusterKind: c.clusterKind,
 				Secure:      c.secure,
 				ReleaseName: c.releaseName,
 				Ctx:         ctx,
 				Cfg:         cfg,
+				HelmValues:  helmvals,
 			}
 
 			connHelper.Setup(t)

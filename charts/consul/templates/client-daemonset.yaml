@@ -100,7 +100,9 @@ spec:
 
       {{- if not .Values.global.openshift.enabled }}
       securityContext:
-        {{- toYaml .Values.client.securityContext | nindent 8 -}}
+        {{- $tmp := dict -}}
+        {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.client.securityContext -}}
+        {{- $dst | toYaml | nindent 8 }}
       {{- end }}
 
       {{- if .Values.client.priorityClassName }}
@@ -479,7 +481,9 @@ spec:
           {{- end }}
           {{- if not .Values.global.openshift.enabled }}
           securityContext:
-            {{- toYaml .Values.client.containerSecurityContext.client | nindent 12 }}
+            {{- $tmp := dict -}}
+            {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.client.containerSecurityContext.client -}}
+            {{- $dst | toYaml | nindent 12 }}
           {{- end }}
         {{- if .Values.client.extraContainers }}
         {{ toYaml .Values.client.extraContainers | nindent 8 }}
@@ -552,7 +556,9 @@ spec:
             cpu: "50m"
         {{- if not .Values.global.openshift.enabled }}
         securityContext:
-          {{- toYaml .Values.client.containerSecurityContext.aclInit | nindent 10 }}
+          {{- $tmp := dict -}}
+          {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.client.containerSecurityContext.aclInit -}}
+          {{- $dst | toYaml | nindent 10 }}
         {{- end }}
       {{- end }}
       {{- if and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt) }}
@@ -601,7 +607,9 @@ spec:
             cpu: "50m"
         {{- if not .Values.global.openshift.enabled }}
         securityContext:
-          {{- toYaml .Values.client.containerSecurityContext.tlsInit | nindent 10 }}
+          {{- $tmp := dict -}}
+          {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.client.containerSecurityContext.tlsInit -}}
+          {{- $dst | toYaml | nindent 10 }}
         {{- end }}
       {{- end }}
       {{- end }}

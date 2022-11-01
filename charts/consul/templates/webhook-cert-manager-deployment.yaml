@@ -45,6 +45,8 @@ spec:
             -deployment-namespace={{ .Release.Namespace }}
         image: {{ .Values.global.imageK8S }}
         name: webhook-cert-manager
+        securityContext:
+          {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
         resources:
           limits:
             cpu: 100m
@@ -69,5 +71,4 @@ spec:
       nodeSelector:
         {{ tpl .Values.webhookCertManager.nodeSelector . | indent 8 | trim }}
       {{- end }}
-
 {{- end }}

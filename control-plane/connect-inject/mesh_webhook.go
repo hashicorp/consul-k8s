@@ -172,6 +172,7 @@ type MeshWebhook struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
+	SecurityContext *corev1.SecurityContext
 	// Log
 	Log logr.Logger
 	// Log settings for consul-dataplane and connect-init containers.

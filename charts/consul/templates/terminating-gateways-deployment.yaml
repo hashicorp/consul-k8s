@@ -207,6 +207,8 @@ spec:
       containers:
         - name: terminating-gateway
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           volumeMounts:
             - name: consul-service
               mountPath: /consul/service

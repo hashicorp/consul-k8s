@@ -114,6 +114,8 @@ spec:
       containers:
         - name: post-install-job
           image: {{ .Values.global.imageK8S }}
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           env:
             - name: NAMESPACE
               valueFrom:

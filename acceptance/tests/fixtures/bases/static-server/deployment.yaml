@@ -15,12 +15,20 @@ spec:
     spec:
       containers:
         - name: static-server
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:latest
+          image: kyleschochenmaier/http-echo:test
           args:
             - -text="hello world"
             - -listen=:8080
           ports:
             - containerPort: 8080
               name: http
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
       serviceAccountName: static-server
       terminationGracePeriodSeconds: 0 # so deletion is quick

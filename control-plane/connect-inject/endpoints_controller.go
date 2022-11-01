@@ -134,6 +134,8 @@ type EndpointsController struct {
 	// whenever service instances are deregistered.
 	AuthMethod string
 
+	SecurityContext *corev1.SecurityContext
+
 	MetricsConfig MetricsConfig
 	Log           logr.Logger
 

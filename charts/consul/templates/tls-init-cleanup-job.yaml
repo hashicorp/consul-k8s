@@ -35,6 +35,8 @@ spec:
       containers:
         - name: tls-init-cleanup
           image: "{{ .Values.global.image }}"
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           env:
             - name: NAMESPACE
               valueFrom:

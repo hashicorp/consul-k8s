@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
         - name: static-server
-          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          image: kyleschochenmaier/http-echo:test
           args:
             - -text="hello world"
             - -listen=:8080

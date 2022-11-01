@@ -46,7 +46,9 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-cni
       {{- if not .Values.global.openshift.enabled }}
       securityContext:
-        {{- toYaml .Values.connectInject.cni.securityContext | nindent 8 -}}
+        {{- $tmp := dict -}}
+        {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.connectInject.cni.securityContext -}}
+        {{- $dst | toYaml | nindent 8 }}
       {{- end }}
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.

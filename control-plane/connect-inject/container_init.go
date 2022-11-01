@@ -93,16 +93,21 @@ func (w *MeshWebhook) initCopyContainer() corev1.Container {
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		Command: []string{"/bin/sh", "-ec", cmd},
+		SecurityContext: w.SecurityContext,
+		Command:         []string{"/bin/sh", "-ec", cmd},
 	}
 	// If running on OpenShift, don't set the security context and instead let OpenShift set a random user/group for us.
 	if !w.EnableOpenShift {
-		container.SecurityContext = &corev1.SecurityContext{
-			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
-			RunAsUser:              pointer.Int64(initContainersUserAndGroupID),
-			RunAsGroup:             pointer.Int64(initContainersUserAndGroupID),
-			RunAsNonRoot:           pointer.Bool(true),
-			ReadOnlyRootFilesystem: pointer.Bool(true),
+		if w.SecurityContext != nil {
+			container.SecurityContext = w.SecurityContext
+		} else {
+			container.SecurityContext = &corev1.SecurityContext{
+				// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
+				RunAsUser:              pointer.Int64(initContainersUserAndGroupID),
+				RunAsGroup:             pointer.Int64(initContainersUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
+			}
 		}
 	}
 	return container
@@ -276,9 +281,10 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: w.ConsulConfig.APITimeout.String(),
 			},
 		},
-		Resources:    w.InitContainerResources,
-		VolumeMounts: volMounts,
-		Command:      []string{"/bin/sh", "-ec", buf.String()},
+		Resources:       w.InitContainerResources,
+		VolumeMounts:    volMounts,
+		SecurityContext: w.SecurityContext,
+		Command:         []string{"/bin/sh", "-ec", buf.String()},
 	}
 
 	if w.TLSEnabled {
@@ -352,29 +358,37 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			})
 	}
 
-	if tproxyEnabled {
+	if w.SecurityContext != nil {
+		container.SecurityContext = w.SecurityContext
+	}
+
+	if false && tproxyEnabled {
 		// Running consul connect redirect-traffic with iptables
 		// requires both being a root user and having NET_ADMIN capability.
-		if !w.EnableCNI {
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:  pointer.Int64(rootUserAndGroupID),
-				RunAsGroup: pointer.Int64(rootUserAndGroupID),
-				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(true),
-				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{netAdminCapability},
-				},
-			}
+		if w.SecurityContext != nil {
+			container.SecurityContext = w.SecurityContext
 		} else {
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-				RunAsNonRoot: pointer.Bool(true),
-				Privileged:   pointer.Bool(false),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
+			if !w.EnableCNI {
+				container.SecurityContext = &corev1.SecurityContext{
+					RunAsUser:  pointer.Int64(rootUserAndGroupID),
+					RunAsGroup: pointer.Int64(rootUserAndGroupID),
+					// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
+					RunAsNonRoot: pointer.Bool(false),
+					Privileged:   pointer.Bool(true),
+					Capabilities: &corev1.Capabilities{
+						Add: []corev1.Capability{netAdminCapability},
+					},
+				}
+			} else {
+				container.SecurityContext = &corev1.SecurityContext{
+					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
+					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
+					RunAsNonRoot: pointer.Bool(true),
+					Privileged:   pointer.Bool(false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+				}
 			}
 		}
 	}

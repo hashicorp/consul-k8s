@@ -51,6 +51,8 @@ spec:
       {{- end }}
       containers:
         - name: apply-enterprise-license
+          securityContext:
+            {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           image: "{{ default .Values.global.image .Values.server.image }}"
           env:
             - name: ENTERPRISE_LICENSE
@@ -117,6 +119,8 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       initContainers:
       - name: ent-license-acl-init
+        securityContext:
+          {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
         image: {{ .Values.global.imageK8S }}
         command:
           - "/bin/sh"
