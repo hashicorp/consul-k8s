@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
 	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +55,7 @@ type ConfigEntryController struct {
 	ConsulClientConfig *consul.Config
 
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
-	ConsulServerConnMgr *discovery.Watcher
+	ConsulServerConnMgr consul.ServerConnectionManager
 
 	// DatacenterName indicates the Consul Datacenter name the controller is
 	// operating in. Adds this value as metadata on managed resources.

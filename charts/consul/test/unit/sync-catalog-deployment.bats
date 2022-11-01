@@ -62,21 +62,33 @@ load _helpers
   [ "${actual}" = "bar" ]
 }
 
-@test "syncCatalog/Deployment: command defaults" {
+@test "syncCatalog/Deployment: consul env defaults" {
   cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
+  local env=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-  
-  local actual=$(echo $object |
-      yq -r ' any(contains("consul-k8s-control-plane sync-catalog"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-      yq -r ' any(contains("consul-api-timeout=5"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-server.default.svc" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8502" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8500" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_DATACENTER").value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
+  [ "${actual}" = "5s" ]
 }
 
 #--------------------------------------------------------------------
@@ -438,286 +450,82 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "syncCatalog/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
+@test "syncCatalog/Deployment: ACL auth method env vars are set when acls are enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local env=$(helm template \
       -s templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul-k8s-control-plane consul-logout -consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_AUTH_METHOD").value' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-k8s-component-auth-method" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_DATACENTER").value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_META").value' | tee /dev/stderr)
+  [ "${actual}" = 'component=sync-catalog,pod=$(NAMESPACE)/$(POD_NAME)' ]
 }
 
-@test "syncCatalog/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
+@test "syncCatalog/Deployment: sets global auth method and primary datacenter when federation and acls and namespaces are enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "syncCatalog/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls disabled" {
-  cd `chart_dir`
-  local object=$(helm template \
+  local env=$(helm template \
       -s templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "sync-catalog-acl-init" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
-      echo $actual
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "sync-catalog-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.adminPartitions.name=default' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "sync-catalog-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.adminPartitions.name=default' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name == "sync-catalog")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "sync-catalog-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: auto-encrypt init container is created and is the first init-container when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "get-auto-encrypt-client-ca" ]
-}
-
-@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command when in non-primary datacenter with Consul Namespaces disabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.datacenter=dc2' \
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc1' \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "sync-catalog-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command when in non-primary datacenter with Consul Namespaces enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/sync-catalog-deployment.yaml \
-      --set 'syncCatalog.enabled=true' \
       --set 'global.datacenter=dc2' \
       --set 'global.enableConsulNamespaces=true' \
-      --set 'global.federation.enabled=true' \
-      --set 'global.federation.primaryDatacenter=dc1' \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
+      --set 'meshGateway.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "sync-catalog-acl-init")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_AUTH_METHOD").value' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-k8s-component-auth-method-dc2" ]
 
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_DATACENTER").value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+}
 
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+@test "syncCatalog/Deployment: sets default login partition and acls and partitions are enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_PARTITION").value' | tee /dev/stderr)
+  [ "${actual}" = "default" ]
+}
+
+@test "syncCatalog/Deployment: sets non-default login partition and acls and partitions are enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=foo' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_LOGIN_PARTITION").value' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
 }
 
 #--------------------------------------------------------------------
@@ -757,12 +565,17 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://$(HOST_IP):8501' ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
 
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_USE_TLS").value' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
 @test "syncCatalog/Deployment: can overwrite CA secret with the provided one" {
@@ -788,82 +601,14 @@ load _helpers
   [ "${actual}" = "key" ]
 }
 
-@test "syncCatalog/Deployment: consul-auto-encrypt-ca-cert volume is not added with auto-encrypt and client.enabled=false" {
+@test "syncCatalog/Deployment: consul-ca-cert volumeMount is added when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-auto-encrypt-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
-}
-
-@test "syncCatalog/Deployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: consul-ca-cert volumeMount is added when TLS with auto-encrypt is enabled and client disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'client.enabled=true' \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "syncCatalog/Deployment: adds both init containers when TLS with auto-encrypt and ACLs are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers | length == 2' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1099,79 +844,6 @@ load _helpers
   [ "${actual}" = '{"limits":{"cpu":"200m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
 }
 
-
-#--------------------------------------------------------------------
-# clients.enabled
-
-@test "syncCatalog/Deployment: HOST_IP is used when client.enabled=true" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'http://$(HOST_IP):8500' ]
-}
-
-@test "syncCatalog/Deployment: HOST_IP is used when client.enabled=true and global.tls.enabled=true" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://$(HOST_IP):8501' ]
-
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
-}
-
-@test "syncCatalog/Deployment: consul service is used when client.enabled=false and global.tls.enabled=true and autoencrypt on" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://release-name-consul-server:8501' ]
-
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
-}
-
-@test "syncCatalog/Deployment: consul service is used when client.enabled=false and global.tls.enabled=true" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://release-name-consul-server:8501' ]
-
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
-}
-
 #--------------------------------------------------------------------
 # priorityClassName
 
@@ -1278,37 +950,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# get-auto-encrypt-client-ca
-
-@test "syncCatalog/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/sync-catalog-deployment.yaml  \
-      --set 'syncCatalog.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
-  [ "${actual}" = "true" ]
-
-  # check server port
-  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
-
-  # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # Vault
 
 @test "syncCatalog/Deployment: configures server CA to come from vault when vault is enabled" {
@@ -1317,7 +958,6 @@ load _helpers
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -1350,7 +990,6 @@ load _helpers
     -s templates/sync-catalog-deployment.yaml  \
     --set 'syncCatalog.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1371,7 +1010,6 @@ load _helpers
     -s templates/sync-catalog-deployment.yaml  \
     --set 'syncCatalog.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1393,7 +1031,6 @@ load _helpers
     -s templates/sync-catalog-deployment.yaml  \
     --set 'syncCatalog.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1415,7 +1052,6 @@ load _helpers
     -s templates/sync-catalog-deployment.yaml  \
     --set 'syncCatalog.enabled=true' \
     --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
@@ -1456,7 +1092,6 @@ load _helpers
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \

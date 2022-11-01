@@ -875,7 +875,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server.
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 
 			// Register service and proxy in consul.
@@ -2022,7 +2022,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consulServer server.
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 
 			// Create the endpoints controller.
@@ -3287,7 +3287,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 
 			// Create test consulServer server
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
-			testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				if tt.enableACLs {
 					c.ACL.Enabled = tt.enableACLs
 					c.ACL.Tokens.InitialManagement = adminToken
@@ -3724,7 +3724,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 
 			// Create test consulServer server
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
-			testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				if tt.enableACLs {
 					c.ACL.Enabled = tt.enableACLs
 					c.ACL.Tokens.InitialManagement = adminToken
@@ -3875,7 +3875,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consulServer server
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 
 			// Set up the initial Consul services.
@@ -3984,7 +3984,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 	// Create test consulServer server
-	testClient := test.TestServerWithConnMgrWatcher(t, nil)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
 
 	// Create the endpoints controller.

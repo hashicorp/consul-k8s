@@ -230,7 +230,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			client := testClient.APIClient
 
 			// Add the client config and watcher to the test's meshWebhook
@@ -486,7 +486,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			// Set up consul server
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
-			testClient := test.TestServerWithConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.ACL.Enabled = true
 				c.ACL.Tokens.InitialManagement = adminToken
 			})
@@ -589,7 +589,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			testClient := test.TestServerWithConnMgrWatcher(t, nil)
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})

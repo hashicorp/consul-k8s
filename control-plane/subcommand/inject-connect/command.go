@@ -149,7 +149,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
-		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.") // todo: rename this to be more specific?
+		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",

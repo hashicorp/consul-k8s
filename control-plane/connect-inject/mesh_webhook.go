@@ -14,7 +14,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,7 +36,7 @@ type MeshWebhook struct {
 	ConsulConfig *consul.Config
 
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
-	ConsulServerConnMgr *discovery.Watcher
+	ConsulServerConnMgr consul.ServerConnectionManager
 
 	// ImageConsul is the container image for Consul to use.
 	// ImageConsulDataplane is the container image for Envoy to use.
