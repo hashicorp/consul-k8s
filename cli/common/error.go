@@ -1,24 +1,25 @@
 package common
 
-// DeletionError should be used when a request was made to delete a resource
-// and that request failed.
-type DeletionError struct {
+// DanglingResourceError should be used when a request was made to remove
+// a resource and the resource still remains after enough time has elapsed
+// that it should have been removed by Kubernetes.
+type DanglingResourceError struct {
 	message string
 }
 
-// NewDeletionError returns a new instance of DeletionError for handling
-// failures in deletion requests.
-func NewDeletionError(message string) *DeletionError {
-	return &DeletionError{message}
+// NewDanglingResourceError returns a new instance of DanglingResourceError with
+// the given message.
+func NewDanglingResourceError(message string) *DanglingResourceError {
+	return &DanglingResourceError{message}
 }
 
-// Error returns a string representation of the deletion error.
-func (d *DeletionError) Error() string {
+// Error returns a string representation of the dangling resource error.
+func (d *DanglingResourceError) Error() string {
 	return d.message
 }
 
-// IsDeletionError returns true if the error passed in is of type DeletionError.
-func IsDeletionError(err error) bool {
-	_, ok := err.(*DeletionError)
+// IsDanglingResourceError returns true if the error passed in is of type DanglingResourceError.
+func IsDanglingResourceError(err error) bool {
+	_, ok := err.(*DanglingResourceError)
 	return ok
 }

@@ -423,11 +423,11 @@ func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
 			return err
 		}
 		if len(crs) != 0 {
-			return common.NewDeletionError(fmt.Sprintf("%d custom resources remain after deletion request. Retrying deletion", len(crs)))
+			return common.NewDanglingResourceError(fmt.Sprintf("%d custom resources remain after deletion request", len(crs)))
 		}
 		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
-	if !common.IsDeletionError(err) {
+	if !common.IsDanglingResourceError(err) {
 		return err
 	}
 
@@ -443,12 +443,18 @@ func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
 		return err
 	}
 
-	crs, err = c.fetchCustomResources(crds)
+	err = backoff.Retry(func() error {
+		crs, err := c.fetchCustomResources(crds)
+		if err != nil {
+			return err
+		}
+		if len(crs) != 0 {
+			return common.NewDanglingResourceError(fmt.Sprintf("%d custom resources remain after request to patch finalizers", len(crs)))
+		}
+		return nil
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
 	if err != nil {
-		return err
-	}
-	if len(crs) != 0 {
-		return fmt.Errorf("unable to remove all custom resources managed by Consul. %d custom resources remain and will need to be removed manually", len(crs))
+		return fmt.Errorf("unable to remove all custom resources managed by Consul. %d custom resources remain and will need to be removed manually. %v", len(crs), err)
 	}
 
 	return nil
