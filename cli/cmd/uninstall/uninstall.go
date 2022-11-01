@@ -2,6 +2,7 @@ package uninstall
 
 import (
 	"fmt"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
@@ -521,7 +522,7 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToRe
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Patch(c.Ctx, cr.GetName(), types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
-		if common.IgnoreNotFoundError(err) != nil {
+		if err != nil && !k8serrors.IsNotFound(err) {
 			return err
 		}
 	}

@@ -446,7 +446,7 @@ func TestFetchCustomResources(t *testing.T) {
 			},
 		},
 	}
-	nonConsulCR := unstructured.Unstructured{
+	nonConsulCR1 := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "example.com/v1",
 			"kind":       "Example",
@@ -456,13 +456,26 @@ func TestFetchCustomResources(t *testing.T) {
 			},
 		},
 	}
+	nonConsulCR2 := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "example.com/v1",
+			"kind":       "Example",
+			"metadata": map[string]interface{}{
+				"name":      "example-resource",
+				"namespace": "other",
+			},
+		},
+	}
 
 	c := getInitializedCommand(t, nil)
+	c.kubernetes = fake.NewSimpleClientset(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}})
 	c.apiext, c.dynamic = createClientsWithCrds()
 
 	_, err := c.dynamic.Resource(serviceDefaultsGRV).Namespace("default").Create(context.Background(), &cr, metav1.CreateOptions{})
 	require.NoError(t, err)
-	_, err = c.dynamic.Resource(nonConsulGRV).Namespace("default").Create(context.Background(), &nonConsulCR, metav1.CreateOptions{})
+	_, err = c.dynamic.Resource(nonConsulGRV).Namespace("default").Create(context.Background(), &nonConsulCR1, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.dynamic.Resource(nonConsulGRV).Namespace("other").Create(context.Background(), &nonConsulCR2, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	crds, err := c.fetchCustomResourceDefinitions()
@@ -472,7 +485,8 @@ func TestFetchCustomResources(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, actual, 1)
 	require.Contains(t, actual, cr)
-	require.NotContains(t, actual, nonConsulCR)
+	require.NotContains(t, actual, nonConsulCR1)
+	require.NotContains(t, actual, nonConsulCR2)
 }
 
 func TestDeleteCustomResources(t *testing.T) {
