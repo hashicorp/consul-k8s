@@ -2,11 +2,12 @@ package uninstall
 
 import (
 	"fmt"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -55,9 +56,9 @@ type Command struct {
 	helmActionsRunner helm.HelmActionsRunner
 
 	// Configuration for interacting with Kubernetes.
-	kubernetes kubernetes.Interface
-	dynamic    dynamic.Interface
-	apiext     apiext.Interface
+	k8sClient        kubernetes.Interface
+	dynamicK8sClient dynamic.Interface
+	apiextK8sClient  apiext.Interface
 
 	set *flag.Sets
 
@@ -323,20 +324,20 @@ func (c *Command) initKubernetes(settings *helmCLI.EnvSettings) error {
 		return err
 	}
 
-	if c.kubernetes == nil {
-		if c.kubernetes, err = kubernetes.NewForConfig(restConfig); err != nil {
+	if c.k8sClient == nil {
+		if c.k8sClient, err = kubernetes.NewForConfig(restConfig); err != nil {
 			return err
 		}
 	}
 
-	if c.dynamic == nil {
-		if c.dynamic, err = dynamic.NewForConfig(restConfig); err != nil {
+	if c.dynamicK8sClient == nil {
+		if c.dynamicK8sClient, err = dynamic.NewForConfig(restConfig); err != nil {
 			return err
 		}
 	}
 
-	if c.apiext == nil {
-		if c.apiext, err = apiext.NewForConfig(restConfig); err != nil {
+	if c.apiextK8sClient == nil {
+		if c.apiextK8sClient, err = apiext.NewForConfig(restConfig); err != nil {
 			return err
 		}
 	}
@@ -438,7 +439,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 
 // fetchCustomResourceDefinitions fetches all Custom Resource Definitions managed by Consul.
 func (c *Command) fetchCustomResourceDefinitions() (*apiextv1.CustomResourceDefinitionList, error) {
-	return c.apiext.ApiextensionsV1().CustomResourceDefinitions().List(c.Ctx, metav1.ListOptions{
+	return c.apiextK8sClient.ApiextensionsV1().CustomResourceDefinitions().List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "app=consul",
 	})
 }
@@ -455,7 +456,7 @@ func (c *Command) fetchCustomResources(crds *apiextv1.CustomResourceDefinitionLi
 				Resource: crd.Spec.Names.Plural,
 			}
 
-			crList, err := c.dynamic.Resource(target).List(c.Ctx, metav1.ListOptions{})
+			crList, err := c.dynamicK8sClient.Resource(target).List(c.Ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -484,7 +485,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToR
 			Resource: kindToResource[cr.GetKind()],
 		}
 
-		err := c.dynamic.
+		err := c.dynamicK8sClient.
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Delete(c.Ctx, cr.GetName(), metav1.DeleteOptions{})
@@ -518,7 +519,7 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToRe
 			Resource: kindToResource[cr.GetKind()],
 		}
 
-		_, err := c.dynamic.
+		_, err := c.dynamicK8sClient.
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Patch(c.Ctx, cr.GetName(), types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
@@ -581,7 +582,7 @@ func (c *Command) findExistingInstallation(options *helm.CheckForInstallationsOp
 func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) error {
 	var pvcNames []string
 	pvcSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	pvcs, err := c.kubernetes.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).List(c.Ctx, pvcSelector)
+	pvcs, err := c.k8sClient.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).List(c.Ctx, pvcSelector)
 	if err != nil {
 		return fmt.Errorf("deletePVCs: %s", err)
 	}
@@ -590,14 +591,14 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 		return nil
 	}
 	for _, pvc := range pvcs.Items {
-		err := c.kubernetes.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).Delete(c.Ctx, pvc.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).Delete(c.Ctx, pvc.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deletePVCs: error deleting PVC %q: %s", pvc.Name, err)
 		}
 		pvcNames = append(pvcNames, pvc.Name)
 	}
 	err = backoff.Retry(func() error {
-		pvcs, err := c.kubernetes.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).List(c.Ctx, pvcSelector)
+		pvcs, err := c.k8sClient.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).List(c.Ctx, pvcSelector)
 		if err != nil {
 			return fmt.Errorf("deletePVCs: %s", err)
 		}
@@ -620,7 +621,7 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 
 // deleteSecrets deletes any secrets that have the label "managed-by" set to "consul-k8s".
 func (c *Command) deleteSecrets(foundReleaseNamespace string) error {
-	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{
+	secrets, err := c.k8sClient.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue,
 	})
 	if err != nil {
@@ -632,7 +633,7 @@ func (c *Command) deleteSecrets(foundReleaseNamespace string) error {
 	}
 	var secretNames []string
 	for _, secret := range secrets.Items {
-		err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)
 		}
@@ -651,7 +652,7 @@ func (c *Command) deleteSecrets(foundReleaseNamespace string) error {
 func (c *Command) deleteServiceAccounts(foundReleaseName, foundReleaseNamespace string) error {
 	var serviceAccountNames []string
 	saSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	sas, err := c.kubernetes.CoreV1().ServiceAccounts(foundReleaseNamespace).List(c.Ctx, saSelector)
+	sas, err := c.k8sClient.CoreV1().ServiceAccounts(foundReleaseNamespace).List(c.Ctx, saSelector)
 	if err != nil {
 		return fmt.Errorf("deleteServiceAccounts: %s", err)
 	}
@@ -660,7 +661,7 @@ func (c *Command) deleteServiceAccounts(foundReleaseName, foundReleaseNamespace 
 		return nil
 	}
 	for _, sa := range sas.Items {
-		err := c.kubernetes.CoreV1().ServiceAccounts(foundReleaseNamespace).Delete(c.Ctx, sa.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.CoreV1().ServiceAccounts(foundReleaseNamespace).Delete(c.Ctx, sa.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteServiceAccounts: error deleting ServiceAccount %q: %s", sa.Name, err)
 		}
@@ -679,7 +680,7 @@ func (c *Command) deleteServiceAccounts(foundReleaseName, foundReleaseNamespace 
 func (c *Command) deleteRoles(foundReleaseName, foundReleaseNamespace string) error {
 	var roleNames []string
 	roleSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	roles, err := c.kubernetes.RbacV1().Roles(foundReleaseNamespace).List(c.Ctx, roleSelector)
+	roles, err := c.k8sClient.RbacV1().Roles(foundReleaseNamespace).List(c.Ctx, roleSelector)
 	if err != nil {
 		return fmt.Errorf("deleteRoles: %s", err)
 	}
@@ -688,7 +689,7 @@ func (c *Command) deleteRoles(foundReleaseName, foundReleaseNamespace string) er
 		return nil
 	}
 	for _, role := range roles.Items {
-		err := c.kubernetes.RbacV1().Roles(foundReleaseNamespace).Delete(c.Ctx, role.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.RbacV1().Roles(foundReleaseNamespace).Delete(c.Ctx, role.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteRoles: error deleting Role %q: %s", role.Name, err)
 		}
@@ -707,7 +708,7 @@ func (c *Command) deleteRoles(foundReleaseName, foundReleaseNamespace string) er
 func (c *Command) deleteRoleBindings(foundReleaseName, foundReleaseNamespace string) error {
 	var rolebindingNames []string
 	rolebindingSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	rolebindings, err := c.kubernetes.RbacV1().RoleBindings(foundReleaseNamespace).List(c.Ctx, rolebindingSelector)
+	rolebindings, err := c.k8sClient.RbacV1().RoleBindings(foundReleaseNamespace).List(c.Ctx, rolebindingSelector)
 	if err != nil {
 		return fmt.Errorf("deleteRoleBindings: %s", err)
 	}
@@ -716,7 +717,7 @@ func (c *Command) deleteRoleBindings(foundReleaseName, foundReleaseNamespace str
 		return nil
 	}
 	for _, rolebinding := range rolebindings.Items {
-		err := c.kubernetes.RbacV1().RoleBindings(foundReleaseNamespace).Delete(c.Ctx, rolebinding.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.RbacV1().RoleBindings(foundReleaseNamespace).Delete(c.Ctx, rolebinding.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteRoleBindings: error deleting Role %q: %s", rolebinding.Name, err)
 		}
@@ -735,7 +736,7 @@ func (c *Command) deleteRoleBindings(foundReleaseName, foundReleaseNamespace str
 func (c *Command) deleteJobs(foundReleaseName, foundReleaseNamespace string) error {
 	var jobNames []string
 	jobSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	jobs, err := c.kubernetes.BatchV1().Jobs(foundReleaseNamespace).List(c.Ctx, jobSelector)
+	jobs, err := c.k8sClient.BatchV1().Jobs(foundReleaseNamespace).List(c.Ctx, jobSelector)
 	if err != nil {
 		return fmt.Errorf("deleteJobs: %s", err)
 	}
@@ -744,7 +745,7 @@ func (c *Command) deleteJobs(foundReleaseName, foundReleaseNamespace string) err
 		return nil
 	}
 	for _, job := range jobs.Items {
-		err := c.kubernetes.BatchV1().Jobs(foundReleaseNamespace).Delete(c.Ctx, job.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.BatchV1().Jobs(foundReleaseNamespace).Delete(c.Ctx, job.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteJobs: error deleting Job %q: %s", job.Name, err)
 		}
@@ -763,7 +764,7 @@ func (c *Command) deleteJobs(foundReleaseName, foundReleaseNamespace string) err
 func (c *Command) deleteClusterRoles(foundReleaseName string) error {
 	var clusterRolesNames []string
 	clusterRolesSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	clusterRoles, err := c.kubernetes.RbacV1().ClusterRoles().List(c.Ctx, clusterRolesSelector)
+	clusterRoles, err := c.k8sClient.RbacV1().ClusterRoles().List(c.Ctx, clusterRolesSelector)
 	if err != nil {
 		return fmt.Errorf("deleteClusterRoles: %s", err)
 	}
@@ -772,7 +773,7 @@ func (c *Command) deleteClusterRoles(foundReleaseName string) error {
 		return nil
 	}
 	for _, clusterRole := range clusterRoles.Items {
-		err := c.kubernetes.RbacV1().ClusterRoles().Delete(c.Ctx, clusterRole.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.RbacV1().ClusterRoles().Delete(c.Ctx, clusterRole.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteClusterRoles: error deleting cluster role %q: %s", clusterRole.Name, err)
 		}
@@ -791,7 +792,7 @@ func (c *Command) deleteClusterRoles(foundReleaseName string) error {
 func (c *Command) deleteClusterRoleBindings(foundReleaseName string) error {
 	var clusterRoleBindingsNames []string
 	clusterRoleBindingsSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
-	clusterRoleBindings, err := c.kubernetes.RbacV1().ClusterRoleBindings().List(c.Ctx, clusterRoleBindingsSelector)
+	clusterRoleBindings, err := c.k8sClient.RbacV1().ClusterRoleBindings().List(c.Ctx, clusterRoleBindingsSelector)
 	if err != nil {
 		return fmt.Errorf("deleteClusterRoleBindings: %s", err)
 	}
@@ -800,7 +801,7 @@ func (c *Command) deleteClusterRoleBindings(foundReleaseName string) error {
 		return nil
 	}
 	for _, clusterRoleBinding := range clusterRoleBindings.Items {
-		err := c.kubernetes.RbacV1().ClusterRoleBindings().Delete(c.Ctx, clusterRoleBinding.Name, metav1.DeleteOptions{})
+		err := c.k8sClient.RbacV1().ClusterRoleBindings().Delete(c.Ctx, clusterRoleBinding.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("deleteClusterRoleBindings: error deleting cluster role binding %q: %s", clusterRoleBinding.Name, err)
 		}
