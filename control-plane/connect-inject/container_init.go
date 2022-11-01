@@ -242,7 +242,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 					Add: []corev1.Capability{netAdminCapability},
 				},
 			}
->>>>>>> main
 		} else {
 			if !w.EnableCNI {
 				container.SecurityContext = &corev1.SecurityContext{
