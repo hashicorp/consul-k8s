@@ -395,6 +395,10 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	return nil
 }
 
+// removeCustomResources fetches a list of custom resource defintions managed
+// by Consul and attempts to delete every custom resource for each definition.
+// If the resources cannot be deleted directly, the finalizers on each resource
+// are patched to be an empty list, freeing them to be deleted by Kubernetes.
 func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
 	uiLogger("Deleting custom resources managed by Consul")
 
