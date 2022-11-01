@@ -116,8 +116,6 @@ type Command struct {
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
 
-	podSecurityStandard *corev1.PodSecurityContext
-
 	clientset kubernetes.Interface
 
 	once sync.Once
