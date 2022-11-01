@@ -11,6 +11,24 @@ metadata:
     release: {{ .Release.Name }}
     component: api-gateway-controller
 rules:
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+{{- end}}
 - apiGroups:
   - api-gateway.consul.hashicorp.com
   resources:
