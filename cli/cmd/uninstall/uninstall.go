@@ -371,7 +371,9 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 	// Delete any custom resources managed by Consul. If they cannot be deleted,
 	// patch the finalizers to be empty on each one.
 	if releaseType == common.ReleaseTypeConsul {
-		c.removeCustomResources(uiLogger)
+		if err := c.removeCustomResources(uiLogger); err != nil {
+			c.UI.Output("Error removing custom resources: %v", err.Error(), terminal.WithErrorStyle())
+		}
 	}
 
 	actionConfig, err := helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
@@ -408,6 +410,7 @@ func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
 	if err != nil {
 		return err
 	}
+
 	if err = c.deleteCustomResources(crs, kindToResource, uiLogger); err != nil {
 		return err
 	}
@@ -422,28 +425,28 @@ func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
 		}
 		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 5))
-	if common.IsDeletionError(err) {
-		uiLogger("Patching finalizers on custom resources managed by Consul")
-
-		crs, err := c.fetchCustomResources(crds)
-		if err != nil {
-			return err
-		}
-
-		if err = c.patchCustomResources(crs, kindToResource, uiLogger); err != nil {
-			return err
-		}
-
-		crs, err = c.fetchCustomResources(crds)
-		if err != nil {
-			return err
-		}
-
-		if len(crs) != 0 {
-			c.UI.Output("Unable to remove all custom resources managed by Consul. %d custom resources remain and will need to be removed manually.", len(crs), terminal.WithErrorStyle())
-		}
-	} else if err != nil {
+	if !common.IsDeletionError(err) {
 		return err
+	}
+
+	// Custom resources could not be deleted directly, attempt to patch their finalizers to an empty array.
+	uiLogger("Patching finalizers on custom resources managed by Consul")
+
+	crs, err = c.fetchCustomResources(crds)
+	if err != nil {
+		return err
+	}
+
+	if err = c.patchCustomResources(crs, kindToResource, uiLogger); err != nil {
+		return err
+	}
+
+	crs, err = c.fetchCustomResources(crds)
+	if err != nil {
+		return err
+	}
+	if len(crs) != 0 {
+		return fmt.Errorf("unable to remove all custom resources managed by Consul. %d custom resources remain and will need to be removed manually", len(crs))
 	}
 
 	return nil
