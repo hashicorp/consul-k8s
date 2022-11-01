@@ -3,7 +3,6 @@ package uninstall
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -473,19 +472,18 @@ func (c *Command) fetchCustomResources(crds *apiextv1.CustomResourceDefinitionLi
 // sends a request to each one to be deleted.
 func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string) error {
 	for _, cr := range crs {
-		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
-		group, version := apiVersion[0], apiVersion[1]
-		if group == "" || version == "" {
-			return fmt.Errorf("malformed api version: %s", apiVersion)
+		gv, err := schema.ParseGroupVersion(cr.GetAPIVersion())
+		if err != nil {
+			return err
 		}
 
 		target := schema.GroupVersionResource{
-			Group:    group,
-			Version:  version,
+			Group:    gv.Group,
+			Version:  gv.Version,
 			Resource: kindToResource[cr.GetKind()],
 		}
 
-		err := c.dynamicK8sClient.
+		err = c.dynamicK8sClient.
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Delete(c.Ctx, cr.GetName(), metav1.DeleteOptions{})
@@ -507,19 +505,18 @@ func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToRe
 	}]`)
 
 	for _, cr := range crs {
-		apiVersion := strings.Split(cr.GetAPIVersion(), "/")
-		group, version := apiVersion[0], apiVersion[1]
-		if group == "" || version == "" {
-			return fmt.Errorf("malformed api version: %s", apiVersion)
+		gv, err := schema.ParseGroupVersion(cr.GetAPIVersion())
+		if err != nil {
+			return err
 		}
 
 		target := schema.GroupVersionResource{
-			Group:    group,
-			Version:  version,
+			Group:    gv.Group,
+			Version:  gv.Version,
 			Resource: kindToResource[cr.GetKind()],
 		}
 
-		_, err := c.dynamicK8sClient.
+		_, err = c.dynamicK8sClient.
 			Resource(target).
 			Namespace(cr.GetNamespace()).
 			Patch(c.Ctx, cr.GetName(), types.JSONPatchType, finalizerPatch, metav1.PatchOptions{})
