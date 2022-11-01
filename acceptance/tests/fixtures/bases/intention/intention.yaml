@@ -1,4 +1,4 @@
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceIntentions
 metadata:
   name: client-to-server

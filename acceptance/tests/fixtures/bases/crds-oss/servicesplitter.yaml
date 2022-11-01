@@ -1,18 +1,18 @@
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: splitter
 spec:
   protocol: http
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: other-splitter
 spec:
   protocol: http
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceSplitter
 metadata:
   name: splitter

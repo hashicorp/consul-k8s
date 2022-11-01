@@ -1,4 +1,4 @@
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: IngressGateway
 metadata:
   name: ingress-gateway

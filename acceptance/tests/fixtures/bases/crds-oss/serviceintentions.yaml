@@ -1,23 +1,23 @@
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: svc1
 spec:
   protocol: http
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: svc2
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: svc3
 spec:
   protocol: http
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceIntentions
 metadata:
   name: intentions
