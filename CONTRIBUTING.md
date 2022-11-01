@@ -164,7 +164,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 ### The Structs
 1. Run the generate command:
     ```bash
-    operator-sdk create api --group consul --version v1alpha1 --kind IngressGateway --controller --namespaced=true --make=false --resource=true
+    operator-sdk create api --group consul --version v1 --kind IngressGateway --controller --namespaced=true --make=false --resource=true
     ```
 1. Re-order the file so it looks like:
     ```go
@@ -339,7 +339,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 1. Replace the names
 1. Ensure you've correctly replaced the names in the kubebuilder annotation, ensure the plurality is correct
     ```go
-    // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-ingressgateway,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=ingressgateways,versions=v1alpha1,name=mutate-ingressgateway.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
+    // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1-ingressgateway,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=ingressgateways,versions=v1,name=mutate-ingressgateway.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
     ```
 
 ### Update command.go
@@ -363,8 +363,8 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 1. Update `control-plane/subcommand/controller/command.go` and add your webhook (the path should match the kubebuilder annotation):
     ```go
-    mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-        &webhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
+    mgr.GetWebhookServer().Register("/mutate-v1-ingressgateway",
+        &webhook.Admission{Handler: &consulv1.IngressGatewayWebhook{
             Client:                     mgr.GetClient(),
             ConsulClient:               consulClient,
             Logger:                     ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
@@ -376,10 +376,10 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 ### Generating YAML
 1. Run `make ctrl-manifests` to generate the CRD and webhook YAML.
 1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patchesStrategicMerge:`
-1. Update the sample, e.g. `control-plane/config/samples/consul_v1alpha1_ingressgateway.yaml` to a valid resource
+1. Update the sample, e.g. `control-plane/config/samples/consul_v1_ingressgateway.yaml` to a valid resource
    that can be used for testing:
     ```yaml
-    apiVersion: consul.hashicorp.com/v1alpha1
+    apiVersion: consul.hashicorp.com/v1
     kind: IngressGateway
     metadata:
       name: ingressgateway-sample
@@ -402,7 +402,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
         service:
           name: {{ template "consul.fullname" . }}-controller-webhook
           namespace: {{ .Release.Namespace }}
-          path: /mutate-v1alpha1-ingressgateway
+          path: /mutate-v1-ingressgateway
       failurePolicy: Fail
       admissionReviewVersions:
         - "v1beta1"
@@ -412,7 +412,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
         - apiGroups:
             - consul.hashicorp.com
           apiVersions:
-            - v1alpha1
+            - v1
           operations:
             - CREATE
             - UPDATE

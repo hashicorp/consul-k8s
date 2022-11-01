@@ -15,7 +15,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-proxydefaults
+      path: /mutate-v1-proxydefaults
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -25,6 +25,7 @@ webhooks:
     - apiGroups:
       - consul.hashicorp.com
       apiVersions:
+      - v1
       - v1alpha1
       operations:
       - CREATE
@@ -36,7 +37,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-mesh
+      path: /mutate-v1-mesh
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -46,6 +47,7 @@ webhooks:
     - apiGroups:
       - consul.hashicorp.com
       apiVersions:
+      - v1
       - v1alpha1
       operations:
       - CREATE
@@ -57,7 +59,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-servicedefaults
+      path: /mutate-v1-servicedefaults
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -67,6 +69,7 @@ webhooks:
   - apiGroups:
     - consul.hashicorp.com
     apiVersions:
+    - v1
     - v1alpha1
     operations:
     - CREATE
@@ -78,7 +81,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-serviceresolver
+      path: /mutate-v1-serviceresolver
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -88,6 +91,7 @@ webhooks:
   - apiGroups:
     - consul.hashicorp.com
     apiVersions:
+    - v1
     - v1alpha1
     operations:
     - CREATE
@@ -99,7 +103,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-servicerouter
+      path: /mutate-v1-servicerouter
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -109,6 +113,7 @@ webhooks:
   - apiGroups:
     - consul.hashicorp.com
     apiVersions:
+    - v1
     - v1alpha1
     operations:
     - CREATE
@@ -120,7 +125,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-servicesplitter
+      path: /mutate-v1-servicesplitter
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -130,6 +135,7 @@ webhooks:
   - apiGroups:
     - consul.hashicorp.com
     apiVersions:
+    - v1
     - v1alpha1
     operations:
     - CREATE
@@ -141,7 +147,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-serviceintentions
+      path: /mutate-v1-serviceintentions
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -151,6 +157,7 @@ webhooks:
   - apiGroups:
     - consul.hashicorp.com
     apiVersions:
+    - v1
     - v1alpha1
     operations:
     - CREATE
@@ -162,7 +169,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-ingressgateway
+      path: /mutate-v1-ingressgateway
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -172,6 +179,7 @@ webhooks:
   - apiGroups:
       - consul.hashicorp.com
     apiVersions:
+      - v1
       - v1alpha1
     operations:
       - CREATE
@@ -183,7 +191,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-terminatinggateway
+      path: /mutate-v1-terminatinggateway
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -193,6 +201,7 @@ webhooks:
   - apiGroups:
       - consul.hashicorp.com
     apiVersions:
+      - v1
       - v1alpha1
     operations:
       - CREATE
@@ -204,7 +213,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-exportedservices
+      path: /mutate-v1-exportedservices
   failurePolicy: Fail
   admissionReviewVersions:
   - "v1beta1"
@@ -214,6 +223,7 @@ webhooks:
   - apiGroups:
       - consul.hashicorp.com
     apiVersions:
+      - v1
       - v1alpha1
     operations:
       - CREATE

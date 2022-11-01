@@ -44,11 +44,12 @@ webhooks:
       service:
         name: {{ template "consul.fullname" . }}-connect-injector
         namespace: {{ .Release.Namespace }}
-        path: "/mutate-v1alpha1-peeringacceptors"
+        path: "/mutate-v1-peeringacceptors"
     rules:
       - apiGroups:
           - consul.hashicorp.com
         apiVersions:
+          - v1
           - v1alpha1
         operations:
           - CREATE
@@ -65,11 +66,12 @@ webhooks:
       service:
         name: {{ template "consul.fullname" . }}-connect-injector
         namespace: {{ .Release.Namespace }}
-        path: "/mutate-v1alpha1-peeringdialers"
+        path: "/mutate-v1-peeringdialers"
     rules:
       - apiGroups:
           - consul.hashicorp.com
         apiVersions:
+          - v1
           - v1alpha1
         operations:
           - CREATE

@@ -25,7 +25,7 @@ metadata:
   name: product-api
 automountServiceAccountToken: true
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: product-api
@@ -96,7 +96,7 @@ spec:
               mountPath: /config
               readOnly: true
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceIntentions
 metadata:
   name: product-api-to-postgres

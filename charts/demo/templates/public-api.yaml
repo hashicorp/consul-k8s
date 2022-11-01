@@ -26,7 +26,7 @@ metadata:
   name: public-api
 automountServiceAccountToken: true
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceDefaults
 metadata:
   name: public-api
@@ -67,7 +67,7 @@ spec:
               value: "http://product-api.{{ .Release.Namespace }}.svc.cluster.local:9090"
               # END CONSUL-K8S MODIFICATION
 ---
-apiVersion: consul.hashicorp.com/v1alpha1
+apiVersion: consul.hashicorp.com/v1
 kind: ServiceIntentions
 metadata:
   name: public-api-to-product-api
