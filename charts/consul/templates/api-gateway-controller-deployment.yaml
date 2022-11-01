@@ -237,4 +237,8 @@ spec:
       nodeSelector:
         {{ tpl .Values.apiGateway.controller.nodeSelector . | indent 8 | trim }}
       {{- end }}
+      {{- if .Values.apiGateway.controller.tolerations }}
+      tolerations:
+        {{ tpl .Values.apiGateway.controller.tolerations . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
