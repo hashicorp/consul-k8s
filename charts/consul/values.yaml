@@ -112,9 +112,10 @@ global:
   enablePodSecurityPolicies: false
 
   # Apply a PodSecurityStandard securityContext which is compatible with Pod Security Admission controllers in Kubernetes-1.23+.
-  # This stanza takes a securityContext object that will be applied to all resources and merged with any existing
-  # securityContext settings with precedence given to this stanza. This feature is incompatible with PodSecurityPolies 
-  # which are deprecated by Kubernetes.  https://kubernetes.io/docs/concepts/security/pod-security-standards/
+  # This stanza takes a securityContext object that will be applied to all Consul resources and sidecars and merged with any
+  # existing securityContext settings with precedence given to this stanza.'
+  # This feature is mutually exclusive with PodSecurityPolicies which are deprecated by Kubernetes 1.25+. 
+  # See: https://kubernetes.io/docs/concepts/security/pod-security-standards/
   # Please see: https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/ for more information about
   # migrating from PSP to PSS/PSA.
   #
@@ -124,6 +125,7 @@ global:
   # podSecurityStandards:
   #   securityContext:
   #      runAsNonRoot: true
+  #      runAsUser: 100
   #      allowPrivilegeEscalation: false
   #      capabilities:
   #        drop:

@@ -58,6 +58,7 @@ func TestConnectInject(t *testing.T) {
 
 			helmvals := map[string]string{
 				"global.podSecurityStandards.securityContext.runAsNonRoot":             "true",
+				"global.podSecurityStandards.securityContext.runAsUser":                "100",
 				"global.podSecurityStandards.securityContext.allowPrivilegeEscalation": "false",
 				"global.podSecurityStandards.securityContext.capabilities.drop":        "{ALL}",
 				"global.podSecurityStandards.securityContext.seccompProfile.type":      "RuntimeDefault",
