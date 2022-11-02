@@ -1874,7 +1874,6 @@ rollingUpdate:
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
-      --set 'server.containerSecurityContext.server.privileged=false' \
       . | tee /dev/stderr)
 
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
