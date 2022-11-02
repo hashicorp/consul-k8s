@@ -220,8 +220,6 @@ func (c *Command) Run(args []string) int {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-	} else {
-		c.UI.Output(fmt.Sprintf("No existing %s installation found.", common.ReleaseTypeConsulDemo), terminal.WithInfoStyle())
 	}
 
 	c.UI.Output("Checking if Consul can be uninstalled", terminal.WithHeaderStyle())
