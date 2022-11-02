@@ -44,11 +44,11 @@ spec:
       # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
       priorityClassName: system-node-critical
       serviceAccountName: {{ template "consul.fullname" . }}-cni
-      {{- if not .Values.global.openshift.enabled }}
+      {{- if and (not .Values.global.openshift.enabled) .Values.global.podSecurityStandards.securityContext}}
       securityContext:
         {{- $tmp := dict -}}
         {{- $dst := merge $tmp .Values.global.podSecurityStandards.securityContext .Values.connectInject.cni.securityContext -}}
-        {{- $dst | toYaml | nindent 8 }}
+        {{- $dst | toYaml | nindent 12 }}
       {{- end }}
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.

@@ -198,6 +198,85 @@ rollingUpdate:
 }
 
 #--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "cni/DaemonSet: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "cni/DaemonSet: global.podSecurityStandards can be set and merges with default server.securityContext" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $security_context | jq -r .fsGroup)
+  [ "${actual}" = "1000" ]
+  local actual=$(echo $security_context | jq -r .runAsUser)
+  [ "${actual}" = "100" ]
+  local actual=$(echo $security_context | jq -r .runAsGroup)
+  [ "${actual}" = "1000" ]
+
+  local actual=$(echo $security_context | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $security_context | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+
+@test "cni/DaemonSet: global.podSecurityStandards can be set and merges with default server.containerSecurityContext.server" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name=="consul") | .securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $security_context | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+
+@test "cni/DaemonSet: global.podSecurityStandards can be set and merges with custom server.containerSecurityContext.server" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'server.containerSecurityContext.server.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name=="consul") | .securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $security_context | jq -r .alice)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $security_context | jq -r .foo)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
 # volumes
 
 @test "cni/DaemonSet: sets default cni-bin-dir volume hostPath" {
