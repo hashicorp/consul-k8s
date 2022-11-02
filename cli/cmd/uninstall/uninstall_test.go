@@ -474,7 +474,7 @@ func TestUninstall(t *testing.T) {
 				"-wipe-data",
 			},
 			messages: []string{
-				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n    No existing Consul demo application installation found.\n",
+				"\n==> Checking if Consul demo application can be uninstalled\n    No existing Consul demo application installation found.\n",
 				"\n==> Checking if Consul can be uninstalled\n ✓ Existing Consul installation found.\n",
 				"\n==> Consul Uninstall Summary\n    Name: consul\n    Namespace: consul\n ✓ Successfully uninstalled Consul Helm release.\n",
 				"\n==> Other Consul Resources\n    Deleting data for installation: \n    Name: consul\n    Namespace consul\n ✓ No PVCs found.\n ✓ No Consul secrets found.\n ✓ No Consul service accounts found.\n ✓ No Consul roles found.\n ✓ No Consul rolebindings found.\n ✓ No Consul jobs found.\n ✓ No Consul cluster roles found.\n ✓ No Consul cluster role bindings found.\n",
