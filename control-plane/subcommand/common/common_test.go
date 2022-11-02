@@ -210,7 +210,7 @@ func TestWriteFileWithPerms_InvalidOutputFile(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	randFileName := fmt.Sprintf("/tmp/tmp/tmp/%d", rand.Int())
 	t.Cleanup(func() {
-		os.Remove(randFileName)
+		os.RemoveAll(randFileName)
 	})
 	err := WriteFileWithPerms(randFileName, "", os.FileMode(0444))
 	require.Errorf(t, err, "unable to create file: %s", randFileName)
@@ -223,7 +223,7 @@ func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 	err := os.WriteFile(randFileName, []byte("foo"), os.FileMode(0444))
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		os.Remove(randFileName)
+		os.RemoveAll(randFileName)
 	})
 	payload := "abcd"
 	err = WriteFileWithPerms(randFileName, payload, os.FileMode(0444))
@@ -239,7 +239,7 @@ func TestWriteFileWithPerms(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
 	t.Cleanup(func() {
-		os.Remove(randFileName)
+		os.RemoveAll(randFileName)
 	})
 	// Issue the write.
 	mode := os.FileMode(0444)

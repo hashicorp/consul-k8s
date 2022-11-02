@@ -99,17 +99,6 @@ load _helpers
   [[ "$output" =~ "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" ]]
 }
 
-@test "serverACLInit/Job: sets -consul-api-timeout=5s" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command[2] | contains("-consul-api-timeout=5s")' |
-      tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "serverACLInit/Job: sets -client=false when client is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -119,19 +108,6 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2] | contains("-client=false")' |
       tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: server address is set to the DNS names of the server stateful set" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -522,23 +498,29 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "serverACLInit/Job: sets TLS flags when global.tls.enabled" {
+@test "serverACLInit/Job: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
-  local command=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-use-https"))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq '[.env[7].name] | any(contains("CONSUL_USE_TLS"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq '[.env[7].value] | any(contains("true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-server-port=8501"))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -629,32 +611,31 @@ load _helpers
       yq -r '.spec.template' | tee /dev/stderr)
 
   # Check annotations
-  local actual
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "aclrole" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-bootstrap-token"]' | tee /dev/stderr)
   local expected=$'{{- with secret \"foo\" -}}\n{{- .Data.data.bar -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
   [ "${actual}" = "true" ]
 
   # Check that no (secret) volumes are not attached
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -698,7 +679,7 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -840,11 +821,11 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
   [ "${actual}" = "true" ]
 }
 
@@ -888,14 +869,14 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication and bootstrap token flags are set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-file=/vault/secrets/bootstrap-token"))')
   [ "${actual}" = "true" ]
 }
 
@@ -938,11 +919,11 @@ load _helpers
   local actual=$(echo $object | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").volumeMounts')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="post-install-job").command | any(contains("-partition-token-file=/vault/secrets/partition-token"))')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-partition-token-file=/vault/secrets/partition-token"))')
   [ "${actual}" = "true" ]
 }
 
@@ -1449,14 +1430,22 @@ load _helpers
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo $object |
-    yq 'any(contains("enable-partitions"))' | tee /dev/stderr)
+      yq '[.env[7].name] | any(contains("CONSUL_PARTITION"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-    yq 'any(contains("partition"))' | tee /dev/stderr)
+      yq '[.env[7].value] | any(contains("default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[8].name] | any(contains("CONSUL_LOGIN_PARTITION"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[8].value] | any(contains("default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1616,46 +1605,47 @@ load _helpers
 
 @test "serverACLInit/Job: sets server address if externalServers.hosts are set" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=\"foo.com\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
+      yq -r '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-@test "serverACLInit/Job: can pass cloud auto-join string to server address via externalServers.hosts" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=provider=my-cloud config=val' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_ADDRESSES"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: port 8501 is used by default" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=1.1.1.1' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[4].name] | any(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[4].value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: can override externalServers.httpsPort" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
@@ -1663,7 +1653,14 @@ load _helpers
       --set 'externalServers.hosts[0]=1.1.1.1' \
       --set 'externalServers.httpsPort=443' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-port=443"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[4].name] | any(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[4].value] | any(contains("443"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1699,7 +1696,7 @@ load _helpers
 
 @test "serverACLInit/Job: sets the CA cert if TLS is enabled and externalServers.enabled is true but externalServers.useSystemRoots is false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
@@ -1708,13 +1705,20 @@ load _helpers
       --set 'externalServers.hosts[0]=1.1.1.1' \
       --set 'externalServers.useSystemRoots=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: sets the CA cert if TLS is enabled and externalServers.useSystemRoots is true but externalServers.enabled is false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
@@ -1722,19 +1726,36 @@ load _helpers
       --set 'externalServers.hosts[0]=1.1.1.1' \
       --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: sets TLS server name if externalServers.tlsServerName is set" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
       --set 'externalServers.tlsServerName=foo' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[9].name] | any(contains("CONSUL_TLS_SERVER_NAME"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[9].value] | any(contains("foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2118,22 +2139,4 @@ load _helpers
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
-}
-
-@test "serverACLInit/Job: sets TLS server name if global.cloud.enabled is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,8 +62,7 @@ partition "part-1" {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
-				flagEnablePartitions: tt.EnablePartitions,
-				flagPartitionName:    tt.PartitionName,
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
@@ -127,8 +127,7 @@ partition_prefix "" {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
-				flagEnablePartitions: tt.EnablePartitions,
-				flagPartitionName:    tt.PartitionName,
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
@@ -181,6 +180,7 @@ namespace_prefix "" {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
 				flagEnableNamespaces: tt.EnableNamespaces,
+				consulFlags:          &flags.ConsulFlags{},
 			}
 
 			meshGatewayRules, err := cmd.apiGatewayControllerRules()
@@ -234,6 +234,7 @@ namespace_prefix "" {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
 				flagEnableNamespaces: tt.EnableNamespaces,
+				consulFlags:          &flags.ConsulFlags{},
 			}
 
 			meshGatewayRules, err := cmd.meshGatewayRules()
@@ -353,8 +354,7 @@ partition "default" {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
-				flagEnablePartitions: tt.EnablePartitions,
-				flagPartitionName:    tt.PartitionName,
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
@@ -460,8 +460,7 @@ partition "default" {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
-				flagEnablePartitions: tt.EnablePartitions,
-				flagPartitionName:    tt.PartitionName,
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
@@ -822,8 +821,7 @@ partition "foo" {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
-				flagEnablePartitions:               tt.EnablePartitions,
-				flagPartitionName:                  tt.PartitionName,
+				consulFlags:                        &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces:               tt.EnableNamespaces,
 				flagConsulSyncDestinationNamespace: tt.ConsulSyncDestinationNamespace,
 				flagEnableSyncK8SNSMirroring:       tt.EnableSyncK8SNSMirroring,
@@ -940,8 +938,7 @@ partition "part-1" {
 		t.Run(caseName, func(t *testing.T) {
 
 			cmd := Command{
-				flagEnablePartitions: tt.EnablePartitions,
-				flagPartitionName:    tt.PartitionName,
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces: tt.EnableNamespaces,
 				flagEnablePeering:    tt.EnablePeering,
 			}
@@ -974,7 +971,7 @@ func TestReplicationTokenRules(t *testing.T) {
   }
     acl = "write"
     service_prefix "" {
-      policy = "read"
+      policy = "write"
       intentions = "read"
     }`,
 		},
@@ -992,7 +989,7 @@ func TestReplicationTokenRules(t *testing.T) {
   namespace_prefix "" {
     acl = "write"
     service_prefix "" {
-      policy = "read"
+      policy = "write"
       intentions = "read"
     }
   }`,
@@ -1014,7 +1011,7 @@ partition "default" {
   namespace_prefix "" {
     acl = "write"
     service_prefix "" {
-      policy = "read"
+      policy = "write"
       intentions = "read"
     }
   }
@@ -1025,8 +1022,7 @@ partition "default" {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
-				flagEnablePartitions: tt.EnablePartitions,
-				flagPartitionName:    tt.PartitionName,
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 			replicationTokenRules, err := cmd.aclReplicationRules()
@@ -1167,8 +1163,7 @@ partition "part-1" {
 				flagConsulInjectDestinationNamespace: tt.DestConsulNS,
 				flagEnableInjectK8SNSMirroring:       tt.Mirroring,
 				flagInjectK8SNSMirroringPrefix:       tt.MirroringPrefix,
-				flagEnablePartitions:                 tt.EnablePartitions,
-				flagPartitionName:                    tt.PartitionName,
+				consulFlags:                          &flags.ConsulFlags{Partition: tt.PartitionName},
 			}
 
 			rules, err := cmd.controllerRules()

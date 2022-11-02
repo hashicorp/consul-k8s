@@ -250,7 +250,7 @@ func TestRun_WithAclAuthMethodDefined_WritesConfigJson_WithTokenMatchingSinkFile
 	tmpDir, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		os.Remove(tokenFile)
+		os.RemoveAll(tokenFile)
 		os.RemoveAll(tmpDir)
 	})
 

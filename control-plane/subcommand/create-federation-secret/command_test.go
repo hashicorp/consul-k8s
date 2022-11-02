@@ -28,7 +28,7 @@ func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	cases := []struct {
 		flags  []string
@@ -101,7 +101,7 @@ func TestRun_CAFileMissing(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -124,7 +124,7 @@ func TestRun_ServerCACertFileMissing(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -147,7 +147,7 @@ func TestRun_ServerCAKeyFileMissing(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -170,7 +170,7 @@ func TestRun_GossipEncryptionKeyFileMissing(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -194,7 +194,7 @@ func TestRun_GossipEncryptionKeyFileEmpty(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -220,7 +220,7 @@ func TestRun_ReplicationTokenMissingExpectedKey(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.RemoveAll(f.Name())
 
 	ui := cli.NewMockUi()
 	k8s := fake.NewSimpleClientset()

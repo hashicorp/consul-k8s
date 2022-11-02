@@ -66,13 +66,16 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 func MockConnMgrForIPAndPort(ip string, port int) *consul.MockServerConnectionManager {
 	parsedIP := net.ParseIP(ip)
 	connMgr := &consul.MockServerConnectionManager{}
-	mockState := discovery.State{Address: discovery.Addr{
-		TCPAddr: net.TCPAddr{
-			IP:   parsedIP,
-			Port: port,
-		},
-	}}
+	mockState := discovery.State{
+		Address: discovery.Addr{
+			TCPAddr: net.TCPAddr{
+				IP:   parsedIP,
+				Port: port,
+			},
+		}}
 	connMgr.On("State").Return(mockState, nil)
+	connMgr.On("Run").Return(nil)
+	connMgr.On("Stop").Return(nil)
 	return connMgr
 }
 
@@ -109,9 +112,9 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		_ = os.Remove(caFile.Name())
-		_ = os.Remove(certFile.Name())
-		_ = os.Remove(certKeyFile.Name())
+		_ = os.RemoveAll(caFile.Name())
+		_ = os.RemoveAll(certFile.Name())
+		_ = os.RemoveAll(certKeyFile.Name())
 	})
 	return caFile.Name(), certFile.Name(), certKeyFile.Name()
 }

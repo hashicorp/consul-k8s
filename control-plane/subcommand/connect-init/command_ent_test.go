@@ -41,8 +41,8 @@ func TestRun_WithNamespaces(t *testing.T) {
 			tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
 			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
 			t.Cleanup(func() {
-				_ = os.Remove(proxyFile)
-				_ = os.Remove(tokenFile)
+				_ = os.RemoveAll(proxyFile)
+				_ = os.RemoveAll(tokenFile)
 			})
 
 			// Start Consul server with ACLs enabled and default deny policy.
