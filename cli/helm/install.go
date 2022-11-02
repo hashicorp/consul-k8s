@@ -99,6 +99,7 @@ func InstallHelmRelease(options *InstallOptions) error {
 		if err != nil {
 			return err
 		}
+		// The install will proceed if the user presses enter or responds with "y"/"yes" (case-insensitive).
 		if confirmation != "" && common.Abort(confirmation) {
 			options.UI.Output("Install aborted. Use the command `consul-k8s install -help` to learn how to customize your installation.",
 				terminal.WithInfoStyle())
