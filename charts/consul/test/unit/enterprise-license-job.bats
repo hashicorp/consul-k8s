@@ -212,3 +212,60 @@ load _helpers
   actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
 }
+
+#--------------------------------------------------------------------
+# podSecurityStandards
+
+@test "enterpriseLicense/Job: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/enterprise-license-job.yaml  \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "enterpriseLicense/Job: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/enterprise-license-job.yaml  \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "apply-enterprise-license")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "enterpriseLicense/Job: global.podSecurityStandards can be set with acls enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/enterprise-license-job.yaml  \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="apply-enterprise-license")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="apply-enterprise-license")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="ent-license-acl-init")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="ent-license-acl-init")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
