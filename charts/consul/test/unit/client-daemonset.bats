@@ -1241,24 +1241,36 @@ load _helpers
       yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-local actual=$(echo $object |
+  local actual=$(echo $object |
       yq -r '.command | any(contains("secret-name"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]  
+  [ "${actual}" = "false" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("k8s-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]  
+      yq -r '.env[1].name | contains("CONSUL_ADDRESSES")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("component-name=client"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]  
+      yq -r '.env[1].value | contains("release-name-consul-server.default.svc")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[6].name | contains("CONSUL_LOGIN_AUTH_METHOD")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[6].value | contains("release-name-consul-k8s-component-auth-method")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[7].name | contains("CONSUL_LOGIN_META")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[7].value | contains("component=client")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("init-type=\"client\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]  
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("acl-auth-method=\"release-name-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo $object |
@@ -1291,19 +1303,47 @@ local actual=$(echo $object |
   [ "${actual}" = "false" ]  
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("k8s-namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]  
+      yq -r '.env[1].name | contains("CONSUL_ADDRESSES")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("component-name=client"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]  
+      yq -r '.env[1].value | contains("release-name-consul-server.default.svc")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[6].name | contains("CONSUL_PARTITION")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[6].value | contains("default")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[7].name | contains("CONSUL_LOGIN_PARTITION")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[7].value | contains("default")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[8].name | contains("CONSUL_LOGIN_AUTH_METHOD")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[8].value | contains("release-name-consul-k8s-component-auth-method")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[9].name | contains("CONSUL_LOGIN_META")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[9].value | contains("component=client")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("init-type=\"client\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]  
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("acl-auth-method=\"release-name-consul-k8s-component-auth-method\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo $object |
@@ -1312,14 +1352,6 @@ local actual=$(echo $object |
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("log-json=false"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]  
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("partition=default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1460,27 +1492,28 @@ local actual=$(echo $object |
 
 @test "client/DaemonSet: server-address flag is set with hosts when externalServers.hosts are provided" {
   cd `chart_dir`
-  local command=$(helm template \
+  local object=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true'  \
       --set 'server.enabled=false' \
       --set 'externalServers.hosts[0]=foo'  \
-      --set 'externalServers.hosts[1]=bar'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"foo\""))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq -r '.env[1].name | contains("CONSUL_ADDRESSES")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-address=\"bar\""))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq -r '.env[1].value | contains("foo")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
 @test "client/DaemonSet: tls-server-name flag is set when externalServers.tlsServerName is provided" {
   cd `chart_dir`
-  local command=$(helm template \
+  local object=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1490,9 +1523,22 @@ local actual=$(echo $object |
       --set 'externalServers.hosts[0]=computer'  \
       --set 'externalServers.tlsServerName=foo'  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-tls-server-name=foo"))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq -r '.env[2].name | contains("CONSUL_ADDRESSES")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[2].value | contains("computer")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[9].name | contains("CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[9].value | contains("foo")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1528,9 +1574,9 @@ local actual=$(echo $object |
   [ "${actual}" = "false" ]
 }
 
-@test "client/DaemonSet: use-https flag is set when global.tls.enabled is provided and externalServers.enabled is true" {
+@test "client/DaemonSet: use-tls env is set when global.tls.enabled is provided and externalServers.enabled is true" {
   cd `chart_dir`
-  local command=$(helm template \
+  local object=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1539,9 +1585,14 @@ local actual=$(echo $object |
       --set 'externalServers.hosts[0]=computer'  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-use-https"))' | tee /dev/stderr)
+  local actual=$(echo $object |
+      yq -r '.env[7].name | contains("CONSUL_USE_TLS")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[7].value | contains("true")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1576,22 +1627,6 @@ local actual=$(echo $object |
 
   local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
-}
-
-@test "client/DaemonSet: server-port flag is set when externalServers.enabled is true" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'client.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'externalServers.enabled=true'  \
-      --set 'server.enabled=false' \
-      --set 'externalServers.hosts[0]=computer'  \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
-
-  local actual=$(echo $command | jq -r ' . | any(contains("-server-port"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

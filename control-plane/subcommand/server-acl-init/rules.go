@@ -90,7 +90,7 @@ partition "{{ .PartitionName }}" {
   namespace_prefix "" {
 {{- end }}
     service_prefix "" {
-      policy = "read"
+      policy = "write"
     }
 {{- if .EnableNamespaces }}
   }

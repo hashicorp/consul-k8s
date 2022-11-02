@@ -24,7 +24,7 @@ func TestAgentRules(t *testing.T) {
     policy = "write"
   }
     service_prefix "" {
-      policy = "read"
+      policy = "write"
     }`,
 		},
 		{
@@ -36,7 +36,7 @@ func TestAgentRules(t *testing.T) {
   }
   namespace_prefix "" {
     service_prefix "" {
-      policy = "read"
+      policy = "write"
     }
   }`,
 		},
@@ -52,7 +52,7 @@ partition "part-1" {
   }
   namespace_prefix "" {
     service_prefix "" {
-      policy = "read"
+      policy = "write"
     }
   }
 }`,

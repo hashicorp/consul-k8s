@@ -151,7 +151,10 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 	_, _, err := consulClient.ACL().AuthMethodCreate(&authMethodTmpl, nil)
 	require.NoError(t, err)
 
-	rules := `acl = "write"`
+	rules := `acl = "write"
+service_prefix "" {
+  policy = "write"
+}`
 	policyName := fmt.Sprintf("%s-token", serviceAccountName)
 	policy := api.ACLPolicy{
 		Name:        policyName,
