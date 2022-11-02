@@ -297,8 +297,6 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, "--")
 		cmd = append(cmd, envoyExtraArgs...)
 	}
-
-	cmd = append([]string{"/bin/sh", "-ec"}, strings.Join(cmd, " "))
 	return cmd, nil
 }
 

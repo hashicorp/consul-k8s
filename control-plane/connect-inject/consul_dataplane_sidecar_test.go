@@ -3,15 +3,17 @@ package connectinject
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 func TestHandlerConsulDataplaneSidecar(t *testing.T) {
@@ -163,13 +165,10 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 
 			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
-			expCmd := []string{
-				"/bin/sh", "-ec",
-				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
-					" -proxy-service-id-path=/consul/connect-inject/proxyid " +
-					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs,
-			}
-			require.Equal(t, expCmd, container.Command)
+			expCmd := "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
+				" -proxy-service-id-path=/consul/connect-inject/proxyid " +
+				"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
+			require.Equal(t, expCmd, strings.Join(container.Command, " "))
 
 			if w.AuthMethod != "" {
 				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
@@ -266,7 +265,7 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 				require.EqualError(t, err, c.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Contains(t, container.Command[2], c.expFlags)
+				require.Contains(t, strings.Join(container.Command, " "), c.expFlags)
 			}
 		})
 	}
@@ -289,7 +288,7 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 	}
 	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 	require.NoError(t, err)
-	require.Contains(t, container.Command[2], "-consul-dns-bind-port=8600")
+	require.Contains(t, container.Command, "-consul-dns-bind-port=8600")
 }
 
 func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
@@ -354,20 +353,20 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 					serviceName:  "web-admin",
 				},
 			}
-			expCommand := [][]string{
-				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
-				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
+			expCommand := []string{
+				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
+					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
+				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
+					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
 			}
 			if aclsEnabled {
-				expCommand = [][]string{
-					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
+				expCommand = []string{
+					"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
-					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
+						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
+					"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
+						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
 				}
 			}
 			expSAVolumeMounts := []corev1.VolumeMount{
@@ -385,7 +384,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			for i, expCmd := range expCommand {
 				container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfos[i])
 				require.NoError(t, err)
-				require.Equal(t, expCmd, container.Command)
+				require.Equal(t, expCmd, strings.Join(container.Command, " "))
 
 				if w.AuthMethod != "" {
 					require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
@@ -661,7 +660,7 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 
 			c, err := h.consulDataplaneSidecar(testNS, *tc.pod, multiPortInfo{})
 			require.NoError(t, err)
-			require.Contains(t, c.Command[2], tc.expectedExtraArgs)
+			require.Contains(t, strings.Join(c.Command, " "), tc.expectedExtraArgs)
 		})
 	}
 }
@@ -1028,7 +1027,7 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				require.Contains(t, err.Error(), c.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Contains(t, container.Command[2], c.expCmdArgs)
+				require.Contains(t, strings.Join(container.Command, " "), c.expCmdArgs)
 			}
 		})
 	}
