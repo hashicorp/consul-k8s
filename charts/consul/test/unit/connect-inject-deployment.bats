@@ -2,64 +2,6 @@
 
 load _helpers
 
-#--------------------------------------------------------------------
-# podSecurityStandards
-
-@test "connectInject/Deployment: podSecurityStandards default off" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'client.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: global.podSecurityStandards are not set when global.openshift.enabled=true" {
-  cd `chart_dir`
-  local manifest=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'client.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.openshift.enabled=true' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "sidecar-injector")) | .[0].securityContext')
-  [ "${actual}" = "null" ]
-}
-
-@test "connectInject/Deployment: global.podSecurityStandards can be set" {
-  cd `chart_dir`
-  local security_context=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'client.enabled=true' \
-      --set 'global.podSecurityStandards.securityContext.bob=false' \
-      --set 'global.podSecurityStandards.securityContext.alice=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
-
-  local actual=$(echo $security_context | jq -r .bob)
-  [ "${actual}" = "false" ]
-  local actual=$(echo $security_context | jq -r .alice)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: command is modified to contain pod-security-standards when enabled" {
-  cd `chart_dir`
-  local cmd=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'client.enabled=true' \
-      --set 'global.podSecurityStandards.securityContext.bob=false' \
-      --set 'global.podSecurityStandards.securityContext.alice=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-pod-security-standards"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "connectInject/Deployment: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -2287,3 +2229,62 @@ reservedNameTest() {
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# podSecurityStandards
+
+@test "connectInject/Deployment: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "sidecar-injector")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "connectInject/Deployment: global.podSecurityStandards can be set" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $security_context | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: command is modified to contain pod-security-standards when enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-pod-security-standards"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+

@@ -137,8 +137,10 @@ spec:
         {{- end }}
         image: {{ .Values.global.imageK8S }}
         name: controller
+        {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
         securityContext:
           {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+        {{- end }}
         ports:
         - containerPort: 9443
           name: webhook-server

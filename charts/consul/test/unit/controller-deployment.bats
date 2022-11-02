@@ -1058,3 +1058,48 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# podSecurityStandards
+
+@test "controller/Deployment: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'controller.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "controller")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "controller/Deployment: global.podSecurityStandards can be set" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'client.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $security_context | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+
