@@ -12,7 +12,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -24,30 +23,6 @@ import (
 const (
 	componentAuthMethod = "consul-k8s-component-auth-method"
 )
-
-func TestRun_FlagValidation(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		flags  []string
-		expErr string
-	}{
-		{
-			flags:  []string{},
-			expErr: "-consul-api-timeout must be set to a value greater than 0",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.expErr, func(t *testing.T) {
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI: ui,
-			}
-			code := cmd.Run(c.flags)
-			require.Equal(t, 1, code)
-			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
-		})
-	}
-}
 
 // Test that we write the secret data to a file.
 func TestRun_TokenSinkFile(t *testing.T) {
@@ -86,7 +61,6 @@ func TestRun_TokenSinkFile(t *testing.T) {
 	code := cmd.Run([]string{
 		"-token-sink-file", sinkFile,
 		"-secret-name", secretName,
-		"-consul-api-timeout", "5s",
 	})
 	require.Equal(0, code, ui.ErrorWriter.String())
 	bytes, err := os.ReadFile(sinkFile)
@@ -127,7 +101,6 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 	code := cmd.Run([]string{
 		"-token-sink-file", "/this/filepath/does/not/exist",
 		"-secret-name", secretName,
-		"-consul-api-timeout", "5s",
 	})
 
 	require.Equal(1, code)
@@ -175,7 +148,6 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		code := cmd.Run([]string{
 			"-token-sink-file", sinkFile,
 			"-secret-name", secretName,
-			"-consul-api-timeout", "5s",
 		})
 		require.Equal(0, code, ui.ErrorWriter.String())
 
@@ -196,49 +168,36 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 
 	// Start Consul server with ACLs enabled and default deny policy.
 	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
-	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+	server := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		c.ACL.DefaultPolicy = "deny"
 		c.ACL.Tokens.InitialManagement = masterToken
 	})
-	require.NoError(t, err)
-	defer server.Stop()
-	server.WaitForLeader(t)
-	cfg := &api.Config{
-		Scheme:  "http",
-		Address: server.HTTPAddr,
-		Token:   masterToken,
-	}
-	consulClient, err := api.NewClient(cfg)
-	require.NoError(t, err)
-
 	// Set up the Component Auth Method, this pre-loads Consul with bindingrule, roles and an acl:write policy so we
 	// can issue an ACL.Login().
-	test.SetupK8sComponentAuthMethod(t, consulClient, "test-sa", "default")
+	client := server.APIClient
+	test.SetupK8sComponentAuthMethod(t, client, "test-sa", "default")
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:              ui,
-		k8sClient:       k8s,
-		bearerTokenFile: bearerFile,
+		UI:        ui,
+		k8sClient: k8s,
 	}
 
 	code := cmd.Run([]string{
 		"-token-sink-file", tokenFile,
-		"-acl-auth-method", componentAuthMethod,
-		"-component-name", "foo",
-		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
-		"-consul-api-timeout", "5s",
+		"-consul-login-bearer-token-file", bearerFile,
+		"-auth-method-name", componentAuthMethod,
+		"-consul-login-meta", "component-name=foo",
+		"-addresses", strings.Split(server.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(server.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(server.TestServer.GRPCAddr, ":")[1],
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 	// Validate the Token got written.
 	tokenBytes, err := os.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.Equal(t, 36, len(tokenBytes))
-	// Validate the Token and its Description.
-	tok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: string(tokenBytes)})
-	require.NoError(t, err)
-	require.Equal(t, "token created via login: {\"component\":\"foo\"}", tok.Description)
 }
 
 // TestRun_WithAclAuthMethodDefinedWritesConfigJsonWithTokenMatchingSinkFile
@@ -259,21 +218,12 @@ func TestRun_WithAclAuthMethodDefined_WritesConfigJson_WithTokenMatchingSinkFile
 	// Start Consul server with ACLs enabled and default deny policy.
 	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
 
-	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+	server := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		c.ACL.DefaultPolicy = "deny"
 		c.ACL.Tokens.InitialManagement = masterToken
 	})
-	require.NoError(t, err)
-	defer server.Stop()
-	server.WaitForLeader(t)
-	cfg := &api.Config{
-		Scheme:  "http",
-		Address: server.HTTPAddr,
-		Token:   masterToken,
-	}
-	consulClient, err := api.NewClient(cfg)
-	require.NoError(t, err)
+	consulClient := server.APIClient
 
 	// Set up the Component Auth Method, this pre-loads Consul with bindingrule,
 	// roles and an acl:write policy so we can issue an ACL.Login().
@@ -281,19 +231,20 @@ func TestRun_WithAclAuthMethodDefined_WritesConfigJson_WithTokenMatchingSinkFile
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:              ui,
-		k8sClient:       k8s,
-		bearerTokenFile: bearerFile,
+		UI:        ui,
+		k8sClient: k8s,
 	}
 
 	code := cmd.Run([]string{
-		"-token-sink-file", tokenFile,
-		"-acl-auth-method", componentAuthMethod,
-		"-component-name", "foo",
-		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-init-type", "client",
 		"-acl-dir", tmpDir,
-		"-consul-api-timeout", "5s",
+		"-token-sink-file", tokenFile,
+		"-consul-login-bearer-token-file", bearerFile,
+		"-auth-method-name", componentAuthMethod,
+		"-consul-login-meta", "component-name=foo",
+		"-addresses", strings.Split(server.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(server.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(server.TestServer.GRPCAddr, ":")[1],
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 	// Validate the ACL Config file got written.
@@ -357,7 +308,6 @@ func TestRun_WithoutAclAuthMethodDefined_WritesConfigJsonWithTokenMatchingSinkFi
 		"-secret-name", secretName,
 		"-init-type", "client",
 		"-acl-dir", tmpDir,
-		"-consul-api-timeout", "5s",
 	})
 	// Validate the ACL Config file got written.
 	aclConfigBytes, err := os.ReadFile(fmt.Sprintf("%s/acl-config.json", tmpDir))
