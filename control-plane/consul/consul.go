@@ -10,7 +10,7 @@ import (
 	capi "github.com/hashicorp/consul/api"
 )
 
-//go:generate mockery --name ServerConnectionManager --inpackage
+//go:generate mockery --name ServerConnectionManager --inpkg
 type ServerConnectionManager interface {
 	State() (discovery.State, error)
 	Run()

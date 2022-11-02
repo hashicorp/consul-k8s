@@ -219,7 +219,7 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 				tokenFile, err := os.CreateTemp("", "")
 				require.NoError(t, err)
 				t.Cleanup(func() {
-					_ = os.Remove(tokenFile.Name())
+					_ = os.RemoveAll(tokenFile.Name())
 				})
 				_, err = tokenFile.WriteString("bearer-token")
 				require.NoError(t, err)
@@ -228,7 +228,7 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 				tokenFile, err := os.CreateTemp("", "")
 				require.NoError(t, err)
 				t.Cleanup(func() {
-					_ = os.Remove(tokenFile.Name())
+					_ = os.RemoveAll(tokenFile.Name())
 				})
 				_, err = tokenFile.WriteString(c.flags.TokenFile)
 				require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 func TestConsulFlags_ConsulServerConnMgrConfig_TLS(t *testing.T) {
 	caFile, err := os.CreateTemp("", "")
 	t.Cleanup(func() {
-		_ = os.Remove(caFile.Name())
+		_ = os.RemoveAll(caFile.Name())
 	})
 	require.NoError(t, err)
 	_, err = caFile.WriteString(testCA)

@@ -89,7 +89,7 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 
 		file, err := os.CreateTemp("", "config.json")
 		require.NoError(t, err)
-		defer os.Remove(file.Name())
+		defer os.RemoveAll(file.Name())
 
 		_, err = file.Write([]byte(configFile))
 		require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 
 	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
-	defer os.Remove(file.Name())
+	defer os.RemoveAll(file.Name())
 
 	_, err = file.Write([]byte(configFile))
 	require.NoError(t, err)
@@ -340,7 +340,7 @@ func TestRun_SecretExists(t *testing.T) {
 
 	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
-	defer os.Remove(file.Name())
+	defer os.RemoveAll(file.Name())
 
 	_, err = file.Write([]byte(configFile))
 	require.NoError(t, err)
@@ -440,7 +440,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 
 	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
-	defer os.Remove(file.Name())
+	defer os.RemoveAll(file.Name())
 
 	_, err = file.Write([]byte(configFileUpdates))
 	require.NoError(t, err)
@@ -630,7 +630,7 @@ func TestCertWatcher(t *testing.T) {
 
 	file, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err)
-	defer os.Remove(file.Name())
+	defer os.RemoveAll(file.Name())
 
 	_, err = file.Write([]byte(configFileUpdates))
 	require.NoError(t, err)
