@@ -1866,6 +1866,94 @@ rollingUpdate:
 }
 
 #--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "client/DaemonSet: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      --set 'server.containerSecurityContext.server.privileged=false' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "client/DaemonSet: global.podSecurityStandards can be set and merges with default server.securityContext" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $security_context | jq -r .fsGroup)
+  [ "${actual}" = "1000" ]
+  local actual=$(echo $security_context | jq -r .runAsUser)
+  [ "${actual}" = "100" ]
+  local actual=$(echo $security_context | jq -r .runAsGroup)
+  [ "${actual}" = "1000" ]
+
+  local actual=$(echo $security_context | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $security_context | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: global.podSecurityStandards can be set and merges with custom client container settings" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'client.containerSecurityContext.client.foo=bar' \
+      --set 'client.containerSecurityContext.aclInit.foo=bar' \
+      --set 'client.containerSecurityContext.tlsInit.foo=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="consul")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="consul")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="consul")) | .[0].securityContext' | jq -r .foo)
+  [ "${actual}" = "bar" ]
+
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="client-acl-init")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="client-acl-init")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="client-acl-init")) | .[0].securityContext' | jq -r .foo)
+  [ "${actual}" = "bar" ]
+
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="client-tls-init")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="client-tls-init")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="client-tls-init")) | .[0].securityContext' | jq -r .foo)
+  [ "${actual}" = "bar" ]
+}
+
+
+#--------------------------------------------------------------------
 # license-autoload
 
 @test "client/DaemonSet: adds volume for license secret when enterprise license secret name and key are provided" {
