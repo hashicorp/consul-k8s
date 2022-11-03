@@ -61,3 +61,47 @@ load _helpers
       yq -r '.spec.template.spec | has("securityContext")' | tee /dev/stderr)
   [ "${has_security_context}" = "false" ]
 }
+
+#--------------------------------------------------------------------
+# podSecurityStandards
+
+@test "gossipEncryptionAutogenerate/Job: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "gossipEncryptionAutogenerate/Job: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "apply-gossip-encryption-autogenerate")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "gossipEncryptionAutogenerate/Job: global.podSecurityStandards can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="gossip-encryption-autogen")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="gossip-encryption-autogen")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
