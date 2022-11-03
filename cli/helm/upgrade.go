@@ -135,7 +135,7 @@ func printDiff(old, new map[string]interface{}, ui terminal.UI) error {
 	}
 
 	ui.Output("\nDifference between user overrides for current and upgraded charts"+
-		"\n--------------------------------------------------------------", terminal.WithInfoStyle())
+		"\n-----------------------------------------------------------------", terminal.WithInfoStyle())
 	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "+") {
 			ui.Output(line, terminal.WithDiffAddedStyle())

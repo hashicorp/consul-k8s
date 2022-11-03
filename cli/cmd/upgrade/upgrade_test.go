@@ -267,7 +267,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -310,7 +310,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n\n==> Upgrading Consul\n ! Helm returned an error.\n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n\n==> Upgrading Consul\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
@@ -337,7 +337,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing consul-demo installation found, but -demo flag provided. consul-demo will be installed in namespace consul.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: consul\n    \n    \n",
 				"\n==> Installing Consul demo application\n ✓ Downloaded charts.\n ✓ Consul demo application installed in namespace \"consul\".\n",
@@ -366,9 +366,9 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n ✓ Existing Consul demo application installation found to be upgraded.\n    Name: consul-demo\n    Namespace: consul-demo\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
-				"\n==> Consul-Demo Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  \n",
+				"\n==> Consul-Demo Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  \n",
 				"\n==> Upgrading consul-demo\n ✓ Consul-Demo upgraded in namespace \"consul-demo\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -392,9 +392,9 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n ✓ Existing Consul demo application installation found to be upgraded.\n    Name: consul-demo\n    Namespace: consul-demo\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
-				"\n==> Consul-Demo Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  \n",
+				"\n==> Consul-Demo Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  \n",
 				"\n==> Upgrading consul-demo\n ✓ Consul-Demo upgraded in namespace \"consul-demo\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -418,9 +418,9 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n ✓ Existing Consul demo application installation found to be upgraded.\n    Name: consul-demo\n    Namespace: consul-demo\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
-				"\n==> Consul-Demo Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  \n",
+				"\n==> Consul-Demo Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  \n",
 				"\n==> Upgrading consul-demo\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -452,7 +452,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  +   metrics:\n  +     defaultEnableMerging: true\n  +     defaultEnabled: true\n  +     enableGatewayMetrics: true\n  + controller:\n  +   enabled: true\n  + global:\n  +   metrics:\n  +     enableAgentMetrics: true\n  +     enabled: true\n  +   name: consul\n  + prometheus:\n  +   enabled: true\n  + server:\n  +   replicas: 1\n  + ui:\n  +   enabled: true\n  +   service:\n  +     enabled: true\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  +   metrics:\n  +     defaultEnableMerging: true\n  +     defaultEnabled: true\n  +     enableGatewayMetrics: true\n  + controller:\n  +   enabled: true\n  + global:\n  +   metrics:\n  +     enableAgentMetrics: true\n  +     enabled: true\n  +   name: consul\n  + prometheus:\n  +   enabled: true\n  + server:\n  +   replicas: 1\n  + ui:\n  +   enabled: true\n  +   service:\n  +     enabled: true\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -477,7 +477,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  + controller:\n  +   enabled: true\n  + global:\n  +   acls:\n  +     manageSystemACLs: true\n  +   gossipEncryption:\n  +     autoGenerate: true\n  +   name: consul\n  +   tls:\n  +     enableAutoEncrypt: true\n  +     enabled: true\n  + server:\n  +   replicas: 1\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  + controller:\n  +   enabled: true\n  + global:\n  +   acls:\n  +     manageSystemACLs: true\n  +   gossipEncryption:\n  +     autoGenerate: true\n  +   name: consul\n  +   tls:\n  +     enableAutoEncrypt: true\n  +     enabled: true\n  + server:\n  +   replicas: 1\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -503,7 +503,7 @@ func TestUpgrade(t *testing.T) {
 				"    Performing dry run upgrade. No changes will be made to the cluster.\n",
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + global:\n  +   name: consul\n  \n",
 				"\n==> Performing Dry Run Upgrade\n    Dry run complete. No changes were made to the Kubernetes cluster.\n    Upgrade can proceed with this configuration.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
