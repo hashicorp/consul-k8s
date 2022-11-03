@@ -22,7 +22,13 @@ gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
 openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
+# This image is built from test/docker/Test.dockerfile
+consul-helm-test-image: &consul-helm-test-image docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
 
+########################
+# COMMANDS
+########################
+# Commands define a sequence of steps as a map to be executed and reused in jobs
 commands:
   install-prereqs:
     steps:
@@ -49,6 +55,48 @@ commands:
             wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
             tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
             sudo mv linux-amd64/helm /usr/local/bin/helm
+  custom-checkout:
+    description: |
+      custom-checkout will perform a custom checkout procedure if provided with an alternative git reference,
+      otherwise it will run the CircleCI defined checkout command. This is needed as the CircleCI defined checkout
+      command does not support subsequent git actions after being called.
+    parameters:
+      git-ref:
+        type: string
+        default: ""
+    steps:
+      - when:
+          condition: << parameters.git-ref >>
+          steps:
+            - run:
+                name: Checkout code
+                command: |
+                  ssh-keyscan github.com >> ~/.ssh/known_hosts
+                  if [ -e '/home/circleci/project/.git' ] ; then
+                    echo 'Fetching into existing repository'
+                    existing_repo='true'
+                    cd '/home/circleci/project'
+                    git remote set-url origin "$CIRCLE_REPOSITORY_URL" || true
+                  else
+                    echo 'Cloning git repository'
+                    existing_repo='false'
+                    mkdir -p '/home/circleci/project'
+                    cd '/home/circleci/project'
+                    git clone --no-checkout "$CIRCLE_REPOSITORY_URL" .
+                  fi
+                  
+                  if [ "$existing_repo" = 'true' ] || [ 'false' = 'true' ]; then
+                    echo 'Fetching from remote repository'
+                    git fetch --force origin
+                    git fetch --force --tags origin
+                  fi
+                  
+                  echo 'Checking out branch/tag'
+                  git checkout --force "<< parameters.git-ref >>"
+      - unless:
+          condition: << parameters.git-ref >>
+          steps:
+            - checkout
   create-kind-clusters:
     parameters:
       version:
@@ -82,6 +130,9 @@ commands:
             consul-k8s version
 
   run-acceptance-tests:
+    description: |
+      Runs the Kind acceptance tests using a provided consul-k8s image, or else attempts to use the image referenced by the 
+      branch name and git reference of the current git commit
     parameters:
       failfast:
         type: boolean
@@ -156,6 +207,11 @@ commands:
                       -debug-directory="$TEST_RESULTS/debug" \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
+########################
+# JOBS
+########################
+# Jobs are a collection of steps. These are used in the workflows to define
+# what gets run in the pipeline
 jobs:
   go-fmt-and-vet-control-plane:
     executor: go
@@ -279,7 +335,6 @@ jobs:
       GOXPARALLEL: 2 # CircleCI containers are 2 CPU x 4GB RAM
     steps:
       - checkout
-
       # Restore go module cache if there is one
       - restore_cache:
           keys:
@@ -495,7 +550,7 @@ jobs:
 
   unit-test-helm-templates:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -505,6 +560,9 @@ jobs:
           working_directory: charts/consul
           command: bats --jobs 4 ./test/unit
 
+  ###########################
+  # KIND ACCEPTANCE TEST JOBS
+  ###########################
   acceptance:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -532,7 +590,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2"
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=hashicorppreview/consul-enterprise:1.13-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -565,7 +623,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.13-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -598,18 +656,18 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.13-dev
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
 
-  ##########################
-  # CLEANUP CLOUD RESOURCES
-  ##########################
+  ##############################
+  # CLEANUP CLOUD RESOURCES JOBS
+  ##############################
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
@@ -627,7 +685,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
     steps:
       - run:
           name: cleanup leftover resources
@@ -645,7 +703,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
     steps:
       - checkout
       - run:
@@ -663,16 +721,15 @@ jobs:
           fail_only: true
           failure_message: "EKS cleanup failed"
 
-  ########################
-  # ACCEPTANCE TESTS
-  ########################
+  #############################
+  # CLOUD ACCEPTANCE TEST JOBS
+  #############################
   acceptance-gke-1-23:
     parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - run:
@@ -716,7 +773,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -740,8 +797,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - run:
@@ -785,7 +841,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni
+          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -809,8 +865,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -843,7 +898,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -867,8 +922,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -901,7 +955,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -924,8 +978,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -964,7 +1017,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -988,8 +1041,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -1028,7 +1080,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1052,8 +1104,7 @@ jobs:
       TEST_RESULTS: /tmp/test-results
     parallelism: 1
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.12.0
+      - image: *consul-helm-test-image
 
     steps:
       - checkout
@@ -1083,7 +1134,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.13-dev
 
       - store_test_results:
           path: /tmp/test-results
@@ -1102,7 +1153,7 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-11:
+  acceptance-kind-1-23-consul-compat-nightly-1-11:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.11-dev"
@@ -1141,7 +1192,7 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.11 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-12:
+  acceptance-kind-1-23-consul-compat-nightly-1-12:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.12-dev"
@@ -1167,6 +1218,7 @@ jobs:
           key: consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - ~/.go_workspace/pkg/mod
+      - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-k8s-image=$CONSUL_K8S_IMAGE -consul-image=$CONSUL_IMAGE -consul-version="1.12" -envoy-image=$ENVOY_IMAGE -helm-chart-version=$HELM_CHART_VERSION
@@ -1179,7 +1231,7 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-23-consul-nightly-1-13:
+  acceptance-kind-1-23-consul-compat-nightly-1-13:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - CONSUL_IMAGE: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.13-dev"
@@ -1218,15 +1270,23 @@ jobs:
           fail_only: true
           failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+########################
+# WORKFLOWS
+########################
+# Workflows are a set of rules for defining a collection of jobs and their run order.
+# This is where the pipeline tests and builds are constructed and triggers for running these tests
+# are defined
 workflows:
   version: 2
   test-and-build:
     jobs:
       # Build this one control-plane binary so that acceptance and acceptance-tproxy will run
-      # The rest of these CircleCI jobs have been migrated to Github Actions. We need to wait until
-      # the summer of 2022 for larger puplic Github Action VMs be available before the acceptance tests can
+      # The rest of these CircleCI jobs have been migrated to GitHub Actions. We need to wait until
+      # there is support for a larger pool of runners before the acceptance tests can
       # be moved
-      # Run acceptance tests using the docker image built for the control plane
+      # Run acceptance tests using the docker image built for the control plane for this particular
+      # branch
+      # This is run on every PR
       - build-distro:
           OS: "linux"
           ARCH: "amd64 arm64"
@@ -1247,10 +1307,73 @@ workflows:
           context: consul-ci
           requires:
             - dev-upload-docker
-  nightly-acceptance-tests:
+
+  nightly-cleanup:
     triggers:
       - schedule:
-          cron: "0 0 * * *"
+          cron: "0 12 * * *" # Run at 12 pm UTC (5 am PST)
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - cleanup-gcp-resources
+      - cleanup-azure-resources
+      - cleanup-eks-resources
+
+
+  nightly-acceptance-tests-release:
+    description: |
+      Tests which run on a release branch nightly. These exist separate from the main
+      acceptance tests so that they can run at their own cadence, but 
+      contains the same sequence of jobs.
+    triggers:
+      - schedule:
+          cron: "0 0 * * *" # Run at 12 am UTC (5 pm PST)
+          filters:
+            branches:
+              only:
+                - release/0.49.x
+    jobs:
+      - build-distro:
+          OS: "linux"
+          ARCH: "amd64 arm64"
+          name: build-distros-linux
+      - dev-upload-docker:
+          requires:
+            - build-distros-linux
+      # Disable until we can use UBI images.
+      # - acceptance-openshift
+      - acceptance-gke-1-23:
+          requires:
+            - dev-upload-docker
+      - acceptance-gke-cni-1-23:
+          requires:
+            - acceptance-gke-1-23
+      - acceptance-eks-1-21:
+          requires:
+            - dev-upload-docker
+      - acceptance-eks-cni-1-21:
+          requires:
+            - acceptance-eks-1-21
+      - acceptance-aks-1-22:
+          requires:
+            - dev-upload-docker
+      - acceptance-aks-cni-1-22:
+          requires:
+            - acceptance-aks-1-22
+      - acceptance-tproxy:
+          requires:
+            - dev-upload-docker
+
+  nightly-acceptance-tests-main:
+    description: |
+      Tests which run on the main branch nightly. These exist separate from the release
+      acceptance tests so that they can run at their own cadence, but 
+      contains the same sequence of jobs.
+    triggers:
+      - schedule:
+          cron: "0 0 * * *" # Run at 12 am UTC (5 pm PST)
           filters:
             branches:
               only:
@@ -1263,44 +1386,43 @@ workflows:
       - dev-upload-docker:
           requires:
             - build-distros-linux
-      - cleanup-gcp-resources
-      - cleanup-azure-resources
-      - cleanup-eks-resources
       # Disable until we can use UBI images.
-      # - acceptance-openshift:
-      #    requires:
-      #      - cleanup-azure-resources
+      # - acceptance-openshift
       - acceptance-gke-1-23:
           requires:
-            - cleanup-gcp-resources
             - dev-upload-docker
       - acceptance-gke-cni-1-23:
           requires:
             - acceptance-gke-1-23
       - acceptance-eks-1-21:
           requires:
-            - cleanup-eks-resources
             - dev-upload-docker
       - acceptance-eks-cni-1-21:
           requires:
             - acceptance-eks-1-21
       - acceptance-aks-1-22:
           requires:
-            - cleanup-azure-resources
             - dev-upload-docker
       - acceptance-aks-cni-1-22:
           requires:
             - acceptance-aks-1-22
+      - acceptance-tproxy:
+          requires:
+            - dev-upload-docker
 
-  nightly-acceptance-tests-consul:
+  nightly-kind-acceptance-tests-consul-compatability:
+    description: |
+      Acceptance tests which run nightly to verify the compatibility between
+      a consul-k8s binary and it's consul version pair. Tests will be conducted
+      for up to n-2 previous Consul-k8s releases.
     triggers:
       - schedule:
-          cron: "0 0 * * *"
+          cron: "0 0 * * *" # Run at 12 am UTC (5 pm PST)
           filters:
             branches:
               only:
                 - main
     jobs:
-      - acceptance-kind-1-23-consul-nightly-1-11
-      - acceptance-kind-1-23-consul-nightly-1-12
-      - acceptance-kind-1-23-consul-nightly-1-13
+      - acceptance-kind-1-23-consul-compat-nightly-1-11
+      - acceptance-kind-1-23-consul-compat-nightly-1-12
+      - acceptance-kind-1-23-consul-compat-nightly-1-13

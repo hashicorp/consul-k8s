@@ -614,6 +614,9 @@ To run a specific test by name use the `--filter` flag:
   ```bash
   brew install gox
   ```
+  ```bash
+  make cli-dev
+  ```
 To run the acceptance tests:
 
     cd acceptance/tests
