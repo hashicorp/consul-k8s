@@ -23,6 +23,7 @@ FEATURES:
 IMPROVEMENTS:
 * CLI
   * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
+  * Enable `consul-k8s uninstall` to delete custom resources when uninstalling Consul. This is done by default. [[GH-1623](https://github.com/hashicorp/consul-k8s/pull/1623)] 
 * Control Plane
   * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
   * Remove unneeded `agent:read` ACL permissions from mesh gateway policy. [[GH-1255](https://github.com/hashicorp/consul-k8s/pull/1255)]
