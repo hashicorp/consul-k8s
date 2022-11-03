@@ -879,3 +879,62 @@ reservedNameTest() {
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "partitionInit/Job: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name == "partition-init-job")) | .[0].securityContext | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "partitionInit/Job: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "partition-init-job")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "partitionInit/Job: global.podSecurityStandards can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="partition-init-job")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="partition-init-job")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+

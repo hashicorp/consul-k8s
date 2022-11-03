@@ -75,8 +75,10 @@ spec:
       containers:
         - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
+          {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
           securityContext:
             {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+          {{- end }}
           env:
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
           {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
