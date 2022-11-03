@@ -36,7 +36,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	multiPort := mpi.serviceName != ""
-	cmd, err := w.getContainerSidecarCommand(namespace, mpi, bearerTokenFile, pod)
+	args, err := w.getContainerSidecarArgs(namespace, mpi, bearerTokenFile, pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -73,7 +73,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		Command:        cmd,
+		Args:           args,
 		ReadinessProbe: probe,
 		LivenessProbe:  probe,
 	}
@@ -127,7 +127,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	return container, nil
 }
 
-func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile string, pod corev1.Pod) ([]string, error) {
+func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile string, pod corev1.Pod) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	if mpi.serviceName != "" {
 		proxyIDFileName = fmt.Sprintf("/consul/connect-inject/proxyid-%s", mpi.serviceName)
@@ -144,9 +144,8 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		envoyConcurrency = int(val)
 	}
 
-	cmd := []string{
-		"consul-dataplane",
-		fmt.Sprintf("-addresses=%q", w.ConsulAddress),
+	args := []string{
+		"-addresses", w.ConsulAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-service-node-name=" + ConsulNodeName,
@@ -156,7 +155,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 	}
 
 	if w.AuthMethod != "" {
-		cmd = append(cmd,
+		args = append(args,
 			"-credential-type=login",
 			"-login-auth-method="+w.AuthMethod,
 			"-login-bearer-token-path="+bearerTokenFile,
@@ -164,34 +163,34 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		)
 		if w.EnableNamespaces {
 			if w.EnableK8SNSMirroring {
-				cmd = append(cmd, "-login-namespace=default")
+				args = append(args, "-login-namespace=default")
 			} else {
-				cmd = append(cmd, "-login-namespace="+w.consulNamespace(namespace.Name))
+				args = append(args, "-login-namespace="+w.consulNamespace(namespace.Name))
 			}
 		}
 		if w.ConsulPartition != "" {
-			cmd = append(cmd, "-login-partition="+w.ConsulPartition)
+			args = append(args, "-login-partition="+w.ConsulPartition)
 		}
 	}
 	if w.EnableNamespaces {
-		cmd = append(cmd, "-service-namespace="+w.consulNamespace(namespace.Name))
+		args = append(args, "-service-namespace="+w.consulNamespace(namespace.Name))
 	}
 	if w.ConsulPartition != "" {
-		cmd = append(cmd, "-service-partition="+w.ConsulPartition)
+		args = append(args, "-service-partition="+w.ConsulPartition)
 	}
 	if w.TLSEnabled {
 		if w.ConsulTLSServerName != "" {
-			cmd = append(cmd, "-tls-server-name="+w.ConsulTLSServerName)
+			args = append(args, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			cmd = append(cmd, "-ca-certs="+ConsulCAFile)
+			args = append(args, "-ca-certs="+ConsulCAFile)
 		}
 	} else {
-		cmd = append(cmd, "-tls-disabled")
+		args = append(args, "-tls-disabled")
 	}
 
 	if mpi.serviceName != "" {
-		cmd = append(cmd, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
+		args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
 	}
 
 	metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
@@ -204,7 +203,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		if err != nil {
 			return nil, fmt.Errorf("unable to determine if merged metrics port: %w", err)
 		}
-		cmd = append(cmd, "-telemetry-prom-scrape-path="+prometheusScrapePath,
+		args = append(args, "-telemetry-prom-scrape-path="+prometheusScrapePath,
 			"-telemetry-prom-merge-port="+mergedMetricsPort)
 
 		serviceMetricsPath := w.MetricsConfig.serviceMetricsPath(pod)
@@ -214,7 +213,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		}
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			cmd = append(cmd, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
 		}
 
 		// Pull the TLS config from the relevant annotations.
@@ -250,7 +249,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
 			}
 			// TLS config has been validated, add them to the consul-dataplane cmd args
-			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile,
+			args = append(args, "-telemetry-prom-ca-certs-file="+prometheusCAFile,
 				"-telemetry-prom-ca-certs-path="+prometheusCAPath,
 				"-telemetry-prom-cert-file="+prometheusCertFile,
 				"-telemetry-prom-key-file="+prometheusKeyFile)
@@ -260,7 +259,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
 	if w.EnableConsulDNS {
-		cmd = append(cmd, "-consul-dns-bind-port="+strconv.Itoa(ConsulDataplaneDNSBindPort))
+		args = append(args, "-consul-dns-bind-port="+strconv.Itoa(ConsulDataplaneDNSBindPort))
 	}
 
 	var envoyExtraArgs []string
@@ -294,10 +293,10 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		}
 	}
 	if envoyExtraArgs != nil {
-		cmd = append(cmd, "--")
-		cmd = append(cmd, envoyExtraArgs...)
+		args = append(args, "--")
+		args = append(args, envoyExtraArgs...)
 	}
-	return cmd, nil
+	return args, nil
 }
 
 func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
