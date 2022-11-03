@@ -115,8 +115,10 @@ spec:
       initContainers:
       - name: mesh-gateway-init
         image: {{ .Values.global.imageK8S }}
+        {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
         securityContext:
           {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+        {{- end }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -168,8 +170,10 @@ spec:
       containers:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
+        {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
         securityContext:
           {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+        {{- end }}
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
