@@ -1272,7 +1272,7 @@ workflows:
       - acceptance-tproxy:
           context: consul-ci
           requires:
-            - dev-upload-docker
+          - dev-upload-docker
 
   nightly-cleanup:
     triggers:
