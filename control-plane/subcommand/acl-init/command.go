@@ -18,8 +18,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-netaddrs"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,10 +60,9 @@ type Command struct {
 
 	k8sClient kubernetes.Interface
 
-	once      sync.Once
-	help      string
-	logger    hclog.Logger
-	providers map[string]discover.Provider
+	once   sync.Once
+	help   string
+	logger hclog.Logger
 
 	ctx          context.Context
 	consulClient *api.Client
@@ -167,18 +166,17 @@ func (c *Command) Run(args []string) int {
 		c.http.MergeOntoConfig(cfg)
 
 		if len(c.flagServerAddresses) > 0 {
-			serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.logger)
+			ipAddrs, err := netaddrs.IPAddrs(c.ctx, c.flagServerAddresses[0], c.logger)
 			if err != nil {
 				c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
 				return 1
 			}
-
 			scheme := "http"
 			if c.flagUseHTTPS {
 				scheme = "https"
 			}
 
-			serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
+			serverAddr := fmt.Sprintf("%s:%d", ipAddrs[0].IP.String(), c.flagServerPort)
 			cfg.Address = serverAddr
 			cfg.Scheme = scheme
 		}
