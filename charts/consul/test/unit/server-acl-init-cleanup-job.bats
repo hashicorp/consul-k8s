@@ -115,3 +115,47 @@ load _helpers
       yq -r '.spec.template.spec.nodeSelector[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
+
+#--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "serverACLInitCleanup/Job: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name == "server-acl-init-cleanup")) | .[0].securityContext | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInitCleanup/Job: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "server-acl-init-cleanup")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "serverACLInitCleanup/Job: global.podSecurityStandards can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="server-acl-init-cleanup")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="server-acl-init-cleanup")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+

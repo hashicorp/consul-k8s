@@ -47,8 +47,10 @@ spec:
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
+          {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
           securityContext:
             {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+          {{- end }}
           command:
             - consul-k8s-control-plane
           args:

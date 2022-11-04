@@ -1315,9 +1315,9 @@ key2: value2' \
 @test "terminatingGateways/Deployment: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/mesh-gateway-deployment.yaml  \
+      -s templates/terminating-gateway-deployment.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
+      --set 'terminatingGateway.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.cloud.enabled=true' \
@@ -1390,3 +1390,60 @@ key2: value2' \
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "terminatingGateways/Deployment: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name == "terminating-gateway")) | .[0].securityContext | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "terminating-gateway")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: global.podSecurityStandards can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="terminating-gateway")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="terminating-gateway")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="terminating-gateway-init")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="terminating-gateway-init")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
+

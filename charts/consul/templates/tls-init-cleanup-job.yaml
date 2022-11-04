@@ -35,7 +35,7 @@ spec:
       containers:
         - name: tls-init-cleanup
           image: "{{ .Values.global.image }}"
-          {{- if .Values.global.podSecurityStandards.securityContext }}
+          {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
           securityContext:
             {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
           {{- end }}

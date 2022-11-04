@@ -80,8 +80,10 @@ spec:
       containers:
         - name: sync-catalog
           image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
+          {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
           securityContext:
             {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+          {{- end }}
           env:
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_HTTP_TOKEN_FILE
@@ -243,8 +245,10 @@ spec:
       {{- end }}
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: sync-catalog-acl-init
+        {{- if and .Values.global.podSecurityStandards.securityContext (not .Values.global.openshift.enabled) }}
         securityContext:
           {{- .Values.global.podSecurityStandards.securityContext | toYaml | nindent 12 }}
+        {{- end }}
         env:
         - name: HOST_IP
           valueFrom:

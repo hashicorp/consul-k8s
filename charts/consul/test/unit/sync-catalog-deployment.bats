@@ -1677,3 +1677,59 @@ reservedNameTest() {
   
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
+
+#--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "syncCatalog/Deployment: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name == "sync-catalog")) | .[0].securityContext | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+
+@test "syncCatalog/Deployment: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "sync-catalog")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "syncCatalog/Deployment: global.podSecurityStandards can be set with tls and acls enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="sync-catalog")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="sync-catalog")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="sync-catalog-acl-init")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.initContainers | map(select(.name=="sync-catalog-acl-init")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}

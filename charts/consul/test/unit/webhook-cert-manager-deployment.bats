@@ -111,3 +111,51 @@ load _helpers
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       .
 }
+
+#--------------------------------------------------------------------
+# global.podSecurityStandards
+
+@test "webhookCertManager/Deployment: podSecurityStandards default off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name == "webhook-cert-manager")) | .[0].securityContext | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "webhookCertManager/Deployment: global.podSecurityStandards are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/webhook-cert-manager-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "webhook-cert-manager")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+@test "webhookCertManager/Deployment: global.podSecurityStandards can be set with tls and acls enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/webhook-cert-manager-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.podSecurityStandards.securityContext.bob=false' \
+      --set 'global.podSecurityStandards.securityContext.alice=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="webhook-cert-manager")) | .[0].securityContext' | jq -r .bob)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.containers | map(select(.name=="webhook-cert-manager")) | .[0].securityContext' | jq -r .alice)
+  [ "${actual}" = "true" ]
+}
