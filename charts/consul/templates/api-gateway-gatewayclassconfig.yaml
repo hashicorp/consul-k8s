@@ -15,6 +15,9 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       managed: true
       method: {{ template "consul.fullname" . }}-k8s-auth-method
+      {{- if .Values.global.enablePodSecurityPolicies }}
+      podSecurityPolicy: {{ template "consul.fullname" . }}-api-gateway
+      {{- end }}
       {{- end }}
     {{- if .Values.global.tls.enabled }}
     scheme: https

@@ -20,7 +20,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/ClusterRole: uses PodSecurityPolicy with apiGateway.enabled=true and global.enablePodSecurityPolicies=true" {
+@test "apiGateway/ClusterRole: can use podsecuritypolicies with apiGateway.enabled=true and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-clusterrole.yaml \
@@ -28,6 +28,18 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
-      yq '.rules[] | select((.resourceNames[0] == "release-name-consul-api-gateway-controller") and (.resources[0] == "podsecuritypolicies")) | length > 0' | tee /dev/stderr)
+      yq '.rules[] | select((.resources[0] == "podsecuritypolicies") and (.verbs[0] == "use")) | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/ClusterRole: can create roles and rolebindings with apiGateway.enabled=true and global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-clusterrole.yaml \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      . | tee /dev/stderr |
+      yq '.rules[] | select((.resources[0] == "roles") and (.resources[1] == "rolebindings") and (.verbs | contains(["create","get","list","watch"]))) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
