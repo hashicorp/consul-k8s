@@ -134,10 +134,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: w.ConsulConfig.APITimeout.String(),
 			},
 		},
-		Resources:       w.InitContainerResources,
-		VolumeMounts:    volMounts,
-		SecurityContext: w.SecurityContext,
-		Command:         []string{"/bin/sh", "-ec", buf.String()},
+		Resources:    w.InitContainerResources,
+		VolumeMounts: volMounts,
+		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}
 
 	if w.TLSEnabled {
@@ -214,8 +213,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if w.SecurityContext != nil {
 		container.SecurityContext = w.SecurityContext
 	}
-
-	if false && tproxyEnabled {
+	if tproxyEnabled {
 		// Running consul connect redirect-traffic with iptables
 		// requires both being a root user and having NET_ADMIN capability.
 		if !w.EnableCNI {
@@ -255,14 +253,16 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 					},
 				}
 			} else {
-				container.SecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(false),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
+				if w.SecurityContext == nil {
+					container.SecurityContext = &corev1.SecurityContext{
+						RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
+						RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
+						RunAsNonRoot: pointer.Bool(true),
+						Privileged:   pointer.Bool(false),
+						Capabilities: &corev1.Capabilities{
+							Drop: []corev1.Capability{"ALL"},
+						},
+					}
 				}
 			}
 		}

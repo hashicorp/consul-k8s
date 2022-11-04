@@ -160,79 +160,97 @@ func TestHandlerContainerInit(t *testing.T) {
 
 func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	cases := map[string]struct {
-		globalEnabled    bool
-		cniEnabled       bool
-		annotations      map[string]string
-		expTproxyEnabled bool
-		namespaceLabel   map[string]string
+		globalEnabled              bool
+		cniEnabled                 bool
+		podSecurityStandardEnabled bool
+		annotations                map[string]string
+		expTproxyEnabled           bool
+		namespaceLabel             map[string]string
 	}{
-		"enabled globally, ns not set, annotation not provided, cni disabled": {
+		"enabled globally, ns not set, annotation not provided, cni disabled, no PSS passed": {
 			true,
+			false,
 			false,
 			nil,
 			true,
 			nil,
 		},
-		"enabled globally, ns not set, annotation is false, cni disabled": {
+		"enabled globally, ns not set, annotation not provided, cni enabled, PSS passed": {
 			true,
-			false,
-			map[string]string{keyTransparentProxy: "false"},
-			false,
-			nil,
-		},
-		"enabled globally, ns not set, annotation is true, cni disabled": {
 			true,
-			false,
-			map[string]string{keyTransparentProxy: "true"},
 			true,
-			nil,
-		},
-		"disabled globally, ns not set, annotation not provided, cni disabled": {
-			false,
-			false,
 			nil,
 			false,
 			nil,
 		},
-		"disabled globally, ns not set, annotation is false, cni disabled": {
+		"enabled globally, ns not set, annotation is false, cni disabled, no PSS passed": {
+			true,
 			false,
 			false,
 			map[string]string{keyTransparentProxy: "false"},
 			false,
 			nil,
 		},
-		"disabled globally, ns not set, annotation is true, cni disabled": {
+		"enabled globally, ns not set, annotation is true, cni disabled, no PSS passed": {
+			true,
 			false,
 			false,
 			map[string]string{keyTransparentProxy: "true"},
 			true,
 			nil,
 		},
-		"disabled globally, ns enabled, annotation not set, cni disabled": {
+		"disabled globally, ns not set, annotation not provided, cni disabled, no PSS passed": {
+			false,
+			false,
+			false,
+			nil,
+			false,
+			nil,
+		},
+		"disabled globally, ns not set, annotation is false, cni disabled, no PSS passed": {
+			false,
+			false,
+			false,
+			map[string]string{keyTransparentProxy: "false"},
+			false,
+			nil,
+		},
+		"disabled globally, ns not set, annotation is true, cni disabled, no PSS passed": {
+			false,
+			false,
+			false,
+			map[string]string{keyTransparentProxy: "true"},
+			true,
+			nil,
+		},
+		"disabled globally, ns enabled, annotation not set, cni disabled, no PSS passed": {
+			false,
 			false,
 			false,
 			nil,
 			true,
 			map[string]string{keyTransparentProxy: "true"},
 		},
-		"enabled globally, ns disabled, annotation not set, cni disabled": {
+		"enabled globally, ns disabled, annotation not set, cni disabled, no PSS passed": {
 			true,
+			false,
 			false,
 			nil,
 			false,
 			map[string]string{keyTransparentProxy: "false"},
 		},
-		"disabled globally, ns enabled, annotation not set, cni enabled": {
+		"disabled globally, ns enabled, annotation not set, cni enabled, no PSS passed": {
 			false,
 			true,
+			false,
 			nil,
 			false,
 			map[string]string{keyTransparentProxy: "true"},
 		},
-
-		"enabled globally, ns not set, annotation not set, cni enabled": {
+		"enabled globally, ns not set, annotation not set, cni enabled, no PSS passed": {
 			true,
 			true,
+			false,
 			nil,
 			false,
 			nil,
@@ -249,7 +267,22 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			pod.Annotations = c.annotations
 
 			var expectedSecurityContext *corev1.SecurityContext
-			if c.cniEnabled {
+			if c.podSecurityStandardEnabled {
+				// This SecurityContext roughly corresponds to the restricted:v1.24 PSA.
+				expectedSecurityContext = &corev1.SecurityContext{
+					RunAsUser:    pointer.Int64(100),
+					RunAsGroup:   pointer.Int64(100),
+					RunAsNonRoot: pointer.Bool(true),
+					Privileged:   pointer.Bool(false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
+				}
+				w.SecurityContext = expectedSecurityContext
+			} else if c.cniEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
 					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
