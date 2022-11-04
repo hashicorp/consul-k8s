@@ -245,11 +245,21 @@ rules:
   - patch
   - update
 {{- if .Values.global.enablePodSecurityPolicies }}
-- apiGroups: ["policy"]
-  resources: ["podsecuritypolicies"]
-  resourceNames:
-    - {{ template "consul.fullname" . }}-api-gateway-controller
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
   verbs:
-    - use
+  - use
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - create
+  - get
+  - list
+  - watch
 {{- end }}
 {{- end }}
