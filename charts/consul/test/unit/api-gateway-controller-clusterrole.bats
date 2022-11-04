@@ -40,6 +40,6 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
-      yq '.rules[] | select((.resources[0] == "roles") and (.resources[1] == "rolebindings") and (.verbs[0] == "create")) | length > 0' | tee /dev/stderr)
+      yq '.rules[] | select((.resources[0] == "roles") and (.resources[1] == "rolebindings") and (.verbs | contains(["create","get","list","watch"]))) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
