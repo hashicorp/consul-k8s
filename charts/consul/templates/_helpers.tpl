@@ -355,6 +355,10 @@ Consul server environment variables for consul-k8s commands.
   value: {{ .Values.externalServers.tlsServerName }}
 {{- end }}
 {{- end }}
+{{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
+- name: CONSUL_SKIP_SERVER_WATCH
+  value: "true" 
+{{- end }}
 {{- end -}}
 
 {{/*
