@@ -53,6 +53,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				Spec: v1alpha1.ServiceDefaultsSpec{
 					Protocol:              "http",
 					MaxInboundConnections: 100,
+					LocalConnectTimeoutMs: 5000,
+					LocalRequestTimeoutMs: 15000,
 				},
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
@@ -70,6 +72,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.True(t, ok, "cast error")
 				require.Equal(t, "http", svcDefault.Protocol)
 				require.Equal(t, 100, svcDefault.MaxInboundConnections)
+				require.Equal(t, 5000, svcDefault.LocalConnectTimeoutMs)
+				require.Equal(t, 15000, svcDefault.LocalRequestTimeoutMs)
 			},
 		},
 		{
