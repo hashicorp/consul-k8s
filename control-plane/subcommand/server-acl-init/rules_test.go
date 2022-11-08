@@ -195,10 +195,11 @@ func TestMeshGatewayRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool
+		EnablePeering    bool
 		Expected         string
 	}{
 		{
-			Name: "Namespaces are disabled",
+			Name: "Namespaces and peering are disabled",
 			Expected: `mesh = "write"
   service "mesh-gateway" {
      policy = "write"
@@ -228,12 +229,54 @@ namespace_prefix "" {
   }
 }`,
 		},
+		{
+			Name:          "Peering is enabled",
+			EnablePeering: true,
+			Expected: `mesh = "write"
+peering = "read"
+partition_prefix "" {
+  peering = "read"
+}
+  service "mesh-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
+  }`,
+		},
+		{
+			Name:             "Peering and namespaces are enabled",
+			EnablePeering:    true,
+			EnableNamespaces: true,
+			Expected: `mesh = "write"
+peering = "read"
+partition_prefix "" {
+  peering = "read"
+}
+namespace "default" {
+  service "mesh-gateway" {
+     policy = "write"
+  }
+}
+namespace_prefix "" {
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
+  }
+}`,
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
 				flagEnableNamespaces: tt.EnableNamespaces,
+				flagEnablePeering:    tt.EnablePeering,
 				consulFlags:          &flags.ConsulFlags{},
 			}
 
