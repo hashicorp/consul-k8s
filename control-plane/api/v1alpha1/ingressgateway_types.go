@@ -57,6 +57,15 @@ type IngressGatewaySpec struct {
 	// Listeners declares what ports the ingress gateway should listen on, and
 	// what services to associated to those ports.
 	Listeners []IngressListener `json:"listeners,omitempty"`
+
+	// Defaults is default configuration for all upstream services
+	Defaults *IngressServiceConfig `json:"defaults,omitempty"`
+}
+
+type IngressServiceConfig struct {
+	MaxConnections        *uint32 `json:"maxConnections,omitempty"`
+	MaxPendingRequests    *uint32 `json:"maxPendingRequests,omitempty"`
+	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
 }
 
 type GatewayTLSConfig struct {
@@ -144,6 +153,10 @@ type IngressService struct {
 	// Allow HTTP header manipulation to be configured.
 	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
 	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
+
+	MaxConnections        *uint32 `json:"maxConnections,omitempty"`
+	MaxPendingRequests    *uint32 `json:"maxPendingRequests,omitempty"`
+	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
 }
 
 func (in *IngressGateway) GetObjectMeta() metav1.ObjectMeta {
