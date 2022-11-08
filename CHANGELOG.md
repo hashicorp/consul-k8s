@@ -12,7 +12,8 @@ BREAKING_CHANGES:
 * Peering:
   * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
     to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
-  * Enabling peering requires `tls.enabled`. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+  * Require `global.tls.enabled` when peering is enabled. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+  * Require `meshGateway.enabled` when peering is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
 
 FEATURES:
 * Consul-dataplane:
@@ -34,6 +35,7 @@ IMPROVEMENTS:
   * API Gateway: Add `tolerations` to `apiGateway.managedGatewayClass` and `apiGateway.controller` [[GH-1650](https://github.com/hashicorp/consul-k8s/pull/1650)]
   * API Gateway: Create PodSecurityPolicy for controller when `global.enablePodSecurityPolicies=true`. [[GH-1656](https://github.com/hashicorp/consul-k8s/pull/1656)]
   * API Gateway: Create PodSecurityPolicy and allow controller to bind it to ServiceAccounts that it creates for Gateway Deployments when `global.enablePodSecurityPolicies=true`. [[GH-1672](https://github.com/hashicorp/consul-k8s/pull/1672)]
+  * Deploy `expose-servers` service only when Admin Partitions(ENT) is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
 
 ## 1.0.0-beta4 (October 28, 2022)
 

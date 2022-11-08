@@ -9,43 +9,6 @@ load _helpers
       . 
 }
 
-@test "expose-servers/Service: enabled when servers and peering are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/expose-servers-service.yaml  \
-      --set 'global.enabled=false' \
-      --set 'server.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "expose-servers/Service: enable with global.enabled true and global.peering.enabled true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/expose-servers-service.yaml  \
-      --set 'global.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "expose-servers/Service: enable with global.peering.enabled true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/expose-servers-service.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "expose-servers/Service: enable with global.adminPartitions.enabled true" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -57,14 +20,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "expose-servers/Service: disable when peering.enabled is false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/expose-servers-service.yaml  \
-      --set 'server.enabled=true' \
-      --set 'global.peering.enabled=false' \
-      .
-}
 
 @test "expose-servers/Service: disable with server.enabled" {
   cd `chart_dir`
@@ -72,7 +27,8 @@ load _helpers
       -s templates/expose-servers-service.yaml  \
       --set 'server.enabled=false' \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       .
 }
 
@@ -83,7 +39,8 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       .
 }
 
@@ -92,7 +49,8 @@ load _helpers
   local cmd=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.ports[0]' | tee /dev/stderr)
@@ -107,7 +65,8 @@ load _helpers
   local cmd=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.ports[0]' | tee /dev/stderr)
@@ -122,7 +81,8 @@ load _helpers
   local cmd=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=false' \
       . | tee /dev/stderr |
@@ -135,7 +95,8 @@ load _helpers
   local cmd=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=false' \
       . | tee /dev/stderr |
@@ -154,7 +115,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations | length' | tee /dev/stderr)
   [ "${actual}" = "0" ]
@@ -165,7 +127,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.exposeService.annotations=key: value' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations.key' | tee /dev/stderr)
@@ -180,7 +143,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.exposeService.type=NodePort' \
       --set 'server.exposeService.nodePort.http=4443' \
       . | tee /dev/stderr |
@@ -193,7 +157,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'server.exposeService.type=NodePort' \
       --set 'server.exposeService.nodePort.https=4443' \
@@ -207,7 +172,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.exposeService.type=NodePort' \
       --set 'server.exposeService.nodePort.rpc=4443' \
       . | tee /dev/stderr |
@@ -220,7 +186,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.exposeService.type=NodePort' \
       --set 'server.exposeService.nodePort.serf=4444' \
       . | tee /dev/stderr |
@@ -233,7 +200,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.exposeService.type=NodePort' \
       --set 'server.exposeService.nodePort.grpc=4444' \
       . | tee /dev/stderr |
@@ -246,7 +214,8 @@ load _helpers
   local ports=$(helm template \
       -s templates/expose-servers-service.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.peering.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.exposeService.type=NodePort' \
       --set 'server.exposeService.nodePort.rpc=4443' \
       --set 'server.exposeService.nodePort.grpc=4444' \

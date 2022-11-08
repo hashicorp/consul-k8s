@@ -1370,6 +1370,8 @@ load _helpers
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.peering.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-peering=true"))' | tee /dev/stderr)
 
@@ -1384,6 +1386,28 @@ load _helpers
       --set 'global.peering.enabled=true' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "setting global.peering.enabled to true requires connectInject.enabled to be true" ]]
+}
+
+@test "connectInject/Deployment: fails if peering is enabled but tls is not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.peering.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "setting global.peering.enabled to true requires global.tls.enabled to be true" ]]
+}
+
+@test "connectInject/Deployment: fails if peering is enabled but mesh gateways are not" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.peering.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "setting global.peering.enabled to true requires meshGateway.enabled to be true" ]]
 }
 
 #--------------------------------------------------------------------

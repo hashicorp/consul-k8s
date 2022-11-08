@@ -992,6 +992,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.peering.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
@@ -1014,6 +1015,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.peering.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)

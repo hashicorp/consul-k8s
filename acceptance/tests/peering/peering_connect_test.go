@@ -69,7 +69,6 @@ func TestPeering_Connect(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
-				"peering.tokenGeneration.serverAddresses.source": "consul",
 			}
 
 			staticServerPeerHelmValues := map[string]string{
@@ -131,6 +130,27 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
 
+			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
+			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
+
+			// Ensure mesh config entries are created in Consul.
+			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			retry.RunWith(timer, t, func(r *retry.R) {
+				ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
+				require.NoError(r, err)
+				configEntryServer, ok := ceServer.(*api.MeshConfigEntry)
+				require.True(r, ok)
+				require.Equal(r, configEntryServer.GetName(), "mesh")
+				require.NoError(r, err)
+
+				ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
+				require.NoError(r, err)
+				configEntryClient, ok := ceClient.(*api.MeshConfigEntry)
+				require.True(r, ok)
+				require.Equal(r, configEntryClient.GetName(), "mesh")
+				require.NoError(r, err)
+			})
+
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
@@ -138,7 +158,6 @@ func TestPeering_Connect(t *testing.T) {
 			})
 
 			// Ensure the secret is created.
-			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
 				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
@@ -177,9 +196,6 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
-
-			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
-			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways.
