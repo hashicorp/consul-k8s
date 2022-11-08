@@ -224,6 +224,9 @@ spec:
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - name: consul-service
+          mountPath: /consul/service
+          readOnly: true
         {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
@@ -259,7 +262,7 @@ spec:
             {{- else }}
             -grpc-port=8502 \
             {{- end }}
-            -proxy-service-id=$POD_NAME \
+            -proxy-service-id-path=/consul/service/proxy-id \
             -service-node-name="k8s-service-mesh" \
             {{- if $root.Values.global.enableConsulNamespaces }}
             -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }} \
