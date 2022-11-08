@@ -57,6 +57,19 @@ spec:
           spec:
             description: IngressGatewaySpec defines the desired state of IngressGateway.
             properties:
+              defaults:
+                description: Defaults is default configuration for all upstream services
+                properties:
+                  maxConcurrentRequests:
+                    format: int32
+                    type: integer
+                  maxConnections:
+                    format: int32
+                    type: integer
+                  maxPendingRequests:
+                    format: int32
+                    type: integer
+                type: object
               listeners:
                 description: Listeners declares what ports the ingress gateway should
                   listen on, and what services to associated to those ports.
@@ -98,6 +111,15 @@ spec:
                             items:
                               type: string
                             type: array
+                          maxConcurrentRequests:
+                            format: int32
+                            type: integer
+                          maxConnections:
+                            format: int32
+                            type: integer
+                          maxPendingRequests:
+                            format: int32
+                            type: integer
                           name:
                             description: "Name declares the service to which traffic
                               should be forwarded. \n This can either be a specific
