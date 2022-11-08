@@ -167,6 +167,10 @@ type MeshWebhook struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
+	// SkipServerWatch prevents consul-dataplane from consuming the server update stream. This is useful
+	// for situations where Consul servers are behind a load balancer.
+	SkipServerWatch bool
+
 	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
 	ReleaseNamespace string
 
