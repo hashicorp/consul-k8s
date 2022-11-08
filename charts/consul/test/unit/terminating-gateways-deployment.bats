@@ -370,6 +370,27 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# externalServers.skipServerWatch
+
+@test "terminatingGateways/Deployment: sets server-watch-disabled flag when externalServers.enabled and externalServers.skipServerWatch is true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=false' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.skipServerWatch=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '. | contains("-server-watch-disabled")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # replicas
 
 @test "terminatingGateways/Deployment: replicas defaults to 2" {

@@ -244,6 +244,9 @@ spec:
             {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
             -telemetry-prom-scrape-path="/metrics"
             {{- end }}
+            {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
+            -server-watch-disabled=true
+            {{- end }}
         livenessProbe:
           tcpSocket:
             port: {{ .Values.meshGateway.containerPort }}
