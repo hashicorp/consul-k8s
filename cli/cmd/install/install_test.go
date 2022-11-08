@@ -521,7 +521,7 @@ func TestInstall(t *testing.T) {
 			},
 			messages: []string{
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n ✓ Valid enterprise Consul secret found.\n",
-				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    -------------------\n    global:\n      enterpriseLicense:\n        secretName: consul-license\n    \n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    global:\n      enterpriseLicense:\n        secretName: consul-license\n    \n",
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{},
@@ -558,7 +558,7 @@ func TestInstall(t *testing.T) {
 			},
 			messages: []string{
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
-				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    -------------------\n    connectInject:\n      enabled: true\n      metrics:\n        defaultEnableMerging: true\n        defaultEnabled: true\n        enableGatewayMetrics: true\n    controller:\n      enabled: true\n    global:\n      metrics:\n        enableAgentMetrics: true\n        enabled: true\n      name: consul\n    prometheus:\n      enabled: true\n    server:\n      replicas: 1\n    ui:\n      enabled: true\n      service:\n        enabled: true\n    \n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    connectInject:\n      enabled: true\n      metrics:\n        defaultEnableMerging: true\n        defaultEnabled: true\n        enableGatewayMetrics: true\n    controller:\n      enabled: true\n    global:\n      metrics:\n        enableAgentMetrics: true\n        enabled: true\n      name: consul\n    prometheus:\n      enabled: true\n    server:\n      replicas: 1\n    ui:\n      enabled: true\n      service:\n        enabled: true\n    \n",
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
 			},
 			helmActionsRunner:                       &helm.MockActionRunner{},
@@ -574,7 +574,7 @@ func TestInstall(t *testing.T) {
 			},
 			messages: []string{
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
-				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    -------------------\n    connectInject:\n      enabled: true\n    controller:\n      enabled: true\n    global:\n      acls:\n        manageSystemACLs: true\n      gossipEncryption:\n        autoGenerate: true\n      name: consul\n      tls:\n        enableAutoEncrypt: true\n        enabled: true\n    server:\n      replicas: 1\n    \n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    connectInject:\n      enabled: true\n    controller:\n      enabled: true\n    global:\n      acls:\n        manageSystemACLs: true\n      gossipEncryption:\n        autoGenerate: true\n      name: consul\n      tls:\n        enableAutoEncrypt: true\n        enabled: true\n    server:\n      replicas: 1\n    \n",
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
 			},
 			helmActionsRunner:                       &helm.MockActionRunner{},

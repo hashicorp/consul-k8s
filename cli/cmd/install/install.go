@@ -401,7 +401,7 @@ func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, 
 	if len(vals) == 0 {
 		c.UI.Output("\nNo overrides provided, using the default Helm values.", terminal.WithInfoStyle())
 	} else {
-		c.UI.Output("\nHelm value overrides\n-------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
+		c.UI.Output("\nHelm value overrides\n--------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
 	}
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting

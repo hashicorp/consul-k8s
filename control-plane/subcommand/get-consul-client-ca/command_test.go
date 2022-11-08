@@ -76,7 +76,7 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 	outputFile, err := os.CreateTemp("", "ca")
 	require.NoError(t, err)
-	defer os.Remove(outputFile.Name())
+	defer os.RemoveAll(outputFile.Name())
 
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
@@ -138,7 +138,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	t.Parallel()
 	outputFile, err := os.CreateTemp("", "ca")
 	require.NoError(t, err)
-	defer os.Remove(outputFile.Name())
+	defer os.RemoveAll(outputFile.Name())
 
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
@@ -225,7 +225,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	t.Parallel()
 	outputFile, err := os.CreateTemp("", "ca")
 	require.NoError(t, err)
-	defer os.Remove(outputFile.Name())
+	defer os.RemoveAll(outputFile.Name())
 
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
@@ -308,7 +308,7 @@ func TestRun_WithProvider(t *testing.T) {
 	t.Parallel()
 	outputFile, err := os.CreateTemp("", "ca")
 	require.NoError(t, err)
-	defer os.Remove(outputFile.Name())
+	defer os.RemoveAll(outputFile.Name())
 
 	ui := cli.NewMockUi()
 

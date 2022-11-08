@@ -146,6 +146,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						Port:      443,
 					},
 					MaxInboundConnections: 20,
+					LocalConnectTimeoutMs: 5000,
+					LocalRequestTimeoutMs: 15000,
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -252,6 +254,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					Port:      443,
 				},
 				MaxInboundConnections: 20,
+				LocalConnectTimeoutMs: 5000,
+				LocalRequestTimeoutMs: 15000,
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",

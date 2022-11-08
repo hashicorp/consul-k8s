@@ -63,7 +63,7 @@ func TestRun_InvalidSinkFile(t *testing.T) {
 func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 	tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
 	t.Cleanup(func() {
-		os.Remove(tokenFile)
+		os.RemoveAll(tokenFile)
 	})
 
 	var caFile, certFile, keyFile string
@@ -118,7 +118,7 @@ func Test_RunUsingLogin(t *testing.T) {
 	// This is the test file that we will write the token to so consul-logout can read it.
 	tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
 	t.Cleanup(func() {
-		os.Remove(tokenFile)
+		os.RemoveAll(tokenFile)
 	})
 
 	// Start Consul server with ACLs enabled and default deny policy.

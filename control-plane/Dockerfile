@@ -144,7 +144,7 @@ ARG TARGETOS
 ARG TARGETARCH
 
 # Copy license for Red Hat certification.
-COPY LICENSE.md /licenses/mozilla.txt
+COPY LICENSE /licenses/mozilla.txt
 
 RUN microdnf install -y ca-certificates gnupg libcap openssl shadow-utils iptables
 

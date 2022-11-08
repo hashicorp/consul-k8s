@@ -448,8 +448,6 @@ func TestGetHelmConfigWithMapSecretNames(t *testing.T) {
 
 	const expectedFull = `connectInject:
   enabled: true
-  transparentProxy:
-    defaultEnabled: false
 controller:
   enabled: true
 global:
@@ -497,8 +495,6 @@ server:
 
 	const expectedWithoutOptional = `connectInject:
   enabled: true
-  transparentProxy:
-    defaultEnabled: false
 controller:
   enabled: true
 global:

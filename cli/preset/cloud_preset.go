@@ -219,8 +219,6 @@ server:
     secretName: %s
 connectInject:
   enabled: true
-  transparentProxy:
-    defaultEnabled: false
 controller:
   enabled: true
 `, cfg.BootstrapResponse.Cluster.ID, secretNameServerCA, corev1.TLSCertKey,
