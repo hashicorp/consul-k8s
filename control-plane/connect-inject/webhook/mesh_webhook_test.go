@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -173,6 +174,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/spec/volumes",
 				},
 				{
@@ -262,6 +267,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/labels",
 				},
 			},
@@ -310,6 +319,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
 					Operation: "add",
@@ -383,6 +396,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/labels",
 				},
 			},
@@ -436,6 +453,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
 					Operation: "add",
@@ -517,6 +538,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
 					Operation: "add",
@@ -652,6 +677,10 @@ func TestHandlerHandle(t *testing.T) {
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
 					Operation: "replace",
 					Path:      "/spec/containers/0/livenessProbe/httpGet/port",
 				},
@@ -712,6 +741,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/labels",
 				},
 			},
@@ -767,6 +800,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/labels",
 				},
 			},
@@ -808,7 +845,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -828,7 +866,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -856,6 +895,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			map[string]string{
 				"consul.hashicorp.com/connect-service": "foo",
 				constants.AnnotationOriginalPod:        "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationConsulK8sVersion:   version.GetHumanVersion(),
 			},
 
 			"",
@@ -882,8 +922,9 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationPort:        "http",
-				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationPort:             "http",
+				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -908,8 +949,9 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationPort:        "8080",
-				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationPort:             "8080",
+				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -917,10 +959,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-
 			podJson, err := json.Marshal(tt.Pod)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			var w MeshWebhook
 			err = w.defaultAnnotations(tt.Pod, string(podJson))
@@ -928,7 +968,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				t.Fatalf("actual: %v, expected err: %v", err, tt.Err)
 			}
 			if tt.Err != "" {
-				require.Contains(err.Error(), tt.Err)
+				require.Contains(t, err.Error(), tt.Err)
 				return
 			}
 
@@ -936,7 +976,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			if len(actual) == 0 {
 				actual = nil
 			}
-			require.Equal(tt.Expected, actual)
+			require.Equal(t, tt.Expected, actual)
 		})
 	}
 }

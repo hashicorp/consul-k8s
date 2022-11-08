@@ -17,6 +17,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-netaddrs v0.0.0-20220509001840-90ed9d26ec46
 	github.com/hashicorp/go-rootcerts v1.0.2
+	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/serf v0.10.1
 	github.com/kr/text v0.2.0
 	github.com/miekg/dns v1.1.41
