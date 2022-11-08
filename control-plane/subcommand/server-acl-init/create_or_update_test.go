@@ -33,6 +33,7 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 		c.ACL.Tokens.InitialManagement = bootToken
 	})
 	require.NoError(err)
+	defer svr.Stop()
 	svr.WaitForLeader(t)
 
 	// Get a Consul client.
