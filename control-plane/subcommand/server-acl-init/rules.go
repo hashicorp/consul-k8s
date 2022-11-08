@@ -175,10 +175,18 @@ namespace_prefix "" {
 // This assumes users are using the default name for the service, i.e.
 // "mesh-gateway".
 func (c *Command) meshGatewayRules() (string, error) {
-	// Mesh gateways can only act as a proxy for services
-	// that its ACL token has access to. So, in the case of
-	// Consul namespaces, it needs access to all namespaces.
+	// Mesh gateways can only act as a proxy for services that its ACL token has access to. So, in the case of Consul
+	// namespaces, it needs access to all namespaces. For peering, it requires the ability to list all peers which in
+	// enterprise requires peering:read on all partitions or in OSS requires a top level peering:read. Since we cannot
+	// determine whether we are using an enterprise or OSS consul image based on whether peering is enabled, we include
+	// both permissions here.
 	meshGatewayRulesTpl := `mesh = "write"
+{{- if .EnablePeering }}
+peering = "read"
+partition_prefix "" {
+  peering = "read"
+}
+{{- end }}
 {{- if .EnableNamespaces }}
 namespace "default" {
 {{- end }}
