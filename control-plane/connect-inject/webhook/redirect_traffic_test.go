@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/stretchr/testify/require"
@@ -66,7 +68,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:       "",
 				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:  proxyDefaultInboundPort,
+				ProxyInboundPort:  endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"5996"},
 			},
@@ -84,8 +86,8 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationEnableMetrics:        "true",
-						annotationPrometheusScrapePort: "13373",
+						common.AnnotationEnableMetrics:        "true",
+						common.AnnotationPrometheusScrapePort: "13373",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -99,7 +101,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:    proxyDefaultInboundPort,
+				ProxyInboundPort:    endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"13373"},
@@ -118,8 +120,8 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationEnableMetrics:        "invalid",
-						annotationPrometheusScrapePort: "13373",
+						common.AnnotationEnableMetrics:        "invalid",
+						common.AnnotationPrometheusScrapePort: "13373",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -133,12 +135,12 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:    proxyDefaultInboundPort,
+				ProxyInboundPort:    endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"13373"},
 			},
-			expErr: fmt.Errorf("%s annotation value of %s was invalid: %s", annotationEnableMetrics, "invalid", "strconv.ParseBool: parsing \"invalid\": invalid syntax"),
+			expErr: fmt.Errorf("%s annotation value of %s was invalid: %s", common.AnnotationEnableMetrics, "invalid", "strconv.ParseBool: parsing \"invalid\": invalid syntax"),
 		},
 		{
 			name: "overwrite probes, transparent proxy annotation set",
@@ -153,8 +155,8 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationTransparentProxyOverwriteProbes: "true",
-						keyTransparentProxy:                       "true",
+						common.AnnotationTransparentProxyOverwriteProbes: "true",
+						common.KeyTransparentProxy:                       "true",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -175,7 +177,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:    proxyDefaultInboundPort,
+				ProxyInboundPort:    endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{strconv.Itoa(exposedPathsLivenessPortsRangeStart)},
@@ -194,7 +196,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationTProxyExcludeInboundPorts: "1111,11111",
+						common.AnnotationTProxyExcludeInboundPorts: "1111,11111",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -208,7 +210,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:    proxyDefaultInboundPort,
+				ProxyInboundPort:    endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"1111", "11111"},
@@ -227,7 +229,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationTProxyExcludeOutboundPorts: "2222,22222",
+						common.AnnotationTProxyExcludeOutboundPorts: "2222,22222",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -241,7 +243,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:          "",
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:     proxyDefaultInboundPort,
+				ProxyInboundPort:     endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:          []string{"5996"},
 				ExcludeOutboundPorts: []string{"2222", "22222"},
@@ -260,7 +262,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationTProxyExcludeOutboundCIDRs: "3.3.3.3,3.3.3.3/24",
+						common.AnnotationTProxyExcludeOutboundCIDRs: "3.3.3.3,3.3.3.3/24",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -274,7 +276,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:          "",
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:     proxyDefaultInboundPort,
+				ProxyInboundPort:     endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:          []string{strconv.Itoa(initContainersUserAndGroupID)},
 				ExcludeOutboundCIDRs: []string{"3.3.3.3", "3.3.3.3/24"},
@@ -293,7 +295,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationTProxyExcludeUIDs: "4444,44444",
+						common.AnnotationTProxyExcludeUIDs: "4444,44444",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -307,7 +309,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			expCfg: iptables.Config{
 				ConsulDNSIP:       "",
 				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:  proxyDefaultInboundPort,
+				ProxyInboundPort:  endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
 			},
@@ -325,10 +327,10 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					Namespace: defaultNamespace,
 					Name:      defaultPodName,
 					Annotations: map[string]string{
-						annotationTProxyExcludeInboundPorts:  "1111,11111",
-						annotationTProxyExcludeOutboundPorts: "2222,22222",
-						annotationTProxyExcludeOutboundCIDRs: "3.3.3.3,3.3.3.3/24",
-						annotationTProxyExcludeUIDs:          "4444,44444",
+						common.AnnotationTProxyExcludeInboundPorts:  "1111,11111",
+						common.AnnotationTProxyExcludeOutboundPorts: "2222,22222",
+						common.AnnotationTProxyExcludeOutboundCIDRs: "3.3.3.3,3.3.3.3/24",
+						common.AnnotationTProxyExcludeUIDs:          "4444,44444",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -341,7 +343,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			},
 			expCfg: iptables.Config{
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
-				ProxyInboundPort:     proxyDefaultInboundPort,
+				ProxyInboundPort:     endpoints.ProxyDefaultInboundPort,
 				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
 				ExcludeInboundPorts:  []string{"1111", "11111"},
 				ExcludeOutboundPorts: []string{"2222", "22222"},
@@ -357,7 +359,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 			// Only compare annotation and iptables config on successful runs
 			if c.expErr == nil {
 				require.NoError(t, err)
-				anno, ok := c.pod.Annotations[annotationRedirectTraffic]
+				anno, ok := c.pod.Annotations[common.AnnotationRedirectTraffic]
 				require.Equal(t, ok, true)
 
 				actualConfig := iptables.Config{}
@@ -384,32 +386,32 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 		},
 		"enabled globally, ns not set, annotation is false": {
 			globalEnabled:         true,
-			annotations:           map[string]string{keyConsulDNS: "false"},
+			annotations:           map[string]string{common.KeyConsulDNS: "false"},
 			expectConsulDNSConfig: false,
 		},
 		"enabled globally, ns not set, annotation is true": {
 			globalEnabled:         true,
-			annotations:           map[string]string{keyConsulDNS: "true"},
+			annotations:           map[string]string{common.KeyConsulDNS: "true"},
 			expectConsulDNSConfig: true,
 		},
 		"disabled globally, ns not set, annotation not provided": {
 			expectConsulDNSConfig: false,
 		},
 		"disabled globally, ns not set, annotation is false": {
-			annotations:           map[string]string{keyConsulDNS: "false"},
+			annotations:           map[string]string{common.KeyConsulDNS: "false"},
 			expectConsulDNSConfig: false,
 		},
 		"disabled globally, ns not set, annotation is true": {
-			annotations:           map[string]string{keyConsulDNS: "true"},
+			annotations:           map[string]string{common.KeyConsulDNS: "true"},
 			expectConsulDNSConfig: true,
 		},
 		"disabled globally, ns enabled, annotation not set": {
-			namespaceLabel:        map[string]string{keyConsulDNS: "true"},
+			namespaceLabel:        map[string]string{common.KeyConsulDNS: "true"},
 			expectConsulDNSConfig: true,
 		},
 		"enabled globally, ns disabled, annotation not set": {
 			globalEnabled:         true,
-			namespaceLabel:        map[string]string{keyConsulDNS: "false"},
+			namespaceLabel:        map[string]string{common.KeyConsulDNS: "false"},
 			expectConsulDNSConfig: false,
 		},
 	}

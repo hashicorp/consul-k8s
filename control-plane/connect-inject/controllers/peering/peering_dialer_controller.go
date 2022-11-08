@@ -1,4 +1,4 @@
-package connectinject
+package peering
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -224,7 +225,7 @@ func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey
 	}
 	dialer.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
 	dialer.SetSyncedCondition(corev1.ConditionTrue, "", "")
-	if peeringVersionString, ok := dialer.Annotations[annotationPeeringVersion]; ok {
+	if peeringVersionString, ok := dialer.Annotations[common.AnnotationPeeringVersion]; ok {
 		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
 		if err != nil {
 			r.Log.Error(err, "failed to update PeeringDialer status", "name", dialer.Name, "namespace", dialer.Namespace)
@@ -299,7 +300,7 @@ func (r *PeeringDialerController) deletePeering(ctx context.Context, apiClient *
 }
 
 func (r *PeeringDialerController) versionAnnotationUpdated(dialer *consulv1alpha1.PeeringDialer) (bool, error) {
-	if peeringVersionString, ok := dialer.Annotations[annotationPeeringVersion]; ok {
+	if peeringVersionString, ok := dialer.Annotations[common.AnnotationPeeringVersion]; ok {
 		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
 		if err != nil {
 			return false, err
@@ -341,7 +342,7 @@ func (r *PeeringDialerController) requestsForPeeringTokens(object client.Object)
 // the Secret is a Peering Token Secret.
 func (r *PeeringDialerController) filterPeeringDialers(object client.Object) bool {
 	secretLabels := object.GetLabels()
-	isPeeringToken, ok := secretLabels[labelPeeringToken]
+	isPeeringToken, ok := secretLabels[common.LabelPeeringToken]
 	if !ok {
 		return false
 	}

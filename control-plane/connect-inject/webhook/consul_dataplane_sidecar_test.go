@@ -1,10 +1,12 @@
-package connectinject
+package webhook
 
 import (
 	"fmt"
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -141,7 +143,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pod",
 					Annotations: map[string]string{
-						annotationService: "foo",
+						common.AnnotationService: "foo",
 					},
 				},
 
@@ -200,7 +202,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			expectedProbe := &corev1.Probe{
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(EnvoyInboundListenerPort),
+						Port: intstr.FromInt(endpoints.EnvoyInboundListenerPort),
 					},
 				},
 				InitialDelaySeconds: 1,
@@ -223,28 +225,28 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 	}{
 		"default settings, no annotations": {
 			annotations: map[string]string{
-				annotationService: "foo",
+				common.AnnotationService: "foo",
 			},
 			expFlags: "-envoy-concurrency=0",
 		},
 		"default settings, annotation override": {
 			annotations: map[string]string{
-				annotationService:               "foo",
-				annotationEnvoyProxyConcurrency: "42",
+				common.AnnotationService:               "foo",
+				common.AnnotationEnvoyProxyConcurrency: "42",
 			},
 			expFlags: "-envoy-concurrency=42",
 		},
 		"default settings, invalid concurrency annotation negative number": {
 			annotations: map[string]string{
-				annotationService:               "foo",
-				annotationEnvoyProxyConcurrency: "-42",
+				common.AnnotationService:               "foo",
+				common.AnnotationEnvoyProxyConcurrency: "-42",
 			},
 			expErr: "unable to parse annotation \"consul.hashicorp.com/consul-envoy-proxy-concurrency\": strconv.ParseUint: parsing \"-42\": invalid syntax",
 		},
 		"default settings, not-parseable concurrency annotation": {
 			annotations: map[string]string{
-				annotationService:               "foo",
-				annotationEnvoyProxyConcurrency: "not-int",
+				common.AnnotationService:               "foo",
+				common.AnnotationEnvoyProxyConcurrency: "not-int",
 			},
 			expErr: "unable to parse annotation \"consul.hashicorp.com/consul-envoy-proxy-concurrency\": strconv.ParseUint: parsing \"not-int\": invalid syntax",
 		},
@@ -314,7 +316,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pod",
 					Annotations: map[string]string{
-						annotationService: "web,web-admin",
+						common.AnnotationService: "web,web-admin",
 					},
 				},
 
@@ -410,7 +412,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 					})
 				}
 
-				port := EnvoyInboundListenerPort + i
+				port := endpoints.EnvoyInboundListenerPort + i
 				expectedProbe := &corev1.Probe{
 					Handler: corev1.Handler{
 						TCPSocket: &corev1.TCPSocketAction{
@@ -479,7 +481,7 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationService: "foo",
+						common.AnnotationService: "foo",
 					},
 				},
 
@@ -636,7 +638,7 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationEnvoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+						common.AnnotationEnvoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 					},
 				},
 			},
@@ -648,7 +650,7 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationEnvoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+						common.AnnotationEnvoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 					},
 				},
 			},
@@ -684,8 +686,8 @@ func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
-						annotationConsulSidecarUserVolumeMount: "[{\"name\": \"tls-cert\", \"mountPath\": \"/custom/path\"}, {\"name\": \"tls-ca\", \"mountPath\": \"/custom/path2\"}]",
+						common.AnnotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+						common.AnnotationConsulSidecarUserVolumeMount: "[{\"name\": \"tls-cert\", \"mountPath\": \"/custom/path\"}, {\"name\": \"tls-ca\", \"mountPath\": \"/custom/path2\"}]",
 					},
 				},
 			},
@@ -709,8 +711,8 @@ func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
-						annotationConsulSidecarUserVolumeMount: "[abcdefg]",
+						common.AnnotationEnvoyExtraArgs:               "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+						common.AnnotationConsulSidecarUserVolumeMount: "[abcdefg]",
 					},
 				},
 			},
@@ -779,10 +781,10 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 		"no defaults, all annotations": {
 			webhook: MeshWebhook{},
 			annotations: map[string]string{
-				annotationSidecarProxyCPURequest:    "100m",
-				annotationSidecarProxyMemoryRequest: "100Mi",
-				annotationSidecarProxyCPULimit:      "200m",
-				annotationSidecarProxyMemoryLimit:   "200Mi",
+				common.AnnotationSidecarProxyCPURequest:    "100m",
+				common.AnnotationSidecarProxyMemoryRequest: "100Mi",
+				common.AnnotationSidecarProxyCPULimit:      "200m",
+				common.AnnotationSidecarProxyMemoryLimit:   "200Mi",
 			},
 			expResources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -803,10 +805,10 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 				DefaultProxyMemoryLimit:   zero,
 			},
 			annotations: map[string]string{
-				annotationSidecarProxyCPURequest:    "100m",
-				annotationSidecarProxyMemoryRequest: "100Mi",
-				annotationSidecarProxyCPULimit:      "200m",
-				annotationSidecarProxyMemoryLimit:   "200Mi",
+				common.AnnotationSidecarProxyCPURequest:    "100m",
+				common.AnnotationSidecarProxyMemoryRequest: "100Mi",
+				common.AnnotationSidecarProxyCPULimit:      "200m",
+				common.AnnotationSidecarProxyMemoryLimit:   "200Mi",
 			},
 			expResources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -841,10 +843,10 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 		"annotations set to 0": {
 			webhook: MeshWebhook{},
 			annotations: map[string]string{
-				annotationSidecarProxyCPURequest:    "0",
-				annotationSidecarProxyMemoryRequest: "0",
-				annotationSidecarProxyCPULimit:      "0",
-				annotationSidecarProxyMemoryLimit:   "0",
+				common.AnnotationSidecarProxyCPURequest:    "0",
+				common.AnnotationSidecarProxyMemoryRequest: "0",
+				common.AnnotationSidecarProxyCPULimit:      "0",
+				common.AnnotationSidecarProxyMemoryLimit:   "0",
 			},
 			expResources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -860,28 +862,28 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 		"invalid cpu request": {
 			webhook: MeshWebhook{},
 			annotations: map[string]string{
-				annotationSidecarProxyCPURequest: "invalid",
+				common.AnnotationSidecarProxyCPURequest: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-cpu-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid cpu limit": {
 			webhook: MeshWebhook{},
 			annotations: map[string]string{
-				annotationSidecarProxyCPULimit: "invalid",
+				common.AnnotationSidecarProxyCPULimit: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-cpu-limit:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory request": {
 			webhook: MeshWebhook{},
 			annotations: map[string]string{
-				annotationSidecarProxyMemoryRequest: "invalid",
+				common.AnnotationSidecarProxyMemoryRequest: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-memory-request:\"invalid\": quantities must match the regular expression",
 		},
 		"invalid memory limit": {
 			webhook: MeshWebhook{},
 			annotations: map[string]string{
-				annotationSidecarProxyMemoryLimit: "invalid",
+				common.AnnotationSidecarProxyMemoryLimit: "invalid",
 			},
 			expErr: "parsing annotation consul.hashicorp.com/sidecar-proxy-memory-limit:\"invalid\": quantities must match the regular expression",
 		},
@@ -933,12 +935,12 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationService:              "web",
-						annotationEnableMetrics:        "true",
-						annotationEnableMetricsMerging: "true",
-						annotationMergedMetricsPort:    "20100",
-						annotationPort:                 "1234",
-						annotationPrometheusScrapePath: "/scrape-path",
+						common.AnnotationService:              "web",
+						common.AnnotationEnableMetrics:        "true",
+						common.AnnotationEnableMetricsMerging: "true",
+						common.AnnotationMergedMetricsPort:    "20100",
+						common.AnnotationPort:                 "1234",
+						common.AnnotationPrometheusScrapePath: "/scrape-path",
 					},
 				},
 			},
@@ -949,16 +951,16 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationService:              "web",
-						annotationEnableMetrics:        "true",
-						annotationEnableMetricsMerging: "true",
-						annotationMergedMetricsPort:    "20100",
-						annotationPort:                 "1234",
-						annotationPrometheusScrapePath: "/scrape-path",
-						annotationPrometheusCAFile:     "/certs/ca.crt",
-						annotationPrometheusCAPath:     "/certs/ca",
-						annotationPrometheusCertFile:   "/certs/server.crt",
-						annotationPrometheusKeyFile:    "/certs/key.pem",
+						common.AnnotationService:              "web",
+						common.AnnotationEnableMetrics:        "true",
+						common.AnnotationEnableMetricsMerging: "true",
+						common.AnnotationMergedMetricsPort:    "20100",
+						common.AnnotationPort:                 "1234",
+						common.AnnotationPrometheusScrapePath: "/scrape-path",
+						common.AnnotationPrometheusCAFile:     "/certs/ca.crt",
+						common.AnnotationPrometheusCAPath:     "/certs/ca",
+						common.AnnotationPrometheusCertFile:   "/certs/server.crt",
+						common.AnnotationPrometheusKeyFile:    "/certs/key.pem",
 					},
 				},
 			},
@@ -969,57 +971,57 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationService:              "web",
-						annotationEnableMetrics:        "true",
-						annotationEnableMetricsMerging: "true",
-						annotationMergedMetricsPort:    "20100",
-						annotationPort:                 "1234",
-						annotationPrometheusScrapePath: "/scrape-path",
-						annotationPrometheusCertFile:   "/certs/server.crt",
-						annotationPrometheusKeyFile:    "/certs/key.pem",
+						common.AnnotationService:              "web",
+						common.AnnotationEnableMetrics:        "true",
+						common.AnnotationEnableMetricsMerging: "true",
+						common.AnnotationMergedMetricsPort:    "20100",
+						common.AnnotationPort:                 "1234",
+						common.AnnotationPrometheusScrapePath: "/scrape-path",
+						common.AnnotationPrometheusCertFile:   "/certs/server.crt",
+						common.AnnotationPrometheusKeyFile:    "/certs/key.pem",
 					},
 				},
 			},
 			expCmdArgs: "",
-			expErr:     fmt.Sprintf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath),
+			expErr:     fmt.Sprintf("must set one of %q or %q when providing prometheus TLS config", common.AnnotationPrometheusCAFile, common.AnnotationPrometheusCAPath),
 		},
 		{
 			name: "merge metrics with TLS enabled, missing cert gives an error",
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationService:              "web",
-						annotationEnableMetrics:        "true",
-						annotationEnableMetricsMerging: "true",
-						annotationMergedMetricsPort:    "20100",
-						annotationPort:                 "1234",
-						annotationPrometheusScrapePath: "/scrape-path",
-						annotationPrometheusCAFile:     "/certs/ca.crt",
-						annotationPrometheusKeyFile:    "/certs/key.pem",
+						common.AnnotationService:              "web",
+						common.AnnotationEnableMetrics:        "true",
+						common.AnnotationEnableMetricsMerging: "true",
+						common.AnnotationMergedMetricsPort:    "20100",
+						common.AnnotationPort:                 "1234",
+						common.AnnotationPrometheusScrapePath: "/scrape-path",
+						common.AnnotationPrometheusCAFile:     "/certs/ca.crt",
+						common.AnnotationPrometheusKeyFile:    "/certs/key.pem",
 					},
 				},
 			},
 			expCmdArgs: "",
-			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile),
+			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", common.AnnotationPrometheusCertFile),
 		},
 		{
 			name: "merge metrics with TLS enabled, missing key file gives an error",
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationService:              "web",
-						annotationEnableMetrics:        "true",
-						annotationEnableMetricsMerging: "true",
-						annotationMergedMetricsPort:    "20100",
-						annotationPort:                 "1234",
-						annotationPrometheusScrapePath: "/scrape-path",
-						annotationPrometheusCAPath:     "/certs/ca",
-						annotationPrometheusCertFile:   "/certs/server.crt",
+						common.AnnotationService:              "web",
+						common.AnnotationEnableMetrics:        "true",
+						common.AnnotationEnableMetricsMerging: "true",
+						common.AnnotationMergedMetricsPort:    "20100",
+						common.AnnotationPort:                 "1234",
+						common.AnnotationPrometheusScrapePath: "/scrape-path",
+						common.AnnotationPrometheusCAPath:     "/certs/ca",
+						common.AnnotationPrometheusCertFile:   "/certs/server.crt",
 					},
 				},
 			},
 			expCmdArgs: "",
-			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile),
+			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", common.AnnotationPrometheusKeyFile),
 		},
 	}
 

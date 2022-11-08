@@ -1,4 +1,4 @@
-package connectinject
+package peering
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -202,7 +203,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 						Name:      "peering",
 						Namespace: "default",
 						Annotations: map[string]string{
-							annotationPeeringVersion: "2",
+							common.AnnotationPeeringVersion: "2",
 						},
 					},
 					Spec: v1alpha1.PeeringDialerSpec{
@@ -372,13 +373,13 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 	}{
 		"fails if annotation is not a number": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "foo",
+				common.AnnotationPeeringVersion: "foo",
 			},
 			expErr: `strconv.ParseUint: parsing "foo": invalid syntax`,
 		},
 		"is no/op if annotation value is less than value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "2",
+				common.AnnotationPeeringVersion: "2",
 			},
 			expectedStatus: &v1alpha1.PeeringDialerStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -393,7 +394,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 		},
 		"is no/op if annotation value is equal to value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "3",
+				common.AnnotationPeeringVersion: "3",
 			},
 			expectedStatus: &v1alpha1.PeeringDialerStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -408,7 +409,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 		},
 		"updates if annotation value is greater than value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "4",
+				common.AnnotationPeeringVersion: "4",
 			},
 			expectedStatus: &v1alpha1.PeeringDialerStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -1026,7 +1027,7 @@ func TestDialer_FilterPeeringDialers(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "true",
+						common.LabelPeeringToken: "true",
 					},
 				},
 			},
@@ -1038,7 +1039,7 @@ func TestDialer_FilterPeeringDialers(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "false",
+						common.LabelPeeringToken: "false",
 					},
 				},
 			},
@@ -1050,7 +1051,7 @@ func TestDialer_FilterPeeringDialers(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "foo",
+						common.LabelPeeringToken: "foo",
 					},
 				},
 			},

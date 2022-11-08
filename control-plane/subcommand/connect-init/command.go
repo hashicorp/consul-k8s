@@ -14,7 +14,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -184,7 +185,7 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
-		if err = common.WriteFileWithPerms(connectinject.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
+		if err = common.WriteFileWithPerms(webhook.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
 			c.logger.Error("error writing CA cert file", "error", err)
 			return 1
 		}

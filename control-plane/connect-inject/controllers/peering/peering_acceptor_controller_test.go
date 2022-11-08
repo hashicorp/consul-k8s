@@ -1,4 +1,4 @@
-package connectinject
+package peering
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -206,7 +207,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 						Name:      "acceptor-created",
 						Namespace: "default",
 						Annotations: map[string]string{
-							annotationPeeringVersion: "2",
+							common.AnnotationPeeringVersion: "2",
 						},
 					},
 					Spec: v1alpha1.PeeringAcceptorSpec{
@@ -512,7 +513,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			}
 
 			// Create the peering acceptor controller
-			controller := &PeeringAcceptorController{
+			controller := &AcceptorController{
 				Client:                   fakeClient,
 				ExposeServersServiceName: "test-expose-servers",
 				ReleaseNamespace:         "default",
@@ -552,8 +553,8 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			require.NoError(t, err)
 			expSecrets := tt.expectedK8sSecrets()
 			require.Equal(t, expSecrets[0].Name, createdSecret.Name)
-			require.Contains(t, createdSecret.Labels, labelPeeringToken)
-			require.Equal(t, createdSecret.Labels[labelPeeringToken], "true")
+			require.Contains(t, createdSecret.Labels, common.LabelPeeringToken)
+			require.Equal(t, createdSecret.Labels[common.LabelPeeringToken], "true")
 			// This assertion needs to be on StringData rather than Data because in the fake K8s client the contents are
 			// stored in StringData if that's how the secret was initialized in the fake client. In a real cluster, this
 			// StringData is an input only field, and shouldn't be read from.
@@ -632,7 +633,7 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the peering acceptor controller.
-	controller := &PeeringAcceptorController{
+	controller := &AcceptorController{
 		Client:              fakeClient,
 		Log:                 logrtest.TestLogger{T: t},
 		ConsulClientConfig:  testClient.Cfg,
@@ -678,13 +679,13 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 	}{
 		"fails if annotation is not a number": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "foo",
+				common.AnnotationPeeringVersion: "foo",
 			},
 			expErr: `strconv.ParseUint: parsing "foo": invalid syntax`,
 		},
 		"is no/op if annotation value is less than value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "2",
+				common.AnnotationPeeringVersion: "2",
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -700,7 +701,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 		},
 		"is no/op if annotation value is equal to value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "3",
+				common.AnnotationPeeringVersion: "3",
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -716,7 +717,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 		},
 		"updates if annotation value is greater than value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "4",
+				common.AnnotationPeeringVersion: "4",
 			},
 			expectedStatus: &v1alpha1.PeeringAcceptorStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -776,7 +777,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create the peering acceptor controller
-			controller := &PeeringAcceptorController{
+			controller := &AcceptorController{
 				Client:              fakeClient,
 				Log:                 logrtest.TestLogger{T: t},
 				ConsulClientConfig:  testClient.Cfg,
@@ -1080,7 +1081,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering acceptor controller.
-			pac := &PeeringAcceptorController{
+			pac := &AcceptorController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
@@ -1192,7 +1193,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering acceptor controller.
-			controller := &PeeringAcceptorController{
+			controller := &AcceptorController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
@@ -1225,7 +1226,7 @@ func TestAcceptor_FilterPeeringAcceptor(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "true",
+						common.LabelPeeringToken: "true",
 					},
 				},
 			},
@@ -1237,7 +1238,7 @@ func TestAcceptor_FilterPeeringAcceptor(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "false",
+						common.LabelPeeringToken: "false",
 					},
 				},
 			},
@@ -1249,7 +1250,7 @@ func TestAcceptor_FilterPeeringAcceptor(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "foo",
+						common.LabelPeeringToken: "foo",
 					},
 				},
 			},
@@ -1268,7 +1269,7 @@ func TestAcceptor_FilterPeeringAcceptor(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			controller := PeeringAcceptorController{}
+			controller := AcceptorController{}
 			result := controller.filterPeeringAcceptors(tt.secret)
 			require.Equal(t, tt.result, result)
 		})
@@ -1475,7 +1476,7 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 			s := scheme.Scheme
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.acceptors).Build()
-			controller := PeeringAcceptorController{
+			controller := AcceptorController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 			}

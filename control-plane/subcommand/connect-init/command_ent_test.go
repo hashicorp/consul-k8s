@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"

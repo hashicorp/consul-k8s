@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 )
@@ -40,7 +42,7 @@ type initContainerCommandData struct {
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
 func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
-	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
+	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -49,7 +51,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 
 	data := initContainerCommandData{
 		AuthMethod:     w.AuthMethod,
-		ConsulNodeName: ConsulNodeName,
+		ConsulNodeName: endpoints.ConsulNodeName,
 		MultiPort:      multiPort,
 		LogLevel:       w.LogLevel,
 		LogJSON:        w.LogJSON,
@@ -66,7 +68,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		data.ServiceName = mpi.serviceName
 	} else {
-		data.ServiceName = pod.Annotations[annotationService]
+		data.ServiceName = pod.Annotations[common.AnnotationService]
 	}
 	var bearerTokenFile string
 	if w.AuthMethod != "" {
@@ -251,32 +253,16 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	return container, nil
 }
 
-// transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
-// It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
-// to read the pod's namespace label when it exists.
-func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
-	// First check to see if the pod annotation exists to override the namespace or global settings.
-	if raw, ok := pod.Annotations[keyTransparentProxy]; ok {
-		return strconv.ParseBool(raw)
-	}
-	// Next see if the namespace has been defaulted.
-	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
-		return strconv.ParseBool(raw)
-	}
-	// Else fall back to the global default.
-	return globalEnabled, nil
-}
-
 // consulDNSEnabled returns true if Consul DNS should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
 func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
 	// First check to see if the pod annotation exists to override the namespace or global settings.
-	if raw, ok := pod.Annotations[keyConsulDNS]; ok {
+	if raw, ok := pod.Annotations[common.KeyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Next see if the namespace has been defaulted.
-	if raw, ok := namespace.Labels[keyConsulDNS]; ok {
+	if raw, ok := namespace.Labels[common.KeyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.

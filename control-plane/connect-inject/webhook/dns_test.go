@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"os"
@@ -74,7 +74,7 @@ options ndots:5`,
 			etcResolvFile, err := os.CreateTemp("", "")
 			require.NoError(t, err)
 			t.Cleanup(func() {
-				_ = os.Remove(etcResolvFile.Name())
+				_ = os.RemoveAll(etcResolvFile.Name())
 			})
 			_, err = etcResolvFile.WriteString(c.etcResolv)
 			require.NoError(t, err)

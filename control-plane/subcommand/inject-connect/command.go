@@ -13,7 +13,10 @@ import (
 	"syscall"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -29,7 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -403,7 +406,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	metricsConfig := connectinject.MetricsConfig{
+	metricsConfig := metrics.Config{
 		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
 		EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
 		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
@@ -412,7 +415,7 @@ func (c *Command) Run(args []string) int {
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
 
-	if err = (&connectinject.EndpointsController{
+	if err = (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,
 		ConsulServerConnMgr:        watcher,
@@ -435,17 +438,17 @@ func (c *Command) Run(args []string) int {
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
 		return 1
 	}
 
-	if err = mgr.AddReadyzCheck("ready", connectinject.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
-		setupLog.Error(err, "unable to create readiness check", "controller", connectinject.EndpointsController{})
+	if err = mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
+		setupLog.Error(err, "unable to create readiness check", "controller", endpoints.Controller{})
 		return 1
 	}
 
 	if c.flagEnablePeering {
-		if err = (&connectinject.PeeringAcceptorController{
+		if err = (&peering.AcceptorController{
 			Client:                   mgr.GetClient(),
 			ConsulClientConfig:       consulConfig,
 			ConsulServerConnMgr:      watcher,
@@ -458,7 +461,7 @@ func (c *Command) Run(args []string) int {
 			setupLog.Error(err, "unable to create controller", "controller", "peering-acceptor")
 			return 1
 		}
-		if err = (&connectinject.PeeringDialerController{
+		if err = (&peering.PeeringDialerController{
 			Client:              mgr.GetClient(),
 			ConsulClientConfig:  consulConfig,
 			ConsulServerConnMgr: watcher,
@@ -471,12 +474,12 @@ func (c *Command) Run(args []string) int {
 		}
 
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
-			&webhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
+			&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
 				Client: mgr.GetClient(),
 				Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
-			&webhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
+			&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
 				Client: mgr.GetClient(),
 				Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
 			}})
@@ -485,7 +488,7 @@ func (c *Command) Run(args []string) int {
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
-		&webhook.Admission{Handler: &connectinject.MeshWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &webhook.MeshWebhook{
 			Clientset:                    c.clientset,
 			ReleaseNamespace:             c.flagReleaseNamespace,
 			ConsulConfig:                 consulConfig,
