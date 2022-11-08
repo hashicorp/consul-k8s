@@ -344,8 +344,8 @@ github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220831174802-b8af65262de8 h1:TQY0oKtLV15UNYWeSkTxi4McBIyLecsEtbc/VfxvbYA=
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220831174802-b8af65262de8/go.mod h1:aw35GB76URgbtxaSSMxbOetbG7YEHHPkIX3/SkTBaWc=
-github.com/hashicorp/consul-server-connection-manager v0.0.0-20220922180412-01c5be1c636f h1:niyK8S2Vb48YumFkxsqzSl+72tDXgvpAEO6KrL3WwAw=
-github.com/hashicorp/consul-server-connection-manager v0.0.0-20220922180412-01c5be1c636f/go.mod h1:I56VZ1V7WN8/oPHswKDywfepvD7rB1RrTE4fRrNz3Wc=
+github.com/hashicorp/consul-server-connection-manager v0.1.0 h1:XCweGvMHzra88rYv2zxwwuUOjBUdcQmNKVrnQmt/muo=
+github.com/hashicorp/consul-server-connection-manager v0.1.0/go.mod h1:XVVlO+Yk7aiRpspiHZkrrFVn9BJIiOPnQIzqytPxGaU=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/api v1.10.1-0.20221005170644-13da2c5fad69 h1:IALuDSO0f6x0txq/tjUDF3sShyDMT8dmjn9af6Ik8BA=
 github.com/hashicorp/consul/api v1.10.1-0.20221005170644-13da2c5fad69/go.mod h1:T09kWtKqm8j1S9yTd1r0hVhfOyPrvLb0zb6dPKpNXxQ=
@@ -375,8 +375,8 @@ github.com/hashicorp/go-multierror v1.0.0/go.mod h1:dHtQlpGsu+cZNNAkkCN/P3hoUDHh
 github.com/hashicorp/go-multierror v1.1.0/go.mod h1:spPvp8C1qA32ftKqdAHm4hHTbPw+vmowP0z+KUhOZdA=
 github.com/hashicorp/go-multierror v1.1.1 h1:H5DkEtf6CXdFp0N0Em5UCwQpXMWke8IA0+lD48awMYo=
 github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9/fmwbPZ6JB6eMoM=
-github.com/hashicorp/go-netaddrs v0.0.0-20220509001840-90ed9d26ec46 h1:BysEAd6g+0HNJ0v99u7KbSObjzxC7rfVQ6yVx6HxrvU=
-github.com/hashicorp/go-netaddrs v0.0.0-20220509001840-90ed9d26ec46/go.mod h1:TjKbv4FhIra0YJ82mws5+4QXOhzv09eAWs4jtOBI4IU=
+github.com/hashicorp/go-netaddrs v0.1.0 h1:TnlYvODD4C/wO+j7cX1z69kV5gOzI87u3OcUinANaW8=
+github.com/hashicorp/go-netaddrs v0.1.0/go.mod h1:33+a/emi5R5dqRspOuZKO0E+Tuz5WV1F84eRWALkedA=
 github.com/hashicorp/go-retryablehttp v0.5.3/go.mod h1:9B5zBasrRhHXnJnui7y6sL7es7NDiJgTc6Er0maI1Xs=
 github.com/hashicorp/go-rootcerts v1.0.0/go.mod h1:K6zTfqpRlCUIjkwsN4Z+hiSfzSTQa6eBIzfwKfwNnHU=
 github.com/hashicorp/go-rootcerts v1.0.2 h1:jzhAVGtqPKbwpyCPELlgNWhE1znq+qwJtW5Oi2viEzc=
