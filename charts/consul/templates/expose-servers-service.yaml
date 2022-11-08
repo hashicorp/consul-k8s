@@ -1,5 +1,5 @@
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
-{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") (or .Values.global.peering.enabled .Values.global.adminPartitions.enabled))) -}}
+{{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) (and (eq (.Values.server.exposeService.enabled | toString) "-") .Values.global.adminPartitions.enabled)) -}}
 {{- if (and $serverEnabled $serverExposeServiceEnabled) }}
 
 # Service with an external IP to reach Consul servers.

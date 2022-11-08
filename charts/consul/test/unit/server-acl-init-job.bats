@@ -1392,6 +1392,8 @@ load _helpers
   local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
