@@ -729,6 +729,7 @@ load _helpers
   local config=$(helm template \
       -s templates/server-config-configmap.yaml \
       --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -782,6 +783,7 @@ load _helpers
   local config=$(helm template \
       -s templates/server-config-configmap.yaml \
       --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.verify=false' \
@@ -855,6 +857,7 @@ load _helpers
   local object=$(helm template \
     -s templates/server-config-configmap.yaml  \
     --set 'global.tls.enabled=true' \
+    --set 'meshGateway.enabled=true' \
     --set 'global.peering.enabled=true' \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
@@ -948,6 +951,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .peering.enabled | tee /dev/stderr)
