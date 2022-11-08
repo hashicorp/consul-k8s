@@ -1,6 +1,6 @@
 ## UNRELEASED
 
-BREAKING_CHANGES:
+BREAKING CHANGES:
 * Helm:
   * Remove `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
   * Consul snapshot-agent now runs as a sidecar with Consul servers. [[GH-1620](https://github.com/hashicorp/consul-k8s/pull/1620)]
@@ -15,7 +15,7 @@ BREAKING_CHANGES:
   * Enabling peering requires `tls.enabled`. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
 
 FEATURES:
-* Consul-dataplane:
+* Consul Dataplane:
   * Support merged metrics with consul-dataplane. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
   * Support transparent proxying when using consul-dataplane. [[GH-1625](https://github.com/hashicorp/consul-k8s/pull/1478),[GH-1632](https://github.com/hashicorp/consul-k8s/pull/1632)]
   * Enable sync-catalog to only talk to Consul servers. [[GH-1659](https://github.com/hashicorp/consul-k8s/pull/1659)]
@@ -34,6 +34,8 @@ IMPROVEMENTS:
   * API Gateway: Add `tolerations` to `apiGateway.managedGatewayClass` and `apiGateway.controller` [[GH-1650](https://github.com/hashicorp/consul-k8s/pull/1650)]
   * API Gateway: Create PodSecurityPolicy for controller when `global.enablePodSecurityPolicies=true`. [[GH-1656](https://github.com/hashicorp/consul-k8s/pull/1656)]
   * API Gateway: Create PodSecurityPolicy and allow controller to bind it to ServiceAccounts that it creates for Gateway Deployments when `global.enablePodSecurityPolicies=true`. [[GH-1672](https://github.com/hashicorp/consul-k8s/pull/1672)]
+  * Use a distroless image for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
+  * The Envoy version is now 1.24.0 for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
 
 ## 1.0.0-beta4 (October 28, 2022)
 
