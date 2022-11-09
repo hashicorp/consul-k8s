@@ -499,6 +499,7 @@ func (c *Command) Run(args []string) int {
 			ConsulCACert:                 string(caCertPem),
 			TLSEnabled:                   c.consul.UseTLS,
 			ConsulAddress:                c.consul.Addresses,
+			SkipServerWatch:              c.consul.SkipServerWatch,
 			ConsulTLSServerName:          c.consul.TLSServerName,
 			DefaultProxyCPURequest:       sidecarProxyCPURequest,
 			DefaultProxyCPULimit:         sidecarProxyCPULimit,

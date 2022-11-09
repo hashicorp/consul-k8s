@@ -39,6 +39,10 @@ IMPROVEMENTS:
   * Use a distroless image for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
   * The Envoy version is now 1.24.0 for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
 
+BUG FIXES:
+* Peering
+  * Add `peering:read` permissions to mesh gateway token to fix peering connections through the mesh gateways. [[GH-1685](https://github.com/hashicorp/consul-k8s/pull/1685)]
+
 ## 1.0.0-beta4 (October 28, 2022)
 
 IMPROVEMENTS:

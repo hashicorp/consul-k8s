@@ -341,7 +341,7 @@ func TestUpgrade(t *testing.T) {
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: consul\n    \n    \n",
 				"\n==> Installing Consul demo application\n ✓ Downloaded charts.\n ✓ Consul demo application installed in namespace \"consul\".\n",
-				"\n==> Accessing Consul Demo Application UI\n    kubectl port-forward deploy/frontend 8080:80 --namespace consul\n    Browse to http://localhost:8080.\n",
+				"\n==> Accessing Consul Demo Application UI\n    kubectl port-forward service/nginx 8080:80 --namespace consul\n    Browse to http://localhost:8080.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
 				CheckForInstallationsFunc: func(options *helm.CheckForInstallationsOptions) (bool, string, string, error) {
