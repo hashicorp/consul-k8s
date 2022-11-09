@@ -3,7 +3,7 @@ package metrics
 import (
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +32,7 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 		{
 			Name: "Metrics enabled via annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationEnableMetrics] = "true"
+				pod.Annotations[constants.AnnotationEnableMetrics] = "true"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -44,7 +44,7 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 		{
 			Name: "Metrics configured via invalid annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationEnableMetrics] = "not-a-bool"
+				pod.Annotations[constants.AnnotationEnableMetrics] = "not-a-bool"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -94,7 +94,7 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 		{
 			Name: "Metrics merging enabled via annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationEnableMetricsMerging] = "true"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "true"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -106,7 +106,7 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 		{
 			Name: "Metrics merging configured via invalid annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationEnableMetricsMerging] = "not-a-bool"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "not-a-bool"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -143,8 +143,8 @@ func TestMetricsConfigServiceMetricsPort(t *testing.T) {
 		{
 			Name: "Prefers annotationServiceMetricsPort",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPort] = "1234"
-				pod.Annotations[common.AnnotationServiceMetricsPort] = "9000"
+				pod.Annotations[constants.AnnotationPort] = "1234"
+				pod.Annotations[constants.AnnotationServiceMetricsPort] = "9000"
 				return pod
 			},
 			Expected: "9000",
@@ -152,7 +152,7 @@ func TestMetricsConfigServiceMetricsPort(t *testing.T) {
 		{
 			Name: "Uses annotationPort of annotationServiceMetricsPort is not set",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPort] = "1234"
+				pod.Annotations[constants.AnnotationPort] = "1234"
 				return pod
 			},
 			Expected: "1234",
@@ -195,7 +195,7 @@ func TestMetricsConfigServiceMetricsPath(t *testing.T) {
 		{
 			Name: "Uses annotationServiceMetricsPath when set",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationServiceMetricsPath] = "/custom-metrics-path"
+				pod.Annotations[constants.AnnotationServiceMetricsPath] = "/custom-metrics-path"
 				return pod
 			},
 			Expected: "/custom-metrics-path",
@@ -234,7 +234,7 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 		{
 			Name: "Uses annotationPrometheusScrapePath when set",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPrometheusScrapePath] = "/custom-scrape-path"
+				pod.Annotations[constants.AnnotationPrometheusScrapePath] = "/custom-scrape-path"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -268,7 +268,7 @@ func TestMetricsConfigShouldRunMergedMetricsServer(t *testing.T) {
 		{
 			Name: "Returns true when metrics and metrics merging are enabled, and the service metrics port is greater than 0",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPort] = "1234"
+				pod.Annotations[constants.AnnotationPort] = "1234"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -280,7 +280,7 @@ func TestMetricsConfigShouldRunMergedMetricsServer(t *testing.T) {
 		{
 			Name: "Returns false when service metrics port is 0",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPort] = "0"
+				pod.Annotations[constants.AnnotationPort] = "0"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -461,7 +461,7 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 		{
 			Name: "Returns merged metrics server configuration correctly",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPort] = "1234"
+				pod.Annotations[constants.AnnotationPort] = "1234"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -476,7 +476,7 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 		{
 			Name: "Returns an error when merged metrics server shouldn't run",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationPort] = "0"
+				pod.Annotations[constants.AnnotationPort] = "0"
 				return pod
 			},
 			MetricsConfig: Config{
@@ -512,7 +512,7 @@ func minimal() *corev1.Pod {
 			Namespace: namespaces.DefaultNamespace,
 			Name:      "minimal",
 			Annotations: map[string]string{
-				common.AnnotationService: "foo",
+				constants.AnnotationService: "foo",
 			},
 		},
 

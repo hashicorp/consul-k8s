@@ -1,4 +1,4 @@
-package common
+package constants
 
 const (
 	// KeyInjectStatus is the key of the annotation that is added to

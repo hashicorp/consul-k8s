@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				Name:      "test-pod",
 				Namespace: "test-namespace",
 				Annotations: map[string]string{
-					common.AnnotationService: "foo",
+					constants.AnnotationService: "foo",
 				},
 			},
 
@@ -56,7 +56,7 @@ func TestHandlerContainerInit(t *testing.T) {
 		{
 			"default cmd and env",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = "web"
+				pod.Annotations[constants.AnnotationService] = "web"
 				return pod
 			},
 			MeshWebhook{
@@ -91,7 +91,7 @@ func TestHandlerContainerInit(t *testing.T) {
 		{
 			"with auth method",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = "web"
+				pod.Annotations[constants.AnnotationService] = "web"
 				pod.Spec.ServiceAccountName = "a-service-account-name"
 				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
 					{
@@ -178,14 +178,14 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 		"enabled globally, ns not set, annotation is false, cni disabled": {
 			true,
 			false,
-			map[string]string{common.KeyTransparentProxy: "false"},
+			map[string]string{constants.KeyTransparentProxy: "false"},
 			false,
 			nil,
 		},
 		"enabled globally, ns not set, annotation is true, cni disabled": {
 			true,
 			false,
-			map[string]string{common.KeyTransparentProxy: "true"},
+			map[string]string{constants.KeyTransparentProxy: "true"},
 			true,
 			nil,
 		},
@@ -199,14 +199,14 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 		"disabled globally, ns not set, annotation is false, cni disabled": {
 			false,
 			false,
-			map[string]string{common.KeyTransparentProxy: "false"},
+			map[string]string{constants.KeyTransparentProxy: "false"},
 			false,
 			nil,
 		},
 		"disabled globally, ns not set, annotation is true, cni disabled": {
 			false,
 			false,
-			map[string]string{common.KeyTransparentProxy: "true"},
+			map[string]string{constants.KeyTransparentProxy: "true"},
 			true,
 			nil,
 		},
@@ -215,21 +215,21 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			false,
 			nil,
 			true,
-			map[string]string{common.KeyTransparentProxy: "true"},
+			map[string]string{constants.KeyTransparentProxy: "true"},
 		},
 		"enabled globally, ns disabled, annotation not set, cni disabled": {
 			true,
 			false,
 			nil,
 			false,
-			map[string]string{common.KeyTransparentProxy: "false"},
+			map[string]string{constants.KeyTransparentProxy: "false"},
 		},
 		"disabled globally, ns enabled, annotation not set, cni enabled": {
 			false,
 			true,
 			nil,
 			false,
-			map[string]string{common.KeyTransparentProxy: "true"},
+			map[string]string{constants.KeyTransparentProxy: "true"},
 		},
 
 		"enabled globally, ns not set, annotation not set, cni enabled": {
@@ -296,7 +296,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					common.AnnotationService: "foo",
+					constants.AnnotationService: "foo",
 				},
 			},
 
@@ -333,7 +333,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		{
 			"default namespace, no partition",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = "web"
+				pod.Annotations[constants.AnnotationService] = "web"
 				return pod
 			},
 			MeshWebhook{
@@ -373,7 +373,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		{
 			"default namespace, default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = "web"
+				pod.Annotations[constants.AnnotationService] = "web"
 				return pod
 			},
 			MeshWebhook{
@@ -417,7 +417,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		{
 			"non-default namespace, no partition",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = "web"
+				pod.Annotations[constants.AnnotationService] = "web"
 				return pod
 			},
 			MeshWebhook{
@@ -457,7 +457,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		{
 			"non-default namespace, non-default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = "web"
+				pod.Annotations[constants.AnnotationService] = "web"
 				return pod
 			},
 			MeshWebhook{
@@ -501,7 +501,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		{
 			"auth method, non-default namespace, mirroring disabled, default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = ""
+				pod.Annotations[constants.AnnotationService] = ""
 				return pod
 			},
 			MeshWebhook{
@@ -568,7 +568,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		{
 			"auth method, non-default namespace, mirroring enabled, non-default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[common.AnnotationService] = ""
+				pod.Annotations[constants.AnnotationService] = ""
 				return pod
 			},
 			MeshWebhook{
@@ -655,7 +655,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					common.AnnotationService: "web,web-admin",
+					constants.AnnotationService: "web,web-admin",
 				},
 			},
 
@@ -830,7 +830,7 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "foo",
+						constants.AnnotationService: "foo",
 					},
 				},
 
@@ -886,7 +886,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				common.AnnotationService: "foo",
+				constants.AnnotationService: "foo",
 			},
 		},
 
@@ -924,7 +924,7 @@ func minimal() *corev1.Pod {
 			Namespace: namespaces.DefaultNamespace,
 			Name:      "minimal",
 			Annotations: map[string]string{
-				common.AnnotationService: "foo",
+				constants.AnnotationService: "foo",
 			},
 		},
 

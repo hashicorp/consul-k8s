@@ -13,6 +13,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -253,9 +254,9 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	w.injectVolumeMount(pod)
 
 	// Optionally add any volumes that are to be used by the envoy sidecar.
-	if _, ok := pod.Annotations[common.AnnotationConsulSidecarUserVolume]; ok {
+	if _, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolume]; ok {
 		var userVolumes []corev1.Volume
-		err := json.Unmarshal([]byte(pod.Annotations[common.AnnotationConsulSidecarUserVolume]), &userVolumes)
+		err := json.Unmarshal([]byte(pod.Annotations[constants.AnnotationConsulSidecarUserVolume]), &userVolumes)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error unmarshalling sidecar user volumes: %s", err))
 		}
@@ -377,7 +378,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
-	pod.Annotations[common.KeyInjectStatus] = common.Injected
+	pod.Annotations[constants.KeyInjectStatus] = constants.Injected
 
 	tproxyEnabled, err := common.TransparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
 	if err != nil {
@@ -388,7 +389,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
 	// to determine if it should traffic redirect or not.
 	if tproxyEnabled {
-		pod.Annotations[common.KeyTransparentProxyStatus] = common.Enabled
+		pod.Annotations[constants.KeyTransparentProxyStatus] = constants.Enabled
 	}
 
 	// If tproxy with DNS redirection is enabled, we want to configure dns on the pod.
@@ -409,15 +410,15 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
-	pod.Labels[common.KeyInjectStatus] = common.Injected
+	pod.Labels[constants.KeyInjectStatus] = constants.Injected
 
 	// Add the managed-by label since services are now managed by endpoints controller. This is to support upgrading
 	// from consul-k8s without Endpoints controller to consul-k8s with Endpoints controller.
-	pod.Labels[common.KeyManagedBy] = common.ManagedByValue
+	pod.Labels[constants.KeyManagedBy] = constants.ManagedByValue
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if w.EnableNamespaces {
-		pod.Annotations[common.AnnotationConsulNamespace] = w.consulNamespace(req.Namespace)
+		pod.Annotations[constants.AnnotationConsulNamespace] = w.consulNamespace(req.Namespace)
 	}
 
 	// Overwrite readiness/liveness probes if needed.
@@ -512,7 +513,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 }
 
 func (w *MeshWebhook) injectVolumeMount(pod corev1.Pod) {
-	containersToInject := splitCommaSeparatedItemsFromAnnotation(common.AnnotationInjectMountVolumes, pod)
+	containersToInject := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
 		if sliceContains(containersToInject, container.Name) {
@@ -542,14 +543,14 @@ func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, erro
 	}
 
 	// If we already injected then don't inject again
-	if pod.Annotations[common.KeyInjectStatus] != "" {
+	if pod.Annotations[constants.KeyInjectStatus] != "" {
 		return false, nil
 	}
 
 	// If the explicit true/false is on, then take that value. Note that
 	// this has to be the last check since it sets a default value after
 	// all other checks.
-	if raw, ok := pod.Annotations[common.AnnotationInject]; ok {
+	if raw, ok := pod.Annotations[constants.AnnotationInject]; ok {
 		return strconv.ParseBool(raw)
 	}
 
@@ -562,18 +563,18 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 	}
 
 	// Default service port is the first port exported in the container
-	if _, ok := pod.ObjectMeta.Annotations[common.AnnotationPort]; !ok {
+	if _, ok := pod.ObjectMeta.Annotations[constants.AnnotationPort]; !ok {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
 			if ps := cs[0].Ports; len(ps) > 0 {
 				if ps[0].Name != "" {
-					pod.Annotations[common.AnnotationPort] = ps[0].Name
+					pod.Annotations[constants.AnnotationPort] = ps[0].Name
 				} else {
-					pod.Annotations[common.AnnotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
+					pod.Annotations[constants.AnnotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
 				}
 			}
 		}
 	}
-	pod.Annotations[common.AnnotationOriginalPod] = podJson
+	pod.Annotations[constants.AnnotationOriginalPod] = podJson
 
 	return nil
 }
@@ -592,9 +593,9 @@ func (w *MeshWebhook) prometheusAnnotations(pod *corev1.Pod) error {
 	prometheusScrapePath := w.MetricsConfig.PrometheusScrapePath(*pod)
 
 	if enableMetrics {
-		pod.Annotations[common.AnnotationPrometheusScrape] = "true"
-		pod.Annotations[common.AnnotationPrometheusPort] = prometheusScrapePort
-		pod.Annotations[common.AnnotationPrometheusPath] = prometheusScrapePath
+		pod.Annotations[constants.AnnotationPrometheusScrape] = "true"
+		pod.Annotations[constants.AnnotationPrometheusPort] = prometheusScrapePort
+		pod.Annotations[constants.AnnotationPrometheusPath] = prometheusScrapePath
 	}
 	return nil
 }
@@ -645,7 +646,7 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 
 func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {
 	var annotatedSvcNames []string
-	if anno, ok := pod.Annotations[common.AnnotationService]; ok {
+	if anno, ok := pod.Annotations[constants.AnnotationService]; ok {
 		annotatedSvcNames = strings.Split(anno, ",")
 	}
 	return annotatedSvcNames

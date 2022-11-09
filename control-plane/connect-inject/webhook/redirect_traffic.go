@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/sdk/iptables"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -28,7 +28,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	}
 
 	// Set the proxy's inbound port.
-	cfg.ProxyInboundPort = endpoints.ProxyDefaultInboundPort
+	cfg.ProxyInboundPort = constants.ProxyDefaultInboundPort
 
 	// Set the proxy's outbound port.
 	cfg.ProxyOutboundPort = iptables.DefaultTProxyOutboundPort
@@ -71,19 +71,19 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	}
 
 	// Inbound ports
-	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(common.AnnotationTProxyExcludeInboundPorts, pod)
+	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeInboundPorts, pod)
 	cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, excludeInboundPorts...)
 
 	// Outbound ports
-	excludeOutboundPorts := splitCommaSeparatedItemsFromAnnotation(common.AnnotationTProxyExcludeOutboundPorts, pod)
+	excludeOutboundPorts := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeOutboundPorts, pod)
 	cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts, excludeOutboundPorts...)
 
 	// Outbound CIDRs
-	excludeOutboundCIDRs := splitCommaSeparatedItemsFromAnnotation(common.AnnotationTProxyExcludeOutboundCIDRs, pod)
+	excludeOutboundCIDRs := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeOutboundCIDRs, pod)
 	cfg.ExcludeOutboundCIDRs = append(cfg.ExcludeOutboundCIDRs, excludeOutboundCIDRs...)
 
 	// UIDs
-	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(common.AnnotationTProxyExcludeUIDs, pod)
+	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeUIDs, pod)
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, excludeUIDs...)
 
 	// Add init container user ID to exclude from traffic redirection.
@@ -98,8 +98,8 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		// If Consul DNS is enabled, we find the environment variable that has the value
 		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
-		cfg.ConsulDNSIP = ConsulDataplaneDNSBindHost
-		cfg.ConsulDNSPort = ConsulDataplaneDNSBindPort
+		cfg.ConsulDNSIP = consulDataplaneDNSBindHost
+		cfg.ConsulDNSPort = consulDataplaneDNSBindPort
 	}
 
 	iptablesConfigJson, err := json.Marshal(&cfg)
@@ -117,7 +117,7 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 		return err
 	}
 
-	pod.Annotations[common.AnnotationRedirectTraffic] = iptablesConfig
+	pod.Annotations[constants.AnnotationRedirectTraffic] = iptablesConfig
 
 	return nil
 }

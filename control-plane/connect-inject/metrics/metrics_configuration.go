@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -67,10 +68,10 @@ func (mc Config) MergedMetricsServerConfiguration(pod corev1.Pod) (metricsPorts,
 // overridden via the annotation.
 func (mc Config) EnableMetrics(pod corev1.Pod) (bool, error) {
 	enabled := mc.DefaultEnableMetrics
-	if raw, ok := pod.Annotations[common.AnnotationEnableMetrics]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationEnableMetrics]; ok && raw != "" {
 		enableMetrics, err := strconv.ParseBool(raw)
 		if err != nil {
-			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", common.AnnotationEnableMetrics, raw, err)
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", constants.AnnotationEnableMetrics, raw, err)
 		}
 		enabled = enableMetrics
 	}
@@ -81,10 +82,10 @@ func (mc Config) EnableMetrics(pod corev1.Pod) (bool, error) {
 // meshWebhook, or if it's been overridden via the annotation.
 func (mc Config) EnableMetricsMerging(pod corev1.Pod) (bool, error) {
 	enabled := mc.DefaultEnableMetricsMerging
-	if raw, ok := pod.Annotations[common.AnnotationEnableMetricsMerging]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationEnableMetricsMerging]; ok && raw != "" {
 		enableMetricsMerging, err := strconv.ParseBool(raw)
 		if err != nil {
-			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", common.AnnotationEnableMetricsMerging, raw, err)
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", constants.AnnotationEnableMetricsMerging, raw, err)
 		}
 		enabled = enableMetricsMerging
 	}
@@ -94,19 +95,19 @@ func (mc Config) EnableMetricsMerging(pod corev1.Pod) (bool, error) {
 // MergedMetricsPort returns the port to run the merged metrics server on, either via the default value in the meshWebhook,
 // or if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (mc Config) MergedMetricsPort(pod corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, common.AnnotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
+	return determineAndValidatePort(pod, constants.AnnotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
 }
 
 // PrometheusScrapePort returns the port for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (mc Config) PrometheusScrapePort(pod corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, common.AnnotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
+	return determineAndValidatePort(pod, constants.AnnotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
 }
 
 // PrometheusScrapePath returns the path for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation.
 func (mc Config) PrometheusScrapePath(pod corev1.Pod) string {
-	if raw, ok := pod.Annotations[common.AnnotationPrometheusScrapePath]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationPrometheusScrapePath]; ok && raw != "" {
 		return raw
 	}
 
@@ -120,25 +121,25 @@ func (mc Config) ServiceMetricsPort(pod corev1.Pod) (string, error) {
 	// The annotationPort is the port used to register the service with Consul.
 	// If that has been set, it'll be used as the port for getting service
 	// metrics as well, unless overridden by the service-metrics-port annotation.
-	if raw, ok := pod.Annotations[common.AnnotationPort]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok && raw != "" {
 		// The service metrics port can be privileged if the service author has
 		// written their service in such a way that it expects to be able to use
 		// privileged ports. So, the port metrics are exposed on the service can
 		// be privileged.
-		return determineAndValidatePort(pod, common.AnnotationServiceMetricsPort, raw, true)
+		return determineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, raw, true)
 	}
 
 	// If the annotationPort is not set, the serviceMetrics port will be 0
 	// unless overridden by the service-metrics-port annotation. If the service
 	// metrics port is 0, the consul sidecar will not run a merged metrics
 	// server.
-	return determineAndValidatePort(pod, common.AnnotationServiceMetricsPort, "0", true)
+	return determineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, "0", true)
 }
 
 // ServiceMetricsPath returns a default of /metrics, or overrides
 // that with the annotation if provided.
 func (mc Config) ServiceMetricsPath(pod corev1.Pod) string {
-	if raw, ok := pod.Annotations[common.AnnotationServiceMetricsPath]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationServiceMetricsPath]; ok && raw != "" {
 		return raw
 	}
 

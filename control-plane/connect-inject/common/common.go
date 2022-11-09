@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -30,11 +31,11 @@ func PortValue(pod corev1.Pod, value string) (int32, error) {
 // to read the pod's namespace label when it exists.
 func TransparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
 	// First check to see if the pod annotation exists to override the namespace or global settings.
-	if raw, ok := pod.Annotations[KeyTransparentProxy]; ok {
+	if raw, ok := pod.Annotations[constants.KeyTransparentProxy]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Next see if the namespace has been defaulted.
-	if raw, ok := namespace.Labels[KeyTransparentProxy]; ok {
+	if raw, ok := namespace.Labels[constants.KeyTransparentProxy]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.
@@ -44,7 +45,7 @@ func TransparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalE
 // ShouldOverwriteProbes returns true if we need to overwrite readiness/liveness probes for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool.
 func ShouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
-	if raw, ok := pod.Annotations[AnnotationTransparentProxyOverwriteProbes]; ok {
+	if raw, ok := pod.Annotations[constants.AnnotationTransparentProxyOverwriteProbes]; ok {
 		return strconv.ParseBool(raw)
 	}
 

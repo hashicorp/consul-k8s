@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
 func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
-	raw, ok := pod.Annotations[common.AnnotationUpstreams]
+	raw, ok := pod.Annotations[constants.AnnotationUpstreams]
 	if !ok || raw == "" {
 		return []corev1.EnvVar{}
 	}

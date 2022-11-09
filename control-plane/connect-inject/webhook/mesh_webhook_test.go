@@ -8,7 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -82,7 +82,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.KeyInjectStatus: common.Injected,
+								constants.KeyInjectStatus: constants.Injected,
 							},
 						},
 						Spec: basicSpec,
@@ -150,7 +150,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationUpstreams: "echo:1234,db:1234",
+								constants.AnnotationUpstreams: "echo:1234,db:1234",
 							},
 						},
 						Spec: basicSpec,
@@ -165,11 +165,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -205,7 +205,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationInject: "false",
+								constants.AnnotationInject: "false",
 							},
 						},
 						Spec: basicSpec,
@@ -231,7 +231,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationInject: "t",
+								constants.AnnotationInject: "t",
 							},
 						},
 						Spec: basicSpec,
@@ -254,11 +254,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -282,7 +282,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationInjectMountVolumes: "",
+								constants.AnnotationInjectMountVolumes: "",
 							},
 						},
 						Spec: basicSpec,
@@ -305,11 +305,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -332,7 +332,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationInjectMountVolumes: "web,unknown,web_three_point_oh",
+								constants.AnnotationInjectMountVolumes: "web,unknown,web_three_point_oh",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -375,11 +375,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -402,7 +402,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationConsulSidecarUserVolume: "[{\"name\":\"bbb\",\"csi\":{\"driver\":\"bob\"}}]",
+								constants.AnnotationConsulSidecarUserVolume: "[{\"name\":\"bbb\",\"csi\":{\"driver\":\"bob\"}}]",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -431,11 +431,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -458,7 +458,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationConsulSidecarUserVolume: "[a]",
+								constants.AnnotationConsulSidecarUserVolume: "[a]",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -490,7 +490,7 @@ func TestHandlerHandle(t *testing.T) {
 						Spec: basicSpec,
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationService: "foo",
+								constants.AnnotationService: "foo",
 							},
 						},
 					}),
@@ -512,11 +512,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -567,11 +567,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/labels/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/labels/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/labels/" + escapeJSONPointer(common.KeyManagedBy),
+					Path:      "/metadata/labels/" + escapeJSONPointer(constants.KeyManagedBy),
 				},
 			},
 		},
@@ -640,16 +640,16 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyTransparentProxyStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
 				},
 
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "replace",
@@ -678,7 +678,7 @@ func TestHandlerHandle(t *testing.T) {
 						Spec: basicSpec,
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationService: "web,web-admin",
+								constants.AnnotationService: "web,web-admin",
 							},
 						},
 					}),
@@ -704,11 +704,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -733,7 +733,7 @@ func TestHandlerHandle(t *testing.T) {
 						Spec: basicSpec,
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								common.AnnotationService: "web,web-admin",
+								constants.AnnotationService: "web,web-admin",
 							},
 						},
 					}),
@@ -759,11 +759,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.KeyInjectStatus),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(common.AnnotationOriginalPod),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
 				},
 				{
 					Operation: "add",
@@ -808,7 +808,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				common.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
 			},
 			"",
 		},
@@ -828,7 +828,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				common.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 			},
 			"",
 		},
@@ -838,7 +838,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "foo",
+						constants.AnnotationService: "foo",
 					},
 				},
 
@@ -855,7 +855,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				"consul.hashicorp.com/connect-service": "foo",
-				common.AnnotationOriginalPod:           "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:        "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 			},
 
 			"",
@@ -882,8 +882,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				common.AnnotationPort:        "http",
-				common.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationPort:        "http",
+				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 			},
 			"",
 		},
@@ -908,8 +908,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				common.AnnotationPort:        "8080",
-				common.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationPort:        "8080",
+				constants.AnnotationOriginalPod: "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 			},
 			"",
 		},
@@ -957,9 +957,9 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 				},
 			},
 			Expected: map[string]string{
-				common.AnnotationPrometheusScrape: "true",
-				common.AnnotationPrometheusPort:   "20200",
-				common.AnnotationPrometheusPath:   "/metrics",
+				constants.AnnotationPrometheusScrape: "true",
+				constants.AnnotationPrometheusPort:   "20200",
+				constants.AnnotationPrometheusPath:   "/metrics",
 			},
 		},
 		{
@@ -1106,7 +1106,7 @@ func TestShouldInject(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						// Service annotation is required for injection
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1121,7 +1121,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1136,7 +1136,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1151,7 +1151,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1166,7 +1166,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1181,7 +1181,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1196,7 +1196,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1211,7 +1211,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1226,7 +1226,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1241,7 +1241,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1256,7 +1256,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1271,7 +1271,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1286,7 +1286,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1301,7 +1301,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1316,7 +1316,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1331,7 +1331,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1346,7 +1346,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1361,7 +1361,7 @@ func TestShouldInject(t *testing.T) {
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService: "testing",
+						constants.AnnotationService: "testing",
 					},
 				},
 			},
@@ -1712,17 +1712,17 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 	}{
 		{
 			name:        "tproxy",
-			annotations: map[string]string{common.KeyTransparentProxy: "true"},
+			annotations: map[string]string{constants.KeyTransparentProxy: "true"},
 			expErr:      "multi port services are not compatible with transparent proxy",
 		},
 		{
 			name:        "metrics",
-			annotations: map[string]string{common.AnnotationEnableMetrics: "true"},
+			annotations: map[string]string{constants.AnnotationEnableMetrics: "true"},
 			expErr:      "multi port services are not compatible with metrics",
 		},
 		{
 			name:        "metrics merging",
-			annotations: map[string]string{common.AnnotationEnableMetricsMerging: "true"},
+			annotations: map[string]string{constants.AnnotationEnableMetricsMerging: "true"},
 			expErr:      "multi port services are not compatible with metrics merging",
 		},
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -47,10 +47,10 @@ type AcceptorController struct {
 }
 
 const (
-	FinalizerName    = "finalizers.consul.hashicorp.com"
-	ConsulAgentError = "ConsulAgentError"
-	InternalError    = "InternalError"
-	KubernetesError  = "KubernetesError"
+	finalizerName    = "finalizers.consul.hashicorp.com"
+	consulAgentError = "consulAgentError"
+	internalError    = "internalError"
+	kubernetesError  = "kubernetesError"
 )
 
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=peeringacceptors,verbs=get;list;watch;create;update;patch;delete
@@ -105,14 +105,14 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// in case it does not exist to all resources. If the DeletionTimestamp is non-zero, the object has been
 	// marked for deletion and goes into the deletion workflow.
 	if acceptor.GetDeletionTimestamp().IsZero() {
-		if !controllerutil.ContainsFinalizer(acceptor, FinalizerName) {
-			controllerutil.AddFinalizer(acceptor, FinalizerName)
+		if !controllerutil.ContainsFinalizer(acceptor, finalizerName) {
+			controllerutil.AddFinalizer(acceptor, finalizerName)
 			if err := r.Update(ctx, acceptor); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		if containsString(acceptor.Finalizers, FinalizerName) {
+		if containsString(acceptor.Finalizers, finalizerName) {
 			r.Log.Info("PeeringAcceptor was deleted, deleting from Consul", "name", req.Name, "ns", req.Namespace)
 			err := r.deletePeering(ctx, apiClient, req.Name)
 			if acceptor.Secret().Backend == "kubernetes" {
@@ -121,7 +121,7 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			controllerutil.RemoveFinalizer(acceptor, FinalizerName)
+			controllerutil.RemoveFinalizer(acceptor, finalizerName)
 			err = r.Update(ctx, acceptor)
 			return ctrl.Result{}, err
 		}
@@ -131,7 +131,7 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 	existingSecret, err := r.getExistingSecret(ctx, acceptor.Secret().Name, acceptor.Namespace)
 	if err != nil {
 		r.Log.Error(err, "error retrieving existing secret", "name", acceptor.Secret().Name)
-		r.updateStatusError(ctx, acceptor, KubernetesError, err)
+		r.updateStatusError(ctx, acceptor, kubernetesError, err)
 		return ctrl.Result{}, err
 	}
 
@@ -150,19 +150,19 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if acceptor.SecretRef() != nil {
 			r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name, "secret-name", acceptor.SecretRef().Name)
 			if err := r.deleteK8sSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace); err != nil {
-				r.updateStatusError(ctx, acceptor, KubernetesError, err)
+				r.updateStatusError(ctx, acceptor, kubernetesError, err)
 				return ctrl.Result{}, err
 			}
 		}
 		// Generate and store the peering token.
 		var resp *api.PeeringGenerateTokenResponse
 		if resp, err = r.generateToken(ctx, apiClient, acceptor.Name); err != nil {
-			r.updateStatusError(ctx, acceptor, ConsulAgentError, err)
+			r.updateStatusError(ctx, acceptor, consulAgentError, err)
 			return ctrl.Result{}, err
 		}
 		if acceptor.Secret().Backend == "kubernetes" {
 			if err := r.createOrUpdateK8sSecret(ctx, acceptor, resp); err != nil {
-				r.updateStatusError(ctx, acceptor, KubernetesError, err)
+				r.updateStatusError(ctx, acceptor, kubernetesError, err)
 				return ctrl.Result{}, err
 			}
 		}
@@ -178,7 +178,7 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// If the peering does exist in Consul, figure out whether to generate and store a new token.
 	shouldGenerate, nameChanged, err := shouldGenerateToken(acceptor, existingSecret)
 	if err != nil {
-		r.updateStatusError(ctx, acceptor, InternalError, err)
+		r.updateStatusError(ctx, acceptor, internalError, err)
 		return ctrl.Result{}, err
 	}
 
@@ -198,7 +198,7 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if nameChanged && acceptor.SecretRef() != nil {
 			r.Log.Info("stale secret in status; deleting stale secret", "name", acceptor.Name, "secret-name", acceptor.SecretRef().Name)
 			if err = r.deleteK8sSecret(ctx, acceptor.SecretRef().Name, acceptor.Namespace); err != nil {
-				r.updateStatusError(ctx, acceptor, KubernetesError, err)
+				r.updateStatusError(ctx, acceptor, kubernetesError, err)
 				return ctrl.Result{}, err
 			}
 		}
@@ -226,7 +226,7 @@ func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingSecre
 		if acceptor.SecretRef().Backend != acceptor.Secret().Backend {
 			return false, false, errors.New("PeeringAcceptor backend cannot be changed")
 		}
-		if peeringVersionString, ok := acceptor.Annotations[common.AnnotationPeeringVersion]; ok {
+		if peeringVersionString, ok := acceptor.Annotations[constants.AnnotationPeeringVersion]; ok {
 			peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
 			if err != nil {
 				return false, false, err
@@ -256,7 +256,7 @@ func (r *AcceptorController) updateStatus(ctx context.Context, acceptorObjKey ty
 	}
 	acceptor.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
 	acceptor.SetSyncedCondition(corev1.ConditionTrue, "", "")
-	if peeringVersionString, ok := acceptor.Annotations[common.AnnotationPeeringVersion]; ok {
+	if peeringVersionString, ok := acceptor.Annotations[constants.AnnotationPeeringVersion]; ok {
 		peeringVersion, err := strconv.ParseUint(peeringVersionString, 10, 64)
 		if err != nil {
 			r.Log.Error(err, "failed to update PeeringAcceptor status", "name", acceptor.Name, "namespace", acceptor.Namespace)
@@ -397,7 +397,7 @@ func (r *AcceptorController) requestsForPeeringTokens(object client.Object) []re
 // the Secret is a Peering Token Secret.
 func (r *AcceptorController) filterPeeringAcceptors(object client.Object) bool {
 	secretLabels := object.GetLabels()
-	isPeeringToken, ok := secretLabels[common.LabelPeeringToken]
+	isPeeringToken, ok := secretLabels[constants.LabelPeeringToken]
 	if !ok {
 		return false
 	}
@@ -411,7 +411,7 @@ func createSecret(name, namespace, key, value string) *corev1.Secret {
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				common.LabelPeeringToken: "true",
+				constants.LabelPeeringToken: "true",
 			},
 		},
 		Data: map[string][]byte{

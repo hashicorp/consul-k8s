@@ -12,6 +12,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
@@ -29,18 +30,17 @@ import (
 )
 
 const (
-	MetaKeyPodName             = "pod-name"
-	MetaKeyKubeServiceName     = "k8s-service-name"
-	MetaKeyKubeNS              = "k8s-namespace"
-	MetaKeyManagedBy           = "managed-by"
-	MetaKeySyntheticNode       = "synthetic-node"
-	MetaKeyConsulWANFederation = "consul-wan-federation"
-	TokenMetaPodNameKey        = "pod"
+	metaKeyKubeServiceName = "k8s-service-name"
+
+	metaKeyManagedBy           = "managed-by"
+	metaKeySyntheticNode       = "synthetic-node"
+	metaKeyConsulWANFederation = "consul-wan-federation"
+	tokenMetaPodNameKey        = "pod"
 
 	// Gateway types for registration.
-	MeshGateway        = "mesh-gateway"
-	TerminatingGateway = "terminating-gateway"
-	IngressGateway     = "ingress-gateway"
+	meshGateway        = "mesh-gateway"
+	terminatingGateway = "terminating-gateway"
+	ingressGateway     = "ingress-gateway"
 
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
@@ -50,25 +50,16 @@ const (
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
 	clusterIPTaggedAddressName = "virtual"
 
-	// ConsulNodeName is the node name that we'll use to register and deregister services.
-	ConsulNodeName = "k8s-service-mesh"
-
-	// ConsulNodeAddress is the address of the consul node (defined by ConsulNodeName).
+	// consulNodeAddress is the address of the consul node (defined by ConsulNodeName).
 	// This address does not need to be routable as this node is ephemeral, and we're only providing it because
 	// Consul's API currently requires node address to be provided when registering a node.
-	ConsulNodeAddress = "127.0.0.1"
+	consulNodeAddress = "127.0.0.1"
 
-	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
-	ConsulKubernetesCheckType = "kubernetes-readiness"
+	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
+	consulKubernetesCheckType = "kubernetes-readiness"
 
-	// ConsulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
-	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
-
-	// EnvoyInboundListenerPort is the port where envoy's inbound listener is listening.
-	EnvoyInboundListenerPort = 20000
-
-	// ProxyDefaultInboundPort is the default inbound port for the proxy.
-	ProxyDefaultInboundPort = 20000
+	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
+	consulKubernetesCheckName = "Kubernetes Readiness Check"
 )
 
 type Controller struct {
@@ -198,7 +189,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
-				svcName, ok := pod.Annotations[common.AnnotationKubernetesService]
+				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 				if ok && serviceEndpoints.Name != svcName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 					// deregistration for service instances that don't match the annotation happens
@@ -252,7 +243,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	endpointAddressMap[pod.Status.PodIP] = true
 
 	var managedByEndpointsController bool
-	if raw, ok := pod.Labels[common.KeyManagedBy]; ok && raw == common.ManagedByValue {
+	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
 	}
 	// For pods managed by this controller, create and register the service instance.
@@ -291,7 +282,7 @@ func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serv
 	endpointAddressMap[pod.Status.PodIP] = true
 
 	var managedByEndpointsController bool
-	if raw, ok := pod.Labels[common.KeyManagedBy]; ok && raw == common.ManagedByValue {
+	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
 	}
 	// For pods managed by this controller, create and register the service instance.
@@ -330,7 +321,7 @@ func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serv
 func serviceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	svcName := serviceEndpoints.Name
 	// If the annotation has a comma, it is a multi port Pod. In that case we always use the name of the endpoint.
-	if serviceNameFromAnnotation, ok := pod.Annotations[common.AnnotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
+	if serviceNameFromAnnotation, ok := pod.Annotations[constants.AnnotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
 		svcName = serviceNameFromAnnotation
 	}
 	return svcName
@@ -357,7 +348,7 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 	// and register that port for the host service.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
 	var consulServicePort int
-	if raw, ok := pod.Annotations[common.AnnotationPort]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok && raw != "" {
 		if multiPort := strings.Split(raw, ","); len(multiPort) > 1 {
 			// Figure out which index of the ports annotation to use by
 			// finding the index of the service names annotation.
@@ -380,18 +371,18 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 	svcID := serviceID(pod, serviceEndpoints)
 
 	meta := map[string]string{
-		MetaKeyPodName:         pod.Name,
-		MetaKeyKubeServiceName: serviceEndpoints.Name,
-		MetaKeyKubeNS:          serviceEndpoints.Namespace,
-		MetaKeyManagedBy:       common.ManagedByValue,
-		MetaKeySyntheticNode:   "true",
+		constants.MetaKeyPodName: pod.Name,
+		metaKeyKubeServiceName:   serviceEndpoints.Name,
+		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
+		metaKeyManagedBy:         constants.ManagedByValue,
+		metaKeySyntheticNode:     "true",
 	}
 	for k, v := range pod.Annotations {
-		if strings.HasPrefix(k, common.AnnotationMeta) && strings.TrimPrefix(k, common.AnnotationMeta) != "" {
+		if strings.HasPrefix(k, constants.AnnotationMeta) && strings.TrimPrefix(k, constants.AnnotationMeta) != "" {
 			if v == "$POD_NAME" {
-				meta[strings.TrimPrefix(k, common.AnnotationMeta)] = pod.Name
+				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = pod.Name
 			} else {
-				meta[strings.TrimPrefix(k, common.AnnotationMeta)] = v
+				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = v
 			}
 		}
 	}
@@ -408,16 +399,16 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 		Tags:      tags,
 	}
 	serviceRegistration := &api.CatalogRegistration{
-		Node:    ConsulNodeName,
-		Address: ConsulNodeAddress,
+		Node:    constants.ConsulNodeName,
+		Address: consulNodeAddress,
 		NodeMeta: map[string]string{
-			MetaKeySyntheticNode: "true",
+			metaKeySyntheticNode: "true",
 		},
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, svcID),
-			Name:      ConsulKubernetesCheckName,
-			Type:      ConsulKubernetesCheckType,
+			Name:      consulKubernetesCheckName,
+			Type:      consulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: svcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
@@ -463,7 +454,7 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 	}
 	proxyConfig.Upstreams = upstreams
 
-	proxyPort := ProxyDefaultInboundPort
+	proxyPort := constants.ProxyDefaultInboundPort
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
@@ -548,7 +539,7 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 		}
 		if overwriteProbes {
 			var originalPod corev1.Pod
-			err = json.Unmarshal([]byte(pod.Annotations[common.AnnotationOriginalPod]), &originalPod)
+			err = json.Unmarshal([]byte(pod.Annotations[constants.AnnotationOriginalPod]), &originalPod)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -596,16 +587,16 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 	}
 
 	proxyServiceRegistration := &api.CatalogRegistration{
-		Node:    ConsulNodeName,
-		Address: ConsulNodeAddress,
+		Node:    constants.ConsulNodeName,
+		Address: consulNodeAddress,
 		NodeMeta: map[string]string{
-			MetaKeySyntheticNode: "true",
+			metaKeySyntheticNode: "true",
 		},
 		Service: proxyService,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, proxySvcID),
-			Name:      ConsulKubernetesCheckName,
-			Type:      ConsulKubernetesCheckType,
+			Name:      consulKubernetesCheckName,
+			Type:      consulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: proxySvcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
@@ -620,11 +611,11 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 // createGatewayRegistrations creates the gateway service registrations with the information from the Pod.
 func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, error) {
 	meta := map[string]string{
-		MetaKeyPodName:         pod.Name,
-		MetaKeyKubeServiceName: serviceEndpoints.Name,
-		MetaKeyKubeNS:          serviceEndpoints.Namespace,
-		MetaKeyManagedBy:       common.ManagedByValue,
-		MetaKeySyntheticNode:   "true",
+		constants.MetaKeyPodName: pod.Name,
+		metaKeyKubeServiceName:   serviceEndpoints.Name,
+		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
+		metaKeyManagedBy:         constants.ManagedByValue,
+		metaKeySyntheticNode:     "true",
 	}
 
 	service := &api.AgentService{
@@ -633,31 +624,31 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		Meta:    meta,
 	}
 
-	gatewayServiceName, ok := pod.Annotations[common.AnnotationGatewayConsulServiceName]
+	gatewayServiceName, ok := pod.Annotations[constants.AnnotationGatewayConsulServiceName]
 	if !ok {
-		return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", common.AnnotationGatewayConsulServiceName, pod.Namespace, pod.Name)
+		return nil, fmt.Errorf("failed to read annontation %s from pod %s/%s", constants.AnnotationGatewayConsulServiceName, pod.Namespace, pod.Name)
 	}
 	service.Service = gatewayServiceName
 
 	var consulNS string
 
 	// Set the service values.
-	switch pod.Annotations[common.AnnotationGatewayKind] {
-	case MeshGateway:
+	switch pod.Annotations[constants.AnnotationGatewayKind] {
+	case meshGateway:
 		service.Kind = api.ServiceKindMeshGateway
 		if r.EnableConsulNamespaces {
 			service.Namespace = defaultNS
 			consulNS = defaultNS
 		}
 
-		port, err := strconv.Atoi(pod.Annotations[common.AnnotationMeshGatewayContainerPort])
+		port, err := strconv.Atoi(pod.Annotations[constants.AnnotationMeshGatewayContainerPort])
 		if err != nil {
 			return nil, err
 		}
 		service.Port = port
 
 		if r.EnableWANFederation {
-			meta[MetaKeyConsulWANFederation] = "1"
+			meta[metaKeyConsulWANFederation] = "1"
 		}
 
 		wanAddr, wanPort, err := r.getWanData(pod, serviceEndpoints)
@@ -674,16 +665,16 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 				Port:    wanPort,
 			},
 		}
-	case TerminatingGateway:
+	case terminatingGateway:
 		service.Kind = api.ServiceKindTerminatingGateway
 		service.Port = 8443
-		if ns, ok := pod.Annotations[common.AnnotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
+		if ns, ok := pod.Annotations[constants.AnnotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
 			service.Namespace = ns
 			consulNS = ns
 		}
-	case IngressGateway:
+	case ingressGateway:
 		service.Kind = api.ServiceKindIngressGateway
-		if ns, ok := pod.Annotations[common.AnnotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
+		if ns, ok := pod.Annotations[constants.AnnotationGatewayNamespace]; ok && r.EnableConsulNamespaces {
 			service.Namespace = ns
 			consulNS = ns
 		}
@@ -715,11 +706,11 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, or %s", common.AnnotationGatewayKind, MeshGateway, TerminatingGateway, IngressGateway)
+		return nil, fmt.Errorf("%s must be one of %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		if pod.Annotations[common.AnnotationGatewayKind] == IngressGateway {
+		if pod.Annotations[constants.AnnotationGatewayKind] == ingressGateway {
 			service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
 		} else {
 			service.Proxy = &api.AgentServiceConnectProxyConfig{
@@ -731,16 +722,16 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	serviceRegistration := &api.CatalogRegistration{
-		Node:    ConsulNodeName,
-		Address: ConsulNodeAddress,
+		Node:    constants.ConsulNodeName,
+		Address: consulNodeAddress,
 		NodeMeta: map[string]string{
-			MetaKeySyntheticNode: "true",
+			metaKeySyntheticNode: "true",
 		},
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, pod.Name),
-			Name:      ConsulKubernetesCheckName,
-			Type:      ConsulKubernetesCheckType,
+			Name:      consulKubernetesCheckName,
+			Type:      consulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: pod.Name,
 			Namespace: consulNS,
@@ -754,9 +745,9 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 
 func (r *Controller) getWanData(pod corev1.Pod, endpoints corev1.Endpoints) (string, int, error) {
 	var wanAddr string
-	source, ok := pod.Annotations[common.AnnotationGatewayWANSource]
+	source, ok := pod.Annotations[constants.AnnotationGatewayWANSource]
 	if !ok {
-		return "", 0, fmt.Errorf("failed to read annotation %s", common.AnnotationGatewayWANSource)
+		return "", 0, fmt.Errorf("failed to read annotation %s", constants.AnnotationGatewayWANSource)
 	}
 	switch source {
 	case "NodeName":
@@ -764,7 +755,7 @@ func (r *Controller) getWanData(pod corev1.Pod, endpoints corev1.Endpoints) (str
 	case "NodeIP":
 		wanAddr = pod.Status.HostIP
 	case "Static":
-		wanAddr = pod.Annotations[common.AnnotationGatewayWANAddress]
+		wanAddr = pod.Annotations[constants.AnnotationGatewayWANAddress]
 	case "Service":
 		svc, err := r.getService(endpoints)
 		if err != nil {
@@ -791,9 +782,9 @@ func (r *Controller) getWanData(pod corev1.Pod, endpoints corev1.Endpoints) (str
 		}
 	}
 
-	wanPort, err := strconv.Atoi(pod.Annotations[common.AnnotationGatewayWANPort])
+	wanPort, err := strconv.Atoi(pod.Annotations[constants.AnnotationGatewayWANPort])
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to parse WAN port from value %s", pod.Annotations[common.AnnotationGatewayWANPort])
+		return "", 0, fmt.Errorf("failed to parse WAN port from value %s", pod.Annotations[constants.AnnotationGatewayWANPort])
 	}
 	return wanAddr, wanPort, nil
 }
@@ -865,7 +856,7 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 				// If the service address is not in the Endpoints addresses, deregister it.
 				r.Log.Info("deregistering service from consul", "svc", svc.ID)
 				_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-					Node:      ConsulNodeName,
+					Node:      constants.ConsulNodeName,
 					ServiceID: svc.ID,
 					Namespace: svc.Namespace,
 				}, nil)
@@ -878,7 +869,7 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 		} else {
 			r.Log.Info("deregistering service from consul", "svc", svc.ID)
 			if _, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-				Node:      ConsulNodeName,
+				Node:      constants.ConsulNodeName,
 				ServiceID: svc.ID,
 				Namespace: svc.Namespace,
 			}, nil); err != nil {
@@ -890,7 +881,7 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 		if r.AuthMethod != "" && serviceDeregistered {
 			r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-			err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[MetaKeyPodName])
+			err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
 			if err != nil {
 				r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
 				return err
@@ -929,7 +920,7 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 				return fmt.Errorf("failed to parse token metadata: %s", err)
 			}
 
-			tokenPodName := strings.TrimPrefix(tokenMeta[TokenMetaPodNameKey], k8sNS+"/")
+			tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], k8sNS+"/")
 
 			// If we can't find token's pod, delete it.
 			if tokenPodName == podName {
@@ -954,7 +945,7 @@ func (r *Controller) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints
 	}
 
 	var upstreams []api.Upstream
-	if raw, ok := pod.Annotations[common.AnnotationUpstreams]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {
 			var upstream api.Upstream
 
@@ -1026,11 +1017,11 @@ func (r *Controller) serviceInstancesForK8SServiceNameAndNamespace(apiClient *ap
 		err         error
 	)
 	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
-		MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, common.ManagedByValue)
+		metaKeyKubeServiceName, k8sServiceName, constants.MetaKeyKubeNS, k8sServiceNamespace, metaKeyManagedBy, constants.ManagedByValue)
 	if r.EnableConsulNamespaces {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(constants.ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
 	} else {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(ConsulNodeName, &api.QueryOptions{Filter: filter})
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(constants.ConsulNodeName, &api.QueryOptions{Filter: filter})
 	}
 	return serviceList, err
 }
@@ -1210,7 +1201,7 @@ func (r *Controller) consulNamespace(namespace string) string {
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
 func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[common.KeyInjectStatus]; ok && anno == common.Injected {
+	if anno, ok := pod.Annotations[constants.KeyInjectStatus]; ok && anno == constants.Injected {
 		return true
 	}
 	return false
@@ -1218,7 +1209,7 @@ func hasBeenInjected(pod corev1.Pod) bool {
 
 // isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
 func isGateway(pod corev1.Pod) bool {
-	anno, ok := pod.Annotations[common.AnnotationGatewayKind]
+	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
 	return ok && anno != ""
 }
 
@@ -1239,7 +1230,7 @@ func mapAddresses(addresses corev1.EndpointSubset) map[corev1.EndpointAddress]st
 // isLabeledIgnore checks the value of the label `consul.hashicorp.com/service-ignore` and returns true if the
 // label exists and is "truthy". Otherwise, it returns false.
 func isLabeledIgnore(labels map[string]string) bool {
-	value, labelExists := labels[common.LabelServiceIgnore]
+	value, labelExists := labels[constants.LabelServiceIgnore]
 	shouldIgnore, err := strconv.ParseBool(value)
 
 	return shouldIgnore && labelExists && err == nil
@@ -1248,7 +1239,7 @@ func isLabeledIgnore(labels map[string]string) bool {
 // consulTags returns tags that should be added to the Consul service and proxy registrations.
 func consulTags(pod corev1.Pod) []string {
 	var tags []string
-	if raw, ok := pod.Annotations[common.AnnotationTags]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationTags]; ok && raw != "" {
 		tags = append(tags, parsetags.ParseTags(raw)...)
 	}
 
@@ -1268,7 +1259,7 @@ func consulTags(pod corev1.Pod) []string {
 }
 
 func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
-	for i, name := range strings.Split(pod.Annotations[common.AnnotationService], ",") {
+	for i, name := range strings.Split(pod.Annotations[constants.AnnotationService], ",") {
 		if name == serviceName(pod, serviceEndpoints) {
 			return i
 		}

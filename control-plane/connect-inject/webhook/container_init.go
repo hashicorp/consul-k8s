@@ -8,13 +8,13 @@ import (
 	"text/template"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 )
 
 const (
-	InjectInitContainerName      = "consul-connect-inject-init"
+	injectInitContainerName      = "consul-connect-inject-init"
 	rootUserAndGroupID           = 0
 	sidecarUserAndGroupID        = 5995
 	initContainersUserAndGroupID = 5996
@@ -51,7 +51,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 
 	data := initContainerCommandData{
 		AuthMethod:     w.AuthMethod,
-		ConsulNodeName: endpoints.ConsulNodeName,
+		ConsulNodeName: constants.ConsulNodeName,
 		MultiPort:      multiPort,
 		LogLevel:       w.LogLevel,
 		LogJSON:        w.LogJSON,
@@ -68,7 +68,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		data.ServiceName = mpi.serviceName
 	} else {
-		data.ServiceName = pod.Annotations[common.AnnotationService]
+		data.ServiceName = pod.Annotations[constants.AnnotationService]
 	}
 	var bearerTokenFile string
 	if w.AuthMethod != "" {
@@ -99,9 +99,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		return corev1.Container{}, err
 	}
 
-	initContainerName := InjectInitContainerName
+	initContainerName := injectInitContainerName
 	if multiPort {
-		initContainerName = fmt.Sprintf("%s-%s", InjectInitContainerName, mpi.serviceName)
+		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
 	container := corev1.Container{
 		Name:  initContainerName,
@@ -258,11 +258,11 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 // to read the pod's namespace label when it exists.
 func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
 	// First check to see if the pod annotation exists to override the namespace or global settings.
-	if raw, ok := pod.Annotations[common.KeyConsulDNS]; ok {
+	if raw, ok := pod.Annotations[constants.KeyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Next see if the namespace has been defaulted.
-	if raw, ok := namespace.Labels[common.KeyConsulDNS]; ok {
+	if raw, ok := namespace.Labels[constants.KeyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.

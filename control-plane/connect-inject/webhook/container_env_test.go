@@ -3,7 +3,7 @@ package webhook
 import (
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,8 +33,8 @@ func TestContainerEnvVars(t *testing.T) {
 			envVars := w.containerEnvVars(corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						common.AnnotationService:   "foo",
-						common.AnnotationUpstreams: tt.Upstream,
+						constants.AnnotationService:   "foo",
+						constants.AnnotationUpstreams: tt.Upstream,
 					},
 				},
 			})
