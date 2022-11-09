@@ -92,6 +92,10 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            -partition {{ .Values.global.adminPartitions.name }} \
+            {{- end }}
+            -datacenter {{ .Values.global.datacenter }} \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
             -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- end }}
