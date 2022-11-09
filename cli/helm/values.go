@@ -147,38 +147,33 @@ type Resources struct {
 	Limits   Limits   `yaml:"limits"`
 }
 
-type ConsulSidecarContainer struct {
-	Resources Resources `yaml:"resources"`
-}
-
 type Openshift struct {
 	Enabled bool `yaml:"enabled"`
 }
 
 type Global struct {
-	Enabled                   bool                   `yaml:"enabled"`
-	LogLevel                  string                 `yaml:"logLevel"`
-	LogJSON                   bool                   `yaml:"logJSON"`
-	Name                      interface{}            `yaml:"name"`
-	Domain                    string                 `yaml:"domain"`
-	AdminPartitions           AdminPartitions        `yaml:"adminPartitions"`
-	Image                     string                 `yaml:"image"`
-	ImagePullSecrets          []interface{}          `yaml:"imagePullSecrets"`
-	ImageK8S                  string                 `yaml:"imageK8S"`
-	Datacenter                string                 `yaml:"datacenter"`
-	EnablePodSecurityPolicies bool                   `yaml:"enablePodSecurityPolicies"`
-	SecretsBackend            SecretsBackend         `yaml:"secretsBackend"`
-	GossipEncryption          GossipEncryption       `yaml:"gossipEncryption"`
-	Recursors                 []interface{}          `yaml:"recursors"`
-	TLS                       TLS                    `yaml:"tls"`
-	EnableConsulNamespaces    bool                   `yaml:"enableConsulNamespaces"`
-	Acls                      Acls                   `yaml:"acls"`
-	EnterpriseLicense         EnterpriseLicense      `yaml:"enterpriseLicense"`
-	Federation                Federation             `yaml:"federation"`
-	Metrics                   GlobalMetrics          `yaml:"metrics"`
-	ConsulSidecarContainer    ConsulSidecarContainer `yaml:"consulSidecarContainer"`
-	ImageEnvoy                string                 `yaml:"imageEnvoy"`
-	Openshift                 Openshift              `yaml:"openshift"`
+	Enabled                   bool              `yaml:"enabled"`
+	LogLevel                  string            `yaml:"logLevel"`
+	LogJSON                   bool              `yaml:"logJSON"`
+	Name                      interface{}       `yaml:"name"`
+	Domain                    string            `yaml:"domain"`
+	AdminPartitions           AdminPartitions   `yaml:"adminPartitions"`
+	Image                     string            `yaml:"image"`
+	ImagePullSecrets          []interface{}     `yaml:"imagePullSecrets"`
+	ImageK8S                  string            `yaml:"imageK8S"`
+	Datacenter                string            `yaml:"datacenter"`
+	EnablePodSecurityPolicies bool              `yaml:"enablePodSecurityPolicies"`
+	SecretsBackend            SecretsBackend    `yaml:"secretsBackend"`
+	GossipEncryption          GossipEncryption  `yaml:"gossipEncryption"`
+	Recursors                 []interface{}     `yaml:"recursors"`
+	TLS                       TLS               `yaml:"tls"`
+	EnableConsulNamespaces    bool              `yaml:"enableConsulNamespaces"`
+	Acls                      Acls              `yaml:"acls"`
+	EnterpriseLicense         EnterpriseLicense `yaml:"enterpriseLicense"`
+	Federation                Federation        `yaml:"federation"`
+	Metrics                   GlobalMetrics     `yaml:"metrics"`
+	ImageEnvoy                string            `yaml:"imageEnvoy"`
+	Openshift                 Openshift         `yaml:"openshift"`
 }
 
 type ServerCert struct {
