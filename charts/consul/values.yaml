@@ -1183,6 +1183,10 @@ externalServers:
   # @type: string
   k8sAuthMethodHost: null
 
+  # If true, setting this prevents the consul-dataplane and consul-k8s components from watching the Consul servers for changes. This is
+  # useful for situations where Consul servers are behind a load balancer. 
+  skipServerWatch: false
+
 # Values that configure running a Consul client on Kubernetes nodes.
 client:
   # If true, the chart will install all

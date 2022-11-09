@@ -2033,6 +2033,35 @@ reservedNameTest() {
   [ "${actual}" = "" ]
 }
 
+@test "connectInject/Deployment: fails if externalServers.skipServerWatch is not provided when externalServers.enabled is true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.skipServerWatch=true' \
+       .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "externalServers.enabled must be set if externalServers.skipServerWatch is true" ]]
+}
+
+@test "connectInject/Deployment: configures the sidecar-injector env to skip server watch" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul' \
+      --set 'externalServers.skipServerWatch=true' \
+      . | tee /dev/stderr |
+       yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)\
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_SKIP_SERVER_WATCH").value' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.cloud
 
