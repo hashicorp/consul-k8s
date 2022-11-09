@@ -12,7 +12,8 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	connectInjectWebhook "github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	cmdCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -348,8 +349,8 @@ func (c *Command) Run(args []string) int {
 	}
 	// +kubebuilder:scaffold:builder
 
-	if err = mgr.AddReadyzCheck("ready", connectinject.ReadinessCheck{CertDir: c.flagWebhookTLSCertDir}.Ready); err != nil {
-		setupLog.Error(err, "unable to create readiness check", "controller", connectinject.EndpointsController{})
+	if err = mgr.AddReadyzCheck("ready", connectInjectWebhook.ReadinessCheck{CertDir: c.flagWebhookTLSCertDir}.Ready); err != nil {
+		setupLog.Error(err, "unable to create readiness check", "controller", endpoints.Controller{})
 		return 1
 	}
 

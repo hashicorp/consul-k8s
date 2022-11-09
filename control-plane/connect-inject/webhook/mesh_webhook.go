@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"context"
@@ -12,6 +12,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"gomodules.xyz/jsonpatch/v2"
@@ -22,6 +25,22 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+)
+
+const (
+	sidecarContainer = "consul-dataplane"
+
+	// exposedPathsLivenessPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a liveness probe.
+	exposedPathsLivenessPortsRangeStart = 20300
+
+	// exposedPathsReadinessPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a readiness probe.
+	exposedPathsReadinessPortsRangeStart = 20400
+
+	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
+	exposedPathsStartupPortsRangeStart = 20500
 )
 
 // kubeSystemNamespaces is a set of namespaces that are considered
@@ -134,7 +153,7 @@ type MeshWebhook struct {
 	// MetricsConfig contains metrics configuration from the inject-connect command and has methods to determine whether
 	// configuration should come from the default flags or annotations. The meshWebhook uses this to configure prometheus
 	// annotations and the merged metrics server.
-	MetricsConfig MetricsConfig
+	MetricsConfig metrics.Config
 
 	// Resource settings for init container. All of these fields
 	// will be populated by the defaults provided in the initial flags.
@@ -208,11 +227,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if err := w.validatePod(pod); err != nil {
-		w.Log.Error(err, "error validating pod", "request name", req.Name)
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-
 	// Setup the default annotation values that are used for the container.
 	// This MUST be done before shouldInject is called since that function
 	// uses these annotations.
@@ -240,9 +254,9 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	w.injectVolumeMount(pod)
 
 	// Optionally add any volumes that are to be used by the envoy sidecar.
-	if _, ok := pod.Annotations[annotationConsulSidecarUserVolume]; ok {
+	if _, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolume]; ok {
 		var userVolumes []corev1.Volume
-		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolume]), &userVolumes)
+		err := json.Unmarshal([]byte(pod.Annotations[constants.AnnotationConsulSidecarUserVolume]), &userVolumes)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error unmarshalling sidecar user volumes: %s", err))
 		}
@@ -364,9 +378,9 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
-	pod.Annotations[keyInjectStatus] = injected
+	pod.Annotations[constants.KeyInjectStatus] = constants.Injected
 
-	tproxyEnabled, err := transparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
+	tproxyEnabled, err := common.TransparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
 	if err != nil {
 		w.Log.Error(err, "error determining if transparent proxy is enabled", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if transparent proxy is enabled: %s", err))
@@ -375,7 +389,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// Add an annotation to the pod sets transparent-proxy-status to enabled or disabled. Used by the CNI plugin
 	// to determine if it should traffic redirect or not.
 	if tproxyEnabled {
-		pod.Annotations[keyTransparentProxyStatus] = enabled
+		pod.Annotations[constants.KeyTransparentProxyStatus] = constants.Enabled
 	}
 
 	// If tproxy with DNS redirection is enabled, we want to configure dns on the pod.
@@ -396,15 +410,15 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
-	pod.Labels[keyInjectStatus] = injected
+	pod.Labels[constants.KeyInjectStatus] = constants.Injected
 
 	// Add the managed-by label since services are now managed by endpoints controller. This is to support upgrading
 	// from consul-k8s without Endpoints controller to consul-k8s with Endpoints controller.
-	pod.Labels[keyManagedBy] = managedByValue
+	pod.Labels[constants.KeyManagedBy] = constants.ManagedByValue
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if w.EnableNamespaces {
-		pod.Annotations[annotationConsulNamespace] = w.consulNamespace(req.Namespace)
+		pod.Annotations[constants.AnnotationConsulNamespace] = w.consulNamespace(req.Namespace)
 	}
 
 	// Overwrite readiness/liveness probes if needed.
@@ -417,7 +431,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
-		if err := w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}
@@ -465,25 +479,15 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)
 }
 
-// shouldOverwriteProbes returns true if we need to overwrite readiness/liveness probes for this pod.
-// It returns an error when the annotation value cannot be parsed by strconv.ParseBool.
-func shouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
-	if raw, ok := pod.Annotations[annotationTransparentProxyOverwriteProbes]; ok {
-		return strconv.ParseBool(raw)
-	}
-
-	return globalOverwrite, nil
-}
-
 // overwriteProbes overwrites readiness/liveness probes of this pod when
 // both transparent proxy is enabled and overwrite probes is true for the pod.
 func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
-	tproxyEnabled, err := transparentProxyEnabled(ns, *pod, w.EnableTransparentProxy)
+	tproxyEnabled, err := common.TransparentProxyEnabled(ns, *pod, w.EnableTransparentProxy)
 	if err != nil {
 		return err
 	}
 
-	overwriteProbes, err := shouldOverwriteProbes(*pod, w.TProxyOverwriteProbes)
+	overwriteProbes, err := common.ShouldOverwriteProbes(*pod, w.TProxyOverwriteProbes)
 	if err != nil {
 		return err
 	}
@@ -509,7 +513,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 }
 
 func (w *MeshWebhook) injectVolumeMount(pod corev1.Pod) {
-	containersToInject := splitCommaSeparatedItemsFromAnnotation(annotationInjectMountVolumes, pod)
+	containersToInject := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
 		if sliceContains(containersToInject, container.Name) {
@@ -539,14 +543,14 @@ func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, erro
 	}
 
 	// If we already injected then don't inject again
-	if pod.Annotations[keyInjectStatus] != "" {
+	if pod.Annotations[constants.KeyInjectStatus] != "" {
 		return false, nil
 	}
 
 	// If the explicit true/false is on, then take that value. Note that
 	// this has to be the last check since it sets a default value after
 	// all other checks.
-	if raw, ok := pod.Annotations[annotationInject]; ok {
+	if raw, ok := pod.Annotations[constants.AnnotationInject]; ok {
 		return strconv.ParseBool(raw)
 	}
 
@@ -559,18 +563,18 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 	}
 
 	// Default service port is the first port exported in the container
-	if _, ok := pod.ObjectMeta.Annotations[annotationPort]; !ok {
+	if _, ok := pod.ObjectMeta.Annotations[constants.AnnotationPort]; !ok {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
 			if ps := cs[0].Ports; len(ps) > 0 {
 				if ps[0].Name != "" {
-					pod.Annotations[annotationPort] = ps[0].Name
+					pod.Annotations[constants.AnnotationPort] = ps[0].Name
 				} else {
-					pod.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
+					pod.Annotations[constants.AnnotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
 				}
 			}
 		}
 	}
-	pod.Annotations[annotationOriginalPod] = podJson
+	pod.Annotations[constants.AnnotationOriginalPod] = podJson
 
 	return nil
 }
@@ -578,20 +582,20 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 // prometheusAnnotations sets the Prometheus scraping configuration
 // annotations on the Pod.
 func (w *MeshWebhook) prometheusAnnotations(pod *corev1.Pod) error {
-	enableMetrics, err := w.MetricsConfig.enableMetrics(*pod)
+	enableMetrics, err := w.MetricsConfig.EnableMetrics(*pod)
 	if err != nil {
 		return err
 	}
-	prometheusScrapePort, err := w.MetricsConfig.prometheusScrapePort(*pod)
+	prometheusScrapePort, err := w.MetricsConfig.PrometheusScrapePort(*pod)
 	if err != nil {
 		return err
 	}
-	prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(*pod)
+	prometheusScrapePath := w.MetricsConfig.PrometheusScrapePath(*pod)
 
 	if enableMetrics {
-		pod.Annotations[annotationPrometheusScrape] = "true"
-		pod.Annotations[annotationPrometheusPort] = prometheusScrapePort
-		pod.Annotations[annotationPrometheusPath] = prometheusScrapePath
+		pod.Annotations[constants.AnnotationPrometheusScrape] = "true"
+		pod.Annotations[constants.AnnotationPrometheusPort] = prometheusScrapePort
+		pod.Annotations[constants.AnnotationPrometheusPath] = prometheusScrapePath
 	}
 	return nil
 }
@@ -601,34 +605,6 @@ func (w *MeshWebhook) prometheusAnnotations(pod *corev1.Pod) error {
 // empty string if namespaces aren't enabled.
 func (w *MeshWebhook) consulNamespace(ns string) string {
 	return namespaces.ConsulNamespace(ns, w.EnableNamespaces, w.ConsulDestinationNamespace, w.EnableK8SNSMirroring, w.K8SNSMirroringPrefix)
-}
-
-func (w *MeshWebhook) validatePod(pod corev1.Pod) error {
-	if _, ok := pod.Annotations[annotationProtocol]; ok {
-		return fmt.Errorf("the %q annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
-			annotationProtocol)
-	}
-
-	if _, ok := pod.Annotations[annotationSyncPeriod]; ok {
-		return fmt.Errorf("the %q annotation is no longer supported because consul-sidecar is no longer injected to periodically register services", annotationSyncPeriod)
-	}
-	return nil
-}
-
-func portValue(pod corev1.Pod, value string) (int32, error) {
-	value = strings.Split(value, ",")[0]
-	// First search for the named port.
-	for _, c := range pod.Spec.Containers {
-		for _, p := range c.Ports {
-			if p.Name == value {
-				return p.ContainerPort, nil
-			}
-		}
-	}
-
-	// Named port not found, return the parsed value.
-	raw, err := strconv.ParseInt(value, 0, 32)
-	return int32(raw), err
 }
 
 func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (corev1.VolumeMount, string, error) {
@@ -670,22 +646,22 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 
 func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {
 	var annotatedSvcNames []string
-	if anno, ok := pod.Annotations[annotationService]; ok {
+	if anno, ok := pod.Annotations[constants.AnnotationService]; ok {
 		annotatedSvcNames = strings.Split(anno, ",")
 	}
 	return annotatedSvcNames
 }
 
 func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
-	tproxyEnabled, err := transparentProxyEnabled(ns, pod, w.EnableTransparentProxy)
+	tproxyEnabled, err := common.TransparentProxyEnabled(ns, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return fmt.Errorf("couldn't check if tproxy is enabled: %s", err)
 	}
-	metricsEnabled, err := w.MetricsConfig.enableMetrics(pod)
+	metricsEnabled, err := w.MetricsConfig.EnableMetrics(pod)
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics is enabled: %s", err)
 	}
-	metricsMergingEnabled, err := w.MetricsConfig.enableMetricsMerging(pod)
+	metricsMergingEnabled, err := w.MetricsConfig.EnableMetricsMerging(pod)
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
 	}

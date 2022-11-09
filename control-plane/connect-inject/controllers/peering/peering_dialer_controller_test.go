@@ -1,4 +1,4 @@
-package connectinject
+package peering
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -202,7 +203,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 						Name:      "peering",
 						Namespace: "default",
 						Annotations: map[string]string{
-							annotationPeeringVersion: "2",
+							constants.AnnotationPeeringVersion: "2",
 						},
 					},
 					Spec: v1alpha1.PeeringDialerSpec{
@@ -354,7 +355,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 					require.Equal(t, tt.expectedStatus.SecretRef.Backend, dialer.SecretRef().Backend)
 					require.Equal(t, "latest-version", dialer.SecretRef().ResourceVersion)
 					require.Equal(t, tt.expectedStatus.LatestPeeringVersion, dialer.Status.LatestPeeringVersion)
-					require.Contains(t, dialer.Finalizers, FinalizerName)
+					require.Contains(t, dialer.Finalizers, finalizerName)
 					require.NotEmpty(t, dialer.SecretRef().ResourceVersion)
 					require.NotEqual(t, "test-version", dialer.SecretRef().ResourceVersion)
 				}
@@ -372,13 +373,13 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 	}{
 		"fails if annotation is not a number": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "foo",
+				constants.AnnotationPeeringVersion: "foo",
 			},
 			expErr: `strconv.ParseUint: parsing "foo": invalid syntax`,
 		},
 		"is no/op if annotation value is less than value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "2",
+				constants.AnnotationPeeringVersion: "2",
 			},
 			expectedStatus: &v1alpha1.PeeringDialerStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -393,7 +394,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 		},
 		"is no/op if annotation value is equal to value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "3",
+				constants.AnnotationPeeringVersion: "3",
 			},
 			expectedStatus: &v1alpha1.PeeringDialerStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -408,7 +409,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 		},
 		"updates if annotation value is greater than value in status": {
 			annotations: map[string]string{
-				annotationPeeringVersion: "4",
+				constants.AnnotationPeeringVersion: "4",
 			},
 			expectedStatus: &v1alpha1.PeeringDialerStatus{
 				SecretRef: &v1alpha1.SecretRefStatus{
@@ -723,7 +724,7 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 			Name:              "dialer-deleted",
 			Namespace:         "default",
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
-			Finalizers:        []string{FinalizerName},
+			Finalizers:        []string{finalizerName},
 		},
 		Spec: v1alpha1.PeeringDialerSpec{
 			Peer: &v1alpha1.Peer{
@@ -936,7 +937,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 					{
 						Type:    v1alpha1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
-						Reason:  InternalError,
+						Reason:  internalError,
 						Message: "this is an error",
 					},
 				},
@@ -973,7 +974,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 					{
 						Type:    v1alpha1.ConditionSynced,
 						Status:  corev1.ConditionFalse,
-						Reason:  InternalError,
+						Reason:  internalError,
 						Message: "this is an error",
 					},
 				},
@@ -999,7 +1000,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 				Scheme: s,
 			}
 
-			controller.updateStatusError(context.Background(), tt.dialer, InternalError, tt.reconcileErr)
+			controller.updateStatusError(context.Background(), tt.dialer, internalError, tt.reconcileErr)
 
 			dialer := &v1alpha1.PeeringDialer{}
 			dialerName := types.NamespacedName{
@@ -1026,7 +1027,7 @@ func TestDialer_FilterPeeringDialers(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "true",
+						constants.LabelPeeringToken: "true",
 					},
 				},
 			},
@@ -1038,7 +1039,7 @@ func TestDialer_FilterPeeringDialers(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "false",
+						constants.LabelPeeringToken: "false",
 					},
 				},
 			},
@@ -1050,7 +1051,7 @@ func TestDialer_FilterPeeringDialers(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Labels: map[string]string{
-						labelPeeringToken: "foo",
+						constants.LabelPeeringToken: "foo",
 					},
 				},
 			},
