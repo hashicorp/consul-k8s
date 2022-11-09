@@ -471,6 +471,8 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 }
 
 func TestIngressGateway_Validate(t *testing.T) {
+	zero := uint32(0)
+
 	cases := map[string]struct {
 		input             *IngressGateway
 		namespacesEnabled bool
@@ -785,6 +787,121 @@ func TestIngressGateway_Validate(t *testing.T) {
 			},
 			partitionEnabled: true,
 		},
+		"defaults.maxConnections invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxConnections: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxconnections: Invalid`,
+			},
+		},
+		"defaults.maxPendingRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxPendingRequests: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxpendingrequests: Invalid`,
+			},
+		},
+		"defaults.maxConcurrentRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxConcurrentRequests: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxconcurrentrequests: Invalid`,
+			},
+		},
+		"service.maxConnections invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name:           "svc1",
+									MaxConnections: &zero,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxconnections: Invalid`,
+			},
+		},
+		"service.maxConcurrentRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name:                  "svc1",
+									MaxConcurrentRequests: &zero,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxconcurrentrequests: Invalid`,
+			},
+		},
+		"service.maxPendingRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name:               "svc1",
+									MaxPendingRequests: &zero,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxpendingrequests: Invalid`,
+			},
+		},
+
 		"multiple errors": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
