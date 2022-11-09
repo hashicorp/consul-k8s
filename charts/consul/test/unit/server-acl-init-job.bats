@@ -114,11 +114,34 @@ load _helpers
 #--------------------------------------------------------------------
 # dns
 
-@test "serverACLInit/Job: dns acl option enabled with .dns.enabled=-" {
+@test "serverACLInit/Job: dns acl option enabled with .dns.enabled=- due to inheriting from connectInject.transparentProxy.defaultEnabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: dns acl option disabled with connectInject.transparentProxy.defaultEnabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.transparentProxy.defaultEnabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: dns acl option enabled with .dns.enabled=true and connectInject.transparentProxy.defaultEnabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.transparentProxy.defaultEnabled=false' \
+      --set 'dns.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
