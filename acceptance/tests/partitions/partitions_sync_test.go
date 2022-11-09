@@ -95,6 +95,9 @@ func TestPartitions_Sync(t *testing.T) {
 				"syncCatalog.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"syncCatalog.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 				"syncCatalog.addK8SNamespaceSuffix":                       "false",
+
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
 			serverHelmValues := map[string]string{
