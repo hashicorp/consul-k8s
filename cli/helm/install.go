@@ -73,7 +73,7 @@ func InstallDemoApp(options *InstallOptions) error {
 
 	options.UI.Output("Accessing %s UI", cases.Title(language.English).String(common.ReleaseTypeConsulDemo), terminal.WithHeaderStyle())
 	port := "8080"
-	portForwardCmd := fmt.Sprintf("kubectl port-forward deploy/frontend %s:80", port)
+	portForwardCmd := fmt.Sprintf("kubectl port-forward service/nginx %s:80", port)
 	if options.Settings.Namespace() != "default" {
 		portForwardCmd += fmt.Sprintf(" --namespace %s", options.Settings.Namespace())
 	}

@@ -1,0 +1,92 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: products-api
+spec:
+  selector:
+    app: products-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: products-api
+automountServiceAccountToken: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: products-api
+spec:
+  protocol: "http"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-configmap
+data:
+  config: |
+    {
+      "db_connection": "host=localhost port=5432 user=postgres password=password dbname=products sslmode=disable",
+      "bind_address": ":9090",
+      "metrics_address": ":9103"
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: products-api
+  labels:
+    app: products-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: products-api
+  template:
+    metadata:
+      labels:
+        app: products-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9102"
+        consul.hashicorp.com/connect-inject: "true"
+        # BEGIN CONSUL-K8S MODIFICATION
+        consul.hashicorp.com/connect-service-upstreams: 'postgres:5432'
+        # END CONSUL-K8S MODIFICATION
+    spec:
+      serviceAccountName: products-api
+      volumes:
+        - name: config
+          configMap:
+            name: db-configmap
+            items:
+              - key: config
+                path: conf.json
+      containers:
+        - name: products-api
+          image: hashicorpdemoapp/product-api:v0.0.21
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9090
+            - containerPort: 9103
+          env:
+            - name: "CONFIG_FILE"
+              value: "/config/conf.json"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+            periodSeconds: 10
+            failureThreshold: 30
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true

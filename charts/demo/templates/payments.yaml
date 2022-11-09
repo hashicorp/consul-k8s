@@ -1,0 +1,52 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments
+spec:
+  selector:
+    app: payments
+  ports:
+    - name: http
+      protocol: TCP
+      port: 1800
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payments
+automountServiceAccountToken: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: payments
+spec:
+  protocol: "http"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments
+  labels:
+    app: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments
+  template:
+    metadata:
+      labels:
+        app: payments
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+    spec:
+      serviceAccountName: payments
+      containers:
+        - name: payments
+          image: hashicorpdemoapp/payments:v0.0.16
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
