@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "dns/Service: enabled by default" {
+@test "dns/Service: enabled by default due to inheriting from connectInject.transparentProxy.defaultEnabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/dns-service.yaml  \
@@ -11,11 +11,11 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "dns/Service: enable with global.enabled false" {
+@test "dns/Service: enable with connectInject.transparentProxy.defaultEnabled false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/dns-service.yaml  \
-      --set 'global.enabled=false' \
+      --set 'connectInject.transparentProxy.defaultEnabled=false' \
       --set 'dns.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -30,11 +30,11 @@ load _helpers
       .
 }
 
-@test "dns/Service: disable with global.enabled" {
+@test "dns/Service: disable with connectInject.transparentProxy.defaultEnabled false" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/dns-service.yaml  \
-      --set 'global.enabled=false' \
+      --set 'connectInject.transparentProxy.defaultEnabled=false' \
       .
 }
 

@@ -1480,7 +1480,7 @@ dns:
   # for default DNS resolution. The DNS lookups fall back to the nameserver IPs
   # listed in /etc/resolv.conf if not found in Consul.
   # @type: boolean
-  enableRedirection: false
+  enableRedirection: "-"
 
   # Used to control the type of service created. For
   # example, setting this to "LoadBalancer" will create an external load
