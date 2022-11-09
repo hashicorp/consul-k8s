@@ -248,6 +248,7 @@ func (in *IngressGateway) ToConsul(datacenter string) capi.ConfigEntry {
 		TLS:       *in.Spec.TLS.toConsul(),
 		Listeners: listeners,
 		Meta:      meta(datacenter),
+		Defaults:  in.Spec.Defaults.toConsul(),
 	}
 }
 
@@ -344,13 +345,16 @@ func (in IngressListener) toConsul() capi.IngressListener {
 
 func (in IngressService) toConsul() capi.IngressService {
 	return capi.IngressService{
-		Name:            in.Name,
-		Hosts:           in.Hosts,
-		Namespace:       in.Namespace,
-		Partition:       in.Partition,
-		TLS:             in.TLS.toConsul(),
-		RequestHeaders:  in.RequestHeaders.toConsul(),
-		ResponseHeaders: in.ResponseHeaders.toConsul(),
+		Name:                  in.Name,
+		Hosts:                 in.Hosts,
+		Namespace:             in.Namespace,
+		Partition:             in.Partition,
+		TLS:                   in.TLS.toConsul(),
+		RequestHeaders:        in.RequestHeaders.toConsul(),
+		ResponseHeaders:       in.ResponseHeaders.toConsul(),
+		MaxConnections:        in.MaxConnections,
+		MaxPendingRequests:    in.MaxPendingRequests,
+		MaxConcurrentRequests: in.MaxConcurrentRequests,
 	}
 }
 
@@ -455,4 +459,15 @@ func (in *IngressServiceConfig) validate(path *field.Path) field.ErrorList {
 		errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *in.MaxPendingRequests, "MaxPendingRequests must be > 0"))
 	}
 	return errs
+}
+
+func (in *IngressServiceConfig) toConsul() *capi.IngressServiceConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.IngressServiceConfig{
+		MaxConnections:        in.MaxConnections,
+		MaxPendingRequests:    in.MaxPendingRequests,
+		MaxConcurrentRequests: in.MaxConcurrentRequests,
+	}
 }

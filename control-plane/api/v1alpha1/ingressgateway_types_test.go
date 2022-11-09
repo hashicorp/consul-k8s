@@ -253,6 +253,15 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 }
 
 func TestIngressGateway_ToConsul(t *testing.T) {
+
+	defaultMaxConnections := uint32(100)
+	defaultMaxPendingRequests := uint32(101)
+	defaultMaxConcurrentRequests := uint32(102)
+
+	maxConnections := uint32(200)
+	maxPendingRequests := uint32(201)
+	maxConcurrentRequests := uint32(202)
+
 	cases := map[string]struct {
 		Ours IngressGateway
 		Exp  *capi.IngressGatewayConfigEntry
@@ -289,6 +298,11 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 					},
+					Defaults: &IngressServiceConfig{
+						MaxConnections:        &defaultMaxConnections,
+						MaxPendingRequests:    &defaultMaxPendingRequests,
+						MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+					},
 					Listeners: []IngressListener{
 						{
 							Port:     8888,
@@ -305,10 +319,13 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 							},
 							Services: []IngressService{
 								{
-									Name:      "name1",
-									Hosts:     []string{"host1_1", "host1_2"},
-									Namespace: "ns1",
-									Partition: "default",
+									Name:                  "name1",
+									Hosts:                 []string{"host1_1", "host1_2"},
+									Namespace:             "ns1",
+									Partition:             "default",
+									MaxConnections:        &maxConnections,
+									MaxPendingRequests:    &maxPendingRequests,
+									MaxConcurrentRequests: &maxConcurrentRequests,
 									TLS: &GatewayServiceTLSConfig{
 										SDS: &GatewayTLSSDSConfig{
 											ClusterName:  "cluster1",
@@ -378,6 +395,11 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 					TLSMaxVersion: "TLSv1_1",
 					CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 				},
+				Defaults: &capi.IngressServiceConfig{
+					MaxConnections:        &defaultMaxConnections,
+					MaxPendingRequests:    &defaultMaxPendingRequests,
+					MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+				},
 				Listeners: []capi.IngressListener{
 					{
 						Port:     8888,
@@ -394,10 +416,13 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 						},
 						Services: []capi.IngressService{
 							{
-								Name:      "name1",
-								Hosts:     []string{"host1_1", "host1_2"},
-								Namespace: "ns1",
-								Partition: "default",
+								Name:                  "name1",
+								Hosts:                 []string{"host1_1", "host1_2"},
+								Namespace:             "ns1",
+								Partition:             "default",
+								MaxConnections:        &maxConnections,
+								MaxPendingRequests:    &maxPendingRequests,
+								MaxConcurrentRequests: &maxConcurrentRequests,
 								TLS: &capi.GatewayServiceTLSConfig{
 									SDS: &capi.GatewayTLSSDSConfig{
 										ClusterName:  "cluster1",
