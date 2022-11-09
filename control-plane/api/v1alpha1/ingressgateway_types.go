@@ -270,6 +270,8 @@ func (in *IngressGateway) Validate(consulMeta common.ConsulMeta) error {
 		errs = append(errs, v.validate(path.Child("listeners").Index(i), consulMeta)...)
 	}
 
+	errs = append(errs, in.Spec.Defaults.validate(path.Child("defaults"))...)
+
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ingressGatewayKubeKind},
@@ -419,6 +421,38 @@ func (in IngressListener) validate(path *field.Path, consulMeta common.ConsulMet
 				string(asJSON),
 				"hosts must be empty if protocol is \"tcp\""))
 		}
+
+		if svc.MaxConnections != nil && *svc.MaxConnections <= 0 {
+			errs = append(errs, field.Invalid(path.Child("maxconnections"), *svc.MaxConnections, "MaxConnections must be > 0"))
+		}
+
+		if svc.MaxConcurrentRequests != nil && *svc.MaxConcurrentRequests <= 0 {
+			errs = append(errs, field.Invalid(path.Child("maxconcurrentrequests"), *svc.MaxConcurrentRequests, "MaxConcurrentRequests must be > 0"))
+		}
+
+		if svc.MaxPendingRequests != nil && *svc.MaxPendingRequests <= 0 {
+			errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *svc.MaxPendingRequests, "MaxPendingRequests must be > 0"))
+		}
+	}
+	return errs
+}
+
+func (in *IngressServiceConfig) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	var errs field.ErrorList
+
+	if in.MaxConnections != nil && *in.MaxConnections <= 0 {
+		errs = append(errs, field.Invalid(path.Child("maxconnections"), *in.MaxConnections, "MaxConnections must be > 0"))
+	}
+
+	if in.MaxConcurrentRequests != nil && *in.MaxConcurrentRequests <= 0 {
+		errs = append(errs, field.Invalid(path.Child("maxconcurrentrequests"), *in.MaxConcurrentRequests, "MaxConcurrentRequests must be > 0"))
+	}
+
+	if in.MaxPendingRequests != nil && *in.MaxPendingRequests <= 0 {
+		errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *in.MaxPendingRequests, "MaxPendingRequests must be > 0"))
 	}
 	return errs
 }
