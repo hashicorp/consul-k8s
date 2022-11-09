@@ -242,7 +242,7 @@ spec:
           command: [
               consul-dataplane,
               {{- if $root.Values.externalServers.enabled }}
-              -addresses={{ $root.Values.externalServers.hosts | first | quote }},
+              -addresses={{ $root.Values.externalServers.hosts | first }},
               {{- else }}
               -addresses={{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc,
               {{- end }}

@@ -199,7 +199,7 @@ spec:
         command: [
             consul-dataplane,
             {{- if .Values.externalServers.enabled }}
-            -addresses={{ .Values.externalServers.hosts | first | quote }},
+            -addresses={{ .Values.externalServers.hosts | first }},
             {{- else }}
             -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc,
             {{- end }}
@@ -246,6 +246,7 @@ spec:
             {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
             -server-watch-disabled=true,
             {{- end }}
+        ]
         livenessProbe:
           tcpSocket:
             port: {{ .Values.meshGateway.containerPort }}

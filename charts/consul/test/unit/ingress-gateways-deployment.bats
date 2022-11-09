@@ -108,9 +108,9 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '. | contains("-tls-disabled")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-tls-disabled"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -122,9 +122,9 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '. | contains("-ca-certs=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -194,18 +194,15 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=false' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '. | contains("-login-bearer-path")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-login-bearer-path"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object | yq -r '. | contains("-login-meta")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-login-method"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object | yq -r '. | contains("-login-method")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  local actual=$(echo $object | yq -r '. | contains("-credential-type=login")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-credential-type=login"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -217,19 +214,36 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '. | contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '. | contains("-login-meta=component=ingress-gateway")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '. | contains("-login-auth-method=release-name-consul-k8s-component-auth-method")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-credential-type=login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
 
-  local actual=$(echo $object | yq -r '. | contains("-credential-type=login")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+@test "ingressGateways/Deployment: add consul-dataplane envvars on ingress-gateway container" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_ENVOY_READY_BIND_ADDRESS") | .valueFrom.fieldRef.fieldPath' | tee /dev/stderr)
+  [ "${actual}" = "status.podIP" ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META1") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'pod=$(NAMESPACE)/$(POD_NAME)' ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META2") | .value' | tee /dev/stderr)
+  [ "${actual}" = "component=ingress-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -327,9 +341,9 @@ load _helpers
       --set 'externalServers.hosts[0]=consul' \
       --set 'externalServers.skipServerWatch=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '. | contains("-server-watch-disabled")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-server-watch-disabled=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -641,7 +655,7 @@ load _helpers
 #--------------------------------------------------------------------
 # topologySpreadConstraints
 
-@test "ingressGateways/Deployment: topologySpreadConstraints not set by default" { 
+@test "ingressGateways/Deployment: topologySpreadConstraints not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml \
@@ -1268,7 +1282,7 @@ key2: value2' \
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -1292,7 +1306,7 @@ key2: value2' \
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -1316,7 +1330,7 @@ key2: value2' \
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -1340,7 +1354,7 @@ key2: value2' \
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -1364,7 +1378,7 @@ key2: value2' \
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -1388,7 +1402,7 @@ key2: value2' \
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 

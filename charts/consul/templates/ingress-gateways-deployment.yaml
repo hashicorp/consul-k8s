@@ -257,12 +257,12 @@ spec:
             consul-dataplane,
             -envoy-ready-bind-port=21000,
             {{- if $root.Values.externalServers.enabled }}
-            -addresses={{ $root.Values.externalServers.hosts | first | quote }}
+            -addresses={{ $root.Values.externalServers.hosts | first }},
             {{- else }}
             -addresses={{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc,
             {{- end }}
             {{- if $root.Values.externalServers.enabled }}
-            -grpc-port={{ $root.Values.externalServers.grpcPort }}
+            -grpc-port={{ $root.Values.externalServers.grpcPort }},
             {{- else }}
             -grpc-port=8502,
             {{- end }}
@@ -300,8 +300,9 @@ spec:
             -telemetry-prom-scrape-path="/metrics",
             {{- end }}
             {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.skipServerWatch }}
-            server-watch-disabled=true,
+            -server-watch-disabled=true,
             {{- end }}
+        ]
         livenessProbe:
           tcpSocket:
             port: 21000
