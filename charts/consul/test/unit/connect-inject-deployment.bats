@@ -428,14 +428,14 @@ load _helpers
 #--------------------------------------------------------------------
 # DNS
 
-@test "connectInject/Deployment: -enable-consul-dns unset by default" {
+@test "connectInject/Deployment: -enable-consul-dns is set by default due to inheriting from connectInject.transparentProxy.defaultEnabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/Deployment: -enable-consul-dns is true if dns.enabled=true and dns.enableRedirection=true" {
@@ -444,9 +444,40 @@ load _helpers
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'dns.enableRedirection=true' \
+      --set 'dns.enabled=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -enable-consul-dns is not set when connectInject.transparentProxy.defaultEnabled is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.transparentProxy.defaultEnabled=false' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -enable-consul-dns is not set if dns.enabled is false or ens.enableRedirection is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'dns.enabled=false' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'dns.enableRedirection=false' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "connectInject/Deployment: -resource-prefix always set" {

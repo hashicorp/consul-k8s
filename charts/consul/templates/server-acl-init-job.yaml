@@ -174,7 +174,7 @@ spec:
             {{- if .Values.global.peering.enabled }}
             -enable-peering=true \
             {{- end }}
-            {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
+            {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) }}
             -allow-dns=true \
             {{- end }}
 

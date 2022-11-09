@@ -9,6 +9,9 @@ BREAKING_CHANGES:
       * `client.snaphostAgent.replicas`
       * `client.snaphostAgent.serviceAccount`
     * Remove `global.secretsBackend.vault.consulSnapshotAgentRole` value. You should now use the `global.secretsBackend.vault.consulServerRole` for access to any Vault secrets. 
+  * Change`dns.enabled` and `dns.enableRedirection` to default to the value of `connectInject.transparentProxy.defaultEnabled`.
+    Previously, `dns.enabled` defaulted to the value of `global.enabled` and `dns.enableRedirection` defaulted to the
+    value to `false`. [[GH-1688](https://github.com/hashicorp/consul-k8s/pull/1688)]
 * Peering:
   * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
     to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
