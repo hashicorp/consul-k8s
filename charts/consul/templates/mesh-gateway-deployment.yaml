@@ -192,58 +192,58 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        command:
-        - /bin/sh
-        - -ec
-        - |
-          consul-dataplane \
+        - name: DP_CREDENTIAL_LOGIN_META1
+          value: pod=$(NAMESPACE)/$(POD_NAME)
+        - name: DP_CREDENTIAL_LOGIN_META2
+          value: component=mesh-gateway
+        command: [
+            consul-dataplane,
             {{- if .Values.externalServers.enabled }}
-            -addresses={{ .Values.externalServers.hosts | first | quote }} \
+            -addresses={{ .Values.externalServers.hosts | first | quote }},
             {{- else }}
-            -addresses="{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc" \
+            -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc,
             {{- end }}
             {{- if .Values.externalServers.enabled }}
-            -grpc-port={{ .Values.externalServers.grpcPort }} \
+            -grpc-port={{ .Values.externalServers.grpcPort }},
             {{- else }}
-            -grpc-port=8502 \
+            -grpc-port=8502,
             {{- end }}
-            -proxy-service-id-path=/consul/service/proxy-id \
-            -service-node-name="k8s-service-mesh" \
+            -proxy-service-id-path=/consul/service/proxy-id,
+            -service-node-name=k8s-service-mesh,
             {{- if .Values.global.tls.enabled }}
             {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
-            -ca-certs=/consul/tls/ca/tls.crt \
+            -ca-certs=/consul/tls/ca/tls.crt,
             {{- end }}
             {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
-            -tls-server-name={{.Values.externalServers.tlsServerName }} \
+            -tls-server-name={{.Values.externalServers.tlsServerName }},
             {{- else if .Values.global.cloud.enabled }}
-            -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+            -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}},
             {{- end }}
             {{- else }}
-            -tls-disabled \
+            -tls-disabled,
             {{- end }}
             {{- if .Values.global.acls.manageSystemACLs }}
-            -credential-type=login \
-            -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
-            -login-meta=component=mesh-gateway \
-            -login-meta=pod=${NAMESPACE}/${POD_NAME} \
+            -credential-type=login,
+            -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token,
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-            -login-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }},
+            -login-datacenter={{ .Values.global.federation.primaryDatacenter }},
             {{- else }}
-            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method,
             {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
-            -login-partition={{ .Values.global.adminPartitions.name }} \
+            -login-partition={{ .Values.global.adminPartitions.name }},
             {{- end }}
             {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
-            -service-partition={{ .Values.global.adminPartitions.name }} \
+            -service-partition={{ .Values.global.adminPartitions.name }},
             {{- end }}
-            -log-level={{ default .Values.global.logLevel }} \
-            -log-json={{ .Values.global.logJSON }} \
+            -log-level={{ default .Values.global.logLevel }},
+            -log-json={{ .Values.global.logJSON }},
             {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
-            -telemetry-prom-scrape-path="/metrics"
+            -telemetry-prom-scrape-path="/metrics",
             {{- end }}
+        ]
         livenessProbe:
           tcpSocket:
             port: {{ .Values.meshGateway.containerPort }}
