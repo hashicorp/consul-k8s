@@ -100,12 +100,8 @@ func TestAppMetrics(t *testing.T) {
 	ns := ctx.KubectlOptions(t).Namespace
 
 	helmValues := map[string]string{
-		"global.datacenter":      "dc1",
-		"global.metrics.enabled": "true",
-
-		// todo (agentless): remove once we have consul-dataplane image with these changes.
-		"global.imageConsulDataplane": "hashicorppreview/consul-dataplane:1.0-dev",
-
+		"global.datacenter":                          "dc1",
+		"global.metrics.enabled":                     "true",
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
 	}
