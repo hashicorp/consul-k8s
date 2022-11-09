@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -209,7 +209,7 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client, proxy
 	return func() error {
 		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
-			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
+			endpoints.MetaKeyPodName, c.flagPodName, endpoints.MetaKeyKubeNS, c.flagPodNamespace)
 		if c.flagMultiPort && c.flagServiceName != "" {
 			// If the service name is set and this is a multi-port pod there may be multiple services registered for
 			// this one Pod. If so, we want to ensure the service and proxy matching our expected name is registered.
@@ -287,7 +287,7 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		var gatewayList *api.CatalogNodeServiceList
 		var err error
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
-			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
+			endpoints.MetaKeyPodName, c.flagPodName, endpoints.MetaKeyKubeNS, c.flagPodNamespace)
 		if c.consul.Namespace != "" {
 			gatewayList, _, err = client.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
 		} else {
