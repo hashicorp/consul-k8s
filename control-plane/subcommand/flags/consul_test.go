@@ -39,6 +39,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 				LoginPartitionEnvVar:       "other-test-partition",
 				LoginNamespaceEnvVar:       "other-test-ns",
 				LoginMetaEnvVar:            "key1=value1,key2=value2",
+				SkipServerWatchEnvVar:      "true",
 			},
 			expFlags: &ConsulFlags{
 				Addresses:  "consul.address",
@@ -66,6 +67,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 						Meta:            map[string]string{"key1": "value1", "key2": "value2"},
 					},
 				},
+				SkipServerWatch: true,
 			},
 		},
 		"defaults": {
@@ -209,6 +211,18 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 						Token: "test-token",
 					},
 				},
+			},
+		},
+		"skip server watch to server watch disabled": {
+			flags: ConsulFlags{
+				Addresses:       "consul.address",
+				GRPCPort:        8502,
+				SkipServerWatch: true,
+			},
+			expConfig: discovery.Config{
+				Addresses:           "consul.address",
+				GRPCPort:            8502,
+				ServerWatchDisabled: true,
 			},
 		},
 	}

@@ -155,6 +155,10 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
 	}
 
+	if w.SkipServerWatch {
+		cmd = append(cmd, "-server-watch-disabled=true")
+	}
+
 	if w.AuthMethod != "" {
 		cmd = append(cmd,
 			"-credential-type=login",

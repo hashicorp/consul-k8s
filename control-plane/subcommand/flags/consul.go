@@ -38,6 +38,8 @@ const (
 	LoginNamespaceEnvVar       = "CONSUL_LOGIN_NAMESPACE"
 	LoginMetaEnvVar            = "CONSUL_LOGIN_META"
 
+	SkipServerWatchEnvVar = "CONSUL_SKIP_SERVER_WATCH"
+
 	APITimeoutEnvVar = "CONSUL_API_TIMEOUT"
 )
 
@@ -51,6 +53,8 @@ type ConsulFlags struct {
 	Namespace  string
 	Partition  string
 	Datacenter string
+
+	SkipServerWatch bool
 
 	ConsulTLSFlags
 	ConsulACLFlags
@@ -87,6 +91,7 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 	grpcPort, _ := strconv.Atoi(os.Getenv(GRPCPortEnvVar))
 	httpPort, _ := strconv.Atoi(os.Getenv(HTTPPortEnvVar))
 	useTLS, _ := strconv.ParseBool(os.Getenv(UseTLSEnvVar))
+	skipServerWatch, _ := strconv.ParseBool(os.Getenv(SkipServerWatchEnvVar))
 	consulLoginMetaFromEnv := os.Getenv(LoginMetaEnvVar)
 	if consulLoginMetaFromEnv != "" {
 		// Parse meta from env var.
@@ -168,6 +173,8 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 			"may be specified multiple times to set multiple meta fields.")
 	fs.DurationVar(&f.APITimeout, "api-timeout", defaultAPITimeout,
 		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
+	fs.BoolVar(&f.SkipServerWatch, "skip-server-watch", skipServerWatch, "If true, skip watching server upstream."+
+		"This can also be specified via the CONSUL_SKIP_SERVER_WATCH environment variable.")
 	return fs
 }
 
@@ -221,6 +228,10 @@ func (f *ConsulFlags) ConsulServerConnMgrConfig() (discovery.Config, error) {
 		}
 		cfg.Credentials.Type = discovery.CredentialsTypeStatic
 		cfg.Credentials.Static.Token = string(token)
+	}
+
+	if f.SkipServerWatch {
+		cfg.ServerWatchDisabled = true
 	}
 
 	return cfg, nil

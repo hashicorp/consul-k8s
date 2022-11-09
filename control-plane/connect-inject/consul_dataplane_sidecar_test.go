@@ -118,6 +118,12 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			},
 			additionalExpCmdArgs: " -tls-disabled",
 		},
+		"skip server watch enabled": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.SkipServerWatch = true
+			},
+			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled",
+		},
 	}
 
 	for name, c := range cases {
