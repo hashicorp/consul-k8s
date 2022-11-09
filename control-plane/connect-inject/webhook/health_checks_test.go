@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"os"

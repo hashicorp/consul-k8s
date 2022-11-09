@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -14,9 +16,8 @@ import (
 )
 
 const (
-	ConsulCAFile               = "/consul/connect-inject/consul-ca.pem"
-	ConsulDataplaneDNSBindHost = "127.0.0.1"
-	ConsulDataplaneDNSBindPort = 8600
+	consulDataplaneDNSBindHost = "127.0.0.1"
+	consulDataplaneDNSBindPort = 8600
 )
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -49,7 +50,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	probe := &corev1.Probe{
 		Handler: corev1.Handler{
 			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(EnvoyInboundListenerPort + mpi.serviceIndex),
+				Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
 			},
 		},
 		InitialDelaySeconds: 1,
@@ -83,16 +84,16 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	// Add any extra VolumeMounts.
-	if _, ok := pod.Annotations[annotationConsulSidecarUserVolumeMount]; ok {
+	if userVolMount, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolumeMount]; ok {
 		var volumeMounts []corev1.VolumeMount
-		err := json.Unmarshal([]byte(pod.Annotations[annotationConsulSidecarUserVolumeMount]), &volumeMounts)
+		err := json.Unmarshal([]byte(userVolMount), &volumeMounts)
 		if err != nil {
 			return corev1.Container{}, err
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
-	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
+	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -136,10 +137,10 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 	envoyConcurrency := w.DefaultEnvoyProxyConcurrency
 
 	// Check to see if the user has overriden concurrency via an annotation.
-	if envoyConcurrencyAnnotation, ok := pod.Annotations[annotationEnvoyProxyConcurrency]; ok {
+	if envoyConcurrencyAnnotation, ok := pod.Annotations[constants.AnnotationEnvoyProxyConcurrency]; ok {
 		val, err := strconv.ParseUint(envoyConcurrencyAnnotation, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse annotation %q: %w", annotationEnvoyProxyConcurrency, err)
+			return nil, fmt.Errorf("unable to parse annotation %q: %w", constants.AnnotationEnvoyProxyConcurrency, err)
 		}
 		envoyConcurrency = int(val)
 	}
@@ -149,7 +150,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		fmt.Sprintf("-addresses=%q", w.ConsulAddress),
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id=" + fmt.Sprintf("$(cat %s)", proxyIDFileName),
-		"-service-node-name=" + ConsulNodeName,
+		"-service-node-name=" + constants.ConsulNodeName,
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
@@ -188,7 +189,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 			cmd = append(cmd, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			cmd = append(cmd, "-ca-certs="+ConsulCAFile)
+			cmd = append(cmd, "-ca-certs="+constants.ConsulCAFile)
 		}
 	} else {
 		cmd = append(cmd, "-tls-disabled")
@@ -198,21 +199,21 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		cmd = append(cmd, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
 	}
 
-	metricsServer, err := w.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	metricsServer, err := w.MetricsConfig.ShouldRunMergedMetricsServer(pod)
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine if merged metrics is enabled: %w", err)
 	}
 	if metricsServer {
-		prometheusScrapePath := w.MetricsConfig.prometheusScrapePath(pod)
-		mergedMetricsPort, err := w.MetricsConfig.mergedMetricsPort(pod)
+		prometheusScrapePath := w.MetricsConfig.PrometheusScrapePath(pod)
+		mergedMetricsPort, err := w.MetricsConfig.MergedMetricsPort(pod)
 		if err != nil {
 			return nil, fmt.Errorf("unable to determine if merged metrics port: %w", err)
 		}
 		cmd = append(cmd, "-telemetry-prom-scrape-path="+prometheusScrapePath,
 			"-telemetry-prom-merge-port="+mergedMetricsPort)
 
-		serviceMetricsPath := w.MetricsConfig.serviceMetricsPath(pod)
-		serviceMetricsPort, err := w.MetricsConfig.serviceMetricsPort(pod)
+		serviceMetricsPath := w.MetricsConfig.ServiceMetricsPath(pod)
+		serviceMetricsPort, err := w.MetricsConfig.ServiceMetricsPort(pod)
 		if err != nil {
 			return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
 		}
@@ -223,35 +224,35 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 
 		// Pull the TLS config from the relevant annotations.
 		var prometheusCAFile string
-		if raw, ok := pod.Annotations[annotationPrometheusCAFile]; ok && raw != "" {
+		if raw, ok := pod.Annotations[constants.AnnotationPrometheusCAFile]; ok && raw != "" {
 			prometheusCAFile = raw
 		}
 
 		var prometheusCAPath string
-		if raw, ok := pod.Annotations[annotationPrometheusCAPath]; ok && raw != "" {
+		if raw, ok := pod.Annotations[constants.AnnotationPrometheusCAPath]; ok && raw != "" {
 			prometheusCAPath = raw
 		}
 
 		var prometheusCertFile string
-		if raw, ok := pod.Annotations[annotationPrometheusCertFile]; ok && raw != "" {
+		if raw, ok := pod.Annotations[constants.AnnotationPrometheusCertFile]; ok && raw != "" {
 			prometheusCertFile = raw
 		}
 
 		var prometheusKeyFile string
-		if raw, ok := pod.Annotations[annotationPrometheusKeyFile]; ok && raw != "" {
+		if raw, ok := pod.Annotations[constants.AnnotationPrometheusKeyFile]; ok && raw != "" {
 			prometheusKeyFile = raw
 		}
 
 		// Validate required Prometheus TLS config is present if set.
 		if prometheusCAFile != "" || prometheusCAPath != "" || prometheusCertFile != "" || prometheusKeyFile != "" {
 			if prometheusCAFile == "" && prometheusCAPath == "" {
-				return nil, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", annotationPrometheusCAFile, annotationPrometheusCAPath)
+				return nil, fmt.Errorf("must set one of %q or %q when providing prometheus TLS config", constants.AnnotationPrometheusCAFile, constants.AnnotationPrometheusCAPath)
 			}
 			if prometheusCertFile == "" {
-				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusCertFile)
+				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", constants.AnnotationPrometheusCertFile)
 			}
 			if prometheusKeyFile == "" {
-				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
+				return nil, fmt.Errorf("must set %q when providing prometheus TLS config", constants.AnnotationPrometheusKeyFile)
 			}
 			// TLS config has been validated, add them to the consul-dataplane cmd args
 			cmd = append(cmd, "-telemetry-prom-ca-certs-file="+prometheusCAFile,
@@ -264,11 +265,11 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
 	if w.EnableConsulDNS {
-		cmd = append(cmd, "-consul-dns-bind-port="+strconv.Itoa(ConsulDataplaneDNSBindPort))
+		cmd = append(cmd, "-consul-dns-bind-port="+strconv.Itoa(consulDataplaneDNSBindPort))
 	}
 
 	var envoyExtraArgs []string
-	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
+	extraArgs, annotationSet := pod.Annotations[constants.AnnotationEnvoyExtraArgs]
 	// --base-id is an envoy arg rather than consul-dataplane, and so we need to make sure we're passing it
 	// last separated by the --.
 	if mpi.serviceName != "" {
@@ -326,10 +327,10 @@ func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequireme
 	// struct.
 
 	// CPU Limit.
-	if anno, ok := pod.Annotations[annotationSidecarProxyCPULimit]; ok {
+	if anno, ok := pod.Annotations[constants.AnnotationSidecarProxyCPULimit]; ok {
 		cpuLimit, err := resource.ParseQuantity(anno)
 		if err != nil {
-			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationSidecarProxyCPULimit, anno, err)
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", constants.AnnotationSidecarProxyCPULimit, anno, err)
 		}
 		resources.Limits[corev1.ResourceCPU] = cpuLimit
 	} else if w.DefaultProxyCPULimit != zeroQuantity {
@@ -337,10 +338,10 @@ func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequireme
 	}
 
 	// CPU Request.
-	if anno, ok := pod.Annotations[annotationSidecarProxyCPURequest]; ok {
+	if anno, ok := pod.Annotations[constants.AnnotationSidecarProxyCPURequest]; ok {
 		cpuRequest, err := resource.ParseQuantity(anno)
 		if err != nil {
-			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationSidecarProxyCPURequest, anno, err)
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", constants.AnnotationSidecarProxyCPURequest, anno, err)
 		}
 		resources.Requests[corev1.ResourceCPU] = cpuRequest
 	} else if w.DefaultProxyCPURequest != zeroQuantity {
@@ -348,10 +349,10 @@ func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequireme
 	}
 
 	// Memory Limit.
-	if anno, ok := pod.Annotations[annotationSidecarProxyMemoryLimit]; ok {
+	if anno, ok := pod.Annotations[constants.AnnotationSidecarProxyMemoryLimit]; ok {
 		memoryLimit, err := resource.ParseQuantity(anno)
 		if err != nil {
-			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationSidecarProxyMemoryLimit, anno, err)
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", constants.AnnotationSidecarProxyMemoryLimit, anno, err)
 		}
 		resources.Limits[corev1.ResourceMemory] = memoryLimit
 	} else if w.DefaultProxyMemoryLimit != zeroQuantity {
@@ -359,10 +360,10 @@ func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequireme
 	}
 
 	// Memory Request.
-	if anno, ok := pod.Annotations[annotationSidecarProxyMemoryRequest]; ok {
+	if anno, ok := pod.Annotations[constants.AnnotationSidecarProxyMemoryRequest]; ok {
 		memoryRequest, err := resource.ParseQuantity(anno)
 		if err != nil {
-			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationSidecarProxyMemoryRequest, anno, err)
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", constants.AnnotationSidecarProxyMemoryRequest, anno, err)
 		}
 		resources.Requests[corev1.ResourceMemory] = memoryRequest
 	} else if w.DefaultProxyMemoryRequest != zeroQuantity {

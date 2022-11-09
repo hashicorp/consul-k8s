@@ -1,4 +1,4 @@
-package connectinject
+package webhook
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 	// configured in our /etc/resolv.conf. It's important to add Consul DNS as the first nameserver because
 	// if we put kube DNS first, it will return NXDOMAIN response and a DNS client will not fall back to other nameservers.
 	if pod.Spec.DNSConfig == nil {
-		nameservers := []string{ConsulDataplaneDNSBindHost}
+		nameservers := []string{consulDataplaneDNSBindHost}
 		nameservers = append(nameservers, cfg.Servers...)
 		var options []corev1.PodDNSConfigOption
 		if cfg.Ndots != defaultDNSOptionNdots {

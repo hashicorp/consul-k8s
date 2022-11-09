@@ -1,6 +1,6 @@
 //go:build enterprise
 
-package connectinject
+package webhook
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -638,7 +639,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 			for _, patch := range resp.Patches {
 				if patch.Path == "/metadata/annotations" {
 					for annotationName, annotationValue := range patch.Value.(map[string]interface{}) {
-						if annotationName == annotationConsulNamespace {
+						if annotationName == constants.AnnotationConsulNamespace {
 							consulNamespaceAnnotationValue = annotationValue.(string)
 						}
 					}

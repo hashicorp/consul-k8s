@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	connectinject "github.com/hashicorp/consul-k8s/control-plane/connect-inject"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -184,7 +184,7 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
-		if err = common.WriteFileWithPerms(connectinject.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
+		if err = common.WriteFileWithPerms(constants.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
 			c.logger.Error("error writing CA cert file", "error", err)
 			return 1
 		}
@@ -208,7 +208,7 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client, proxy
 	return func() error {
 		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
-			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
+			constants.MetaKeyPodName, c.flagPodName, constants.MetaKeyKubeNS, c.flagPodNamespace)
 		if c.flagMultiPort && c.flagServiceName != "" {
 			// If the service name is set and this is a multi-port pod there may be multiple services registered for
 			// this one Pod. If so, we want to ensure the service and proxy matching our expected name is registered.
@@ -286,7 +286,7 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		var gatewayList *api.CatalogNodeServiceList
 		var err error
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
-			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
+			constants.MetaKeyPodName, c.flagPodName, constants.MetaKeyKubeNS, c.flagPodNamespace)
 		if c.consul.Namespace != "" {
 			gatewayList, _, err = client.Catalog().NodeServiceList(c.flagConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
 		} else {
