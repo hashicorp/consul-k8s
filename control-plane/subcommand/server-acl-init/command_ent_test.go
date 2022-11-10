@@ -293,7 +293,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-ingress-gateway-name=anotherigw",
 				"-terminating-gateway-name=tgw",
 				"-terminating-gateway-name=anothertgw",
-				"-controller",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -331,7 +330,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"tgw-policy",
 				"anothertgw-policy",
 				"connect-inject-policy",
-				"controller-policy",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
 			require.NoError(t, err)
@@ -383,7 +381,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anotherigw-policy",
 				"tgw-policy",
 				"anothertgw-policy",
-				"controller-policy",
 				"partitions-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)

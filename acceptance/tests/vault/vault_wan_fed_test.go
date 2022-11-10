@@ -363,7 +363,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Mesh config.
 		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
 		"meshGateway.enabled":   "true",
 		"meshGateway.replicas":  "1",
 

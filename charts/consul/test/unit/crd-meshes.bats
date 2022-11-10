@@ -15,11 +15,11 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "mesh/CustomResourceDefinition: enabled with controller.enabled=true" {
+@test "mesh/CustomResourceDefinition: enabled with connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-meshes.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       # The generated CRDs have "---" at the top which results in two objects
       # being detected by yq, the first of which is null. We must therefore use
@@ -29,10 +29,10 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "ingressGateway/CustomResourceDefinition: disabled with controller.enabled=false" {
+@test "ingressGateway/CustomResourceDefinition: disabled with connectInject.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/crd-meshes.yaml  \
-      --set 'controller.enabled=false' \
+      --set 'connectInject.enabled=false' \
       .
 }

@@ -1987,12 +1987,6 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 		Roles       []string
 	}{
 		{
-			TestName:    "Controller",
-			TokenFlags:  []string{"-controller"},
-			PolicyNames: []string{"controller-policy"},
-			Roles:       []string{resourcePrefix + "-controller-acl-role"},
-		},
-		{
 			TestName:    "Connect Inject",
 			TokenFlags:  []string{"-connect-inject"},
 			PolicyNames: []string{"connect-inject-policy"},
@@ -2143,13 +2137,6 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 		Roles            []string
 		GlobalAuthMethod bool
 	}{
-		{
-			TestName:         "Controller",
-			TokenFlags:       []string{"-controller"},
-			PolicyNames:      []string{"controller-policy-" + secondaryDatacenter},
-			Roles:            []string{resourcePrefix + "-controller-acl-role-" + secondaryDatacenter},
-			GlobalAuthMethod: true,
-		},
 		{
 			TestName:         "Connect Inject",
 			TokenFlags:       []string{"-connect-inject"},
@@ -2311,12 +2298,6 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 		GlobalToken        bool
 	}{
 		{
-			ComponentName: "controller",
-			TokenFlags:    []string{"-controller"},
-			Roles:         []string{resourcePrefix + "-controller-acl-role"},
-			GlobalToken:   false,
-		},
-		{
 			ComponentName: "connect-injector",
 			TokenFlags:    []string{"-connect-inject"},
 			Roles:         []string{resourcePrefix + "-connect-inject-acl-role"},
@@ -2451,13 +2432,6 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 		GlobalAuthMethod   bool
 		GlobalToken        bool
 	}{
-		{
-			ComponentName:    "controller",
-			TokenFlags:       []string{"-controller"},
-			Roles:            []string{resourcePrefix + "-controller-acl-role-dc2"},
-			GlobalAuthMethod: true,
-			GlobalToken:      true,
-		},
 		{
 			ComponentName:    "connect-injector",
 			TokenFlags:       []string{"-connect-inject"},

@@ -37,7 +37,6 @@ func TestComponentMetrics(t *testing.T) {
 		"client.enabled": "true",
 
 		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
 
 		"meshGateway.enabled":      "true",
 		"meshGateway.replicas":     "1",

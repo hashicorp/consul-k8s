@@ -62,7 +62,6 @@ func TestWANFederation(t *testing.T) {
 
 				"connectInject.enabled":  "true",
 				"connectInject.replicas": "1",
-				"controller.enabled":     "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -123,7 +122,6 @@ func TestWANFederation(t *testing.T) {
 
 				"connectInject.enabled":  "true",
 				"connectInject.replicas": "1",
-				"controller.enabled":     "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",

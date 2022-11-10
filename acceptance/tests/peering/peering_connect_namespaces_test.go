@@ -114,8 +114,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
 
-				"controller.enabled": "true",
-
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
