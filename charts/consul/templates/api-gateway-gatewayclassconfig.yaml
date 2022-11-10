@@ -26,6 +26,8 @@ spec:
       "externalServers" specified and running in "agentless" mode, this will only work 0.5+
     */}}
     address: {{ first .Values.externalServers.hosts }}
+    {{- else if and (not .Values.externalServers.enabled) .Values.client.enabled }}
+    address: $(HOST_IP)
     {{- else }}
     {{/*
       We have local network connectivity between deployments and the internal cluster, this

@@ -92,6 +92,9 @@ spec:
           {{- else }}
           value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
           {{- end }}
+          {{- else if and (not .Values.externalServers.enabled) .Values.client.enabled }}
+          {{- if .Values.global.tls.enabled }}
+          value: $(HOST_IP):8501
           {{- else }}
           {{/*
             We have local network connectivity between deployments and the internal cluster, this
