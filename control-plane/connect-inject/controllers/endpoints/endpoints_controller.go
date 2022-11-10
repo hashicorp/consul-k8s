@@ -113,11 +113,18 @@ type Controller struct {
 	// whenever service instances are deregistered.
 	AuthMethod string
 
+	// EnableAutoEncrypt indicates whether we should use auto-encrypt when talking
+	// to Consul client agents.
+	EnableAutoEncrypt bool
+
 	MetricsConfig metrics.Config
 	Log           logr.Logger
 
 	Scheme *runtime.Scheme
 	context.Context
+
+	// consulClientHttpPort is only used in tests.
+	consulClientHttpPort int
 }
 
 // Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
@@ -199,9 +206,29 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
-					if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
-						r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-						errs = multierror.Append(errs, err)
+					if isConsulDataplaneSupported(pod) {
+						if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
+							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							errs = multierror.Append(errs, err)
+						}
+					} else {
+						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
+						if err != nil {
+							r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							errs = multierror.Append(errs, err)
+							continue
+						}
+						r.Log.Info("updating health check on the Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
+							r.Log.Error(err, "failed to update health check on Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace, "consul-client-ip", pod.Status.HostIP)
+							errs = multierror.Append(errs, err)
+						}
+						// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
+						// in the case when Consul clients are running in the cluster. If endpoints are deleted, consul clients
+						// will detect that they are unhealthy, and we don't need to worry about keeping them up-to-date.
+						// This is so that health checks are still updated during an upgrade to consul-dataplane.
+						continue
 					}
 				}
 				if isGateway(pod) {
@@ -249,7 +276,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(apiClient, pod, serviceEndpoints, healthStatus)
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -332,18 +359,18 @@ func serviceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 }
 
 func proxyServiceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
-	serviceName := serviceName(pod, serviceEndpoints)
-	return fmt.Sprintf("%s-sidecar-proxy", serviceName)
+	svcName := serviceName(pod, serviceEndpoints)
+	return fmt.Sprintf("%s-sidecar-proxy", svcName)
 }
 
 func proxyServiceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
-	proxyServiceName := proxyServiceName(pod, serviceEndpoints)
-	return fmt.Sprintf("%s-%s", pod.Name, proxyServiceName)
+	proxySvcName := proxyServiceName(pod, serviceEndpoints)
+	return fmt.Sprintf("%s-%s", pod.Name, proxySvcName)
 }
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.

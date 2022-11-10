@@ -83,12 +83,6 @@ type Command struct {
 	flagDefaultPrometheusScrapePort string
 	flagDefaultPrometheusScrapePath string
 
-	// Consul sidecar resource settings.
-	flagDefaultConsulSidecarCPULimit      string
-	flagDefaultConsulSidecarCPURequest    string
-	flagDefaultConsulSidecarMemoryLimit   string
-	flagDefaultConsulSidecarMemoryRequest string
-
 	// Init container resource settings.
 	flagInitContainerCPULimit      string
 	flagInitContainerCPURequest    string
@@ -107,6 +101,8 @@ type Command struct {
 
 	// WAN Federation flags.
 	flagEnableFederation bool
+
+	flagEnableAutoEncrypt bool
 
 	// Consul DNS flags.
 	flagEnableConsulDNS bool
@@ -187,6 +183,8 @@ func (c *Command) init() {
 		"Indicates that the command runs in an OpenShift cluster.")
 	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
 		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
+	c.flagSet.BoolVar(&c.flagEnableAutoEncrypt, "enable-auto-encrypt", false,
+		"Indicates whether TLS with auto-encrypt should be used when talking to Consul clients.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -213,11 +211,6 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagInitContainerMemoryRequest, "init-container-memory-request", "25Mi", "Init container memory request.")
 	c.flagSet.StringVar(&c.flagInitContainerMemoryLimit, "init-container-memory-limit", "150Mi", "Init container memory limit.")
 
-	// Consul sidecar resource setting flags.
-	c.flagSet.StringVar(&c.flagDefaultConsulSidecarCPURequest, "default-consul-sidecar-cpu-request", "20m", "Default consul sidecar CPU request.")
-	c.flagSet.StringVar(&c.flagDefaultConsulSidecarCPULimit, "default-consul-sidecar-cpu-limit", "20m", "Default consul sidecar CPU limit.")
-	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryRequest, "default-consul-sidecar-memory-request", "25Mi", "Default consul sidecar memory request.")
-	c.flagSet.StringVar(&c.flagDefaultConsulSidecarMemoryLimit, "default-consul-sidecar-memory-limit", "50Mi", "Default consul sidecar memory limit.")
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
 	c.consul = &flags.ConsulFlags{}
@@ -436,6 +429,7 @@ func (c *Command) Run(args []string) int {
 		Scheme:                     mgr.GetScheme(),
 		ReleaseName:                c.flagReleaseName,
 		ReleaseNamespace:           c.flagReleaseNamespace,
+		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})

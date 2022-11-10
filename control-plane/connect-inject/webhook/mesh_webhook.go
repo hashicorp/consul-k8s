@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -575,6 +576,7 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 		}
 	}
 	pod.Annotations[constants.AnnotationOriginalPod] = podJson
+	pod.Annotations[constants.AnnotationConsulK8sVersion] = version.GetHumanVersion()
 
 	return nil
 }
