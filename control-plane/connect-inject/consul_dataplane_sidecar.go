@@ -155,7 +155,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	}
 
 	if w.SkipServerWatch {
-		cmd = append(cmd, "-server-watch-disabled=true")
+		args = append(args, "-server-watch-disabled=true")
 	}
 
 	if w.AuthMethod != "" {
