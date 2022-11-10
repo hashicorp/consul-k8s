@@ -155,7 +155,7 @@ key2: value2' \
       --set 'externalServers.hosts[0]=consul' \
       --set 'externalServers.skipServerWatch=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | any(contains("-server-watch-disabled"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -480,7 +480,7 @@ key2: value2' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
       local actual=$(echo $command | yq -r '. | any(contains("credential-type=login"))'| tee /dev/stderr)
       [ "${actual}" = "false" ]
@@ -500,7 +500,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
       local actual=$(echo $command | yq -r '. | any(contains("credential-type=login"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
@@ -523,7 +523,7 @@ key2: value2' \
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc2' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method-dc1"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
@@ -543,7 +543,7 @@ key2: value2' \
       --set 'global.adminPartitions.name=other-partition' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-partition=other-partition"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
@@ -791,7 +791,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $flags | yq -r '. | any(contains("-tls-disabled"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
@@ -805,7 +805,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $flags | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
@@ -824,7 +824,7 @@ key2: value2' \
       --set 'externalServers.tlsServerName=foo.tls.server' \
       --set 'externalServers.hosts[0]=host' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $flags | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = 'false' ]
@@ -1147,7 +1147,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("partition"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args | any(contains("partition"))' | tee /dev/stderr)
 
   [ "${actual}" = "false" ]
 }
@@ -1175,7 +1175,7 @@ key2: value2' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("partition=default"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args | any(contains("partition=default"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
@@ -1588,6 +1588,6 @@ key2: value2' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

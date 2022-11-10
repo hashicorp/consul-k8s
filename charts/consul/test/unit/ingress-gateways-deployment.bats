@@ -108,7 +108,22 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '. | any(contains("-tls-disabled"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: sets flags when global.tls.enabled is false and global.enableConsulNamespaces=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=false' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | any(contains("-tls-disabled"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -122,7 +137,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -194,7 +209,7 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=false' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | any(contains("-login-bearer-path"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -214,7 +229,7 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | any(contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -341,7 +356,7 @@ load _helpers
       --set 'externalServers.hosts[0]=consul' \
       --set 'externalServers.skipServerWatch=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '. | any(contains("-server-watch-disabled=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -914,9 +929,9 @@ key2: value2' \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.command | any(contains("-partition"))' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-partition"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -930,9 +945,9 @@ key2: value2' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=default' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.command | any(contains("-service-partition=default"))' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '. | any(contains("-service-partition=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1424,6 +1439,6 @@ key2: value2' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
