@@ -100,9 +100,8 @@ func TestAppMetrics(t *testing.T) {
 	ns := ctx.KubectlOptions(t).Namespace
 
 	helmValues := map[string]string{
-		"global.datacenter":      "dc1",
-		"global.metrics.enabled": "true",
-
+		"global.datacenter":                          "dc1",
+		"global.metrics.enabled":                     "true",
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
 	}

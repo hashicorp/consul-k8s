@@ -227,6 +227,9 @@ spec:
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - name: consul-service
+          mountPath: /consul/service
+          readOnly: true
         {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
@@ -245,65 +248,67 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DP_ENVOY_READY_BIND_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DP_CREDENTIAL_LOGIN_META1
+          value: pod=$(NAMESPACE)/$(POD_NAME)
+        - name: DP_CREDENTIAL_LOGIN_META2
+          value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
         command:
-        - /bin/sh
-        - -ec
-        - |
-          consul-dataplane \
-            -envoy-ready-bind-address=$POD_IP \
-            -envoy-ready-bind-port=21000 \
-            {{- if $root.Values.externalServers.enabled }}
-            -addresses={{ $root.Values.externalServers.hosts | first | quote }} \
-            {{- else }}
-            -addresses="{{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc" \
-            {{- end }}
-            {{- if $root.Values.externalServers.enabled }}
-            -grpc-port={{ $root.Values.externalServers.grpcPort }} \
-            {{- else }}
-            -grpc-port=8502 \
-            {{- end }}
-            -proxy-service-id=$POD_NAME \
-            -service-node-name=$DP_SERVICE_NODE_NAME \
-            {{- if $root.Values.global.enableConsulNamespaces }}
-            -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }} \
-            {{- end }}
-            {{- if and $root.Values.global.tls.enabled }}
-            {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
-            -ca-certs=/consul/tls/ca/tls.crt \
-            {{- end }}
-            {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
-            -tls-server-name={{ $root.Values.externalServers.tlsServerName }} \
-            {{- else if $root.Values.global.cloud.enabled }}
-            -tls-server-name=server.{{ $root.Values.global.datacenter}}.{{ $root.Values.global.domain}} \
-            {{- end }}
-            {{- else }}
-            -tls-disabled \
-            {{- end }}
-            {{- if $root.Values.global.acls.manageSystemACLs }}
-            -credential-type=login \
-            -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
-            -login-meta=component=ingress-gateway \
-            -login-meta=pod=${NAMESPACE}/${POD_NAME} \
-            -login-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method \
-            {{- if $root.Values.global.adminPartitions.enabled }}
-            -login-partition={{ $root.Values.global.adminPartitions.name }} \
-            {{- end }}
-            {{- end }}
-            {{- if $root.Values.global.adminPartitions.enabled }}
-            -service-partition={{ $root.Values.global.adminPartitions.name }} \
-            {{- end }}
-            -log-level={{ default $root.Values.global.logLevel }} \
-            -log-json={{ $root.Values.global.logJSON }} \
-            {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
-            -telemetry-prom-scrape-path="/metrics"
-            {{- end }}
-            {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.skipServerWatch }}
-            -server-watch-disabled=true
-            {{- end }}
+        - consul-dataplane
+        args:
+        - -envoy-ready-bind-port=21000
+        {{- if $root.Values.externalServers.enabled }}
+        - -addresses={{ $root.Values.externalServers.hosts | first }}
+        {{- else }}
+        - -addresses={{ template "consul.fullname" $root }}-server.{{ $root.Release.Namespace }}.svc
+        {{- end }}
+        {{- if $root.Values.externalServers.enabled }}
+        - -grpc-port={{ $root.Values.externalServers.grpcPort }}
+        {{- else }}
+        - -grpc-port=8502
+        {{- end }}
+        - -proxy-service-id-path=/consul/service/proxy-id
+        {{- if $root.Values.global.enableConsulNamespaces }}
+        - -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }}
+        {{- end }}
+        {{- if and $root.Values.global.tls.enabled }}
+        {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+        - -ca-certs=/consul/tls/ca/tls.crt
+        {{- end }}
+        {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
+        - -tls-server-name={{ $root.Values.externalServers.tlsServerName }}
+        {{- else if $root.Values.global.cloud.enabled }}
+        - -tls-server-name=server.{{ $root.Values.global.datacenter}}.{{ $root.Values.global.domain}}
+        {{- end }}
+        {{- else }}
+        - -tls-disabled
+        {{- end }}
+        {{- if $root.Values.global.acls.manageSystemACLs }}
+        - -credential-type=login
+        - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -login-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method
+        {{- if $root.Values.global.adminPartitions.enabled }}
+        - -login-partition={{ $root.Values.global.adminPartitions.name }}
+        {{- end }}
+        {{- end }}
+        {{- if $root.Values.global.adminPartitions.enabled }}
+        - -service-partition={{ $root.Values.global.adminPartitions.name }}
+        {{- end }}
+        - -log-level={{ default $root.Values.global.logLevel }}
+        - -log-json={{ $root.Values.global.logJSON }}
+        {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
+        - -telemetry-prom-scrape-path=/metrics
+        {{- end }}
+        {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.skipServerWatch }}
+        - -server-watch-disabled=true
+        {{- end }}
         livenessProbe:
           tcpSocket:
             port: 21000
