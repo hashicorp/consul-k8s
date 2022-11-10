@@ -9,13 +9,13 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220831174802-b8af65262de8
-	github.com/hashicorp/consul-server-connection-manager v0.0.0-20220922180412-01c5be1c636f
+	github.com/hashicorp/consul-server-connection-manager v0.1.0
 	github.com/hashicorp/consul/api v1.10.1-0.20221005170644-13da2c5fad69
 	github.com/hashicorp/consul/sdk v0.11.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v1.2.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/go-netaddrs v0.0.0-20220509001840-90ed9d26ec46
+	github.com/hashicorp/go-netaddrs v0.1.0
 	github.com/hashicorp/go-rootcerts v1.0.2
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/serf v0.10.1

@@ -195,65 +195,64 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: DP_CREDENTIAL_LOGIN_META1
+          value: pod=$(NAMESPACE)/$(POD_NAME)
+        - name: DP_CREDENTIAL_LOGIN_META2
+          value: component=mesh-gateway
         - name: DP_SERVICE_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
         command:
-        - /bin/sh
-        - -ec
-        - |
-          consul-dataplane \
-            {{- if .Values.externalServers.enabled }}
-            -addresses={{ .Values.externalServers.hosts | first | quote }} \
-            {{- else }}
-            -addresses="{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc" \
-            {{- end }}
-            {{- if .Values.externalServers.enabled }}
-            -grpc-port={{ .Values.externalServers.grpcPort }} \
-            {{- else }}
-            -grpc-port=8502 \
-            {{- end }}
-            -proxy-service-id=$POD_NAME \
-            -service-node-name=$DP_SERVICE_NODE_NAME \
-            {{- if .Values.global.tls.enabled }}
-            {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
-            -ca-certs=/consul/tls/ca/tls.crt \
-            {{- end }}
-            {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
-            -tls-server-name={{.Values.externalServers.tlsServerName }} \
-            {{- else if .Values.global.cloud.enabled }}
-            -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
-            {{- end }}
-            {{- else }}
-            -tls-disabled \
-            {{- end }}
-            {{- if .Values.global.acls.manageSystemACLs }}
-            -credential-type=login \
-            -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token \
-            -login-meta=component=mesh-gateway \
-            -login-meta=pod=${NAMESPACE}/${POD_NAME} \
-            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-            -login-datacenter={{ .Values.global.federation.primaryDatacenter }} \
-            {{- else }}
-            -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
-            {{- end }}
-            {{- if .Values.global.adminPartitions.enabled }}
-            -login-partition={{ .Values.global.adminPartitions.name }} \
-            {{- end }}
-            {{- end }}
-            {{- if .Values.global.adminPartitions.enabled }}
-            -service-partition={{ .Values.global.adminPartitions.name }} \
-            {{- end }}
-            -log-level={{ default .Values.global.logLevel }} \
-            -log-json={{ .Values.global.logJSON }} \
-            {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
-            -telemetry-prom-scrape-path="/metrics"
-            {{- end }}
-            {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
-            -server-watch-disabled=true
-            {{- end }}
+        - consul-dataplane
+        args:
+        {{- if .Values.externalServers.enabled }}
+        - -addresses={{ .Values.externalServers.hosts | first }}
+        {{- else }}
+        - -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+        {{- end }}
+        {{- if .Values.externalServers.enabled }}
+        - -grpc-port={{ .Values.externalServers.grpcPort }}
+        {{- else }}
+        - -grpc-port=8502
+        {{- end }}
+        - -proxy-service-id-path=/consul/service/proxy-id
+        {{- if .Values.global.tls.enabled }}
+        {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+        - -ca-certs=/consul/tls/ca/tls.crt
+        {{- end }}
+        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+        - -tls-server-name={{.Values.externalServers.tlsServerName }}
+        {{- else if .Values.global.cloud.enabled }}
+        - -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
+        {{- end }}
+        {{- else }}
+        - -tls-disabled
+        {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - -credential-type=login
+        - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+        - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+        - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
+        {{- else }}
+        - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method
+        {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+        - -login-partition={{ .Values.global.adminPartitions.name }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+        - -service-partition={{ .Values.global.adminPartitions.name }}
+        {{- end }}
+        - -log-level={{ default .Values.global.logLevel }}
+        - -log-json={{ .Values.global.logJSON }}
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+        - -telemetry-prom-scrape-path=/metrics
+        {{- end }}
+        {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
+        - -server-watch-disabled=true
+        {{- end }}
         livenessProbe:
           tcpSocket:
             port: {{ .Values.meshGateway.containerPort }}

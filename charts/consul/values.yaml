@@ -160,15 +160,15 @@ global:
       # and check the name of `metadata.name`.
       adminPartitionsRole: ""
 
-      # The Vault role to read Consul controller's webhook's 
+      # The Vault role to read Consul controller's webhook's
       # CA and issue a certificate and private key.
-      # A Vault policy must be created which grants issue capabilities to 
+      # A Vault policy must be created which grants issue capabilities to
       # `global.secretsBackend.vault.controller.tlsCert.secretName`.
       controllerRole: ""
 
       # The Vault role to read Consul connect-injector webhook's CA
       # and issue a certificate and private key.
-      # A Vault policy must be created which grants issue capabilities to 
+      # A Vault policy must be created which grants issue capabilities to
       # `global.secretsBackend.vault.connectInject.tlsCert.secretName`.
       connectInjectRole: ""
 
@@ -177,7 +177,7 @@ global:
       # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
       # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
       consulCARole: ""
-      
+
       # This value defines additional annotations for
       # Vault agent on any pods where it'll be running.
       # This should be formatted as a multi-line string.
@@ -242,7 +242,7 @@ global:
           {}
 
       controller:
-        # Configuration to the Vault Secret that Kubernetes will use on 
+        # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes CRD creation, deletion, and update, to get TLS certificates
         # used issued from vault to send webhooks to the controller.
         tlsCert:
@@ -250,8 +250,8 @@ global:
           # webhooks.
           # @type: string
           secretName: null
-          
-        # Configuration to the Vault Secret that Kubernetes will use on 
+
+        # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes CRD creation, deletion, and update, to get CA certificates
         # used issued from vault to send webhooks to the controller.
         caCert:
@@ -259,18 +259,18 @@ global:
           # webhooks.
           # @type: string
           secretName: null
-      
+
       connectInject:
-        # Configuration to the Vault Secret that Kubernetes will use on 
+        # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes pod creation, deletion, and update, to get CA certificates
         # used issued from vault to send webhooks to the ConnectInject.
-        caCert: 
+        caCert:
           # The Vault secret path that contains the CA certificate for
           # Connect Inject webhooks.
           # @type: string
           secretName: null
-        
-        # Configuration to the Vault Secret that Kubernetes will use on 
+
+        # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes pod creation, deletion, and update, to get TLS certificates
         # used issued from vault to send webhooks to the ConnectInject.
         tlsCert:
@@ -572,7 +572,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: hashicorp/consul-dataplane:1.0.0-beta3
+  imageConsulDataplane: "hashicorppreview/consul-dataplane:1.0-dev"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -581,17 +581,17 @@ global:
     # its components on OpenShift.
     enabled: false
 
-  # The time in seconds that the consul API client will wait for a response from 
+  # The time in seconds that the consul API client will wait for a response from
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
   # Enables installing an HCP Consul self-managed cluster.
-  # Requires Consul v1.14+. 
+  # Requires Consul v1.14+.
   cloud:
     # If true, the Helm chart will enable the installation of an HCP Consul
     # self-managed cluster.
     enabled: false
-    
+
     # The name of the Kubernetes secret that holds the HCP resource id.
     # This is required when global.cloud.enabled is true.
     resourceId:
@@ -611,7 +611,7 @@ global:
       # The key within the Kubernetes secret that holds the client id.
       # @type: string
       secretKey: null
-    
+
     # The name of the Kubernetes secret that holds the HCP cloud client secret.
     # This is required when global.cloud.enabled is true.
     clientSecret:
@@ -711,7 +711,7 @@ server:
   #
   # Vault Secrets backend:
   # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
-  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`. 
+  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`.
   # Please see the following guide for steps to generate a compatible certificate:
   # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
   # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
@@ -751,13 +751,13 @@ server:
 
   # The StorageClass to use for the servers' StatefulSet storage. It must be
   # able to be dynamically provisioned if you want the storage
-  # to be automatically created. For example, to use 
+  # to be automatically created. For example, to use
   # local(https://kubernetes.io/docs/concepts/storage/storage-classes/#local)
   # storage classes, the PersistentVolumeClaims would need to be manually created.
   # A `null` value will use the Kubernetes cluster's default StorageClass. If a default
   # StorageClass does not exist, you will need to create one.
-  # Refer to the [Read/Write Tuning](https://www.consul.io/docs/install/performance#read-write-tuning) 
-  # section of the Server Performance Requirements documentation for considerations 
+  # Refer to the [Read/Write Tuning](https://www.consul.io/docs/install/performance#read-write-tuning)
+  # section of the Server Performance Requirements documentation for considerations
   # around choosing a performant storage class.
   #
   # ~> **Note:** The [Reference Architecture](https://learn.hashicorp.com/tutorials/consul/reference-architecture#hardware-sizing-for-consul-servers)
@@ -1184,7 +1184,7 @@ externalServers:
   k8sAuthMethodHost: null
 
   # If true, setting this prevents the consul-dataplane and consul-k8s components from watching the Consul servers for changes. This is
-  # useful for situations where Consul servers are behind a load balancer. 
+  # useful for situations where Consul servers are behind a load balancer.
   skipServerWatch: false
 
 # Values that configure running a Consul client on Kubernetes nodes.
@@ -1731,9 +1731,9 @@ syncCatalog:
     # already exist, it will be created. Turning this on overrides the
     # `consulDestinationNamespace` setting.
     # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
-    # If mirroring is enabled, avoid creating any Consul resources in the following 
-    # Kubernetes namespaces, as Consul currently reserves these namespaces for 
-    # system use: "system", "universal", "operator", "root". 
+    # If mirroring is enabled, avoid creating any Consul resources in the following
+    # Kubernetes namespaces, as Consul currently reserves these namespaces for
+    # system use: "system", "universal", "operator", "root".
     mirroringK8S: true
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
@@ -1880,7 +1880,7 @@ syncCatalog:
   #
   # @type: string
   annotations: null
-  
+
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
@@ -1919,8 +1919,8 @@ connectInject:
 
   # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
   # for the service mesh sidecar injector.
-  disruptionBudget: 
-    # This will enable/disable registering a PodDisruptionBudget for the 
+  disruptionBudget:
+    # This will enable/disable registering a PodDisruptionBudget for the
     # service mesh sidecar injector. If this is enabled, it will only register the budget so long as
     # the service mesh is enabled.
     enabled: true
@@ -1940,15 +1940,15 @@ connectInject:
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
-    # If true, then all traffic redirection setup will use the consul-cni plugin. 
+    # If true, then all traffic redirection setup will use the consul-cni plugin.
     # Requires connectInject.enabled to also be true.
     # @type: boolean
     enabled: false
 
     # Log level for the installer and plugin. Overrides global.logLevel
     # @type: string
-    logLevel: null 
-    
+    logLevel: null
+
     # Location on the kubernetes node where the CNI plugin is installed. Shoud be the absolute path and start with a '/'
     # Example on GKE:
     #
@@ -1965,15 +1965,15 @@ connectInject:
     # If multus CNI plugin is enabled with consul-cni. When enabled, consul-cni will not be installed as a chained
     # CNI plugin. Instead, a NetworkAttachementDefinition CustomResourceDefinition (CRD) will be created in the helm
     # release namespace. Following multus plugin standards, an annotation is required in order for the consul-cni plugin
-    # to be executed and for your service to be added to the Consul Service Mesh. 
+    # to be executed and for your service to be added to the Consul Service Mesh.
     #
     # Add the annotation `'k8s.v1.cni.cncf.io/networks': '[{ "name":"consul-cni","namespace": "consul" }]'` to your pod
     # to use the default installed NetworkAttachementDefinition CRD.
     #
     # Please refer to the [Multus Quickstart Guide](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/quickstart.md)
-    # for more information about using multus. 
+    # for more information about using multus.
     # @type: string
-    multus: false 
+    multus: false
 
     # The resource settings for CNI installer daemonset.
     # @recurse: false
@@ -2077,7 +2077,7 @@ connectInject:
   #
   # @type: string
   annotations: null
-  
+
   # The Docker image for Consul to use when performing Connect injection.
   # Defaults to global.image.
   # @type: string
@@ -2119,7 +2119,7 @@ connectInject:
   # This setting can be safely disabled by setting to "Ignore".
   failurePolicy: "Fail"
 
-  # Selector for restricting the webhook to only specific namespaces. 
+  # Selector for restricting the webhook to only specific namespaces.
   # Use with `connectInject.default: true` to automatically inject all pods in namespaces that match the selector. This should be set to a multiline string.
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
   # for more details.
@@ -2186,9 +2186,9 @@ connectInject:
     # of the same name as their k8s namespace, optionally prefixed if
     # `mirroringK8SPrefix` is set below. If the Consul namespace does not
     # already exist, it will be created. Turning this on overrides the
-    # `consulDestinationNamespace` setting. If mirroring is enabled, avoid creating any Consul 
-    # resources in the following Kubernetes namespaces, as Consul currently reserves these 
-    # namespaces for system use: "system", "universal", "operator", "root". 
+    # `consulDestinationNamespace` setting. If mirroring is enabled, avoid creating any Consul
+    # resources in the following Kubernetes namespaces, as Consul currently reserves these
+    # namespaces for system use: "system", "universal", "operator", "root".
     mirroringK8S: true
 
     # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace

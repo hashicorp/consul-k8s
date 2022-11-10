@@ -1,6 +1,6 @@
 ## UNRELEASED
 
-BREAKING_CHANGES:
+BREAKING CHANGES:
 * CLI:
   * Change default behavior of `consul-k8s install` to perform the installation when no answer is provided to the prompt. [[GH-1673](https://github.com/hashicorp/consul-k8s/pull/1673)]
 * Helm:
@@ -21,7 +21,7 @@ BREAKING_CHANGES:
   * Require `meshGateway.enabled` when peering is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
 
 FEATURES:
-* Consul-dataplane:
+* Consul Dataplane:
   * Support merged metrics with consul-dataplane. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
   * Support transparent proxying when using consul-dataplane. [[GH-1625](https://github.com/hashicorp/consul-k8s/pull/1478),[GH-1632](https://github.com/hashicorp/consul-k8s/pull/1632)]
   * Enable sync-catalog to only talk to Consul servers. [[GH-1659](https://github.com/hashicorp/consul-k8s/pull/1659)]
@@ -44,6 +44,8 @@ IMPROVEMENTS:
   * API Gateway: Create PodSecurityPolicy for controller when `global.enablePodSecurityPolicies=true`. [[GH-1656](https://github.com/hashicorp/consul-k8s/pull/1656)]
   * API Gateway: Create PodSecurityPolicy and allow controller to bind it to ServiceAccounts that it creates for Gateway Deployments when `global.enablePodSecurityPolicies=true`. [[GH-1672](https://github.com/hashicorp/consul-k8s/pull/1672)]
   * Deploy `expose-servers` service only when Admin Partitions(ENT) is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
+  * Use a distroless image for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
+  * The Envoy version is now 1.24.0 for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
 
 BUG FIXES:
 * Peering
