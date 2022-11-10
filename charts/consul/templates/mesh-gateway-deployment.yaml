@@ -242,7 +242,7 @@ spec:
         - -log-level={{ default .Values.global.logLevel }}
         - -log-json={{ .Values.global.logJSON }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
-        - -telemetry-prom-scrape-path="/metrics"
+        - -telemetry-prom-scrape-path=/metrics
         {{- end }}
         {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
         - -server-watch-disabled=true
