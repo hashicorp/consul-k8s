@@ -253,6 +253,15 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 }
 
 func TestIngressGateway_ToConsul(t *testing.T) {
+
+	defaultMaxConnections := uint32(100)
+	defaultMaxPendingRequests := uint32(101)
+	defaultMaxConcurrentRequests := uint32(102)
+
+	maxConnections := uint32(200)
+	maxPendingRequests := uint32(201)
+	maxConcurrentRequests := uint32(202)
+
 	cases := map[string]struct {
 		Ours IngressGateway
 		Exp  *capi.IngressGatewayConfigEntry
@@ -289,6 +298,11 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 					},
+					Defaults: &IngressServiceConfig{
+						MaxConnections:        &defaultMaxConnections,
+						MaxPendingRequests:    &defaultMaxPendingRequests,
+						MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+					},
 					Listeners: []IngressListener{
 						{
 							Port:     8888,
@@ -305,10 +319,13 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 							},
 							Services: []IngressService{
 								{
-									Name:      "name1",
-									Hosts:     []string{"host1_1", "host1_2"},
-									Namespace: "ns1",
-									Partition: "default",
+									Name:                  "name1",
+									Hosts:                 []string{"host1_1", "host1_2"},
+									Namespace:             "ns1",
+									Partition:             "default",
+									MaxConnections:        &maxConnections,
+									MaxPendingRequests:    &maxPendingRequests,
+									MaxConcurrentRequests: &maxConcurrentRequests,
 									TLS: &GatewayServiceTLSConfig{
 										SDS: &GatewayTLSSDSConfig{
 											ClusterName:  "cluster1",
@@ -378,6 +395,11 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 					TLSMaxVersion: "TLSv1_1",
 					CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
 				},
+				Defaults: &capi.IngressServiceConfig{
+					MaxConnections:        &defaultMaxConnections,
+					MaxPendingRequests:    &defaultMaxPendingRequests,
+					MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+				},
 				Listeners: []capi.IngressListener{
 					{
 						Port:     8888,
@@ -394,10 +416,13 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 						},
 						Services: []capi.IngressService{
 							{
-								Name:      "name1",
-								Hosts:     []string{"host1_1", "host1_2"},
-								Namespace: "ns1",
-								Partition: "default",
+								Name:                  "name1",
+								Hosts:                 []string{"host1_1", "host1_2"},
+								Namespace:             "ns1",
+								Partition:             "default",
+								MaxConnections:        &maxConnections,
+								MaxPendingRequests:    &maxPendingRequests,
+								MaxConcurrentRequests: &maxConcurrentRequests,
 								TLS: &capi.GatewayServiceTLSConfig{
 									SDS: &capi.GatewayTLSSDSConfig{
 										ClusterName:  "cluster1",
@@ -471,6 +496,8 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 }
 
 func TestIngressGateway_Validate(t *testing.T) {
+	zero := uint32(0)
+
 	cases := map[string]struct {
 		input             *IngressGateway
 		namespacesEnabled bool
@@ -785,6 +812,121 @@ func TestIngressGateway_Validate(t *testing.T) {
 			},
 			partitionEnabled: true,
 		},
+		"defaults.maxConnections invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxConnections: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxconnections: Invalid`,
+			},
+		},
+		"defaults.maxPendingRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxPendingRequests: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxpendingrequests: Invalid`,
+			},
+		},
+		"defaults.maxConcurrentRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxConcurrentRequests: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxconcurrentrequests: Invalid`,
+			},
+		},
+		"service.maxConnections invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name:           "svc1",
+									MaxConnections: &zero,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxconnections: Invalid`,
+			},
+		},
+		"service.maxConcurrentRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name:                  "svc1",
+									MaxConcurrentRequests: &zero,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxconcurrentrequests: Invalid`,
+			},
+		},
+		"service.maxPendingRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name:               "svc1",
+									MaxPendingRequests: &zero,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxpendingrequests: Invalid`,
+			},
+		},
+
 		"multiple errors": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{

@@ -57,6 +57,15 @@ type IngressGatewaySpec struct {
 	// Listeners declares what ports the ingress gateway should listen on, and
 	// what services to associated to those ports.
 	Listeners []IngressListener `json:"listeners,omitempty"`
+
+	// Defaults is default configuration for all upstream services
+	Defaults *IngressServiceConfig `json:"defaults,omitempty"`
+}
+
+type IngressServiceConfig struct {
+	MaxConnections        *uint32 `json:"maxConnections,omitempty"`
+	MaxPendingRequests    *uint32 `json:"maxPendingRequests,omitempty"`
+	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
 }
 
 type GatewayTLSConfig struct {
@@ -144,6 +153,10 @@ type IngressService struct {
 	// Allow HTTP header manipulation to be configured.
 	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
 	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
+
+	MaxConnections        *uint32 `json:"maxConnections,omitempty"`
+	MaxPendingRequests    *uint32 `json:"maxPendingRequests,omitempty"`
+	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
 }
 
 func (in *IngressGateway) GetObjectMeta() metav1.ObjectMeta {
@@ -235,6 +248,7 @@ func (in *IngressGateway) ToConsul(datacenter string) capi.ConfigEntry {
 		TLS:       *in.Spec.TLS.toConsul(),
 		Listeners: listeners,
 		Meta:      meta(datacenter),
+		Defaults:  in.Spec.Defaults.toConsul(),
 	}
 }
 
@@ -256,6 +270,8 @@ func (in *IngressGateway) Validate(consulMeta common.ConsulMeta) error {
 	for i, v := range in.Spec.Listeners {
 		errs = append(errs, v.validate(path.Child("listeners").Index(i), consulMeta)...)
 	}
+
+	errs = append(errs, in.Spec.Defaults.validate(path.Child("defaults"))...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -329,13 +345,16 @@ func (in IngressListener) toConsul() capi.IngressListener {
 
 func (in IngressService) toConsul() capi.IngressService {
 	return capi.IngressService{
-		Name:            in.Name,
-		Hosts:           in.Hosts,
-		Namespace:       in.Namespace,
-		Partition:       in.Partition,
-		TLS:             in.TLS.toConsul(),
-		RequestHeaders:  in.RequestHeaders.toConsul(),
-		ResponseHeaders: in.ResponseHeaders.toConsul(),
+		Name:                  in.Name,
+		Hosts:                 in.Hosts,
+		Namespace:             in.Namespace,
+		Partition:             in.Partition,
+		TLS:                   in.TLS.toConsul(),
+		RequestHeaders:        in.RequestHeaders.toConsul(),
+		ResponseHeaders:       in.ResponseHeaders.toConsul(),
+		MaxConnections:        in.MaxConnections,
+		MaxPendingRequests:    in.MaxPendingRequests,
+		MaxConcurrentRequests: in.MaxConcurrentRequests,
 	}
 }
 
@@ -406,6 +425,49 @@ func (in IngressListener) validate(path *field.Path, consulMeta common.ConsulMet
 				string(asJSON),
 				"hosts must be empty if protocol is \"tcp\""))
 		}
+
+		if svc.MaxConnections != nil && *svc.MaxConnections <= 0 {
+			errs = append(errs, field.Invalid(path.Child("maxconnections"), *svc.MaxConnections, "MaxConnections must be > 0"))
+		}
+
+		if svc.MaxConcurrentRequests != nil && *svc.MaxConcurrentRequests <= 0 {
+			errs = append(errs, field.Invalid(path.Child("maxconcurrentrequests"), *svc.MaxConcurrentRequests, "MaxConcurrentRequests must be > 0"))
+		}
+
+		if svc.MaxPendingRequests != nil && *svc.MaxPendingRequests <= 0 {
+			errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *svc.MaxPendingRequests, "MaxPendingRequests must be > 0"))
+		}
 	}
 	return errs
+}
+
+func (in *IngressServiceConfig) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	var errs field.ErrorList
+
+	if in.MaxConnections != nil && *in.MaxConnections <= 0 {
+		errs = append(errs, field.Invalid(path.Child("maxconnections"), *in.MaxConnections, "MaxConnections must be > 0"))
+	}
+
+	if in.MaxConcurrentRequests != nil && *in.MaxConcurrentRequests <= 0 {
+		errs = append(errs, field.Invalid(path.Child("maxconcurrentrequests"), *in.MaxConcurrentRequests, "MaxConcurrentRequests must be > 0"))
+	}
+
+	if in.MaxPendingRequests != nil && *in.MaxPendingRequests <= 0 {
+		errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *in.MaxPendingRequests, "MaxPendingRequests must be > 0"))
+	}
+	return errs
+}
+
+func (in *IngressServiceConfig) toConsul() *capi.IngressServiceConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.IngressServiceConfig{
+		MaxConnections:        in.MaxConnections,
+		MaxPendingRequests:    in.MaxPendingRequests,
+		MaxConcurrentRequests: in.MaxConcurrentRequests,
+	}
 }
