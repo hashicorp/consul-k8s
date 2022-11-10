@@ -63,8 +63,16 @@ type IngressGatewaySpec struct {
 }
 
 type IngressServiceConfig struct {
-	MaxConnections        *uint32 `json:"maxConnections,omitempty"`
-	MaxPendingRequests    *uint32 `json:"maxPendingRequests,omitempty"`
+	// The maximum number of connections a service instance
+	// will be allowed to establish against the given upstream. Use this to limit
+	// HTTP/1.1 traffic, since HTTP/1.1 has a request per connection.
+	MaxConnections *uint32 `json:"maxConnections,omitempty"`
+	// The maximum number of requests that will be queued
+	// while waiting for a connection to be established.
+	MaxPendingRequests *uint32 `json:"maxPendingRequests,omitempty"`
+	// The maximum number of concurrent requests that
+	// will be allowed at a single point in time. Use this to limit HTTP/2 traffic,
+	// since HTTP/2 has many requests per connection.
 	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
 }
 
@@ -154,9 +162,7 @@ type IngressService struct {
 	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
 	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
 
-	MaxConnections        *uint32 `json:"maxConnections,omitempty"`
-	MaxPendingRequests    *uint32 `json:"maxPendingRequests,omitempty"`
-	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
+	IngressServiceConfig `json:",inline"`
 }
 
 func (in *IngressGateway) GetObjectMeta() metav1.ObjectMeta {
@@ -426,17 +432,7 @@ func (in IngressListener) validate(path *field.Path, consulMeta common.ConsulMet
 				"hosts must be empty if protocol is \"tcp\""))
 		}
 
-		if svc.MaxConnections != nil && *svc.MaxConnections <= 0 {
-			errs = append(errs, field.Invalid(path.Child("maxconnections"), *svc.MaxConnections, "MaxConnections must be > 0"))
-		}
-
-		if svc.MaxConcurrentRequests != nil && *svc.MaxConcurrentRequests <= 0 {
-			errs = append(errs, field.Invalid(path.Child("maxconcurrentrequests"), *svc.MaxConcurrentRequests, "MaxConcurrentRequests must be > 0"))
-		}
-
-		if svc.MaxPendingRequests != nil && *svc.MaxPendingRequests <= 0 {
-			errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *svc.MaxPendingRequests, "MaxPendingRequests must be > 0"))
-		}
+		errs = append(errs, svc.IngressServiceConfig.validate(path)...)
 	}
 	return errs
 }
