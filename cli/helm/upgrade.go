@@ -81,7 +81,7 @@ func UpgradeHelmRelease(options *UpgradeOptions) error {
 	// Check if the user is OK with the upgrade unless the auto approve or dry run flags are true.
 	if !options.AutoApprove && !options.DryRun {
 		confirmation, err := options.UI.Input(&terminal.Input{
-			Prompt: "Proceed with upgrade? (y/N)",
+			Prompt: "Proceed with upgrade? (Y/n)",
 			Style:  terminal.InfoStyle,
 			Secret: false,
 		})
@@ -89,7 +89,8 @@ func UpgradeHelmRelease(options *UpgradeOptions) error {
 		if err != nil {
 			return err
 		}
-		if common.Abort(confirmation) {
+		// The upgrade will proceed if the user presses enter or responds with "y"/"yes" (case-insensitive).
+		if confirmation != "" && common.Abort(confirmation) {
 			options.UI.Output("Upgrade aborted. Use the command `consul-k8s upgrade -help` to learn how to customize your upgrade.",
 				terminal.WithInfoStyle())
 			return err
@@ -134,7 +135,7 @@ func printDiff(old, new map[string]interface{}, ui terminal.UI) error {
 	}
 
 	ui.Output("\nDifference between user overrides for current and upgraded charts"+
-		"\n--------------------------------------------------------------", terminal.WithInfoStyle())
+		"\n-----------------------------------------------------------------", terminal.WithInfoStyle())
 	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "+") {
 			ui.Output(line, terminal.WithDiffAddedStyle())
