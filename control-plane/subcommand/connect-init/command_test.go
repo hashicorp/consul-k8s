@@ -812,7 +812,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
 			t.Cleanup(func() {
-				_ = os.Remove(proxyFile)
+				_ = os.RemoveAll(proxyFile)
 			})
 
 			// Start Consul server.

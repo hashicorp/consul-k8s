@@ -3418,6 +3418,209 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 	}
 }
 
+// TestReconcileUpdateEndpoint_LegacyService tests that we can update health checks on a consul client.
+func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name                 string
+		k8sObjects           func() []runtime.Object
+		initialConsulSvcs    []*api.AgentServiceRegistration
+		expectedHealthChecks []*api.AgentCheck
+	}{
+		{
+			name: "Health check changes from unhealthy to healthy",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Status.HostIP = "127.0.0.1"
+				pod1.Annotations[constants.AnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Check: &api.AgentServiceCheck{
+						CheckID: "default/pod1-service-updated/kubernetes-health-check",
+						TTL:     "100000h",
+						Name:    "Kubernetes Health Check",
+						Status:  api.HealthCritical,
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+				},
+			},
+			expectedHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      "Kubernetes health checks passing",
+					Type:        "ttl",
+				},
+			},
+		},
+		{
+			name: "Health check changes from healthy to unhealthy",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Status.HostIP = "127.0.0.1"
+				pod1.Annotations[constants.AnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Check: &api.AgentServiceCheck{
+						CheckID: "default/pod1-service-updated/kubernetes-health-check",
+						TTL:     "100000h",
+						Name:    "Kubernetes Health Check",
+						Status:  api.HealthPassing,
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+				},
+			},
+			expectedHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      "Pod \"default/pod1\" is not ready",
+					Type:        "ttl",
+				},
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client.
+			k8sObjects := append(tt.k8sObjects(), &ns)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consulServer server
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+
+			// Create a consul client joined with this server.
+			var consulClientHttpPort int
+			consulClientAgent, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.Server = false
+				c.Bootstrap = false
+				consulClientHttpPort = c.Ports.HTTP
+			})
+			require.NoError(t, err)
+			consulClientAgent.JoinLAN(t, testClient.TestServer.LANAddr)
+			consulClientAgent.WaitForSerfCheck(t)
+
+			consulClient, err := api.NewClient(&api.Config{Address: consulClientAgent.HTTPAddr})
+			require.NoError(t, err)
+
+			// Register service and proxy in consul.
+			for _, svc := range tt.initialConsulSvcs {
+				err := consulClient.Agent().ServiceRegister(svc)
+				require.NoError(t, err)
+			}
+
+			// Create the endpoints controller.
+			ep := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "default",
+				consulClientHttpPort:  consulClientHttpPort,
+			}
+			namespacedName := types.NamespacedName{Namespace: "default", Name: "service-updated"}
+
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// After reconciliation, Consul should have service-updated with the correct health check status.
+			for _, expectedCheck := range tt.expectedHealthChecks {
+				filter := fmt.Sprintf("ServiceID == %q", expectedCheck.ServiceID)
+				checks, err := consulClient.Agent().ChecksWithFilter(filter)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(checks))
+				// Ignoring Namespace because the response from ENT includes it and OSS does not.
+				var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
+				require.True(t, cmp.Equal(checks[expectedCheck.CheckID], expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+			}
+		})
+	}
+}
+
 // Tests deleting an Endpoints object, with and without matching Consul and K8s service names.
 // This test covers Controller.deregisterService when the map is nil (not selectively deregistered).
 func TestReconcileDeleteEndpoint(t *testing.T) {
@@ -5473,7 +5676,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				Log:                    logrtest.TestLogger{T: t},
 			}
 
-			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(nil, *pod, *endpoints, api.HealthPassing)
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints, api.HealthPassing)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
@@ -6119,10 +6322,12 @@ func Test_GetWANData(t *testing.T) {
 func createServicePod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   "default",
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Name:      name,
+			Namespace: "default",
+			Labels:    map[string]string{},
+			Annotations: map[string]string{
+				constants.AnnotationConsulK8sVersion: "1.0.0",
+			},
 		},
 		Status: corev1.PodStatus{
 			PodIP: ip,

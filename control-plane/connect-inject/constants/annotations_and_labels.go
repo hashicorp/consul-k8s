@@ -166,6 +166,9 @@ const (
 	// to explicitly perform the peering operation again.
 	AnnotationPeeringVersion = "consul.hashicorp.com/peering-version"
 
+	// AnnotationConsulK8sVersion is the current version of this binary.
+	AnnotationConsulK8sVersion = "consul.hashicorp.com/connect-k8s-version"
+
 	// LabelServiceIgnore is a label that can be added to a service to prevent it from being
 	// registered with Consul.
 	LabelServiceIgnore = "consul.hashicorp.com/service-ignore"

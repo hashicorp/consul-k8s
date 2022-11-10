@@ -82,9 +82,9 @@ spec:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
           ports:
-          - containerPort: 8080
-            name: webhook-server
-            protocol: TCP
+            - containerPort: 8080
+              name: webhook-server
+              protocol: TCP
           env:
             - name: NAMESPACE
               valueFrom:
@@ -239,23 +239,11 @@ spec:
                 {{- end }}
                 {{- end }}
 
-                {{- if .Values.global.consulSidecarContainer }}
-                {{- $consulSidecarResources := .Values.global.consulSidecarContainer.resources }}
-                {{- if not (kindIs "invalid" $consulSidecarResources.limits.memory) }}
-                -default-consul-sidecar-memory-limit={{ $consulSidecarResources.limits.memory }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $consulSidecarResources.requests.memory) }}
-                -default-consul-sidecar-memory-request={{ $consulSidecarResources.requests.memory }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $consulSidecarResources.limits.cpu) }}
-                -default-consul-sidecar-cpu-limit={{ $consulSidecarResources.limits.cpu }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $consulSidecarResources.requests.cpu) }}
-                -default-consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
-                {{- end }}
-                {{- end }}
                 {{- if .Values.global.cloud.enabled }}
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
+                {{- end }}
+                {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
+                -enable-auto-encrypt \
                 {{- end }}
           startupProbe:
             httpGet:
@@ -286,14 +274,14 @@ spec:
             timeoutSeconds: 5
           volumeMounts:
           {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
-          - name: certs
-            mountPath: /etc/connect-injector/certs
-            readOnly: true
+            - name: certs
+              mountPath: /etc/connect-injector/certs
+              readOnly: true
           {{- end }}
           {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots))}}
-          - name: consul-ca-cert
-            mountPath: /consul/tls/ca
-            readOnly: true
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
           {{- end }}
           {{- with .Values.connectInject.resources }}
           resources:
@@ -301,23 +289,23 @@ spec:
           {{- end }}
       volumes:
       {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
-      - name: certs
-        secret:
-          defaultMode: 420
-          secretName: {{ template "consul.fullname" . }}-connect-inject-webhook-cert
+        - name: certs
+          secret:
+            defaultMode: 420
+            secretName: {{ template "consul.fullname" . }}-connect-inject-webhook-cert
       {{- end }}
       {{- if .Values.global.tls.enabled }}
       {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-      - name: consul-ca-cert
-        secret:
+        - name: consul-ca-cert
+          secret:
           {{- if .Values.global.tls.caCert.secretName }}
-          secretName: {{ .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
           {{- else }}
-          secretName: {{ template "consul.fullname" . }}-ca-cert
+            secretName: {{ template "consul.fullname" . }}-ca-cert
           {{- end }}
-          items:
-          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
-            path: tls.crt
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
       {{- end }}
       {{- end }}
       {{- if .Values.connectInject.priorityClassName }}

@@ -2109,10 +2109,12 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 func createPodWithNamespace(name, namespace, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   namespace,
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{},
+			Annotations: map[string]string{
+				constants.AnnotationConsulK8sVersion: "1.0.0",
+			},
 		},
 		Status: corev1.PodStatus{
 			PodIP:  ip,
