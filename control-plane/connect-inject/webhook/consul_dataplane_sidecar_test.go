@@ -15,6 +15,8 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const nodeName = "test-node"
+
 func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 	cases := map[string]struct {
 		webhookSetupFunc     func(w *MeshWebhook)
@@ -165,6 +167,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 						},
 					},
 					ServiceAccountName: "web",
+					NodeName:           nodeName,
 				},
 			}
 
@@ -174,7 +177,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				"/bin/sh", "-ec",
 				"consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 					" -proxy-service-id=$(cat /consul/connect-inject/proxyid) " +
-					"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs,
+					"-service-node-name=${DP_SERVICE_NODE_NAME} -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs,
 			}
 			require.Equal(t, expCmd, container.Command)
 
@@ -209,9 +212,11 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Equal(t, expectedProbe, container.LivenessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 1)
+			require.Len(t, container.Env, 2)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
+			require.Equal(t, container.Env[1].Name, "DP_SERVICE_NODE_NAME")
+			require.Equal(t, container.Env[1].ValueFrom.FieldRef.FieldPath, "spec.nodeName")
 		})
 	}
 }
@@ -363,17 +368,17 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			}
 			expCommand := [][]string{
 				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
+					"-service-node-name=${DP_SERVICE_NODE_NAME} -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
 				{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
+					"-service-node-name=${DP_SERVICE_NODE_NAME} -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
 			}
 			if aclsEnabled {
 				expCommand = [][]string{
 					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web) " +
-						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+						"-service-node-name=${DP_SERVICE_NODE_NAME} -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0"},
 					{"/bin/sh", "-ec", "consul-dataplane -addresses=\"1.1.1.1\" -grpc-port=8502 -proxy-service-id=$(cat /consul/connect-inject/proxyid-web-admin) " +
-						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+						"-service-node-name=${DP_SERVICE_NODE_NAME} -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1"},
 				}
 			}

@@ -65,7 +65,6 @@ func TestHandlerContainerInit(t *testing.T) {
 				LogLevel:      "info",
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -84,6 +83,14 @@ func TestHandlerContainerInit(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "0s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 			},
 		},
@@ -109,7 +116,6 @@ func TestHandlerContainerInit(t *testing.T) {
 				LogJSON:       true,
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=debug \
   -log-json=true \
   -service-account-name="a-service-account-name" \
@@ -130,6 +136,14 @@ func TestHandlerContainerInit(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -344,7 +358,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -363,6 +376,14 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -384,7 +405,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -403,6 +423,14 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -428,7 +456,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -447,6 +474,14 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -468,7 +503,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -487,6 +521,14 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -513,7 +555,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -534,6 +575,14 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -581,7 +630,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -602,6 +650,14 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_API_TIMEOUT",
 					Value: "5s",
+				},
+				{
+					Name: "CONSUL_NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -724,7 +780,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 			},
 			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \
   -multiport=true \
@@ -732,7 +787,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
   -service-name="web" \`,
 
 				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \
   -multiport=true \
@@ -764,7 +818,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 			},
 			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -773,7 +826,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
   -proxy-id-file=/consul/connect-inject/proxyid-web \`,
 
 				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name=k8s-service-mesh \
   -log-level=info \
   -log-json=false \
   -service-account-name="web-admin" \
@@ -851,11 +903,11 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 			require.Equal(t, "CONSUL_HTTP_PORT", container.Env[4].Name)
 			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.HTTPPort), container.Env[4].Value)
 			if w.TLSEnabled {
-				require.Equal(t, "CONSUL_USE_TLS", container.Env[6].Name)
-				require.Equal(t, "true", container.Env[6].Value)
+				require.Equal(t, "CONSUL_USE_TLS", container.Env[7].Name)
+				require.Equal(t, "true", container.Env[7].Value)
 				if caProvided {
-					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[7].Name)
-					require.Equal(t, "consul-ca-cert", container.Env[7].Value)
+					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[8].Name)
+					require.Equal(t, "consul-ca-cert", container.Env[8].Value)
 				} else {
 					for _, ev := range container.Env {
 						if ev.Name == "CONSUL_CACERT_PEM" {

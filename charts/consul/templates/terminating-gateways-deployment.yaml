@@ -176,13 +176,16 @@ spec:
           - name: CONSUL_LOGIN_META
             value: "component=terminating-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
           {{- end }}
+          - name: CONSUL_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           command:  
             - "/bin/sh"
             - "-ec"
             - |
                 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
                   -gateway-kind="terminating-gateway" \
-                  -consul-node-name="k8s-service-mesh" \
                   -proxy-id-file=/consul/service/proxy-id \
                   -service-name={{ .name }} \
                   -log-level={{ default $root.Values.global.logLevel }} \
@@ -235,6 +238,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: DP_SERVICE_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           command:
             - /bin/sh
             - -ec
@@ -251,7 +258,7 @@ spec:
                 -grpc-port=8502 \
                 {{- end }}
                 -proxy-service-id=$POD_NAME \
-                -service-node-name="k8s-service-mesh" \
+                -service-node-name=$DP_SERVICE_NODE_NAME \
                 {{- if $root.Values.global.enableConsulNamespaces }}
                 -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }} \
                 {{- end }}

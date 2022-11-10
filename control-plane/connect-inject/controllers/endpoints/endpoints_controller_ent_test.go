@@ -209,8 +209,9 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Add the pods namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testCase.SourceKubeNS}}
+			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 			// Create fake k8s client.
-			k8sObjects := append(setup.k8sObjects(), &ns)
+			k8sObjects := append(setup.k8sObjects(), &ns, &node)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consulServer server
@@ -471,7 +472,8 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			// Create fake k8s client.
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(setup.k8sObjects()...).Build()
+			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(append(setup.k8sObjects(), &node)...).Build()
 
 			// Create testCase Consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -633,7 +635,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-service-updated",
@@ -645,8 +647,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
 							ID:      "pod1-service-updated-sidecar-proxy",
@@ -706,7 +708,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-different-consul-svc-name",
@@ -718,7 +720,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -787,8 +789,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-service-updated",
 							Service:   "service-updated",
@@ -799,7 +801,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -869,8 +871,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-service-updated",
 							Service:   "service-updated",
@@ -881,7 +883,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -898,8 +900,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod2-service-updated",
 							Service:   "service-updated",
@@ -910,7 +912,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -972,8 +974,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-different-consul-svc-name",
 							Service:   "different-consul-svc-name",
@@ -984,7 +986,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1001,8 +1003,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod2-different-consul-svc-name",
 							Service:   "different-consul-svc-name",
@@ -1013,7 +1015,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1061,8 +1063,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-service-updated",
 							Service:   "service-updated",
@@ -1073,7 +1075,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1090,8 +1092,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod2-service-updated",
 							Service:   "service-updated",
@@ -1102,7 +1104,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1138,8 +1140,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod1-different-consul-svc-name",
 							Service:   "different-consul-svc-name",
@@ -1150,7 +1152,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1167,8 +1169,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:        "pod2-different-consul-svc-name",
 							Service:   "different-consul-svc-name",
@@ -1179,7 +1181,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1228,8 +1230,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:      "pod1-service-updated",
 							Service: "service-updated",
@@ -1246,7 +1248,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1314,8 +1316,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				},
 				initialConsulSvcs: []*api.CatalogRegistration{
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:      "pod1-service-updated",
 							Service: "service-updated",
@@ -1332,7 +1334,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1355,8 +1357,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
-						Address: "127.0.0.1",
+						Node:    nodeName,
+						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							ID:      "pod2-service-updated",
 							Service: "service-updated",
@@ -1373,7 +1375,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						},
 					},
 					{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: &api.AgentService{
 							Kind:    api.ServiceKindConnectProxy,
@@ -1417,8 +1419,9 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 			t.Run(fmt.Sprintf("%s: %s", name, tt.name), func(t *testing.T) {
 				// Add the pods namespace.
 				ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ts.SourceKubeNS}}
+				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 				// Create fake k8s client.
-				k8sObjects := append(tt.k8sObjects(), &ns)
+				k8sObjects := append(tt.k8sObjects(), &ns, &node)
 				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 				// Create test consulServer server
@@ -1722,8 +1725,9 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 		}
 		for _, tt := range cases {
 			t.Run(fmt.Sprintf("%s:%s", name, tt.name), func(t *testing.T) {
+				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 				// Create fake k8s client.
-				fakeClient := fake.NewClientBuilder().Build()
+				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&node).Build()
 
 				// Create test consulServer server
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -1742,7 +1746,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				var token *api.ACLToken
 				for _, svc := range tt.initialConsulSvcs {
 					serviceRegistration := &api.CatalogRegistration{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: svc,
 					}
@@ -2014,7 +2018,8 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 		for _, tt := range cases {
 			t.Run(fmt.Sprintf("%s:%s", name, tt.name), func(t *testing.T) {
 				// Create fake k8s client.
-				fakeClient := fake.NewClientBuilder().Build()
+				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&node).Build()
 
 				// Create test Consul server.
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -2033,7 +2038,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				var token *api.ACLToken
 				for _, svc := range tt.initialConsulSvcs {
 					serviceRegistration := &api.CatalogRegistration{
-						Node:    constants.ConsulNodeName,
+						Node:    nodeName,
 						Address: consulNodeAddress,
 						Service: svc,
 					}
@@ -2118,7 +2123,7 @@ func createPodWithNamespace(name, namespace, ip string, inject bool, managedByEn
 		},
 		Status: corev1.PodStatus{
 			PodIP:  ip,
-			HostIP: "127.0.0.1",
+			HostIP: consulNodeAddress,
 			Phase:  corev1.PodRunning,
 			Conditions: []corev1.PodCondition{
 				{
@@ -2126,6 +2131,9 @@ func createPodWithNamespace(name, namespace, ip string, inject bool, managedByEn
 					Status: corev1.ConditionTrue,
 				},
 			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: nodeName,
 		},
 	}
 	if inject {
@@ -2151,7 +2159,7 @@ func createGatewayWithNamespace(name, namespace, ip string, annotations map[stri
 		},
 		Status: corev1.PodStatus{
 			PodIP:  ip,
-			HostIP: "127.0.0.1",
+			HostIP: consulNodeAddress,
 			Phase:  corev1.PodRunning,
 			Conditions: []corev1.PodCondition{
 				{
@@ -2159,6 +2167,9 @@ func createGatewayWithNamespace(name, namespace, ip string, annotations map[stri
 					Status: corev1.ConditionTrue,
 				},
 			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: nodeName,
 		},
 	}
 	return pod

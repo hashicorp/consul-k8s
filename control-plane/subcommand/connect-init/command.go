@@ -71,7 +71,7 @@ type Command struct {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
-	c.flagSet.StringVar(&c.flagConsulNodeName, "consul-node-name", "", "Name of the Consul node where services are registered.")
+	c.flagSet.StringVar(&c.flagConsulNodeName, "consul-node-name", os.Getenv("CONSUL_NODE_NAME"), "Name of the Consul node where services are registered.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "Service account name on the pod.")
 	c.flagSet.StringVar(&c.flagServiceName, "service-name", "", "Service name as specified via the pod annotation.")
@@ -95,7 +95,6 @@ func (c *Command) init() {
 }
 
 func (c *Command) Run(args []string) int {
-	var err error
 	c.once.Do(c.init)
 
 	if err := c.flagSet.Parse(args); err != nil {
