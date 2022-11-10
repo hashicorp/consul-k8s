@@ -50,6 +50,28 @@ spec:
           spec:
             description: IngressGatewaySpec defines the desired state of IngressGateway.
             properties:
+              defaults:
+                description: Defaults is default configuration for all upstream services
+                properties:
+                  maxConcurrentRequests:
+                    description: The maximum number of concurrent requests that will
+                      be allowed at a single point in time. Use this to limit HTTP/2
+                      traffic, since HTTP/2 has many requests per connection.
+                    format: int32
+                    type: integer
+                  maxConnections:
+                    description: The maximum number of connections a service instance
+                      will be allowed to establish against the given upstream. Use
+                      this to limit HTTP/1.1 traffic, since HTTP/1.1 has a request
+                      per connection.
+                    format: int32
+                    type: integer
+                  maxPendingRequests:
+                    description: The maximum number of requests that will be queued
+                      while waiting for a connection to be established.
+                    format: int32
+                    type: integer
+                type: object
               listeners:
                 description: Listeners declares what ports the ingress gateway should
                   listen on, and what services to associated to those ports.
@@ -91,6 +113,25 @@ spec:
                             items:
                               type: string
                             type: array
+                          maxConcurrentRequests:
+                            description: The maximum number of concurrent requests
+                              that will be allowed at a single point in time. Use
+                              this to limit HTTP/2 traffic, since HTTP/2 has many
+                              requests per connection.
+                            format: int32
+                            type: integer
+                          maxConnections:
+                            description: The maximum number of connections a service
+                              instance will be allowed to establish against the given
+                              upstream. Use this to limit HTTP/1.1 traffic, since
+                              HTTP/1.1 has a request per connection.
+                            format: int32
+                            type: integer
+                          maxPendingRequests:
+                            description: The maximum number of requests that will
+                              be queued while waiting for a connection to be established.
+                            format: int32
+                            type: integer
                           name:
                             description: "Name declares the service to which traffic
                               should be forwarded. \n This can either be a specific
