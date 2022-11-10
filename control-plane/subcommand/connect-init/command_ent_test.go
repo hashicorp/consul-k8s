@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -68,7 +67,7 @@ func TestRun_WithNamespaces(t *testing.T) {
 			testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
 			for _, svc := range testConsulServices {
 				serviceRegistration := &api.CatalogRegistration{
-					Node:    constants.ConsulNodeName,
+					Node:    nodeName,
 					Address: "127.0.0.1",
 					Service: &svc,
 				}
@@ -90,7 +89,7 @@ func TestRun_WithNamespaces(t *testing.T) {
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-namespace", c.consulServiceNamespace,
 				"-proxy-id-file", proxyFile,
-				"-consul-node-name", constants.ConsulNodeName,
+				"-consul-node-name", nodeName,
 			}
 
 			// Run the command.

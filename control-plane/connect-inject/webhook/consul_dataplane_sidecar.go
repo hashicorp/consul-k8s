@@ -67,6 +67,14 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				Name:  "TMPDIR",
 				Value: "/consul/connect-inject",
 			},
+			{
+				Name: "DP_SERVICE_NODE_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "spec.nodeName",
+					},
+				},
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -150,7 +158,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(namespace corev1.Namespace, mpi
 		fmt.Sprintf("-addresses=%q", w.ConsulAddress),
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id=" + fmt.Sprintf("$(cat %s)", proxyIDFileName),
-		"-service-node-name=" + constants.ConsulNodeName,
+		"-service-node-name=${DP_SERVICE_NODE_NAME}",
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),

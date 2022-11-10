@@ -7,9 +7,6 @@ const (
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000
 
-	// ConsulNodeName is the node name that we'll use to register and deregister services.
-	ConsulNodeName = "k8s-service-mesh"
-
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"
 

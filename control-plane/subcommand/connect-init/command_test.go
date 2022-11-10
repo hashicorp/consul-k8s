@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
@@ -20,6 +19,8 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
+
+const nodeName = "test-node"
 
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
@@ -145,7 +146,7 @@ func TestRun_ConnectServices(t *testing.T) {
 			}
 			for _, svc := range testConsulServices {
 				serviceRegistration := &api.CatalogRegistration{
-					Node:    constants.ConsulNodeName,
+					Node:    nodeName,
 					Address: "127.0.0.1",
 					Service: &svc,
 				}
@@ -169,7 +170,7 @@ func TestRun_ConnectServices(t *testing.T) {
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
 				"-multiport=" + strconv.FormatBool(tt.multiport),
-				"-consul-node-name", constants.ConsulNodeName,
+				"-consul-node-name", nodeName,
 			}
 			if tt.aclsEnabled {
 				flags = append(flags, "-auth-method-name", test.AuthMethod,
@@ -299,7 +300,7 @@ func TestRun_Gateways(t *testing.T) {
 			testConsulServices := []api.AgentService{tt.agentService}
 			for _, svc := range testConsulServices {
 				serviceRegistration := &api.CatalogRegistration{
-					Node:    constants.ConsulNodeName,
+					Node:    nodeName,
 					Address: "127.0.0.1",
 					Service: &svc,
 				}
@@ -322,7 +323,7 @@ func TestRun_Gateways(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
-				"-consul-node-name", constants.ConsulNodeName,
+				"-consul-node-name", nodeName,
 			}
 
 			// Run the command.
@@ -519,7 +520,7 @@ func TestRun_ConnectServices_Errors(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
-				"-consul-node-name", constants.ConsulNodeName,
+				"-consul-node-name", nodeName,
 			}
 
 			code := cmd.Run(flags)
@@ -612,7 +613,7 @@ func TestRun_Gateways_Errors(t *testing.T) {
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
 				"-consul-api-timeout", "5s",
-				"-consul-node-name", constants.ConsulNodeName,
+				"-consul-node-name", nodeName,
 			}
 
 			code := cmd.Run(flags)
@@ -648,7 +649,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		time.Sleep(time.Second * 2)
 		// Register counting service.
 		serviceRegistration := &api.CatalogRegistration{
-			Node:    constants.ConsulNodeName,
+			Node:    nodeName,
 			Address: "127.0.0.1",
 			Service: &consulCountingSvc,
 		}
@@ -672,7 +673,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", proxyFile,
-		"-consul-node-name", constants.ConsulNodeName,
+		"-consul-node-name", nodeName,
 	}
 	code := cmd.Run(flags)
 	wg.Wait()
@@ -706,7 +707,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
 	for _, svc := range testConsulServices {
 		serviceRegistration := &api.CatalogRegistration{
-			Node:    constants.ConsulNodeName,
+			Node:    nodeName,
 			Address: "127.0.0.1",
 			Service: &svc,
 		}
@@ -845,7 +846,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
 			for _, svc := range testConsulServices {
 				serviceRegistration := &api.CatalogRegistration{
-					Node:    constants.ConsulNodeName,
+					Node:    nodeName,
 					Address: "127.0.0.1",
 					Service: &svc,
 				}
@@ -869,7 +870,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			flags := []string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-consul-node-name", constants.ConsulNodeName,
+				"-consul-node-name", nodeName,
 				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
