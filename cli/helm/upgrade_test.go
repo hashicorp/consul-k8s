@@ -40,7 +40,7 @@ func TestUpgrade(t *testing.T) {
 	}
 
 	expectedMessages := []string{
-		"\n==>  Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  \n",
+		"\n==>  Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  \n",
 		"\n==> Upgrading \n ✓  upgraded in namespace \"consul-namespace\".\n",
 	}
 	err := UpgradeHelmRelease(options)
@@ -59,7 +59,7 @@ func TestUpgradeHelmRelease(t *testing.T) {
 	}{
 		"basic success": {
 			messages: []string{
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    --------------------------------------------------------------\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul-namespace\".\n",
 			},
 			helmActionsRunner: &MockActionRunner{},
