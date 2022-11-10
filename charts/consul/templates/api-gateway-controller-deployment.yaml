@@ -69,19 +69,34 @@ spec:
           value: "/consul/login/acl-token"
         {{- end }}
         - name: CONSUL_HTTP_ADDR
-          {{- if and .Values.externalServers.enabled (not .Values.client.enabled) }}
-          {{- if .Values.global.tls.enabled }}
-          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
-          {{- else }}
-          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
-          {{- end }}
-          {{- else if and (not .Values.externalServers.enabled) .Values.client.enabled }}
+          {{- if .Values.client.enabled }}
+          {{/*
+            We use client agent nodes if we have them to support backwards compatibility in <=0.4 releases which
+            require connectivity between the registered Consul agent node and a deployment for health checking
+            (originating from the Consul node). Always leveraging the agents in the case that they're explicitly
+            opted into allows us to support users with agent node + "externalServers" configuration upgrading a
+            helm chart without upgrading api gateways. Otherwise, using "externalServers" when provided
+            without local agents will break gateways <=0.4.
+          */}}
           {{- if .Values.global.tls.enabled }}
           value: $(HOST_IP):8501
           {{- else }}
           value: $(HOST_IP):8500
           {{- end }}
-          {{- else }} # Internal servers, no clients
+          {{- else if .Values.externalServers.enabled }}
+          {{/*
+            "externalServers" specified and running in "agentless" mode, this will only work 0.5+
+          */}}
+          {{- if .Values.global.tls.enabled }}
+          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
+          {{- else }}
+          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
+          {{- end }}
+          {{- else }}
+          {{/*
+            We have local network connectivity between deployments and the internal cluster, this
+            should be supported in all versions of api-gateway
+          */}}
           {{- if .Values.global.tls.enabled }}
           value: {{ template "consul.fullname" . }}-server:8501
           {{- else }}
