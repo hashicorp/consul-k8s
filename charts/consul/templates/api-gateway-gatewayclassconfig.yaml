@@ -11,6 +11,11 @@ metadata:
     component: api-gateway
 spec:
   consul:
+    {{- if .Values.externalServers.enabled }}
+    address: {{ first .Values.externalServers.hosts }}
+    {{- else }}
+    address: {{ template "consul.fullname" . }}-server
+    {{- end }}
     authentication:
       {{- if .Values.global.acls.manageSystemACLs }}
       managed: true
@@ -25,12 +30,21 @@ spec:
     scheme: http
     {{- end }}
     ports:
+      {{- if .Values.externalServers.enabled }}
+      grpc: {{ .Values.externalServers.grpcPort }} 
+      {{- if .Values.global.tls.enabled }}
+      http: {{ .Values.externalServers.httpsPort }}
+      {{- else }}
+      http: {{ .Values.externalServers.httpPort }}
+      {{- end }}
+      {{- else }}
       grpc: 8502
-    {{- if .Values.global.tls.enabled }}
+      {{- if .Values.global.tls.enabled }}
       http: 8501
-    {{- else }}
+      {{- else }}
       http: 8500
-    {{- end }}
+      {{- end }}
+      {{- end }}
   {{- with .Values.apiGateway.managedGatewayClass.deployment }}
   deployment:
     {{- toYaml . | nindent 4 }}
