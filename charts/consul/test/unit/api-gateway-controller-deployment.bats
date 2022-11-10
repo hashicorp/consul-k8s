@@ -1133,6 +1133,33 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# CONSUL_HTTP_SSL
+
+@test "apiGateway/Deployment: CONSUL_HTTP_SSL set correctly when not using TLS." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[2].value' | tee /dev/stderr)
+  [ "${actual}" = "\"false\"" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_SSL set correctly when using TLS." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3].value' | tee /dev/stderr)
+  [ "${actual}" = "\"true\"" ]
+}
+
+#--------------------------------------------------------------------
 # CONSUL_HTTP_ADDR
 
 @test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly when using external servers and TLS." {
