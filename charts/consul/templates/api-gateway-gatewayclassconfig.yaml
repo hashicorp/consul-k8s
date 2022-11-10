@@ -11,8 +11,10 @@ metadata:
     component: api-gateway
 spec:
   consul:
-    {{- if .Values.externalServers.enabled }}
+    {{- if and .Values.externalServers.enabled (not .Values.client.enabled) }}
     address: {{ first .Values.externalServers.hosts }}
+    {{- else if and (not .Values.externalServers.enabled) .Values.client.enabled }}
+    address: $(HOST_IP)
     {{- else }}
     address: {{ template "consul.fullname" . }}-server
     {{- end }}

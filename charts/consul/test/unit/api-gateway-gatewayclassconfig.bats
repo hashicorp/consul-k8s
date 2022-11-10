@@ -82,7 +82,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Consul server address
 
-@test "apiGateway/GatewayClassConfig: Consul server address set when using external servers." {
+@test "apiGateway/GatewayClassConfig: Consul server address set with external servers." {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-gatewayclassconfig.yaml \
@@ -96,7 +96,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/GatewayClassConfig: Consul server address set when not using external servers." {
+@test "apiGateway/GatewayClassConfig: Consul server address set with local servers and no clients." {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-gatewayclassconfig.yaml \
@@ -104,6 +104,18 @@ load _helpers
       --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq '.spec.consul.address == "release-name-consul-server"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/GatewayClassConfig: Consul server address set with local servers and clients." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-gatewayclassconfig.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.consul.address == "$(HOST_IP)"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

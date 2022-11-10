@@ -1162,7 +1162,7 @@ load _helpers
 #--------------------------------------------------------------------
 # CONSUL_HTTP_ADDR
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly when using external servers and TLS." {
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, TLS, and no clients." {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1173,12 +1173,13 @@ load _helpers
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.httpsPort=8501' \
       --set 'server.enabled=false' \
+      --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("external-consul.host:8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly when using external servers and no-TLS." {
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, no TLS, and no clients" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -1189,30 +1190,59 @@ load _helpers
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.httpPort=8500' \
       --set 'server.enabled=false' \
+      --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("external-consul.host:8500"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly when not using external servers and using TLS." {
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and clients" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=bar' \
       --set 'global.tls.enabled=true' \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("release-name-consul-server:8501"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("$(HOST_IP):8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly when not using external servers or TLS." {
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and clients" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=bar' \
       --set 'global.tls.enabled=false' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("$(HOST_IP):8500"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and no clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("release-name-consul-server:8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and no clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=false' \
+      --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("release-name-consul-server:8500"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]

@@ -69,13 +69,19 @@ spec:
           value: "/consul/login/acl-token"
         {{- end }}
         - name: CONSUL_HTTP_ADDR
-          {{- if .Values.externalServers.enabled }}
+          {{- if and .Values.externalServers.enabled (not .Values.client.enabled) }}
           {{- if .Values.global.tls.enabled }}
           value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
           {{- else }}
           value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
           {{- end }}
+          {{- else if and (not .Values.externalServers.enabled) .Values.client.enabled }}
+          {{- if .Values.global.tls.enabled }}
+          value: $(HOST_IP):8501
           {{- else }}
+          value: $(HOST_IP):8500
+          {{- end }}
+          {{- else }} # Internal servers, no clients
           {{- if .Values.global.tls.enabled }}
           value: {{ template "consul.fullname" . }}-server:8501
           {{- else }}
