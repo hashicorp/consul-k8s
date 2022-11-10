@@ -11,6 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const minSupportedConsulDataplaneVersion = "v1.0.0-beta1"
+
 // isConsulDataplaneSupported returns true if the consul-k8s version on the pod supports
 // consul-dataplane architecture of Consul.
 func isConsulDataplaneSupported(pod corev1.Pod) bool {
@@ -19,7 +21,7 @@ func isConsulDataplaneSupported(pod corev1.Pod) bool {
 		if err != nil {
 			return false
 		}
-		consulDPSupportedVersion, err := version.NewVersion("v1.0.0-beta1")
+		consulDPSupportedVersion, err := version.NewVersion(minSupportedConsulDataplaneVersion)
 		if err != nil {
 			return false
 		}
