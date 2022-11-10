@@ -1,8 +1,9 @@
-package connectinject
+package metrics
 
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +14,7 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 	cases := []struct {
 		Name          string
 		Pod           func(*corev1.Pod) *corev1.Pod
-		MetricsConfig MetricsConfig
+		MetricsConfig Config
 		Expected      bool
 		Err           string
 	}{
@@ -22,7 +23,7 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics: true,
 			},
 			Expected: true,
@@ -31,10 +32,10 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 		{
 			Name: "Metrics enabled via annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetrics] = "true"
+				pod.Annotations[constants.AnnotationEnableMetrics] = "true"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics: false,
 			},
 			Expected: true,
@@ -43,10 +44,10 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 		{
 			Name: "Metrics configured via invalid annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetrics] = "not-a-bool"
+				pod.Annotations[constants.AnnotationEnableMetrics] = "not-a-bool"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics: false,
 			},
 			Expected: false,
@@ -59,7 +60,7 @@ func TestMetricsConfigEnableMetrics(t *testing.T) {
 			require := require.New(t)
 			mc := tt.MetricsConfig
 
-			actual, err := mc.enableMetrics(*tt.Pod(minimal()))
+			actual, err := mc.EnableMetrics(*tt.Pod(minimal()))
 
 			if tt.Err == "" {
 				require.Equal(tt.Expected, actual)
@@ -75,7 +76,7 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 	cases := []struct {
 		Name          string
 		Pod           func(*corev1.Pod) *corev1.Pod
-		MetricsConfig MetricsConfig
+		MetricsConfig Config
 		Expected      bool
 		Err           string
 	}{
@@ -84,7 +85,7 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetricsMerging: true,
 			},
 			Expected: true,
@@ -93,10 +94,10 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 		{
 			Name: "Metrics merging enabled via annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetricsMerging] = "true"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "true"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetricsMerging: false,
 			},
 			Expected: true,
@@ -105,10 +106,10 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 		{
 			Name: "Metrics merging configured via invalid annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetricsMerging] = "not-a-bool"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "not-a-bool"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetricsMerging: false,
 			},
 			Expected: false,
@@ -121,7 +122,7 @@ func TestMetricsConfigEnableMetricsMerging(t *testing.T) {
 			require := require.New(t)
 			mc := tt.MetricsConfig
 
-			actual, err := mc.enableMetricsMerging(*tt.Pod(minimal()))
+			actual, err := mc.EnableMetricsMerging(*tt.Pod(minimal()))
 
 			if tt.Err == "" {
 				require.Equal(tt.Expected, actual)
@@ -142,8 +143,8 @@ func TestMetricsConfigServiceMetricsPort(t *testing.T) {
 		{
 			Name: "Prefers annotationServiceMetricsPort",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
-				pod.Annotations[annotationServiceMetricsPort] = "9000"
+				pod.Annotations[constants.AnnotationPort] = "1234"
+				pod.Annotations[constants.AnnotationServiceMetricsPort] = "9000"
 				return pod
 			},
 			Expected: "9000",
@@ -151,7 +152,7 @@ func TestMetricsConfigServiceMetricsPort(t *testing.T) {
 		{
 			Name: "Uses annotationPort of annotationServiceMetricsPort is not set",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
+				pod.Annotations[constants.AnnotationPort] = "1234"
 				return pod
 			},
 			Expected: "1234",
@@ -168,9 +169,9 @@ func TestMetricsConfigServiceMetricsPort(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			mc := MetricsConfig{}
+			mc := Config{}
 
-			actual, err := mc.serviceMetricsPort(*tt.Pod(minimal()))
+			actual, err := mc.ServiceMetricsPort(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 			require.NoError(err)
@@ -194,7 +195,7 @@ func TestMetricsConfigServiceMetricsPath(t *testing.T) {
 		{
 			Name: "Uses annotationServiceMetricsPath when set",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationServiceMetricsPath] = "/custom-metrics-path"
+				pod.Annotations[constants.AnnotationServiceMetricsPath] = "/custom-metrics-path"
 				return pod
 			},
 			Expected: "/custom-metrics-path",
@@ -204,9 +205,9 @@ func TestMetricsConfigServiceMetricsPath(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			mc := MetricsConfig{}
+			mc := Config{}
 
-			actual := mc.serviceMetricsPath(*tt.Pod(minimal()))
+			actual := mc.ServiceMetricsPath(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 		})
@@ -217,7 +218,7 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 	cases := []struct {
 		Name          string
 		Pod           func(*corev1.Pod) *corev1.Pod
-		MetricsConfig MetricsConfig
+		MetricsConfig Config
 		Expected      string
 	}{
 		{
@@ -225,7 +226,7 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultPrometheusScrapePath: "/default-prometheus-scrape-path",
 			},
 			Expected: "/default-prometheus-scrape-path",
@@ -233,10 +234,10 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 		{
 			Name: "Uses annotationPrometheusScrapePath when set",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPrometheusScrapePath] = "/custom-scrape-path"
+				pod.Annotations[constants.AnnotationPrometheusScrapePath] = "/custom-scrape-path"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultPrometheusScrapePath: "/default-prometheus-scrape-path",
 			},
 			Expected: "/custom-scrape-path",
@@ -248,7 +249,7 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 			require := require.New(t)
 			mc := tt.MetricsConfig
 
-			actual := mc.prometheusScrapePath(*tt.Pod(minimal()))
+			actual := mc.PrometheusScrapePath(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 		})
@@ -256,21 +257,21 @@ func TestMetricsConfigPrometheusScrapePath(t *testing.T) {
 }
 
 // This test only needs unique cases not already handled in tests for
-// h.enableMetrics, h.enableMetricsMerging, and h.serviceMetricsPort.
+// h.EnableMetrics, h.EnableMetricsMerging, and h.ServiceMetricsPort.
 func TestMetricsConfigShouldRunMergedMetricsServer(t *testing.T) {
 	cases := []struct {
 		Name          string
 		Pod           func(*corev1.Pod) *corev1.Pod
-		MetricsConfig MetricsConfig
+		MetricsConfig Config
 		Expected      bool
 	}{
 		{
 			Name: "Returns true when metrics and metrics merging are enabled, and the service metrics port is greater than 0",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
+				pod.Annotations[constants.AnnotationPort] = "1234"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics:        true,
 				DefaultEnableMetricsMerging: true,
 			},
@@ -279,10 +280,10 @@ func TestMetricsConfigShouldRunMergedMetricsServer(t *testing.T) {
 		{
 			Name: "Returns false when service metrics port is 0",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "0"
+				pod.Annotations[constants.AnnotationPort] = "0"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics:        true,
 				DefaultEnableMetricsMerging: true,
 			},
@@ -295,7 +296,7 @@ func TestMetricsConfigShouldRunMergedMetricsServer(t *testing.T) {
 			require := require.New(t)
 			mc := tt.MetricsConfig
 
-			actual, err := mc.shouldRunMergedMetricsServer(*tt.Pod(minimal()))
+			actual, err := mc.ShouldRunMergedMetricsServer(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 			require.NoError(err)
@@ -304,7 +305,7 @@ func TestMetricsConfigShouldRunMergedMetricsServer(t *testing.T) {
 }
 
 // Tests determineAndValidatePort, which in turn tests the
-// prometheusScrapePort() and mergedMetricsPort() functions because their logic
+// PrometheusScrapePort() and MergedMetricsPort() functions because their logic
 // is just to call out to determineAndValidatePort().
 func TestMetricsConfigDetermineAndValidatePort(t *testing.T) {
 	cases := []struct {
@@ -446,12 +447,12 @@ func TestMetricsConfigDetermineAndValidatePort(t *testing.T) {
 	}
 }
 
-// Tests mergedMetricsServerConfiguration happy path and error case not covered by other MetricsConfig tests.
+// Tests MergedMetricsServerConfiguration happy path and error case not covered by other Config tests.
 func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 	cases := []struct {
 		Name                       string
 		Pod                        func(*corev1.Pod) *corev1.Pod
-		MetricsConfig              MetricsConfig
+		MetricsConfig              Config
 		ExpectedMergedMetricsPort  string
 		ExpectedServiceMetricsPort string
 		ExpectedServiceMetricsPath string
@@ -460,10 +461,10 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 		{
 			Name: "Returns merged metrics server configuration correctly",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
+				pod.Annotations[constants.AnnotationPort] = "1234"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics:        true,
 				DefaultEnableMetricsMerging: true,
 				DefaultMergedMetricsPort:    "12345",
@@ -475,10 +476,10 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 		{
 			Name: "Returns an error when merged metrics server shouldn't run",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "0"
+				pod.Annotations[constants.AnnotationPort] = "0"
 				return pod
 			},
-			MetricsConfig: MetricsConfig{
+			MetricsConfig: Config{
 				DefaultEnableMetrics:        true,
 				DefaultEnableMetricsMerging: false,
 			},
@@ -491,7 +492,7 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 			require := require.New(t)
 			mc := tt.MetricsConfig
 
-			metricsPorts, err := mc.mergedMetricsServerConfiguration(*tt.Pod(minimal()))
+			metricsPorts, err := mc.MergedMetricsServerConfiguration(*tt.Pod(minimal()))
 
 			if tt.ExpErr != "" {
 				require.Equal(tt.ExpErr, err.Error())
@@ -511,7 +512,7 @@ func minimal() *corev1.Pod {
 			Namespace: namespaces.DefaultNamespace,
 			Name:      "minimal",
 			Annotations: map[string]string{
-				annotationService: "foo",
+				constants.AnnotationService: "foo",
 			},
 		},
 

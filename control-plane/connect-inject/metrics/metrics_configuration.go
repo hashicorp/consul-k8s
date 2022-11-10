@@ -1,15 +1,17 @@
-package connectinject
+package metrics
 
 import (
 	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
-// MetricsConfig represents configuration common to connect-inject components related to metrics.
-type MetricsConfig struct {
+// Config represents configuration common to connect-inject components related to metrics.
+type Config struct {
 	DefaultEnableMetrics        bool
 	EnableGatewayMetrics        bool
 	DefaultEnableMetricsMerging bool
@@ -28,10 +30,10 @@ const (
 	defaultServiceMetricsPath = "/metrics"
 )
 
-// mergedMetricsServerConfiguration is called when running a merged metrics server and used to return ports necessary to
+// MergedMetricsServerConfiguration is called when running a merged metrics server and used to return ports necessary to
 // configure the merged metrics server.
-func (mc MetricsConfig) mergedMetricsServerConfiguration(pod corev1.Pod) (metricsPorts, error) {
-	run, err := mc.shouldRunMergedMetricsServer(pod)
+func (mc Config) MergedMetricsServerConfiguration(pod corev1.Pod) (metricsPorts, error) {
+	run, err := mc.ShouldRunMergedMetricsServer(pod)
 	if err != nil {
 		return metricsPorts{}, err
 	}
@@ -43,16 +45,16 @@ func (mc MetricsConfig) mergedMetricsServerConfiguration(pod corev1.Pod) (metric
 	}
 
 	// Configure consul sidecar with the appropriate metrics flags.
-	mergedMetricsPort, err := mc.mergedMetricsPort(pod)
+	mergedMetricsPort, err := mc.MergedMetricsPort(pod)
 	if err != nil {
 		return metricsPorts{}, err
 	}
 
 	// Don't need to check the error since it's checked in the call to
-	// mc.shouldRunMergedMetricsServer() above.
-	serviceMetricsPort, _ := mc.serviceMetricsPort(pod)
+	// mc.ShouldRunMergedMetricsServer() above.
+	serviceMetricsPort, _ := mc.ServiceMetricsPort(pod)
 
-	serviceMetricsPath := mc.serviceMetricsPath(pod)
+	serviceMetricsPath := mc.ServiceMetricsPath(pod)
 
 	metricsPorts := metricsPorts{
 		mergedPort:  mergedMetricsPort,
@@ -62,108 +64,108 @@ func (mc MetricsConfig) mergedMetricsServerConfiguration(pod corev1.Pod) (metric
 	return metricsPorts, nil
 }
 
-// enableMetrics returns whether metrics are enabled either via the default value in the meshWebhook, or if it's been
+// EnableMetrics returns whether metrics are enabled either via the default value in the meshWebhook, or if it's been
 // overridden via the annotation.
-func (mc MetricsConfig) enableMetrics(pod corev1.Pod) (bool, error) {
+func (mc Config) EnableMetrics(pod corev1.Pod) (bool, error) {
 	enabled := mc.DefaultEnableMetrics
-	if raw, ok := pod.Annotations[annotationEnableMetrics]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationEnableMetrics]; ok && raw != "" {
 		enableMetrics, err := strconv.ParseBool(raw)
 		if err != nil {
-			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", annotationEnableMetrics, raw, err)
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", constants.AnnotationEnableMetrics, raw, err)
 		}
 		enabled = enableMetrics
 	}
 	return enabled, nil
 }
 
-// enableMetricsMerging returns whether metrics merging functionality is enabled either via the default value in the
+// EnableMetricsMerging returns whether metrics merging functionality is enabled either via the default value in the
 // meshWebhook, or if it's been overridden via the annotation.
-func (mc MetricsConfig) enableMetricsMerging(pod corev1.Pod) (bool, error) {
+func (mc Config) EnableMetricsMerging(pod corev1.Pod) (bool, error) {
 	enabled := mc.DefaultEnableMetricsMerging
-	if raw, ok := pod.Annotations[annotationEnableMetricsMerging]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationEnableMetricsMerging]; ok && raw != "" {
 		enableMetricsMerging, err := strconv.ParseBool(raw)
 		if err != nil {
-			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", annotationEnableMetricsMerging, raw, err)
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", constants.AnnotationEnableMetricsMerging, raw, err)
 		}
 		enabled = enableMetricsMerging
 	}
 	return enabled, nil
 }
 
-// mergedMetricsPort returns the port to run the merged metrics server on, either via the default value in the meshWebhook,
+// MergedMetricsPort returns the port to run the merged metrics server on, either via the default value in the meshWebhook,
 // or if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
-func (mc MetricsConfig) mergedMetricsPort(pod corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, annotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
+func (mc Config) MergedMetricsPort(pod corev1.Pod) (string, error) {
+	return determineAndValidatePort(pod, constants.AnnotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
 }
 
-// prometheusScrapePort returns the port for Prometheus to scrape from, either via the default value in the meshWebhook, or
+// PrometheusScrapePort returns the port for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
-func (mc MetricsConfig) prometheusScrapePort(pod corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, annotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
+func (mc Config) PrometheusScrapePort(pod corev1.Pod) (string, error) {
+	return determineAndValidatePort(pod, constants.AnnotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
 }
 
-// prometheusScrapePath returns the path for Prometheus to scrape from, either via the default value in the meshWebhook, or
+// PrometheusScrapePath returns the path for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation.
-func (mc MetricsConfig) prometheusScrapePath(pod corev1.Pod) string {
-	if raw, ok := pod.Annotations[annotationPrometheusScrapePath]; ok && raw != "" {
+func (mc Config) PrometheusScrapePath(pod corev1.Pod) string {
+	if raw, ok := pod.Annotations[constants.AnnotationPrometheusScrapePath]; ok && raw != "" {
 		return raw
 	}
 
 	return mc.DefaultPrometheusScrapePath
 }
 
-// serviceMetricsPort returns the port the service exposes metrics on. This will
+// ServiceMetricsPort returns the port the service exposes metrics on. This will
 // default to the port used to register the service with Consul, and can be
 // overridden with the annotation if provided.
-func (mc MetricsConfig) serviceMetricsPort(pod corev1.Pod) (string, error) {
+func (mc Config) ServiceMetricsPort(pod corev1.Pod) (string, error) {
 	// The annotationPort is the port used to register the service with Consul.
 	// If that has been set, it'll be used as the port for getting service
 	// metrics as well, unless overridden by the service-metrics-port annotation.
-	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
+	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok && raw != "" {
 		// The service metrics port can be privileged if the service author has
 		// written their service in such a way that it expects to be able to use
 		// privileged ports. So, the port metrics are exposed on the service can
 		// be privileged.
-		return determineAndValidatePort(pod, annotationServiceMetricsPort, raw, true)
+		return determineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, raw, true)
 	}
 
 	// If the annotationPort is not set, the serviceMetrics port will be 0
 	// unless overridden by the service-metrics-port annotation. If the service
 	// metrics port is 0, the consul sidecar will not run a merged metrics
 	// server.
-	return determineAndValidatePort(pod, annotationServiceMetricsPort, "0", true)
+	return determineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, "0", true)
 }
 
-// serviceMetricsPath returns a default of /metrics, or overrides
+// ServiceMetricsPath returns a default of /metrics, or overrides
 // that with the annotation if provided.
-func (mc MetricsConfig) serviceMetricsPath(pod corev1.Pod) string {
-	if raw, ok := pod.Annotations[annotationServiceMetricsPath]; ok && raw != "" {
+func (mc Config) ServiceMetricsPath(pod corev1.Pod) string {
+	if raw, ok := pod.Annotations[constants.AnnotationServiceMetricsPath]; ok && raw != "" {
 		return raw
 	}
 
 	return defaultServiceMetricsPath
 }
 
-// shouldRunMergedMetricsServer returns whether we need to run a merged metrics
+// ShouldRunMergedMetricsServer returns whether we need to run a merged metrics
 // server. This is used to configure the consul sidecar command, and the init
 // container, so it can pass appropriate arguments to the consul connect envoy
 // command.
-func (mc MetricsConfig) shouldRunMergedMetricsServer(pod corev1.Pod) (bool, error) {
-	enableMetrics, err := mc.enableMetrics(pod)
+func (mc Config) ShouldRunMergedMetricsServer(pod corev1.Pod) (bool, error) {
+	enableMetrics, err := mc.EnableMetrics(pod)
 	if err != nil {
 		return false, err
 	}
-	enableMetricsMerging, err := mc.enableMetricsMerging(pod)
+	enableMetricsMerging, err := mc.EnableMetricsMerging(pod)
 	if err != nil {
 		return false, err
 	}
-	serviceMetricsPort, err := mc.serviceMetricsPort(pod)
+	serviceMetricsPort, err := mc.ServiceMetricsPort(pod)
 	if err != nil {
 		return false, err
 	}
 
-	// Don't need to check error here since serviceMetricsPort has been
-	// validated by calling mc.serviceMetricsPort above.
+	// Don't need to check error here since ServiceMetricsPort has been
+	// validated by calling mc.ServiceMetricsPort above.
 	smp, _ := strconv.Atoi(serviceMetricsPort)
 
 	if enableMetrics && enableMetricsMerging && smp > 0 {
@@ -180,7 +182,7 @@ func (mc MetricsConfig) shouldRunMergedMetricsServer(pod corev1.Pod) (bool, erro
 // unprivileged range of 1024-65535.
 func determineAndValidatePort(pod corev1.Pod, annotation string, defaultPort string, privileged bool) (string, error) {
 	if raw, ok := pod.Annotations[annotation]; ok && raw != "" {
-		port, err := portValue(pod, raw)
+		port, err := common.PortValue(pod, raw)
 		if err != nil {
 			return "", fmt.Errorf("%s annotation value of %s is not a valid integer", annotation, raw)
 		}
@@ -197,7 +199,7 @@ func determineAndValidatePort(pod corev1.Pod, annotation string, defaultPort str
 
 	// If the annotation does not exist, return the default.
 	if defaultPort != "" {
-		port, err := portValue(pod, defaultPort)
+		port, err := common.PortValue(pod, defaultPort)
 		if err != nil {
 			return "", fmt.Errorf("%s is not a valid port on the pod %s", defaultPort, pod.Name)
 		}
