@@ -82,6 +82,12 @@ spec:
           value: {{ template "consul.fullname" . }}-server:8500
           {{- end }}
           {{- end }}
+        - name: CONSUL_HTTP_SSL
+          value: {{ .Values.global.tls.enabled }}
+        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+        - name: CONSUL_TLS_SERVER_NAME
+          value: {{ .Values.externalServers.tlsServerName }}
+        {{- end }}
         command:
         - "/bin/sh"
         - "-ec"

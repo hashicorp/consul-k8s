@@ -1191,3 +1191,22 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# externalServers tlsServerName
+
+@test "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME can be set for externalServers" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.httpsPort=8501' \
+      --set 'externalServers.tlsServerName=hashi' \
+      --set 'server.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[4].value == "hashi"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
