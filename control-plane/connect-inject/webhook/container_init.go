@@ -26,9 +26,6 @@ type initContainerCommandData struct {
 	ServiceAccountName string
 	AuthMethod         string
 
-	// ConsulNodeName is the node name in Consul where services are registered.
-	ConsulNodeName string
-
 	// MultiPort determines whether this is a multi port Pod, which configures the init container to be specific to one
 	// of the services on the multi port Pod.
 	MultiPort bool
@@ -50,11 +47,10 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	multiPort := mpi.serviceName != ""
 
 	data := initContainerCommandData{
-		AuthMethod:     w.AuthMethod,
-		ConsulNodeName: constants.ConsulNodeName,
-		MultiPort:      multiPort,
-		LogLevel:       w.LogLevel,
-		LogJSON:        w.LogJSON,
+		AuthMethod: w.AuthMethod,
+		MultiPort:  multiPort,
+		LogLevel:   w.LogLevel,
+		LogJSON:    w.LogJSON,
 	}
 
 	// Create expected volume mounts
@@ -134,6 +130,14 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			{
 				Name:  "CONSUL_API_TIMEOUT",
 				Value: w.ConsulConfig.APITimeout.String(),
+			},
+			{
+				Name: "CONSUL_NODE_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "spec.nodeName",
+					},
+				},
 			},
 		},
 		Resources:    w.InitContainerResources,
@@ -284,7 +288,6 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // the init container.
 const initContainerCommandTpl = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -consul-node-name={{ .ConsulNodeName }} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
   {{- if .AuthMethod }}

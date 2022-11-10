@@ -113,11 +113,18 @@ type Controller struct {
 	// whenever service instances are deregistered.
 	AuthMethod string
 
+	// EnableAutoEncrypt indicates whether we should use auto-encrypt when talking
+	// to Consul client agents.
+	EnableAutoEncrypt bool
+
 	MetricsConfig metrics.Config
 	Log           logr.Logger
 
 	Scheme *runtime.Scheme
 	context.Context
+
+	// consulClientHttpPort is only used in tests.
+	consulClientHttpPort int
 }
 
 // Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
@@ -199,9 +206,29 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
-					if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
-						r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-						errs = multierror.Append(errs, err)
+					if isConsulDataplaneSupported(pod) {
+						if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
+							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							errs = multierror.Append(errs, err)
+						}
+					} else {
+						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
+						if err != nil {
+							r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							errs = multierror.Append(errs, err)
+							continue
+						}
+						r.Log.Info("updating health check on the Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
+							r.Log.Error(err, "failed to update health check on Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace, "consul-client-ip", pod.Status.HostIP)
+							errs = multierror.Append(errs, err)
+						}
+						// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
+						// in the case when Consul clients are running in the cluster. If endpoints are deleted, consul clients
+						// will detect that they are unhealthy, and we don't need to worry about keeping them up-to-date.
+						// This is so that health checks are still updated during an upgrade to consul-dataplane.
+						continue
 					}
 				}
 				if isGateway(pod) {
@@ -249,7 +276,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(apiClient, pod, serviceEndpoints, healthStatus)
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -332,18 +359,18 @@ func serviceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 }
 
 func proxyServiceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
-	serviceName := serviceName(pod, serviceEndpoints)
-	return fmt.Sprintf("%s-sidecar-proxy", serviceName)
+	svcName := serviceName(pod, serviceEndpoints)
+	return fmt.Sprintf("%s-sidecar-proxy", svcName)
 }
 
 func proxyServiceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
-	proxyServiceName := proxyServiceName(pod, serviceEndpoints)
-	return fmt.Sprintf("%s-%s", pod.Name, proxyServiceName)
+	proxySvcName := proxyServiceName(pod, serviceEndpoints)
+	return fmt.Sprintf("%s-%s", pod.Name, proxySvcName)
 }
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
@@ -399,8 +426,8 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 		Tags:      tags,
 	}
 	serviceRegistration := &api.CatalogRegistration{
-		Node:    constants.ConsulNodeName,
-		Address: consulNodeAddress,
+		Node:    pod.Spec.NodeName,
+		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",
 		},
@@ -587,8 +614,8 @@ func (r *Controller) createServiceRegistrations(apiClient *api.Client, pod corev
 	}
 
 	proxyServiceRegistration := &api.CatalogRegistration{
-		Node:    constants.ConsulNodeName,
-		Address: consulNodeAddress,
+		Node:    pod.Spec.NodeName,
+		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",
 		},
@@ -722,8 +749,8 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	serviceRegistration := &api.CatalogRegistration{
-		Node:    constants.ConsulNodeName,
-		Address: consulNodeAddress,
+		Node:    pod.Spec.NodeName,
+		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",
 		},
@@ -839,52 +866,54 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // has addresses, it will only deregister instances not in the map.
 func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
 	// Get services matching metadata.
-	svcs, err := r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sSvcName, k8sSvcNamespace)
+	nodesWithSvcs, err := r.serviceInstancesForK8sNodes(apiClient, k8sSvcName, k8sSvcNamespace)
 	if err != nil {
 		r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
 		return err
 	}
 
 	// Deregister each service instance that matches the metadata.
-	for _, svc := range svcs.Services {
-		// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
-		// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
-		// every service instance.
-		var serviceDeregistered bool
-		if endpointsAddressesMap != nil {
-			if _, ok := endpointsAddressesMap[svc.Address]; !ok {
-				// If the service address is not in the Endpoints addresses, deregister it.
+	for _, nodeSvcs := range nodesWithSvcs {
+		for _, svc := range nodeSvcs.Services {
+			// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
+			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
+			// every service instance.
+			var serviceDeregistered bool
+			if endpointsAddressesMap != nil {
+				if _, ok := endpointsAddressesMap[svc.Address]; !ok {
+					// If the service address is not in the Endpoints addresses, deregister it.
+					r.Log.Info("deregistering service from consul", "svc", svc.ID)
+					_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+						Node:      nodeSvcs.Node.Node,
+						ServiceID: svc.ID,
+						Namespace: svc.Namespace,
+					}, nil)
+					if err != nil {
+						r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
+						return err
+					}
+					serviceDeregistered = true
+				}
+			} else {
 				r.Log.Info("deregistering service from consul", "svc", svc.ID)
-				_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-					Node:      constants.ConsulNodeName,
+				if _, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+					Node:      nodeSvcs.Node.Node,
 					ServiceID: svc.ID,
 					Namespace: svc.Namespace,
-				}, nil)
-				if err != nil {
+				}, nil); err != nil {
 					r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
 					return err
 				}
 				serviceDeregistered = true
 			}
-		} else {
-			r.Log.Info("deregistering service from consul", "svc", svc.ID)
-			if _, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-				Node:      constants.ConsulNodeName,
-				ServiceID: svc.ID,
-				Namespace: svc.Namespace,
-			}, nil); err != nil {
-				r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-				return err
-			}
-			serviceDeregistered = true
-		}
 
-		if r.AuthMethod != "" && serviceDeregistered {
-			r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-			err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
-			if err != nil {
-				r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
-				return err
+			if r.AuthMethod != "" && serviceDeregistered {
+				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
+				err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
+				if err != nil {
+					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
+					return err
+				}
 			}
 		}
 	}
@@ -1009,9 +1038,26 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 	return tokenMeta, nil
 }
 
+func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) ([]*api.CatalogNodeServiceList, error) {
+	var serviceList []*api.CatalogNodeServiceList
+	// Get a list of k8s nodes.
+	var nodeList corev1.NodeList
+	err := r.Client.List(r.Context, &nodeList)
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range nodeList.Items {
+		var nodeServices *api.CatalogNodeServiceList
+		nodeServices, err = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, node.Name)
+		serviceList = append(serviceList, nodeServices)
+	}
+
+	return serviceList, err
+}
+
 // serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list
 // of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
-func (r *Controller) serviceInstancesForK8SServiceNameAndNamespace(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) (*api.CatalogNodeServiceList, error) {
+func (r *Controller) serviceInstancesForK8SServiceNameAndNamespace(apiClient *api.Client, k8sServiceName, k8sServiceNamespace, nodeName string) (*api.CatalogNodeServiceList, error) {
 	var (
 		serviceList *api.CatalogNodeServiceList
 		err         error
@@ -1019,9 +1065,9 @@ func (r *Controller) serviceInstancesForK8SServiceNameAndNamespace(apiClient *ap
 	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
 		metaKeyKubeServiceName, k8sServiceName, constants.MetaKeyKubeNS, k8sServiceNamespace, metaKeyManagedBy, constants.ManagedByValue)
 	if r.EnableConsulNamespaces {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(constants.ConsulNodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
 	} else {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(constants.ConsulNodeName, &api.QueryOptions{Filter: filter})
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter})
 	}
 	return serviceList, err
 }

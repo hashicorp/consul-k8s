@@ -16,6 +16,8 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const nodeName = "test-node"
+
 func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 	cases := map[string]struct {
 		webhookSetupFunc     func(w *MeshWebhook)
@@ -166,6 +168,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 						},
 					},
 					ServiceAccountName: "web",
+					NodeName:           nodeName,
 				},
 			}
 
@@ -173,7 +176,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.NoError(t, err)
 			expCmd := "-addresses 1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 				" -proxy-service-id-path=/consul/connect-inject/proxyid " +
-				"-service-node-name=k8s-service-mesh -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
+				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
 			require.Equal(t, expCmd, strings.Join(container.Args, " "))
 
 			if w.AuthMethod != "" {
@@ -207,9 +210,11 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Equal(t, expectedProbe, container.LivenessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 1)
+			require.Len(t, container.Env, 2)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
+			require.Equal(t, container.Env[1].Name, "DP_SERVICE_NODE_NAME")
+			require.Equal(t, container.Env[1].ValueFrom.FieldRef.FieldPath, "spec.nodeName")
 		})
 	}
 }
@@ -361,17 +366,17 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			}
 			expArgs := []string{
 				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
 				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-					"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
 			}
 			if aclsEnabled {
 				expArgs = []string{
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-						"-service-node-name=k8s-service-mesh -log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
 				}
 			}

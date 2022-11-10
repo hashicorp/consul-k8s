@@ -141,13 +141,16 @@ spec:
         - name: CONSUL_LOGIN_META
           value: "component=mesh-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
         {{- end }}
+        - name: CONSUL_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         command:
         - "/bin/sh"
         - "-ec"
         - |
           consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
            -gateway-kind="mesh-gateway" \
-           -consul-node-name="k8s-service-mesh" \
            -proxy-id-file=/consul/service/proxy-id \
            -service-name={{ .Values.meshGateway.consulServiceName }} \
            -log-level={{ default .Values.global.logLevel }} \
@@ -196,6 +199,10 @@ spec:
           value: pod=$(NAMESPACE)/$(POD_NAME)
         - name: DP_CREDENTIAL_LOGIN_META2
           value: component=mesh-gateway
+        - name: DP_SERVICE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         command:
         - consul-dataplane
         args:
@@ -210,7 +217,6 @@ spec:
         - -grpc-port=8502
         {{- end }}
         - -proxy-service-id-path=/consul/service/proxy-id
-        - -service-node-name=k8s-service-mesh
         {{- if .Values.global.tls.enabled }}
         {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
         - -ca-certs=/consul/tls/ca/tls.crt
