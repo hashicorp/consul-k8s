@@ -480,10 +480,6 @@ type WanAddress struct {
 	Static string `yaml:"static"`
 }
 
-type InitCopyConsulContainer struct {
-	Resources Resources `yaml:"resources"`
-}
-
 type InitServiceInitContainer struct {
 	Resources Resources `yaml:"resources"`
 }
@@ -500,7 +496,6 @@ type MeshGateway struct {
 	HostPort                 interface{}              `yaml:"hostPort"`
 	ServiceAccount           ServiceAccount           `yaml:"serviceAccount"`
 	Resources                Resources                `yaml:"resources"`
-	InitCopyConsulContainer  InitCopyConsulContainer  `yaml:"initCopyConsulContainer"`
 	InitServiceInitContainer InitServiceInitContainer `yaml:"initServiceInitContainer"`
 	Affinity                 string                   `yaml:"affinity"`
 	Tolerations              interface{}              `yaml:"tolerations"`
@@ -522,18 +517,17 @@ type DefaultsService struct {
 }
 
 type IngressGatewayDefaults struct {
-	Replicas                      int                     `yaml:"replicas"`
-	Service                       DefaultsService         `yaml:"service"`
-	ServiceAccount                ServiceAccount          `yaml:"serviceAccount"`
-	Resources                     Resources               `yaml:"resources"`
-	InitCopyConsulContainer       InitCopyConsulContainer `yaml:"initCopyConsulContainer"`
-	Affinity                      string                  `yaml:"affinity"`
-	Tolerations                   interface{}             `yaml:"tolerations"`
-	NodeSelector                  interface{}             `yaml:"nodeSelector"`
-	PriorityClassName             string                  `yaml:"priorityClassName"`
-	TerminationGracePeriodSeconds int                     `yaml:"terminationGracePeriodSeconds"`
-	Annotations                   interface{}             `yaml:"annotations"`
-	ConsulNamespace               string                  `yaml:"consulNamespace"`
+	Replicas                      int             `yaml:"replicas"`
+	Service                       DefaultsService `yaml:"service"`
+	ServiceAccount                ServiceAccount  `yaml:"serviceAccount"`
+	Resources                     Resources       `yaml:"resources"`
+	Affinity                      string          `yaml:"affinity"`
+	Tolerations                   interface{}     `yaml:"tolerations"`
+	NodeSelector                  interface{}     `yaml:"nodeSelector"`
+	PriorityClassName             string          `yaml:"priorityClassName"`
+	TerminationGracePeriodSeconds int             `yaml:"terminationGracePeriodSeconds"`
+	Annotations                   interface{}     `yaml:"annotations"`
+	ConsulNamespace               string          `yaml:"consulNamespace"`
 }
 
 type Gateways struct {
@@ -547,17 +541,16 @@ type IngressGateways struct {
 }
 
 type Defaults struct {
-	Replicas                int                     `yaml:"replicas"`
-	ExtraVolumes            []interface{}           `yaml:"extraVolumes"`
-	Resources               Resources               `yaml:"resources"`
-	InitCopyConsulContainer InitCopyConsulContainer `yaml:"initCopyConsulContainer"`
-	Affinity                string                  `yaml:"affinity"`
-	Tolerations             interface{}             `yaml:"tolerations"`
-	NodeSelector            interface{}             `yaml:"nodeSelector"`
-	PriorityClassName       string                  `yaml:"priorityClassName"`
-	Annotations             interface{}             `yaml:"annotations"`
-	ServiceAccount          ServiceAccount          `yaml:"serviceAccount"`
-	ConsulNamespace         string                  `yaml:"consulNamespace"`
+	Replicas          int            `yaml:"replicas"`
+	ExtraVolumes      []interface{}  `yaml:"extraVolumes"`
+	Resources         Resources      `yaml:"resources"`
+	Affinity          string         `yaml:"affinity"`
+	Tolerations       interface{}    `yaml:"tolerations"`
+	NodeSelector      interface{}    `yaml:"nodeSelector"`
+	PriorityClassName string         `yaml:"priorityClassName"`
+	Annotations       interface{}    `yaml:"annotations"`
+	ServiceAccount    ServiceAccount `yaml:"serviceAccount"`
+	ConsulNamespace   string         `yaml:"consulNamespace"`
 }
 
 type TerminatingGateways struct {
