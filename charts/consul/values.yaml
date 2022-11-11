@@ -2848,6 +2848,8 @@ apiGateway:
   enabled: false
 
   # Image to use for the api-gateway-controller pods and gateway instances
+  #
+  # ~> **Note:** Using API Gateway <= 0.4 with external servers requires setting `client.enabled: true`.
   # @type: string
   image: null
 
