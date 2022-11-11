@@ -2066,6 +2066,19 @@ connectInject:
   # Optional priorityClassName.
   priorityClassName: ""
 
+  # Extra labels to attach to the connect inject pods. This should be a YAML map.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraLabels:
+  #   labelKey: label-value
+  #   anotherLabelKey: another-label-value
+  # ```
+  #
+  # @type: map
+  extraLabels: null
+
   # This value defines additional annotations for
   # connect inject pods. This should be formatted as a multi-line string.
   #

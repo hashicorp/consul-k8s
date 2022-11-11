@@ -1249,6 +1249,31 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# extraLabels
+
+@test "connectInject/Deployment: no extra labels defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "connectInject/Deployment: can set extra labels" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.extraLabels.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
 # annotations
 
 @test "connectInject/Deployment: no annotations defined by default" {
