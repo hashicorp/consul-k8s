@@ -106,6 +106,21 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'server.enabled=false' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.consul.address == "external-consul.host"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/GatewayClassConfig: Consul server address set with external servers and clients." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-gatewayclassconfig.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'server.enabled=false' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.consul.address == "$(HOST_IP)"' | tee /dev/stderr)
