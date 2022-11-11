@@ -11,31 +11,10 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "webhookCertManager/ClusterRole: enabled with controller.enabled=true and connectInject.enabled=false" {
+@test "webhookCertManager/ClusterRole: enabled with connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "webhookCertManager/ClusterRole: enabled with connectInject.enabled=true and controller.enabled=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "webhookCertManager/ClusterRole: enabled with connectInject.enabled=true and controller.enabled=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -49,7 +28,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0]' | tee /dev/stderr)
 
@@ -85,7 +64,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.rules[1]' | tee /dev/stderr)
 
@@ -112,7 +91,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.rules[2]' | tee /dev/stderr)
 
@@ -136,7 +115,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[3]' | tee /dev/stderr)
@@ -155,7 +134,7 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/webhook-cert-manager-clusterrole.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \

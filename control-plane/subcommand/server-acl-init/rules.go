@@ -320,10 +320,11 @@ func (c *Command) injectRules() (string, error) {
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
 {{- else }}
-{{- if .EnableNamespaces }}
   operator = "write"
-{{- end }}
+  acl = "write"
 {{- end }}
 {{- if .EnablePeering }}
   peering = "write"
@@ -340,6 +341,7 @@ partition "{{ .PartitionName }}" {
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }
 {{- if .EnableNamespaces }}
   }
@@ -385,44 +387,6 @@ partition "default" {
 {{- end }}
 `
 	return c.renderRules(aclReplicationRulesTpl)
-}
-
-// policy = "write" is required when creating namespaces within a partition.
-// acl = "write" is required when creating namespace with a default policy.
-// Attaching a default ACL policy to a namespace requires acl = "write" in the
-// namespace that the policy is defined in, which in our case is "default".
-func (c *Command) controllerRules() (string, error) {
-	controllerRules := `
-{{- if .EnablePartitions }}
-partition "{{ .PartitionName }}" {
-  mesh = "write"
-  acl = "write"
-{{- else }}
-  operator = "write"
-  acl = "write"
-{{- end }}
-{{- if .EnableNamespaces }}
-{{- if .InjectEnableNSMirroring }}
-  namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
-{{- else }}
-  namespace "{{ .InjectConsulDestNS }}" {
-{{- end }}
-{{- end }}
-{{- if .EnablePartitions }}
-    policy = "write"
-{{- end }}
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-{{- if .EnableNamespaces }}
-  }
-{{- end }}
-{{- if .EnablePartitions }}
-}
-{{- end }}
-`
-	return c.renderRules(controllerRules)
 }
 
 func (c *Command) rulesData() rulesData {

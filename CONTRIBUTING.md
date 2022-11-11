@@ -349,7 +349,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
         ...
         IngressGateway    string = "ingressgateway"
     ```
-1. Update `control-plane/subcommand/controller/command.go` and add your controller:
+1. Update `control-plane/subcommand/inject-connect/command.go` and add your controller:
     ```go
     if err = (&controller.IngressGatewayController{
         ConfigEntryController: configEntryReconciler,
@@ -361,7 +361,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
         return 1
     }
     ```
-1. Update `control-plane/subcommand/controller/command.go` and add your webhook (the path should match the kubebuilder annotation):
+1. Update `control-plane/subcommand/inject-connect/command.go` and add your webhook (the path should match the kubebuilder annotation):
     ```go
     mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
         &webhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{

@@ -6,7 +6,6 @@ import (
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
-	cmdController "github.com/hashicorp/consul-k8s/control-plane/subcommand/controller"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
@@ -72,10 +71,6 @@ func init() {
 
 		"create-federation-secret": func() (cli.Command, error) {
 			return &cmdCreateFederationSecret.Command{UI: ui}, nil
-		},
-
-		"controller": func() (cli.Command, error) {
-			return &cmdController.Command{UI: ui}, nil
 		},
 
 		"webhook-cert-manager": func() (cli.Command, error) {

@@ -894,12 +894,15 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
+  operator = "write"
+  acl = "write"
   node_prefix "" {
     policy = "write"
   }
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }`,
 		},
 		{
@@ -908,6 +911,7 @@ func TestInjectRules(t *testing.T) {
 			EnablePeering:    false,
 			Expected: `
   operator = "write"
+  acl = "write"
   node_prefix "" {
     policy = "write"
   }
@@ -915,6 +919,7 @@ func TestInjectRules(t *testing.T) {
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }
   }`,
 		},
@@ -924,6 +929,7 @@ func TestInjectRules(t *testing.T) {
 			EnablePeering:    true,
 			Expected: `
   operator = "write"
+  acl = "write"
   peering = "write"
   node_prefix "" {
     policy = "write"
@@ -932,6 +938,7 @@ func TestInjectRules(t *testing.T) {
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }
   }`,
 		},
@@ -942,6 +949,8 @@ func TestInjectRules(t *testing.T) {
 			PartitionName:    "part-1",
 			Expected: `
 partition "part-1" {
+  mesh = "write"
+  acl = "write"
   node_prefix "" {
     policy = "write"
   }
@@ -950,6 +959,7 @@ partition "part-1" {
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }
   }
 }`,
@@ -961,6 +971,8 @@ partition "part-1" {
 			PartitionName:    "part-1",
 			Expected: `
 partition "part-1" {
+  mesh = "write"
+  acl = "write"
   peering = "write"
   node_prefix "" {
     policy = "write"
@@ -970,6 +982,7 @@ partition "part-1" {
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }
   }
 }`,
@@ -1071,148 +1084,6 @@ partition "default" {
 			replicationTokenRules, err := cmd.aclReplicationRules()
 			require.NoError(t, err)
 			require.Equal(t, tt.Expected, replicationTokenRules)
-		})
-	}
-}
-
-func TestControllerRules(t *testing.T) {
-	cases := []struct {
-		Name             string
-		EnablePartitions bool
-		PartitionName    string
-		EnableNamespaces bool
-		DestConsulNS     string
-		Mirroring        bool
-		MirroringPrefix  string
-		Expected         string
-	}{
-		{
-			Name: "namespaces=disabled, partitions=disabled",
-			Expected: `
-  operator = "write"
-  acl = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }`,
-		},
-		{
-			Name:             "namespaces=enabled, consulDestNS=consul, partitions=disabled",
-			EnableNamespaces: true,
-			DestConsulNS:     "consul",
-			Expected: `
-  operator = "write"
-  acl = "write"
-  namespace "consul" {
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }`,
-		},
-		{
-			Name:             "namespaces=enabled, mirroring=true, partitions=disabled",
-			EnableNamespaces: true,
-			Mirroring:        true,
-			Expected: `
-  operator = "write"
-  acl = "write"
-  namespace_prefix "" {
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }`,
-		},
-		{
-			Name:             "namespaces=enabled, mirroring=true, mirroringPrefix=prefix-, partitions=disabled",
-			EnableNamespaces: true,
-			Mirroring:        true,
-			MirroringPrefix:  "prefix-",
-			Expected: `
-  operator = "write"
-  acl = "write"
-  namespace_prefix "prefix-" {
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }`,
-		},
-		{
-			Name:             "namespaces=enabled, consulDestNS=consul, partitions=enabled",
-			EnablePartitions: true,
-			PartitionName:    "part-1",
-			EnableNamespaces: true,
-			DestConsulNS:     "consul",
-			Expected: `
-partition "part-1" {
-  mesh = "write"
-  acl = "write"
-  namespace "consul" {
-    policy = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }
-}`,
-		},
-		{
-			Name:             "namespaces=enabled, mirroring=true, partitions=enabled",
-			EnablePartitions: true,
-			PartitionName:    "part-1",
-			EnableNamespaces: true,
-			Mirroring:        true,
-			Expected: `
-partition "part-1" {
-  mesh = "write"
-  acl = "write"
-  namespace_prefix "" {
-    policy = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }
-}`,
-		},
-		{
-			Name:             "namespaces=enabled, mirroring=true, mirroringPrefix=prefix-, partitions=enabled",
-			EnablePartitions: true,
-			PartitionName:    "part-1",
-			EnableNamespaces: true,
-			Mirroring:        true,
-			MirroringPrefix:  "prefix-",
-			Expected: `
-partition "part-1" {
-  mesh = "write"
-  acl = "write"
-  namespace_prefix "prefix-" {
-    policy = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }
-}`,
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			cmd := Command{
-				flagEnableNamespaces:                 tt.EnableNamespaces,
-				flagConsulInjectDestinationNamespace: tt.DestConsulNS,
-				flagEnableInjectK8SNSMirroring:       tt.Mirroring,
-				flagInjectK8SNSMirroringPrefix:       tt.MirroringPrefix,
-				consulFlags:                          &flags.ConsulFlags{Partition: tt.PartitionName},
-			}
-
-			rules, err := cmd.controllerRules()
-
-			require.NoError(t, err)
-			require.Equal(t, tt.Expected, rules)
 		})
 	}
 }

@@ -165,7 +165,6 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 
 		"connectInject.enabled":  "false",
 		"connectInject.replicas": "1",
-		"controller.enabled":     "false",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,

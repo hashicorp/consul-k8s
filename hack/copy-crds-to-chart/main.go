@@ -43,8 +43,8 @@ func realMain(helmPath string) error {
 		// Strip leading newline.
 		contents = strings.TrimPrefix(contents, "\n")
 
-		// Add {{- if .Values.controller.enabled }} {{- end }} wrapper.
-		contents = fmt.Sprintf("{{- if .Values.controller.enabled }}\n%s{{- end }}\n", contents)
+		// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
+		contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)
 
 		// Add labels, this is hacky because we're relying on the line number
 		// but it means we don't need to regex or yaml parse.

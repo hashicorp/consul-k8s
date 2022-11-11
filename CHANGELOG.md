@@ -4,6 +4,7 @@ BREAKING CHANGES:
 * CLI:
   * Change default behavior of `consul-k8s install` to perform the installation when no answer is provided to the prompt. [[GH-1673](https://github.com/hashicorp/consul-k8s/pull/1673)]
 * Helm:
+  * Remove `controller` section from the values file as the controller has now been merged into the connect-inject deployment. [[GH-1697](https://github.com/hashicorp/consul-k8s/pull/1697)]
   * Remove `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
   * Consul snapshot-agent now runs as a sidecar with Consul servers. [[GH-1620](https://github.com/hashicorp/consul-k8s/pull/1620)]
     This results in the following changes to Helm values:

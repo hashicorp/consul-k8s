@@ -300,7 +300,6 @@ func TestVault_Partitions(t *testing.T) {
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,

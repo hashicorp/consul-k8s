@@ -11,11 +11,11 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serviceintentions/CustomResourceDefinitions: enabled with controller.enabled=true" {
+@test "serviceintentions/CustomResourceDefinitions: enabled with connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-serviceintentions.yaml  \
-      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       # The generated CRDs have "---" at the top which results in two objects
       # being detected by yq, the first of which is null. We must therefore use
