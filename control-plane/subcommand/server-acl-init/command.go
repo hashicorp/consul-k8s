@@ -54,8 +54,6 @@ type Command struct {
 	flagAuthMethodHost      string
 	flagBindingRuleSelector string
 
-	flagController bool
-
 	flagCreateEntLicenseToken bool
 
 	flagSnapshotAgent bool
@@ -144,9 +142,6 @@ func (c *Command) init() {
 			"If not provided, the default cluster Kubernetes service will be used.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
-
-	c.flags.BoolVar(&c.flagController, "controller", false,
-		"Toggle for configuring ACL login for the controller.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
@@ -682,29 +677,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagController {
-		rules, err := c.controllerRules()
-		if err != nil {
-			c.log.Error("Error templating controller token rules", "err", err)
-			return 1
-		}
-
-		serviceAccountName := c.withPrefix("controller")
-
-		// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
-		// Controller token must be global because config entry writes all
-		// go to the primary datacenter. This means secondary datacenters need
-		// a token that is known by the primary datacenters.
-		authMethodName := localComponentAuthMethodName
-		if !primary {
-			authMethodName = globalComponentAuthMethodName
-		}
-		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
-		}
-	}
 	c.log.Info("server-acl-init completed successfully")
 	return 0
 }

@@ -42,7 +42,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[0]' | tee /dev/stderr)
+      yq -r '.rules[2]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("endpoints")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -77,7 +77,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[1]' | tee /dev/stderr)
+      yq -r '.rules[3]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("pods")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -106,7 +106,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[2]' | tee /dev/stderr)
+      yq -r '.rules[4]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("leases")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -136,7 +136,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[0]' | tee /dev/stderr)
+      yq -r '.rules[2]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("serviceaccounts")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -200,7 +200,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       . | tee /dev/stderr |
-      yq -r '.rules[3]' | tee /dev/stderr)
+      yq -r '.rules[5]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
   [ "${actual}" = "mutatingwebhookconfigurations" ]

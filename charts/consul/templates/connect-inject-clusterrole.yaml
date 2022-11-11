@@ -11,9 +11,55 @@ metadata:
     release: {{ .Release.Name }}
     component: connect-injector
 rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicedefaults
+  - serviceresolvers
+  - proxydefaults
+  - meshes
+  - exportedservices
+  - servicerouters
+  - servicesplitters
+  - serviceintentions
+  - ingressgateways
+  - terminatinggateways
+  {{- if .Values.global.peering.enabled }}
+  - peeringacceptors
+  - peeringdialers
+  {{- end }}
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicedefaults/status
+  - serviceresolvers/status
+  - proxydefaults/status
+  - meshes/status
+  - exportedservices/status
+  - servicerouters/status
+  - servicesplitters/status
+  - serviceintentions/status
+  - ingressgateways/status
+  - terminatinggateways/status
+  {{- if .Values.global.peering.enabled }}
+  - peeringacceptors/status
+  - peeringdialers/status
+  {{- end }}
+  verbs:
+  - get
+  - patch
+  - update
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources: ["serviceaccounts", "secrets"]
+  resources: [ "serviceaccounts", "secrets" ]
   verbs:
   - get
 {{- end }}
@@ -53,7 +99,7 @@ rules:
 {{- end }}
 {{- if .Values.global.peering.enabled }}
 - apiGroups: [ "" ]
-  resources: ["secrets"]
+  resources: [ "secrets" ]
   verbs:
   - "get"
   - "list"
@@ -61,42 +107,6 @@ rules:
   - "create"
   - "update"
   - "delete"
-- apiGroups: ["consul.hashicorp.com"]
-  resources: ["peeringacceptors"]
-  verbs:
-    - create
-    - delete
-    - get
-    - list
-    - patch
-    - update
-    - watch
-- apiGroups:
-    - consul.hashicorp.com
-  resources:
-    - peeringacceptors/status
-  verbs:
-    - get
-    - patch
-    - update
-- apiGroups: ["consul.hashicorp.com"]
-  resources: ["peeringdialers"]
-  verbs:
-    - create
-    - delete
-    - get
-    - list
-    - patch
-    - update
-    - watch
-- apiGroups:
-    - consul.hashicorp.com
-  resources:
-    - peeringdialers/status
-  verbs:
-    - get
-    - patch
-    - update
 {{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]

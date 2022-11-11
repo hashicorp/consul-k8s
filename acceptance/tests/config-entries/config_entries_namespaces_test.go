@@ -1,4 +1,4 @@
-package controller
+package config_entries
 
 import (
 	"fmt"
@@ -79,7 +79,6 @@ func TestControllerNamespaces(t *testing.T) {
 			helmValues := map[string]string{
 				"global.enableConsulNamespaces":  "true",
 				"global.adminPartitions.enabled": "true",
-				"controller.enabled":             "true",
 				"connectInject.enabled":          "true",
 
 				// When mirroringK8S is set, this setting is ignored.

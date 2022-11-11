@@ -34,7 +34,6 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"global.tls.enabled":           strconv.FormatBool(secure),
 
 				// Don't install injector, controller and cni on this cluster so that it's not installed twice.
-				"controller.enabled":        "false",
 				"connectInject.enabled":     "false",
 				"connectInject.cni.enabled": "false",
 			}

@@ -1938,30 +1938,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# controller
-
-@test "serverACLInit/Job: -controller set by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("controller"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: -controller set when controller.enabled=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'controller.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("controller"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # global.federation.enabled
 
 @test "serverACLInit/Job: ensure federation is passed when federation is enabled" {

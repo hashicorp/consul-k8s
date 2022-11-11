@@ -1,5 +1,5 @@
 {{ $hasConfiguredWebhookCertsUsingVault := (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.controllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName) -}}
-{{- if (and (or .Values.connectInject.enabled .Values.controller.enabled) (not $hasConfiguredWebhookCertsUsingVault)) }}
+{{- if (and .Values.connectInject.enabled (not $hasConfiguredWebhookCertsUsingVault)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,7 +14,6 @@ metadata:
 data:
   webhook-config.json: |-
     [
-    {{- if .Values.connectInject.enabled }}
       {
         "name": "{{ template "consul.fullname" . }}-connect-injector",
         "tlsAutoHosts": [
@@ -25,19 +24,6 @@ data:
         ],
         "secretName": "{{ template "consul.fullname" . }}-connect-inject-webhook-cert",
         "secretNamespace": "{{ .Release.Namespace }}"
-      }{{- if and .Values.controller.enabled }},{{- end }}{{- end }}
-    {{- if and .Values.controller.enabled }}
-      {
-        "name": "{{ template "consul.fullname" . }}-controller",
-        "tlsAutoHosts": [
-          "{{ template "consul.fullname" . }}-controller-webhook",
-          "{{ template "consul.fullname" . }}-controller-webhook.{{ .Release.Namespace }}",
-          "{{ template "consul.fullname" . }}-controller-webhook.{{ .Release.Namespace }}.svc",
-          "{{ template "consul.fullname" . }}-controller-webhook.{{ .Release.Namespace }}.svc.cluster.local"
-        ],
-        "secretName": "{{ template "consul.fullname" . }}-controller-webhook-cert",
-        "secretNamespace": "{{ .Release.Namespace }}"
       }
-    {{- end }}
     ]
   {{- end }}

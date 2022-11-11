@@ -262,10 +262,6 @@ spec:
             -partition-token-file=/vault/secrets/partition-token \
             {{- end }}
 
-            {{- if .Values.controller.enabled }}
-            -controller=true \
-            {{- end }}
-
             {{- if .Values.apiGateway.enabled }}
             -api-gateway-controller=true \
             {{- end }}

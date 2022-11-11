@@ -1,4 +1,4 @@
-package controller
+package config_entries
 
 import (
 	"fmt"
@@ -52,7 +52,6 @@ func TestController(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"controller.enabled":           "true",
 				"connectInject.enabled":        "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
