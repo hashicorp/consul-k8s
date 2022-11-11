@@ -65,25 +65,31 @@ load _helpers
 #--------------------------------------------------------------------
 # grpc
 
-@test "server/ConfigMap: if tls is disabled, grpc port is set" {
+@test "server/ConfigMap: if tls is disabled, grpc port is set and grpc_tls port is disabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local configmap=$(helm template \
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
-      yq -r '.data["server.json"]' | jq -r .ports.grpc | tee /dev/stderr)
+      yq -r '.data["server.json"]' | tee /dev/stderr)
 
+  local actual=$(echo $configmap | jq -r .ports.grpc |  tee /dev/stderr)
   [ "${actual}" = "8502" ]
+  local actual=$(echo $configmap | jq -r .ports.grpc_tls |  tee /dev/stderr)
+  [ "${actual}" = "-1" ]
 }
 
-@test "server/ConfigMap: if tls is enabled, grpc_tls port is set" {
+@test "server/ConfigMap: if tls is enabled, grpc_tls port is set and grpc port is disabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local configmap=$(helm template \
       --set 'global.tls.enabled=true' \
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
-      yq -r '.data["server.json"]' | jq -r .ports.grpc_tls | tee /dev/stderr)
+      yq -r '.data["server.json"]' | tee /dev/stderr)
 
+  local actual=$(echo $configmap | jq -r .ports.grpc_tls |  tee /dev/stderr)
   [ "${actual}" = "8502" ]
+  local actual=$(echo $configmap | jq -r .ports.grpc |  tee /dev/stderr)
+  [ "${actual}" = "-1" ]
 }
 
 #--------------------------------------------------------------------

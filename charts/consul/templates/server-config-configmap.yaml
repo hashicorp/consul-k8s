@@ -29,8 +29,10 @@ data:
       "ports": {
         {{- if not .Values.global.tls.enabled }}
         "grpc": 8502,
+        "grpc_tls": -1,
         {{- end }}
         {{- if .Values.global.tls.enabled }}
+        "grpc": -1,
         "grpc_tls": 8502,
         {{- end }}
         "serf_lan": {{ .Values.server.ports.serflan.port }}
