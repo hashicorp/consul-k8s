@@ -1496,7 +1496,7 @@ load _helpers
 #--------------------------------------------------------------------
 # replicas
 
-@test "connectInject/Deployment: replicas defaults to 2" {
+@test "connectInject/Deployment: replicas defaults to 1" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -1504,7 +1504,7 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.replicas' | tee /dev/stderr)
 
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "connectInject/Deployment: replicas can be set" {

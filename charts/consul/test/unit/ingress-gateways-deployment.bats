@@ -365,7 +365,7 @@ load _helpers
 #--------------------------------------------------------------------
 # replicas
 
-@test "ingressGateways/Deployment: replicas defaults to 2" {
+@test "ingressGateways/Deployment: replicas defaults to 1" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -373,7 +373,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.replicas' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "ingressGateways/Deployment: replicas can be set through defaults" {
@@ -590,15 +590,15 @@ load _helpers
 #--------------------------------------------------------------------
 # affinity
 
-@test "ingressGateways/Deployment: affinity defaults to one per node" {
+@test "ingressGateways/Deployment: affinity defaults to null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey' | tee /dev/stderr)
-  [ "${actual}" = "kubernetes.io/hostname" ]
+      yq -s -r '.[0].spec.template.spec.affinity' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }
 
 @test "ingressGateways/Deployment: affinity can be set through defaults" {
