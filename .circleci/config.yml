@@ -588,7 +588,7 @@ jobs:
       - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          failfast: true
+          failfast: false
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=ndhanushkodi/consul-ent-dev:latestacldns5a15bf425e4
       - store_test_results:
           path: /tmp/test-results
@@ -621,7 +621,7 @@ jobs:
       - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          failfast: true
+          failfast: false
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=ndhanushkodi/consul-ent-dev:latestacldns5a15bf425e4
       - store_test_results:
           path: /tmp/test-results
@@ -654,7 +654,7 @@ jobs:
       - build-cli
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
-          failfast: true
+          failfast: false
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni -consul-image=ndhanushkodi/consul-ent-dev:latestacldns5a15bf425e4
       - store_test_results:
           path: /tmp/test-results
@@ -1273,6 +1273,9 @@ workflows:
           context: consul-ci
           requires:
           - dev-upload-docker
+      - acceptance-gke-1-23:
+          requires:
+            - dev-upload-docker
 
   nightly-cleanup:
     triggers:
