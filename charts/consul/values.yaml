@@ -563,12 +563,6 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
-  # The name (and tag) of the Envoy Docker image used for the
-  # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
-  # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
-  # @default: envoyproxy/envoy-alpine:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.23.1"
-
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
@@ -2815,6 +2809,11 @@ apiGateway:
   # Image to use for the api-gateway-controller pods and gateway instances
   # @type: string
   image: null
+
+  # The name (and tag) of the Envoy Docker image used for the
+  # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
+  # @default: envoyproxy/envoy:<latest supported version>
+  imageEnvoy: "envoyproxy/envoy:v1.23.1"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string

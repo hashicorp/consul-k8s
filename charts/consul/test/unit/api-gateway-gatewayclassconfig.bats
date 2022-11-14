@@ -66,3 +66,16 @@ load _helpers
       yq '.spec.deployment.minInstances == 3' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "apiGateway/GatewayClassConfig: imageEnvoy can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-gatewayclassconfig.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'apiGateway.imageEnvoy=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.image.envoy' | tee /dev/stderr)
+  [ "${actual}" = "\"bar\"" ]
+}
+

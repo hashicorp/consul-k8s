@@ -37,7 +37,7 @@ spec:
   {{- end }}
   image:
     consulAPIGateway: {{ .Values.apiGateway.image }}
-    envoy: {{ .Values.global.imageEnvoy }}
+    envoy: {{ .Values.apiGateway.imageEnvoy }}
   {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
   nodeSelector:
     {{ tpl .Values.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}

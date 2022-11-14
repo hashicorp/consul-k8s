@@ -210,7 +210,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# client.snapshotAgent
+# server.snapshotAgent
 
 @test "serverACLInit/Job: snapshot agent acl option disabled by default" {
   cd `chart_dir`
@@ -222,7 +222,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: snapshot agent acl option enabled with .client.snapshotAgent.enabled=true" {
+@test "serverACLInit/Job: snapshot agent acl option enabled with .server.snapshotAgent.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
