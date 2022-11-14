@@ -106,9 +106,9 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'server.enabled=false' \
-      --set 'client.enabled=false' \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.consul.address == "external-consul.host"' | tee /dev/stderr)
+      yq '.spec.consul.address == "$(HOST_IP)"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
