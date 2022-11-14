@@ -84,7 +84,8 @@ spec:
           {{- end }}
           {{- else if .Values.externalServers.enabled }}
           {{/*
-            "externalServers" specified and running in "agentless" mode, this will only work 0.5+
+            "externalServers" specified and running in "agentless" mode, this will only work with
+            Consul API Gateway v0.5 or newer
           */}}
           {{- if .Values.global.tls.enabled }}
           value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
