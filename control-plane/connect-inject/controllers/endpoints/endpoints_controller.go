@@ -125,6 +125,7 @@ type Controller struct {
 
 	// consulClientHttpPort is only used in tests.
 	consulClientHttpPort int
+	NodeMeta             map[string]string
 }
 
 // Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
@@ -443,6 +444,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		},
 		SkipNodeUpdate: true,
 	}
+	r.appendNodeMeta(serviceRegistration)
 
 	proxySvcName := proxyServiceName(pod, serviceEndpoints)
 	proxySvcID := proxyServiceID(pod, serviceEndpoints)
@@ -631,6 +633,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		},
 		SkipNodeUpdate: true,
 	}
+	r.appendNodeMeta(proxyServiceRegistration)
 
 	return serviceRegistration, proxyServiceRegistration, nil
 }
@@ -766,6 +769,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		},
 		SkipNodeUpdate: true,
 	}
+	r.appendNodeMeta(serviceRegistration)
 
 	return serviceRegistration, nil
 }
@@ -1243,6 +1247,12 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
 func (r *Controller) consulNamespace(namespace string) string {
 	return namespaces.ConsulNamespace(namespace, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
+}
+
+func (r *Controller) appendNodeMeta(registration *api.CatalogRegistration) {
+	for k, v := range r.NodeMeta {
+		registration.NodeMeta[k] = v
+	}
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
