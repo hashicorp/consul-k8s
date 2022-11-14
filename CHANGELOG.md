@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.49.1 (November 14, 2022)
 BREAKING CHANGES:
 * Peering:
   * Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
