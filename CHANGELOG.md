@@ -1,4 +1,7 @@
 ## UNRELEASED
+FEATURES:
+* Ingress Gateway
+  * Add support for MaxConnections, MaxConcurrentRequests, and MaxPendingRequests to Ingress Gateway CRD. [[GH-1691](https://github.com/hashicorp/consul-k8s/pull/1691)]
 
 IMPROVEMENTS:
 * Helm:
