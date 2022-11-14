@@ -167,7 +167,7 @@ func (in *ExportedService) toConsul() capi.ExportedService {
 	for _, consumer := range in.Consumers {
 		consumers = append(consumers, capi.ServiceConsumer{
 			Partition: consumer.Partition,
-			PeerName:  consumer.Peer,
+			Peer:      consumer.Peer,
 		})
 	}
 	return capi.ExportedService{
