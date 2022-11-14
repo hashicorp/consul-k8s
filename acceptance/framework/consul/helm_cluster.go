@@ -3,19 +3,18 @@ package consul
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
-	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -303,72 +302,7 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 
 func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) string {
 	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	return h.CreatePortForwardTunnelToResourcePort(t, serverPod, remotePort)
-}
-
-func (h *HelmCluster) CreatePortForwardTunnelToResourcePort(t *testing.T, resourceName string, remotePort int) string {
-	localPort := terratestk8s.GetAvailablePort(t)
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		h.helmOptions.KubectlOptions,
-		terratestk8s.ResourceTypePod,
-		resourceName,
-		localPort,
-		remotePort,
-		h.logger)
-
-	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
-		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
-		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
-		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
-	})
-
-	doneChan := make(chan bool)
-
-	t.Cleanup(func() {
-		close(doneChan)
-	})
-
-	go h.monitorPortForwardedServer(t, localPort, tunnel, doneChan, resourceName, remotePort)
-
-	return fmt.Sprintf("127.0.0.1:%d", localPort)
-}
-
-func (h *HelmCluster) monitorPortForwardedServer(t *testing.T, port int, tunnel *terratestk8s.Tunnel, doneChan chan bool, resourceName string, remotePort int) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-doneChan:
-			logger.Log(t, "stopping monitor of the port-forwarded server")
-			tunnel.Close()
-			return
-		case <-ticker.C:
-			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-			if err != nil {
-				logger.Log(t, "lost connection to port-forwarded server; restarting port-forwarding", "port", port)
-				tunnel.Close()
-				tunnel = terratestk8s.NewTunnelWithLogger(
-					h.helmOptions.KubectlOptions,
-					terratestk8s.ResourceTypePod,
-					resourceName,
-					port,
-					remotePort,
-					h.logger)
-				err = tunnel.ForwardPortE(t)
-				if err != nil {
-					// If we couldn't establish a port forwarding channel, continue, so we can try again.
-					continue
-				}
-			}
-			if conn != nil {
-				// Ignore error because we don't care if connection is closed successfully or not.
-				_ = conn.Close()
-			}
-		}
-	}
+	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
@@ -273,7 +274,7 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, podList.Items)
 	connectInjectorPodName := podList.Items[0].Name
-	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 8080)
+	connectInjectorPodAddress := portforward.CreateTunnelToResourcePort(t, connectInjectorPodName, 8080, kubectlOptions, terratestLogger.Discard)
 	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String())

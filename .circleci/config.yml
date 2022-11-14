@@ -1273,6 +1273,10 @@ workflows:
           context: consul-ci
           requires:
           - dev-upload-docker
+      - acceptance-aks-1-22:
+          context: consul-ci
+          requires:
+            - dev-upload-docker
 
   nightly-cleanup:
     triggers:
