@@ -336,7 +336,14 @@ spec:
                 {{- end }}
                 {{- end }}
                 {{- if .Values.client.grpc }}
+                {{- if not .Values.global.tls.enabled }}
                 -hcl='ports { grpc = 8502 }' \
+                -hcl='ports { grpc_tls = -1 }' \
+                {{- end }}
+                {{- if .Values.global.tls.enabled }}
+                -hcl='ports { grpc_tls = 8502 }' \
+                -hcl='ports { grpc = -1 }' \
+                {{- end }}
                 {{- end }}
                 {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
                 -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
