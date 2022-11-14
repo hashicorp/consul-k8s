@@ -111,6 +111,10 @@ func (mc Config) PrometheusScrapePath(pod corev1.Pod) string {
 		return raw
 	}
 
+	if mc.DefaultPrometheusScrapePath == "" {
+		return defaultServiceMetricsPath
+	}
+
 	return mc.DefaultPrometheusScrapePath
 }
 

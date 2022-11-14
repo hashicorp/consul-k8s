@@ -25,20 +25,20 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 	}{
 		"default": {
 			webhookSetupFunc:     nil,
-			additionalExpCmdArgs: " -tls-disabled",
+			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with custom gRPC port": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulConfig.GRPCPort = 8602
 			},
-			additionalExpCmdArgs: " -tls-disabled",
+			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.AuthMethod = "test-auth-method"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -tls-disabled",
+				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -47,7 +47,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled",
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -56,7 +56,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulDestinationNamespace = "test-ns"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled",
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -64,7 +64,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulPartition = "test-part"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled",
+				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -72,28 +72,28 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulTLSServerName = "server.dc1.consul"
 				w.ConsulCACert = "consul-ca-cert"
 			},
-			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and no CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.TLSEnabled = true
 				w.ConsulTLSServerName = "server.dc1.consul"
 			},
-			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -telemetry-prom-scrape-path=/metrics",
 		},
 		"with single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "consul-namespace"
 			},
-			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled",
+			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled",
+			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring prefix": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -101,32 +101,38 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 				w.K8SNSMirroringPrefix = "foo-"
 			},
-			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled",
+			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulPartition = "partition-1"
 			},
-			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled",
+			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 			},
-			additionalExpCmdArgs: " -tls-disabled",
+			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level and log json": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 				w.LogJSON = true
 			},
-			additionalExpCmdArgs: " -tls-disabled",
+			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"skip server watch enabled": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.SkipServerWatch = true
 			},
-			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled",
+			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled -telemetry-prom-scrape-path=/metrics",
+		},
+		"custom prometheus scrape path": {
+			webhookSetupFunc: func(w *MeshWebhook) {
+				w.MetricsConfig.DefaultPrometheusScrapePath = "/scrape-path" // Simulate what would be passed as a flag
+			},
+			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/scrape-path",
 		},
 	}
 
@@ -366,18 +372,18 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			}
 			expArgs := []string{
 				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 			}
 			if aclsEnabled {
 				expArgs = []string{
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -- --base-id 0",
+						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -- --base-id 1",
+						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 				}
 			}
 			expSAVolumeMounts := []corev1.VolumeMount{
