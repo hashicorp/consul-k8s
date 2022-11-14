@@ -403,7 +403,7 @@ load _helpers
 #--------------------------------------------------------------------
 # replicas
 
-@test "terminatingGateways/Deployment: replicas defaults to 2" {
+@test "terminatingGateways/Deployment: replicas defaults to 1" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
@@ -411,7 +411,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.replicas' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "terminatingGateways/Deployment: replicas can be set through defaults" {
@@ -663,15 +663,15 @@ load _helpers
 #--------------------------------------------------------------------
 # affinity
 
-@test "terminatingGateways/Deployment: affinity defaults to one per node" {
+@test "terminatingGateways/Deployment: affinity defaults to null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey' | tee /dev/stderr)
-  [ "${actual}" = "kubernetes.io/hostname" ]
+      yq -s -r '.[0].spec.template.spec.affinity' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }
 
 @test "terminatingGateways/Deployment: affinity can be set through defaults" {

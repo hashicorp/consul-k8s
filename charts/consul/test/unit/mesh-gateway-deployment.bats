@@ -164,7 +164,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # replicas
 
-@test "meshGateway/Deployment: replicas defaults to 2" {
+@test "meshGateway/Deployment: replicas defaults to 1" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
@@ -172,7 +172,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.replicas' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "meshGateway/Deployment: replicas can be overridden" {
@@ -190,15 +190,15 @@ key2: value2' \
 #--------------------------------------------------------------------
 # affinity
 
-@test "meshGateway/Deployment: affinity defaults to one per node" {
+@test "meshGateway/Deployment: affinity defaults to null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey' | tee /dev/stderr)
-  [ "${actual}" = "kubernetes.io/hostname" ]
+      yq -r '.spec.template.spec.affinity' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }
 
 @test "meshGateway/Deployment: affinity can be overridden" {
