@@ -139,6 +139,9 @@ spec:
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
+                {{- range $k, $v := .Values.connectInject.consulNode.meta }}
+                -node-meta={{ $k }}={{ $v }} \
+                {{- end }}
                 {{- if .Values.connectInject.transparentProxy.defaultEnabled }}
                 -default-enable-transparent-proxy=true \
                 {{- else }}

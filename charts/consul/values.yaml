@@ -2012,6 +2012,20 @@ connectInject:
     # @type: string
     updateStrategy: null
 
+  consulNode:
+    # meta specifies an arbitrary metadata key/value pair to associate with the node.
+    #
+    # Example:
+    #
+    # ```yaml
+    # meta:
+    #   cluster: test-cluster
+    #   persistent: true
+    # ```
+    #
+    # @type: map
+    meta: null
+
 
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.

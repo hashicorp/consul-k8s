@@ -992,6 +992,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedHealthChecks       []*api.HealthCheck
 		metricsEnabled             bool
+		nodeMeta                   map[string]string
 		expErr                     string
 	}{
 		{
@@ -1020,6 +1021,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Basic endpoints",
 			svcName:       "service-created",
 			consulSvcName: "service-created",
+			nodeMeta: map[string]string{
+				"test-node": "true",
+			},
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				endpoint := &corev1.Endpoints{
@@ -1053,6 +1057,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
+					NodeMeta: map[string]string{
+						"synthetic-node": "true",
+						"test-node":      "true",
+					},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1069,6 +1077,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
+					NodeMeta: map[string]string{
+						"synthetic-node": "true",
+						"test-node":      "true",
+					},
 				},
 			},
 			expectedHealthChecks: []*api.HealthCheck{
@@ -1096,6 +1108,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Mesh Gateway",
 			svcName:       "mesh-gateway",
 			consulSvcName: "mesh-gateway",
+			nodeMeta: map[string]string{
+				"test-node": "true",
+			},
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
 					constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
@@ -1145,6 +1160,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+					NodeMeta: map[string]string{
+						"synthetic-node": "true",
+						"test-node":      "true",
+					},
 				},
 			},
 			expectedHealthChecks: []*api.HealthCheck{
@@ -2041,6 +2060,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consulServer",
 				ReleaseNamespace:      "default",
+				NodeMeta:              tt.nodeMeta,
 			}
 			if tt.metricsEnabled {
 				ep.MetricsConfig = metrics.Config{
@@ -2076,6 +2096,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceProxy, instance.ServiceProxy)
+				if tt.nodeMeta != nil {
+					require.Equal(t, tt.expectedConsulSvcInstances[i].NodeMeta, instance.NodeMeta)
+				}
 			}
 			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
 			require.NoError(t, err)
@@ -2087,7 +2110,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
-
+				if tt.nodeMeta != nil {
+					require.Equal(t, tt.expectedProxySvcInstances[i].NodeMeta, instance.NodeMeta)
+				}
 				// When comparing the ServiceProxy field we ignore the DestinationNamespace
 				// field within that struct because on Consul OSS it's set to "" but on Consul Enterprise
 				// it's set to "default" and we want to re-use this test for both OSS and Ent.

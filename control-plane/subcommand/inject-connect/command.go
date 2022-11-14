@@ -99,6 +99,9 @@ type Command struct {
 	// CNI flag.
 	flagEnableCNI bool
 
+	// Additional metadata to get applied to nodes.
+	flagNodeMeta map[string]string
+
 	// Peering flags.
 	flagEnablePeering bool
 
@@ -137,6 +140,8 @@ func init() {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
+	c.flagSet.Var((*flags.FlagMapValue)(&c.flagNodeMeta), "node-meta",
+		"Metadata to set on the node, formatted as key=value. This flag may be specified multiple times to set multiple meta fields.")
 	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")
 	c.flagSet.StringVar(&c.flagCertDir, "tls-cert-dir", "",
 		"Directory with PEM-encoded TLS certificate and key to serve.")
@@ -428,6 +433,7 @@ func (c *Command) Run(args []string) int {
 		EnableWANFederation:        c.flagEnableFederation,
 		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
 		AuthMethod:                 c.flagACLAuthMethod,
+		NodeMeta:                   c.flagNodeMeta,
 		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
 		Scheme:                     mgr.GetScheme(),
 		ReleaseName:                c.flagReleaseName,
