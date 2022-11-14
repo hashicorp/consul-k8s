@@ -47,10 +47,14 @@ IMPROVEMENTS:
   * Deploy `expose-servers` service only when Admin Partitions(ENT) is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
   * Use a distroless image for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
   * The Envoy version is now 1.24.0 for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
+  * Allow addition of extra labels to Connect Inject pods. [[GH-1678](https://github.com/hashicorp/consul-k8s/pull/1678)]
+  * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
 
 BUG FIXES:
 * Peering
   * Add `peering:read` permissions to mesh gateway token to fix peering connections through the mesh gateways. [[GH-1685](https://github.com/hashicorp/consul-k8s/pull/1685)]
+* Helm:
+  * Disable PodSecurityPolicies in all templates when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
 
 ## 1.0.0-beta4 (October 28, 2022)
 
