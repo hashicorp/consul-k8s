@@ -112,6 +112,10 @@ spec:
         - name: CONSUL_TLS_SERVER_NAME
           value: {{ .Values.externalServers.tlsServerName }}
         {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+        - name: CONSUL_PARTITION
+          value: {{ .Values.global.adminPartitions.name }}
+        {{- end }}
         command:
         - "/bin/sh"
         - "-ec"
