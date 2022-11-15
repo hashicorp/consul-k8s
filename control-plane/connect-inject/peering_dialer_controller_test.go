@@ -255,6 +255,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				// must be unique on the acceptor and dialer peers. Otherwise the following consul error will be thrown:
 				// https://github.com/hashicorp/consul/blob/74b87d49d33069a048aead7a86d85d4b4b6461b5/agent/rpc/peering/service.go#L491.
 				c.Datacenter = "acceptor-dc"
+				c.Ports.HTTPS = 0
 			})
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
@@ -438,6 +439,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 				// We set the datacenter because the server name, typically formatted as "server.<datacenter>.<domain>"
 				// must be unique on the acceptor and dialer peers.
 				c.Datacenter = "acceptor-dc"
+				c.Ports.HTTPS = 0
 			})
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
