@@ -435,7 +435,7 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 			expErr: "upstream \"upstream1:1234:dc1\" is invalid: ProxyDefaults mesh gateway mode is neither \"local\" nor \"remote\"",
 			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = "bad-mode"
 				return pd
@@ -492,7 +492,7 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = api.MeshGatewayModeLocal
 				return pd
@@ -516,7 +516,7 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = api.MeshGatewayModeRemote
 				return pd
@@ -533,7 +533,7 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 			expErr: "",
 			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = "remote"
 				return pd
@@ -634,7 +634,7 @@ func TestProcessUpstreams(t *testing.T) {
 				return pod1
 			},
 			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = "remote"
 				return pd
@@ -670,7 +670,7 @@ func TestProcessUpstreams(t *testing.T) {
 				return pod1
 			},
 			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = "remote"
 				return pd
