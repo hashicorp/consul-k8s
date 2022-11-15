@@ -68,12 +68,16 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				Value: "/consul/connect-inject",
 			},
 			{
-				Name: "DP_SERVICE_NODE_NAME",
+				Name: "NODE_NAME",
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
 						FieldPath: "spec.nodeName",
 					},
 				},
+			},
+			{
+				Name:  "DP_SERVICE_NODE_NAME",
+				Value: "$(NODE_NAME)-virtual",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{

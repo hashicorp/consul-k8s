@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -50,4 +51,8 @@ func ShouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
 	}
 
 	return globalOverwrite, nil
+}
+
+func ConsulNodeNameFromK8sNode(nodeName string) string {
+	return fmt.Sprintf("%s-virtual", nodeName)
 }

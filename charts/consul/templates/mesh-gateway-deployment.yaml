@@ -124,6 +124,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_LOGIN_AUTH_METHOD
@@ -142,9 +146,7 @@ spec:
           value: "component=mesh-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
         {{- end }}
         - name: CONSUL_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
+          value: $(NODE_NAME)-virtual
         command:
         - "/bin/sh"
         - "-ec"
@@ -199,14 +201,16 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         - name: DP_CREDENTIAL_LOGIN_META1
           value: pod=$(NAMESPACE)/$(POD_NAME)
         - name: DP_CREDENTIAL_LOGIN_META2
           value: component=mesh-gateway
         - name: DP_SERVICE_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
+          value: $(NODE_NAME)-virtual
         command:
         - consul-dataplane
         args:

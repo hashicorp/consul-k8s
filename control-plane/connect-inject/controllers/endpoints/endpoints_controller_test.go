@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	nodeName = "test-node"
+	nodeName       = "test-node"
+	consulNodeName = "test-node-virtual"
 )
 
 func TestShouldIgnore(t *testing.T) {
@@ -887,7 +888,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			// Register service and proxy in consul.
 			for _, svc := range tt.initialConsulSvcs {
 				catalogRegistration := &api.CatalogRegistration{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: svc,
 				}
@@ -2195,7 +2196,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -2214,7 +2215,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2300,7 +2301,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -2319,7 +2320,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2405,7 +2406,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -2422,7 +2423,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2487,7 +2488,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
@@ -2504,7 +2505,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2577,7 +2578,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -2588,7 +2589,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2691,7 +2692,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -2702,7 +2703,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2718,7 +2719,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
@@ -2729,7 +2730,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2788,7 +2789,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
@@ -2799,7 +2800,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2815,7 +2816,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-different-consul-svc-name",
@@ -2826,7 +2827,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2871,7 +2872,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -2882,7 +2883,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2898,7 +2899,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
@@ -2909,7 +2910,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2944,7 +2945,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
@@ -2955,7 +2956,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -2971,7 +2972,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-different-consul-svc-name",
@@ -2982,7 +2983,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -3030,7 +3031,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -3047,7 +3048,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -3126,7 +3127,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -3143,7 +3144,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -3165,7 +3166,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
@@ -3182,7 +3183,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -3265,7 +3266,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 			initialConsulSvcs: []*api.CatalogRegistration{
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
@@ -3282,7 +3283,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 				{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
@@ -3972,7 +3973,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			var token *api.ACLToken
 			for _, svc := range tt.initialConsulSvcs {
 				serviceRegistration := &api.CatalogRegistration{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: svc,
 				}
@@ -4118,7 +4119,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			// Set up the initial Consul services.
 			if tt.svcInitiallyRegistered {
 				serviceRegistration := &api.CatalogRegistration{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: consulNodeAddress,
 					Service: &api.AgentService{
 						ID:      "pod1-" + svcName,
@@ -4241,7 +4242,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 
 	// Initially register the pod with the bad endpoint
 	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
-		Node:    nodeName,
+		Node:    consulNodeName,
 		Address: consulNodeAddress,
 		Service: &api.AgentService{
 			ID:      "pod1-" + svcName,
@@ -4398,7 +4399,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 
 			for _, svc := range servicesInConsul {
 				catalogRegistration := &api.CatalogRegistration{
-					Node:    nodeName,
+					Node:    consulNodeName,
 					Address: "127.0.0.1",
 					Service: svc,
 				}
@@ -4407,7 +4408,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			}
 			ep := Controller{}
 
-			svcs, err := ep.serviceInstancesForK8SServiceNameAndNamespace(consulClient, k8sSvc, k8sNS, nodeName)
+			svcs, err := ep.serviceInstancesForK8SServiceNameAndNamespace(consulClient, k8sSvc, k8sNS, consulNodeName)
 			require.NoError(t, err)
 			if len(svcs.Services) > 0 {
 				require.Len(t, svcs, 2)

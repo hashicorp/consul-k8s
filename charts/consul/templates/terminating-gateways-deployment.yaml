@@ -163,6 +163,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           {{- include "consul.consulK8sConsulServerEnvVars" $root | nindent 10 }}
           {{- if $root.Values.global.enableConsulNamespaces }}
           - name: CONSUL_NAMESPACE
@@ -177,9 +181,7 @@ spec:
             value: "component=terminating-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
           {{- end }}
           - name: CONSUL_NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
+            value: $(NODE_NAME)-virtual
           command:
             - "/bin/sh"
             - "-ec"
@@ -238,14 +240,16 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           - name: DP_CREDENTIAL_LOGIN_META1
             value: pod=$(NAMESPACE)/$(POD_NAME)
           - name: DP_CREDENTIAL_LOGIN_META2
             value: component=terminating-gateway
           - name: DP_SERVICE_NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
+            value: $(NODE_NAME)-virtual
           command:
           - consul-dataplane
           args:

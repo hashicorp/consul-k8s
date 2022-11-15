@@ -254,7 +254,7 @@ func TestVault(t *testing.T) {
 		"syncCatalog.toK8S":    "false",
 
 		// Enable clients to make sure vault integration still works.
-		//"client.enabled": "true",
+		"client.enabled": "true",
 	}
 
 	if cfg.EnableEnterprise {

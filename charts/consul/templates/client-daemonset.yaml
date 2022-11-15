@@ -329,7 +329,7 @@ spec:
                 -hcl='verify_server_hostname = true' \
                 {{- end }}
                 {{- end }}
-                -hcl='ports { https = 8501, grpc = -1, grpc_tls = 8502 }' \
+                -hcl='ports { https = 8501 }' \
                 {{- if .Values.global.tls.httpsOnly }}
                 -hcl='ports { http = -1 }' \
                 {{- end }}
