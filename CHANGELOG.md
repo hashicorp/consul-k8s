@@ -49,6 +49,7 @@ IMPROVEMENTS:
   * The Envoy version is now 1.24.0 for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
   * Allow addition of extra labels to Connect Inject pods. [[GH-1678](https://github.com/hashicorp/consul-k8s/pull/1678)]
   * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
+  * API Gateway: Enable API Gateways to directly connect to Consul servers when running in the agentless configuration. [[GH-1694](https://github.com/hashicorp/consul-k8s/pull/1694)]
 
 BUG FIXES:
 * Peering

@@ -11,6 +11,28 @@ metadata:
     component: api-gateway
 spec:
   consul:
+    {{- if .Values.client.enabled }}
+    {{/*
+      We use client agent nodes if we have them to support backwards compatibility in <=0.4 releases which
+      require connectivity between the registered Consul agent node and a deployment for health checking
+      (originating from the Consul node). Always leveraging the agents in the case that they're explicitly
+      opted into allows us to support users with agent node + "externalServers" configuration upgrading a
+      helm chart without upgrading api gateways. Otherwise, using "externalServers" when provided
+      without local agents will break gateways <=0.4.
+    */}}
+    address: $(HOST_IP)
+    {{- else if .Values.externalServers.enabled }} 
+    {{/*
+      "externalServers" specified and running in "agentless" mode, this will only work 0.5+
+    */}}
+    address: {{ first .Values.externalServers.hosts }}
+    {{- else }}
+    {{/*
+      We have local network connectivity between deployments and the internal cluster, this
+      should be supported in all versions of api-gateway
+    */}}
+    address: {{ template "consul.fullname" . }}-server
+    {{- end }}
     authentication:
       {{- if .Values.global.acls.manageSystemACLs }}
       managed: true
@@ -25,12 +47,21 @@ spec:
     scheme: http
     {{- end }}
     ports:
+      {{- if .Values.externalServers.enabled }}
+      grpc: {{ .Values.externalServers.grpcPort }} 
+      {{- if .Values.global.tls.enabled }}
+      http: {{ .Values.externalServers.httpsPort }}
+      {{- else }}
+      http: {{ .Values.externalServers.httpPort }}
+      {{- end }}
+      {{- else }}
       grpc: 8502
-    {{- if .Values.global.tls.enabled }}
+      {{- if .Values.global.tls.enabled }}
       http: 8501
-    {{- else }}
+      {{- else }}
       http: 8500
-    {{- end }}
+      {{- end }}
+      {{- end }}
   {{- with .Values.apiGateway.managedGatewayClass.deployment }}
   deployment:
     {{- toYaml . | nindent 4 }}

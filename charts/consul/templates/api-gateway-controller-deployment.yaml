@@ -69,11 +69,46 @@ spec:
           value: "/consul/login/acl-token"
         {{- end }}
         - name: CONSUL_HTTP_ADDR
+          {{- if .Values.client.enabled }}
+          {{/*
+            We use client agent nodes if we have them to support backwards compatibility for Consul API Gateway
+            v0.4 and older, which requires connectivity between the registered Consul agent node and a
+            deployment for health checking (originating from the Consul node). Always leveraging the agents in
+            the case that they're explicitly opted into allows us to support users with agent node +
+            "externalServers" configuration upgrading a Helm chart without upgrading API gateways.
+          */}}
           {{- if .Values.global.tls.enabled }}
-          value: https://$(HOST_IP):8501
+          value: $(HOST_IP):8501
           {{- else }}
-          value: http://$(HOST_IP):8500
+          value: $(HOST_IP):8500
           {{- end }}
+          {{- else if .Values.externalServers.enabled }}
+          {{/*
+            "externalServers" specified and running in "agentless" mode, this will only work with
+            Consul API Gateway v0.5 or newer
+          */}}
+          {{- if .Values.global.tls.enabled }}
+          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
+          {{- else }}
+          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
+          {{- end }}
+          {{- else }}
+          {{/*
+            We have local network connectivity between deployments and the internal cluster, this
+            should be supported in all versions of Consul API Gateway
+          */}}
+          {{- if .Values.global.tls.enabled }}
+          value: {{ template "consul.fullname" . }}-server:8501
+          {{- else }}
+          value: {{ template "consul.fullname" . }}-server:8500
+          {{- end }}
+          {{- end }}
+        - name: CONSUL_HTTP_SSL
+          value: "{{ .Values.global.tls.enabled }}"
+        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+        - name: CONSUL_TLS_SERVER_NAME
+          value: {{ .Values.externalServers.tlsServerName }}
+        {{- end }}
         command:
         - "/bin/sh"
         - "-ec"
