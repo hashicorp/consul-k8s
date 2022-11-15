@@ -115,6 +115,10 @@ spec:
         {{- if .Values.global.adminPartitions.enabled }}
         - name: CONSUL_PARTITION
           value: {{ .Values.global.adminPartitions.name }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_PARTITION
+          value: {{ .Values.global.adminPartitions.name }}
+        {{- end }}
         {{- end }}
         command:
         - "/bin/sh"
@@ -229,9 +233,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         - name: CONSUL_LOGIN_META  
           value: "component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
         - mountPath: /consul/login
