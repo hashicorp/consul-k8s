@@ -205,18 +205,20 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
 	}
 
+	// Set a default scrape path that can be overwritten by the annotation.
+	prometheusScrapePath := w.MetricsConfig.PrometheusScrapePath(pod)
+	args = append(args, "-telemetry-prom-scrape-path="+prometheusScrapePath)
+
 	metricsServer, err := w.MetricsConfig.ShouldRunMergedMetricsServer(pod)
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine if merged metrics is enabled: %w", err)
 	}
 	if metricsServer {
-		prometheusScrapePath := w.MetricsConfig.PrometheusScrapePath(pod)
 		mergedMetricsPort, err := w.MetricsConfig.MergedMetricsPort(pod)
 		if err != nil {
 			return nil, fmt.Errorf("unable to determine if merged metrics port: %w", err)
 		}
-		args = append(args, "-telemetry-prom-scrape-path="+prometheusScrapePath,
-			"-telemetry-prom-merge-port="+mergedMetricsPort)
+		args = append(args, "-telemetry-prom-merge-port="+mergedMetricsPort)
 
 		serviceMetricsPath := w.MetricsConfig.ServiceMetricsPath(pod)
 		serviceMetricsPort, err := w.MetricsConfig.ServiceMetricsPort(pod)
