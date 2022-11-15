@@ -303,12 +303,27 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -329,16 +344,23 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -346,9 +368,8 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
 }
 
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
@@ -370,7 +391,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-auth-method-name=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -378,24 +399,31 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -447,11 +475,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-auth-method-name=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-datacenter=dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -472,24 +500,31 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.volumeMounts[1].name] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
