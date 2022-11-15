@@ -1435,3 +1435,26 @@ key2: value2' \
       yq '.spec.template.spec.containers[0].args | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "terminatingGateways/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+    . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
+  [ "${actual}" = "server.dc1.consul" ]
+}
+
