@@ -12,9 +12,11 @@ BREAKING CHANGES:
       * `client.snaphostAgent.replicas`
       * `client.snaphostAgent.serviceAccount`
     * Remove `global.secretsBackend.vault.consulSnapshotAgentRole` value. You should now use the `global.secretsBackend.vault.consulServerRole` for access to any Vault secrets. 
-  * Change`dns.enabled` and `dns.enableRedirection` to default to the value of `connectInject.transparentProxy.defaultEnabled`.
+  * Change `dns.enabled` and `dns.enableRedirection` to default to the value of `connectInject.transparentProxy.defaultEnabled`.
     Previously, `dns.enabled` defaulted to the value of `global.enabled` and `dns.enableRedirection` defaulted to the
     value to `false`. [[GH-1688](https://github.com/hashicorp/consul-k8s/pull/1688)]
+  * Remove `global.imageEnvoy` and replace with `global.imageConsulDataplane` for running the sidecar proxy.
+  * Add `apiGateway.imageEnvoy` as the API Gateway uses Envoy. [[GH-1698](https://github.com/hashicorp/consul-k8s/pull/1698)]
 * Peering:
   * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
     to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
@@ -50,6 +52,8 @@ IMPROVEMENTS:
   * Allow addition of extra labels to Connect Inject pods. [[GH-1678](https://github.com/hashicorp/consul-k8s/pull/1678)]
   * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
   * API Gateway: Enable API Gateways to directly connect to Consul servers when running in the agentless configuration. [[GH-1694](https://github.com/hashicorp/consul-k8s/pull/1694)]
+  * Add `connectInject.consulNode.meta` to allow users to provide custom metadata to append to the NodeMeta [[GH-1707](https://github.com/hashicorp/consul-k8s/pull/1707)]
+  * Add `externalServers.skipServerWatch` which prevents consul-dataplane from consuming the server update stream. This is useful for situations where Consul servers are behind a load balancer. [[GH-1686](https://github.com/hashicorp/consul-k8s/pull/1686)]
 
 BUG FIXES:
 * Peering
