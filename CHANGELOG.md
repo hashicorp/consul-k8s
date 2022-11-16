@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Control Plane
+   * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.1`. [[GH-1725](https://github.com/hashicorp/consul-k8s/pull/1725)]
+
 ## 0.49.1 (November 14, 2022)
 BREAKING CHANGES:
 * Peering:
