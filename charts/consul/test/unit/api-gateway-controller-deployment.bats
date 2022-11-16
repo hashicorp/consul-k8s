@@ -1302,3 +1302,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].env[4].value == "hashi"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# Admin Partitions
+
+@test "apiGateway/Deployment: CONSUL_PARTITION is set when using admin partitions" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=hashi' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3].value == "hashi"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_LOGIN_PARTITION is set when using admin partitions with ACLs" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=hashi' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[4].value == "hashi"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
