@@ -858,7 +858,7 @@ load _helpers
   [ "${actual}" = 'component=connect-injector,pod=$(NAMESPACE)/$(POD_NAME)' ]
 }
 
-@test "connectInject/Deployment: sets global auth method and primary datacenter when federation and acls and namespaces are enabled" {
+@test "connectInject/Deployment: sets global auth method and primary datacenter when federation and acls" {
   cd `chart_dir`
   local env=$(helm template \
       -s templates/connect-inject-deployment.yaml \
@@ -867,7 +867,6 @@ load _helpers
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc1' \
       --set 'global.datacenter=dc2' \
-      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'meshGateway.enabled=true' \
       . | tee /dev/stderr |
