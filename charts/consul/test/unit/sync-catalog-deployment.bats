@@ -982,6 +982,12 @@ load _helpers
   local actual
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
+
+  actual=$(echo $object | jq -r '.spec.volumes[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  actual=$(echo $object | jq -r '.spec.containers[0].volumeMounts[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
 }
 
 @test "syncCatalog/Deployment: vault CA is not configured by default" {

@@ -427,7 +427,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Tags:      tags,
 	}
 	serviceRegistration := &api.CatalogRegistration{
-		Node:    pod.Spec.NodeName,
+		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",
@@ -616,7 +616,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	proxyServiceRegistration := &api.CatalogRegistration{
-		Node:    pod.Spec.NodeName,
+		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",
@@ -752,7 +752,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	serviceRegistration := &api.CatalogRegistration{
-		Node:    pod.Spec.NodeName,
+		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",
@@ -1052,7 +1052,7 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	}
 	for _, node := range nodeList.Items {
 		var nodeServices *api.CatalogNodeServiceList
-		nodeServices, err = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, node.Name)
+		nodeServices, err = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
 		serviceList = append(serviceList, nodeServices)
 	}
 

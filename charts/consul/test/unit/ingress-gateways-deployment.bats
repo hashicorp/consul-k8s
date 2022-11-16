@@ -1027,6 +1027,21 @@ key2: value2' \
 
   local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
+
+  actual=$(echo $object | jq -r '.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  actual=$(echo $object | jq -r '.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  actual=$(echo $object | jq -r '.spec.initContainers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  actual=$(echo $object | jq -r '.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
+
+  actual=$(echo $object | jq -r '.spec.containers[0].args | any(contains("-ca-certs=/vault/secrets/serverca.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "ingressGateway/Deployment: vault CA is not configured by default" {
