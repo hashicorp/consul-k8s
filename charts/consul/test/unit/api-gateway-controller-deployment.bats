@@ -284,6 +284,18 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: CONSUL_LOGIN_DATACENTER is set when acls are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[2].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1331,6 +1343,6 @@ load _helpers
       --set 'global.adminPartitions.name=hashi' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[4].value == "hashi"' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].env[6].value == "hashi"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
