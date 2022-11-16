@@ -859,6 +859,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "client/DaemonSet: TLS GRPC port is configured" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("ports { grpc = -1, grpc_tls = 8502 }")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: non-TLS GRPC port is configured when TLS is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("ports { grpc = 8502, grpc_tls = -1 }")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "client/DaemonSet: init container is created when global.tls.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \

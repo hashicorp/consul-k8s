@@ -33,11 +33,14 @@ on:
     secrets:
         CONSUL_ENT_LICENSE:
           required: true
+        VAULT_LICENSE:
+          required: true
 
 # Environment variables can only be used at the step level
 env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   CONSUL_ENT_LICENSE: ${{ secrets.CONSUL_ENT_LICENSE }}
+  VAULT_LICENSE: ${{ secrets.VAULT_LICENSE }}
   CONSUL_K8S_IMAGE: ${{ inputs.consul-k8s-image }}
 
 jobs:

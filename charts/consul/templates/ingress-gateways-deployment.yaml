@@ -152,7 +152,7 @@ spec:
         emptyDir:
           medium: "Memory"
       {{- if $root.Values.global.tls.enabled }}
-      {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+      {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
       - name: consul-ca-cert
         secret:
           {{- if $root.Values.global.tls.caCert.secretName }}
@@ -178,6 +178,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         {{- include "consul.consulK8sConsulServerEnvVars" $root | nindent 8 }}
         {{- if $root.Values.global.enableConsulNamespaces }}
         - name: CONSUL_NAMESPACE
@@ -192,9 +196,7 @@ spec:
           value: "component=ingress-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
        {{- end }}
         - name: CONSUL_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
+          value: $(NODE_NAME)-virtual
         command:
         - "/bin/sh"
         - "-ec"
@@ -208,10 +210,12 @@ spec:
         volumeMounts:
         - name: consul-service
           mountPath: /consul/service
-        {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+        {{- if $root.Values.global.tls.enabled }}
+        {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
           readOnly: true
+        {{- end }}
         {{- end }}
         resources:
           requests:
@@ -230,10 +234,12 @@ spec:
         - name: consul-service
           mountPath: /consul/service
           readOnly: true
-        {{- if and $root.Values.global.tls.enabled (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+        {{- if $root.Values.global.tls.enabled }}
+        {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
           readOnly: true
+        {{- end }}
         {{- end }}
         env:
         - name: POD_NAME
@@ -248,6 +254,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         - name: DP_ENVOY_READY_BIND_ADDRESS
           valueFrom:
             fieldRef:
@@ -257,9 +267,7 @@ spec:
         - name: DP_CREDENTIAL_LOGIN_META2
           value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
+          value: $(NODE_NAME)-virtual
         command:
         - consul-dataplane
         args:
@@ -280,7 +288,11 @@ spec:
         {{- end }}
         {{- if and $root.Values.global.tls.enabled }}
         {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
+        {{- if $root.Values.global.secretsBackend.vault.enabled }}
+        - -ca-certs=/vault/secrets/serverca.crt
+        {{- else }}
         - -ca-certs=/consul/tls/ca/tls.crt
+        {{- end }}
         {{- end }}
         {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
         - -tls-server-name={{ $root.Values.externalServers.tlsServerName }}

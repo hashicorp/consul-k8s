@@ -116,6 +116,14 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				},
 			},
 			{
+				Name: "NODE_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "spec.nodeName",
+					},
+				},
+			},
+			{
 				Name:  "CONSUL_ADDRESSES",
 				Value: w.ConsulAddress,
 			},
@@ -132,12 +140,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: w.ConsulConfig.APITimeout.String(),
 			},
 			{
-				Name: "CONSUL_NODE_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "spec.nodeName",
-					},
-				},
+				Name:  "CONSUL_NODE_NAME",
+				Value: "$(NODE_NAME)-virtual",
 			},
 		},
 		Resources:    w.InitContainerResources,
