@@ -29,7 +29,7 @@ global:
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
-  # [Experimental] Configures the Cluster Peering feature. Requires Consul v1.13+ and Consul-K8s v0.45+.
+  # Configures the Cluster Peering feature. Requires Consul v1.14+ and Consul-K8s v1.0.0+.
   peering:
     # If true, the Helm chart enables Cluster Peering for the cluster. This option enables peering controllers and
     # allows use of the PeeringAcceptor and PeeringDialer CRDs for establishing service mesh peerings.
@@ -325,6 +325,7 @@ global:
     # If true, the Helm chart will enable TLS for Consul
     # servers and clients and all consul-k8s-control-plane components, as well as generate certificate
     # authority (optional) and server and client certificates.
+    # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
     enabled: false
 
     # If true, turns on the auto-encrypt feature on clients and servers.
@@ -2326,13 +2327,12 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
-# Mesh Gateways enable Consul Connect to work across Consul datacenters.
+# [Mesh Gateways](/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
-  # If mesh gateways are enabled, a Deployment will be created that runs
+  # If [mesh gateways](/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
-  # See https://www.consul.io/docs/connect/mesh_gateway.html
-  # Requirements: consul 1.6.0+ if using
-  # global.acls.manageSystemACLs.
+  # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
+  # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
   # Number of replicas for the Deployment.
