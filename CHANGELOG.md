@@ -38,7 +38,8 @@ IMPROVEMENTS:
 * Control Plane
   * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
   * Remove unneeded `agent:read` ACL permissions from mesh gateway policy. [[GH-1255](https://github.com/hashicorp/consul-k8s/pull/1255)]
-  * Support updating health checks on consul clients during an upgrade to agentless. [[GH-1690](https://github.com/hashicorp/consul-k8s/pull/1690)] 
+  * Support updating health checks on consul clients during an upgrade to agentless. [[GH-1690](https://github.com/hashicorp/consul-k8s/pull/1690)]
+  * Remove unused curl from docker images [[1624](https://github.com/hashicorp/consul-k8s/pull/1624)]
 * Helm:
   * Remove deprecated annotation `service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"` in the `server-service` template. [[GH-1619](https://github.com/hashicorp/consul-k8s/pull/1619)]
   * Support `minAvailable` on connect injector `PodDisruptionBudget`. [[GH-1557](https://github.com/hashicorp/consul-k8s/pull/1557)]
@@ -54,6 +55,11 @@ IMPROVEMENTS:
   * API Gateway: Enable API Gateways to directly connect to Consul servers when running in the agentless configuration. [[GH-1694](https://github.com/hashicorp/consul-k8s/pull/1694)]
   * Add `connectInject.consulNode.meta` to allow users to provide custom metadata to append to the NodeMeta [[GH-1707](https://github.com/hashicorp/consul-k8s/pull/1707)]
   * Add `externalServers.skipServerWatch` which prevents consul-dataplane from consuming the server update stream. This is useful for situations where Consul servers are behind a load balancer. [[GH-1686](https://github.com/hashicorp/consul-k8s/pull/1686)]
+  * Support simplified default deployment values to allow for easier quick starts and testing:
+      * Set `connectInject.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+      * Set `meshGateway.affinity` to null and `meshGateway.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+      * Set `ingressGateways.defaults.affinity` to null and `ingressGateways.defaults.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+      * Set `terminatingGateways.defaults.affinity` to null and `terminatingGateways.defaults.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
 
 BUG FIXES:
 * Peering
