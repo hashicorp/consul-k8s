@@ -67,6 +67,8 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: "/consul/login/acl-token"
+        - name: CONSUL_LOGIN_DATACENTER
+          value: {{ .Values.global.datacenter }}
         {{- end }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.client.enabled }}
