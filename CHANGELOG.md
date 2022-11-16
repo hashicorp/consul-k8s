@@ -16,7 +16,7 @@ BREAKING CHANGES:
     Previously, `dns.enabled` defaulted to the value of `global.enabled` and `dns.enableRedirection` defaulted to the
     value to `false`. [[GH-1688](https://github.com/hashicorp/consul-k8s/pull/1688)]
   * Remove `global.imageEnvoy` and replace with `global.imageConsulDataplane` for running the sidecar proxy.
-  * Add `apiGateway.imageEnvoy` as the API Gateway uses Envoy. [[GH-1698](https://github.com/hashicorp/consul-k8s/pull/1698)]
+  * Add `apiGateway.imageEnvoy` as for configuring the version of Envoy that the API Gateway uses. [[GH-1698](https://github.com/hashicorp/consul-k8s/pull/1698)]
 * Peering:
   * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
     to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
