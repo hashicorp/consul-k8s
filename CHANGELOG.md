@@ -37,6 +37,7 @@ IMPROVEMENTS:
   * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
   * Remove unneeded `agent:read` ACL permissions from mesh gateway policy. [[GH-1255](https://github.com/hashicorp/consul-k8s/pull/1255)]
   * Support updating health checks on consul clients during an upgrade to agentless. [[GH-1690](https://github.com/hashicorp/consul-k8s/pull/1690)] 
+  * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.1`. [[GH-1725][https://github.com/hashicorp/consul-k8s/pull/1725]]
 * Helm:
   * Remove deprecated annotation `service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"` in the `server-service` template. [[GH-1619](https://github.com/hashicorp/consul-k8s/pull/1619)]
   * Support `minAvailable` on connect injector `PodDisruptionBudget`. [[GH-1557](https://github.com/hashicorp/consul-k8s/pull/1557)]
