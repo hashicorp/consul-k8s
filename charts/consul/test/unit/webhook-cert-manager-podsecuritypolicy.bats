@@ -15,7 +15,7 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
-      --set 'connectInject.enabled=false' \
+      --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=false' \
       .
 }
