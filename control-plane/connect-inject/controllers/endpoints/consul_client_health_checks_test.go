@@ -18,18 +18,19 @@ func TestIsConsulDataplaneSupported(t *testing.T) {
 	versions := map[string]struct {
 		expIsConsulDataplaneSupported bool
 	}{
-		"":                  {false},
-		"v1.0.0":            {true},
-		"1.0.0":             {true},
-		"v0.49.0":           {false},
-		"0.49.0-beta2":      {false},
-		"0.49.2":            {false},
-		"v1.0.0-beta1":      {true},
-		"v1.0.0-beta3":      {true},
-		"v1.1.0-beta1":      {true},
-		"v1.0.0-dev":        {true},
-		"v1.0.0-dev+abcdef": {true},
-		"invalid":           {false},
+		"":                    {false},
+		"v1.0.0":              {true},
+		"1.0.0":               {true},
+		"v0.49.0":             {false},
+		"0.49.0-beta2":        {false},
+		"0.49.2":              {false},
+		"v1.0.0-beta1":        {true},
+		"v1.0.0-beta3":        {true},
+		"v1.1.0-beta1":        {true},
+		"v1.0.0-dev":          {true},
+		"v1.0.0-dev (abcdef)": {true},
+		"v1.0.0-dev+abcdef":   {true},
+		"invalid":             {true},
 	}
 
 	for version, c := range versions {
