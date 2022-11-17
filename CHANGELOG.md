@@ -1,6 +1,8 @@
 ## UNRELEASED
 
 BREAKING CHANGES:
+* Helm:
+  * Kubernetes-1.25 is now supported with the caveat that `global.enablePodSecurityPolicies` is not supported since PodSecurityPolicies have been removed in favor of PodSecurityStandards in Kubernetes-1.25. Full support for PodSecurityStandards will be added in a follow-on commit. [[GH-1726](https://github.com/hashicorp/consul-k8s/pull/1726)]
 * CLI:
   * Change default behavior of `consul-k8s install` to perform the installation when no answer is provided to the prompt. [[GH-1673](https://github.com/hashicorp/consul-k8s/pull/1673)]
 * Helm:
