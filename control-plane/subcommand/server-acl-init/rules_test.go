@@ -196,6 +196,7 @@ func TestMeshGatewayRules(t *testing.T) {
 		Name             string
 		EnableNamespaces bool
 		EnablePeering    bool
+		PartitionName    string
 		Expected         string
 	}{
 		{
@@ -230,8 +231,24 @@ namespace_prefix "" {
 }`,
 		},
 		{
-			Name:          "Peering is enabled",
+			Name:          "Peering is enabled with unspecified partition name (oss case)",
 			EnablePeering: true,
+			Expected: `mesh = "write"
+peering = "read"
+  service "mesh-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
+  }`,
+		},
+		{
+			Name:          "Peering is enabled with partition explicitly specified as default (ent default case)",
+			EnablePeering: true,
+			PartitionName: "default",
 			Expected: `mesh = "write"
 peering = "read"
 partition_prefix "" {
@@ -248,14 +265,27 @@ partition_prefix "" {
   }`,
 		},
 		{
+			Name:          "Peering is enabled with partition explicitly specified as non-default (ent non-default case)",
+			EnablePeering: true,
+			PartitionName: "non-default",
+			Expected: `mesh = "write"
+peering = "read"
+  service "mesh-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
+  }`,
+		},
+		{
 			Name:             "Peering and namespaces are enabled",
 			EnablePeering:    true,
 			EnableNamespaces: true,
 			Expected: `mesh = "write"
 peering = "read"
-partition_prefix "" {
-  peering = "read"
-}
 namespace "default" {
   service "mesh-gateway" {
      policy = "write"
@@ -277,7 +307,9 @@ namespace_prefix "" {
 			cmd := Command{
 				flagEnableNamespaces: tt.EnableNamespaces,
 				flagEnablePeering:    tt.EnablePeering,
-				consulFlags:          &flags.ConsulFlags{},
+				consulFlags: &flags.ConsulFlags{
+					Partition: tt.PartitionName,
+				},
 			}
 
 			meshGatewayRules, err := cmd.meshGatewayRules()
