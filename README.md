@@ -35,19 +35,6 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
     Sync Consul services into first-class Kubernetes services and vice versa.
     This enables Kubernetes to easily access external services and for
     non-Kubernetes nodes to easily discover and access Kubernetes services.
-    
-### Prerequisites
-
-The following pre-requisites must be met before installing Consul on Kubernetes. 
-
-  * **Kubernetes 1.22.x - 1.25.x** - This represents the earliest versions of Kubernetes tested.
-    It is possible that this chart works with earlier versions, but it is
-    untested.
-  * Helm install
-    * **Helm 3.6+** for Helm based installs. 
-  * Consul K8s CLI based install
-    * `kubectl` configured to authenticate to a Kubernetes cluster with a valid `kubeconfig` file.
-    * `brew`, `yum`, or `apt` package manager on your local machine 
 
 ## Installation
 
@@ -62,8 +49,18 @@ The following pre-requisites must be met before installing Consul on Kubernetes.
 
   * Consul K8s CLI, distributed as `consul-k8s`, can be used to install and uninstall Consul Kubernetes. See the [Consul K8s CLI Reference](https://www.consul.io/docs/k8s/k8s-cli) for more details on usage. 
 
-  * Raw binaries are available in the [HashiCorp releases directory](https://releases.hashicorp.com/consul-k8s/).
-    These can be used to run `consul-k8s` directly or build custom packages.
+### Prerequisites
+
+The following pre-requisites must be met before installing Consul on Kubernetes. 
+
+  * **Kubernetes 1.22.x - 1.25.x** - This represents the earliest versions of Kubernetes tested.
+    It is possible that this chart works with earlier versions, but it is
+    untested.
+  * Helm install
+    * **Helm 3.6+** for Helm based installs. 
+  * Consul K8s CLI based install
+    * `kubectl` configured to authenticate to a Kubernetes cluster with a valid `kubeconfig` file.
+    * `brew`, `yum`, or `apt` package manager on your local machine 
 
 ## CLI
 
