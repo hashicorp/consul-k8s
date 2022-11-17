@@ -74,21 +74,21 @@ for each subcommand.
 
  1. Install the HashiCorp tap, which is a repository of all Homebrew packages for HashiCorp:
  
-   ``` bash
-   brew tap hashicorp/tap
-   ```
+    ``` bash
+    brew tap hashicorp/tap
+    ```
   
 2. Install the Consul K8s CLI with hashicorp/tap/consul formula.
 
-   ``` bash
-   brew install hashicorp/tap/consul-k8s
-   ```
+    ``` bash
+    brew install hashicorp/tap/consul-k8s
+    ```
   
 3. Issue the install subcommand to install Consul on Kubernetes:
    
-   ``` bash 
-   consul-k8s install 
-   ```
+    ``` bash 
+    consul-k8s install 
+    ```
 
 ## Helm
 
