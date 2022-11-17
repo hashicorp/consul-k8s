@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: static-client
-          image: docker.mirror.hashicorp.services/ubuntu:xenial
+          image: docker.mirror.hashicorp.services/buildpack-deps:jammy-curl
           command: [ "/bin/sh", "-c", "--" ]
           args: [ "while true; do sleep 30; done;" ]
           env:
