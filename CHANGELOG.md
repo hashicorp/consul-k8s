@@ -51,6 +51,7 @@ IMPROVEMENTS:
   * Allow addition of extra labels to Connect Inject pods. [[GH-1678](https://github.com/hashicorp/consul-k8s/pull/1678)]
   * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
   * API Gateway: Enable API Gateways to directly connect to Consul servers when running in the agentless configuration. [[GH-1694](https://github.com/hashicorp/consul-k8s/pull/1694)]
+  * API Gateway: Add support for using dynamic server discovery strings when running without agents. [[GH-1732](https://github.com/hashicorp/consul-k8s/pull/1732)]
 
 BUG FIXES:
 * Peering

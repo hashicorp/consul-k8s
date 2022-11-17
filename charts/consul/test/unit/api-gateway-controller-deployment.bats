@@ -1346,3 +1346,27 @@ load _helpers
       yq '.spec.template.spec.containers[0].env[6].value == "hashi"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is set when not using clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3].value == "true"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is not set when using clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3]' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
