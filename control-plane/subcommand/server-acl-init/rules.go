@@ -183,9 +183,11 @@ func (c *Command) meshGatewayRules() (string, error) {
 	meshGatewayRulesTpl := `mesh = "write"
 {{- if .EnablePeering }}
 peering = "read"
+{{- if eq .PartitionName "default" }}
 partition_prefix "" {
   peering = "read"
 }
+{{- end }}
 {{- end }}
 {{- if .EnableNamespaces }}
 namespace "default" {
