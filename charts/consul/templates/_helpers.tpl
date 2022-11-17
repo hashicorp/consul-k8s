@@ -353,6 +353,9 @@ Consul server environment variables for consul-k8s commands.
 {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
 - name: CONSUL_TLS_SERVER_NAME
   value: {{ .Values.externalServers.tlsServerName }}
+{{- else if .Values.global.cloud.enabled }}
+- name: CONSUL_TLS_SERVER_NAME
+  value: server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
 {{- end }}
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
