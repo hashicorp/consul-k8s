@@ -1287,7 +1287,6 @@ workflows:
       - cleanup-azure-resources
       - cleanup-eks-resources
 
-
   nightly-acceptance-tests-release:
     description: |
       Tests which run on a release branch nightly. These exist separate from the main
@@ -1300,6 +1299,7 @@ workflows:
             branches:
               only:
                 - release/0.49.x
+                - release/1.0.x
     jobs:
       - build-distro:
           OS: "linux"
@@ -1316,18 +1316,6 @@ workflows:
       - acceptance-gke-cni-1-23:
           requires:
             - acceptance-gke-1-23
-      - acceptance-eks-1-21:
-          requires:
-            - dev-upload-docker
-      - acceptance-eks-cni-1-21:
-          requires:
-            - acceptance-eks-1-21
-      - acceptance-aks-1-22:
-          requires:
-            - dev-upload-docker
-      - acceptance-aks-cni-1-22:
-          requires:
-            - acceptance-aks-1-22
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
