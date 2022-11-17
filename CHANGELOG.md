@@ -1,4 +1,4 @@
-## UNRELEASED
+## 1.0.0 (November 17, 2022)
 
 BREAKING CHANGES:
 * Admin Partitions **(Consul Enterprise only)**: Remove the partition service. When configuring Admin Partitions, the expose-servers service should be used instead.
