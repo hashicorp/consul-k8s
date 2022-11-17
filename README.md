@@ -35,6 +35,19 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
     Sync Consul services into first-class Kubernetes services and vice versa.
     This enables Kubernetes to easily access external services and for
     non-Kubernetes nodes to easily discover and access Kubernetes services.
+    
+### Prerequisites
+
+The following pre-requisites must be met before installing Consul on Kubernetes. 
+
+  * **Kubernetes 1.22.x - 1.25.x** - This represents the earliest versions of Kubernetes tested.
+    It is possible that this chart works with earlier versions, but it is
+    untested.
+  * Helm install
+    * **Helm 3.6+** for Helm based installs. 
+  * Consul K8s CLI based install
+    * `kubectl` configured to authenticate to a Kubernetes cluster with a valid `kubeconfig` file.
+    * `brew`, `yum`, or `apt` package manager on your local machine 
 
 ## Installation
 
@@ -52,6 +65,29 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
   * Raw binaries are available in the [HashiCorp releases directory](https://releases.hashicorp.com/consul-k8s/).
     These can be used to run `consul-k8s` directly or build custom packages.
 
+## CLI
+
+The Consul K8s CLI is the easiest way to get up and running with Consul on Kubernetes. See [Install Consul on K8s CLI](https://developer.hashicorp.com/consul/docs/k8s/installation/install-cli#install-the-cli) for more details on installation, and refer to 
+[Consul on Kubernetes CLI Reference](https://developer.hashicorp.com/consul/docs/k8s/k8s-cli) for more details on subcommands and a list of all available flags
+for each subcommand. 
+
+
+ 1. Install the HashiCorp tap, which is a repository of all Homebrew packages for HashiCorp:
+ 
+ ``` bash
+  brew tap hashicorp/tap
+  ```
+  
+  1. Install the Consul K8s CLI with hashicorp/tap/consul formula.
+  ``` bash
+  brew install hashicorp/tap/consul-k8s
+  ```
+  
+  1. Issue the install subcommand to install Consul on Kubernetes:
+  ``` bash 
+  consul-k8s install 
+  ```
+
 ## Helm
 
 Within the ['charts/consul'](charts/consul) directory is the official HashiCorp Helm chart for installing
@@ -61,12 +97,6 @@ cases of Consul on Kubernetes, depending on the values provided.
 For full documentation on this Helm chart along with all the ways you can
 use Consul with Kubernetes, please see the
 [Consul and Kubernetes documentation](https://www.consul.io/docs/platform/k8s/index.html).
-
-### Prerequisites
-  * **Helm 3.6+** 
-  * **Kubernetes 1.22.x - 1.25.x** - This represents the earliest versions of Kubernetes tested.
-    It is possible that this chart works with earlier versions, but it is
-    untested.
 
 ### Usage
 
