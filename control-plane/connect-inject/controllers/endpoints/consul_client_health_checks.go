@@ -19,7 +19,9 @@ func isConsulDataplaneSupported(pod corev1.Pod) bool {
 	if anno, ok := pod.Annotations[constants.AnnotationConsulK8sVersion]; ok {
 		consulK8sVersion, err := version.NewVersion(anno)
 		if err != nil {
-			return false
+			// Only consul-k8s v1.0.0+ (including pre-release versions) have the version annotation. So it would be
+			// reasonable to default to supporting dataplane even if the version is malformed or invalid.
+			return true
 		}
 		consulDPSupportedVersion, err := version.NewVersion(minSupportedConsulDataplaneVersion)
 		if err != nil {

@@ -61,6 +61,8 @@ IMPROVEMENTS:
       * Set `meshGateway.affinity` to null and `meshGateway.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
       * Set `ingressGateways.defaults.affinity` to null and `ingressGateways.defaults.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
       * Set `terminatingGateways.defaults.affinity` to null and `terminatingGateways.defaults.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+  * API Gateway: Add support for using dynamic server discovery strings when running without agents. [[GH-1732](https://github.com/hashicorp/consul-k8s/pull/1732)]
+
 
 BUG FIXES:
 * Peering
