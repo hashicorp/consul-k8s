@@ -4,9 +4,6 @@
 </h1>
 
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
- 
-> **Warning**  
-> Please read the following issue to learn more about upcoming breaking changes that will be implemented by Q4 2022 for the default deployment of Consul on Kubernetes: [Enabling of service mesh by default and disabling of node-level client agents from Consul Service Mesh on Kubernetes and Catalog Sync](https://github.com/hashicorp/consul-k8s/issues/1438)
 
 ## Overview
 
@@ -52,28 +49,47 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
   * Consul K8s CLI, distributed as `consul-k8s`, can be used to install and uninstall Consul Kubernetes. See the [Consul K8s CLI Reference](https://www.consul.io/docs/k8s/k8s-cli) for more details on usage. 
 
-  * Raw binaries are available in the [HashiCorp releases directory](https://releases.hashicorp.com/consul-k8s/).
-    These can be used to run `consul-k8s` directly or build custom packages.
-
-## Helm
-
-Within the ['charts/consul'](charts/consul) directory is the official HashiCorp Helm chart for installing
-and configuring Consul on Kubernetes. This chart supports multiple use
-cases of Consul on Kubernetes, depending on the values provided.
-
-For full documentation on this Helm chart along with all the ways you can
-use Consul with Kubernetes, please see the
-[Consul and Kubernetes documentation](https://www.consul.io/docs/platform/k8s/index.html).
-
 ### Prerequisites
-  * **Helm 3.6+** 
-  * **Kubernetes 1.21-1.24** - This is the earliest version of Kubernetes tested.
+
+The following pre-requisites must be met before installing Consul on Kubernetes. 
+
+  * **Kubernetes 1.22.x - 1.25.x** - This represents the earliest versions of Kubernetes tested.
     It is possible that this chart works with earlier versions, but it is
     untested.
+  * Helm install
+    * **Helm 3.6+** for Helm based installs. 
+  * Consul K8s CLI based install
+    * `kubectl` configured to authenticate to a Kubernetes cluster with a valid `kubeconfig` file.
+    * `brew`, `yum`, or `apt` package manager on your local machine 
 
-### Usage
+### CLI
 
-Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
+The Consul K8s CLI is the easiest way to get up and running with Consul on Kubernetes. See [Install Consul on K8s CLI](https://developer.hashicorp.com/consul/docs/k8s/installation/install-cli#install-the-cli) for more details on installation, and refer to 
+[Consul on Kubernetes CLI Reference](https://developer.hashicorp.com/consul/docs/k8s/k8s-cli) for more details on subcommands and a list of all available flags
+for each subcommand. 
+
+
+ 1. Install the HashiCorp tap, which is a repository of all Homebrew packages for HashiCorp:
+ 
+    ``` bash
+    brew tap hashicorp/tap
+    ```
+  
+2. Install the Consul K8s CLI with hashicorp/tap/consul formula.
+
+    ``` bash
+    brew install hashicorp/tap/consul-k8s
+    ```
+  
+3. Issue the install subcommand to install Consul on Kubernetes:
+   
+    ``` bash 
+    consul-k8s install 
+    ```
+
+### Helm
+
+The Helm chart is ideal for those who prefer to use Helm for automation for either the installation or upgrade of Consul on Kubernetes. The chart supports multiple use cases of Consul on Kubernetes, depending on the values provided. Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
 1. Add the HashiCorp Helm repository:
    
@@ -98,7 +114,7 @@ Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
 [Consul website](https://www.consul.io/docs/platform/k8s/helm.html).
 
-# Tutorials
+## Tutorials
 
 You can find examples and complete tutorials on how to deploy Consul on 
 Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/collections/consul/kubernetes).
