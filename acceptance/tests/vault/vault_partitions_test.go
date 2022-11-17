@@ -357,7 +357,7 @@ func TestVault_Partitions(t *testing.T) {
 	consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
 	consulCluster.Create(t)
 
-	partitionServiceName := fmt.Sprintf("%s-consul-partition", consulReleaseName)
+	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)

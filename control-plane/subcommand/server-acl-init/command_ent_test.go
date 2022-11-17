@@ -1262,18 +1262,6 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) *tes
 
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
 	require.NoError(t, err)
-	// TODO (ashwin: agentless) remove this sleep.
-	// Currently we need this sleep in order to ensure the Consul client that is a partition of the Consul server
-	// can successfully join the server. 3 seconds was the minimum sleep that worked in this situation.
-	time.Sleep(3 * time.Second)
-	_ = test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
-		c.Server = false
-		c.Bootstrap = false
-		c.Partition = partitionName
-		c.RetryJoin = []string{server.TestServer.LANAddr}
-		c.ACL.Enabled = true
-		c.ACL.Tokens.InitialManagement = bootToken
-	})
 
 	return server.TestServer
 }
