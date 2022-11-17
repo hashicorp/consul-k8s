@@ -74,28 +74,25 @@ for each subcommand.
 
  1. Install the HashiCorp tap, which is a repository of all Homebrew packages for HashiCorp:
  
- ``` bash
-  brew tap hashicorp/tap
-  ```
+   ``` bash
+   brew tap hashicorp/tap
+   ```
   
-  1. Install the Consul K8s CLI with hashicorp/tap/consul formula.
-  ``` bash
-  brew install hashicorp/tap/consul-k8s
-  ```
+2. Install the Consul K8s CLI with hashicorp/tap/consul formula.
+
+   ``` bash
+   brew install hashicorp/tap/consul-k8s
+   ```
   
-  1. Issue the install subcommand to install Consul on Kubernetes:
-  ``` bash 
-  consul-k8s install 
-  ```
+3. Issue the install subcommand to install Consul on Kubernetes:
+   
+   ``` bash 
+   consul-k8s install 
+   ```
 
 ## Helm
 
-The Helm chart is ideal for those who prefer to use Helm for automation for either the installation or upgrade of Consul on Kubernetes. The chart supports multiple use cases of Consul on Kubernetes, depending on the values provided. For full documentation on this Helm chart along with all the ways you can
-use Consul with Kubernetes, please see the [Consul and Kubernetes documentation](https://www.consul.io/docs/platform/k8s/index.html).
-
-### Usage
-
-Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
+The Helm chart is ideal for those who prefer to use Helm for automation for either the installation or upgrade of Consul on Kubernetes. The chart supports multiple use cases of Consul on Kubernetes, depending on the values provided. Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
 1. Add the HashiCorp Helm repository:
    
