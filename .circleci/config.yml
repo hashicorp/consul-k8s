@@ -1273,9 +1273,6 @@ workflows:
           context: consul-ci
           requires:
           - dev-upload-docker
-      - acceptance-gke-1-23:
-          requires:
-            - dev-upload-docker
 
   nightly-cleanup:
     triggers:
