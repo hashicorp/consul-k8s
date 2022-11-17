@@ -7,6 +7,16 @@ load _helpers
   assert_empty helm template \
       -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
       --set 'connectInject.enabled=false' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      .
+}
+
+@test "webhookCertManager/PodSecurityPolicy: disabled by default with PSP disabled" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=false' \
       .
 }
 

@@ -11,6 +11,7 @@ BREAKING CHANGES:
 * CLI:
   * Change default behavior of `consul-k8s install` to perform the installation when no answer is provided to the prompt. [[GH-1673](https://github.com/hashicorp/consul-k8s/pull/1673)]
 * Helm:
+  * Kubernetes-1.25 is now supported with the caveat that `global.enablePodSecurityPolicies` is not supported since PodSecurityPolicies have been removed in favor of PodSecurityStandards in Kubernetes-1.25. Full support for PodSecurityStandards will be added in a follow-on commit. [[GH-1726](https://github.com/hashicorp/consul-k8s/pull/1726)]
   * `client.enabled` now defaults to `false`. Setting it to `true` will deploy client agents, however, none of the consul-k8s components will use clients for their operation.
   * `global.imageEnvoy` is no longer used for sidecar proxies, as well as mesh, terminating, and ingress gateways.
   * `externalServers.grpcPort` default is now `8502` instead of `8503`.

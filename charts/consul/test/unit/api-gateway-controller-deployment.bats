@@ -1235,7 +1235,7 @@ load _helpers
       --set 'global.tls.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.httpPort=8500' \
+      --set 'externalServers.httpsPort=8500' \
       --set 'server.enabled=false' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
