@@ -49,11 +49,7 @@ spec:
     ports:
       {{- if .Values.externalServers.enabled }}
       grpc: {{ .Values.externalServers.grpcPort }} 
-      {{- if .Values.global.tls.enabled }}
       http: {{ .Values.externalServers.httpsPort }}
-      {{- else }}
-      http: {{ .Values.externalServers.httpPort }}
-      {{- end }}
       {{- else }}
       grpc: 8502
       {{- if .Values.global.tls.enabled }}

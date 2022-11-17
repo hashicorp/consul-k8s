@@ -149,7 +149,7 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.grpcPort=1234' \
-      --set 'externalServers.httpPort=5678' \
+      --set 'externalServers.httpsPort=5678' \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.consul.ports' | tee /dev/stderr)

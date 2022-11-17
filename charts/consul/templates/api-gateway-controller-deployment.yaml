@@ -89,11 +89,7 @@ spec:
             "externalServers" specified and running in "agentless" mode, this will only work with
             Consul API Gateway v0.5 or newer
           */}}
-          {{- if .Values.global.tls.enabled }}
           value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
-          {{- else }}
-          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpPort }}
-          {{- end }}
           {{- else }}
           {{/*
             We have local network connectivity between deployments and the internal cluster, this
