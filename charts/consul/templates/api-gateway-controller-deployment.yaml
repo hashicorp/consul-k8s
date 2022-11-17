@@ -119,6 +119,10 @@ spec:
           value: {{ .Values.global.adminPartitions.name }}
         {{- end }}
         {{- end }}
+        {{- if not .Values.client.enabled }}
+        - name: CONSUL_DYNAMIC_SERVER_DISCOVERY
+          value: "true"
+        {{- end }}
         command:
         - "/bin/sh"
         - "-ec"
