@@ -67,6 +67,8 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: "/consul/login/acl-token"
+        - name: CONSUL_LOGIN_DATACENTER
+          value: {{ .Values.global.datacenter }}
         {{- end }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.client.enabled }}
@@ -108,6 +110,14 @@ spec:
         {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
         - name: CONSUL_TLS_SERVER_NAME
           value: {{ .Values.externalServers.tlsServerName }}
+        {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+        - name: CONSUL_PARTITION
+          value: {{ .Values.global.adminPartitions.name }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_PARTITION
+          value: {{ .Values.global.adminPartitions.name }}
+        {{- end }}
         {{- end }}
         command:
         - "/bin/sh"
@@ -214,16 +224,17 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-          {{- if .Values.global.tls.enabled }}
-        - name: CONSUL_CACERT
-          value: /consul/tls/ca/tls.crt
-          {{- end }}
-        - name: CONSUL_HTTP_ADDR
-          {{- if .Values.global.tls.enabled }}
-          value: https://$(HOST_IP):8501
-          {{- else }}
-          value: http://$(HOST_IP):8500
-          {{- end }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CONSUL_LOGIN_META  
+          value: "component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
         - mountPath: /consul/login
@@ -243,17 +254,16 @@ spec:
         - "-ec"
         - |
           consul-k8s-control-plane acl-init \
-            -component-name=api-gateway-controller \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-            -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+            -datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- else }}
-            -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method \
             {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
-            -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
+            -api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
         resources:
