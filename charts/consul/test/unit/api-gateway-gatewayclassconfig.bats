@@ -120,7 +120,7 @@ load _helpers
       --set 'apiGateway.image=foo' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.consul.address == "release-name-consul-server"' | tee /dev/stderr)
+      yq '.spec.consul.address == "release-name-consul-server.default.svc"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
