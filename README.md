@@ -62,7 +62,7 @@ The following pre-requisites must be met before installing Consul on Kubernetes.
     * `kubectl` configured to authenticate to a Kubernetes cluster with a valid `kubeconfig` file.
     * `brew`, `yum`, or `apt` package manager on your local machine 
 
-## CLI
+### CLI
 
 The Consul K8s CLI is the easiest way to get up and running with Consul on Kubernetes. See [Install Consul on K8s CLI](https://developer.hashicorp.com/consul/docs/k8s/installation/install-cli#install-the-cli) for more details on installation, and refer to 
 [Consul on Kubernetes CLI Reference](https://developer.hashicorp.com/consul/docs/k8s/k8s-cli) for more details on subcommands and a list of all available flags
@@ -87,7 +87,7 @@ for each subcommand.
     consul-k8s install 
     ```
 
-## Helm
+### Helm
 
 The Helm chart is ideal for those who prefer to use Helm for automation for either the installation or upgrade of Consul on Kubernetes. The chart supports multiple use cases of Consul on Kubernetes, depending on the values provided. Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
@@ -114,7 +114,7 @@ Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
 [Consul website](https://www.consul.io/docs/platform/k8s/helm.html).
 
-# Tutorials
+## Tutorials
 
 You can find examples and complete tutorials on how to deploy Consul on 
 Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/collections/consul/kubernetes).
