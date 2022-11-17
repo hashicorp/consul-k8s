@@ -541,19 +541,13 @@ func (c *Command) Run(args []string) int {
 		serviceAccountName := c.withPrefix("connect-injector")
 		componentAuthMethodName := localComponentAuthMethodName
 
-		// If namespaces are enabled, the policy and token need to be global
-		// to be allowed to create namespaces.
-		if c.flagEnableNamespaces {
-			// Create the connect-inject ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
-			// ConnectInjector token must be global when namespaces are enabled. This means secondary datacenters need
-			// a token that is known by the primary datacenters.
-			if !primary {
-				componentAuthMethodName = globalComponentAuthMethodName
-			}
-			err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
-		} else {
-			err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
+		// Create the connect-inject ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
+		// ConnectInjector token must be global. This means secondary datacenters need
+		// a token that is known by the primary datacenters.
+		if !primary {
+			componentAuthMethodName = globalComponentAuthMethodName
 		}
+		err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1

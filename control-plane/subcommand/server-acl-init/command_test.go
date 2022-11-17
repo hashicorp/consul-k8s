@@ -526,6 +526,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				"-timeout=1m",
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
+				"-auth-method-host=https://my-kube.com",
 				"-addresses", strings.Split(consulHTTPAddr, ":")[0],
 				"-http-port", strings.Split(consulHTTPAddr, ":")[1],
 				"-grpc-port", strings.Split(consulGRPCAddr, ":")[1],
@@ -1898,6 +1899,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			cmdArgs := append([]string{
 				"-timeout=1m",
 				"-k8s-namespace=" + ns,
+				"-auth-method-host=https://my-kube.com",
 				"-acl-replication-token-file", tokenFile,
 				"-addresses", strings.Split(serverAddr, ":")[0],
 				"-http-port", strings.Split(serverAddr, ":")[1],
@@ -2142,7 +2144,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			TokenFlags:       []string{"-connect-inject"},
 			PolicyNames:      []string{"connect-inject-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-connect-inject-acl-role-" + secondaryDatacenter},
-			GlobalAuthMethod: false,
+			GlobalAuthMethod: true,
 		},
 		{
 			TestName:         "Sync Catalog",
@@ -2436,8 +2438,8 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			ComponentName:    "connect-injector",
 			TokenFlags:       []string{"-connect-inject"},
 			Roles:            []string{resourcePrefix + "-connect-inject-acl-role-dc2"},
-			GlobalAuthMethod: false,
-			GlobalToken:      false,
+			GlobalAuthMethod: true,
+			GlobalToken:      true,
 		},
 		{
 			ComponentName:    "sync-catalog",

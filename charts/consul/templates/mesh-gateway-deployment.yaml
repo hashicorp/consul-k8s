@@ -186,7 +186,7 @@ spec:
           name: consul-service
           readOnly: true
         {{- if .Values.global.tls.enabled }}
-        {{- if and .Values.global.tls.enabled (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
           readOnly: true

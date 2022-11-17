@@ -1135,9 +1135,10 @@ externalServers:
 
   # An array of external Consul server hosts that are used to make
   # HTTPS connections from the components in this Helm chart.
-  # Valid values include IPs, DNS names, or Cloud auto-join string.
+  # Valid values include an IP, a DNS name, or an [exec=](https://github.com/hashicorp/go-netaddrs) string.
   # The port must be provided separately below.
-  # Note: `client.join` must also be set to the hosts that should be
+  # Note: This slice can only contain a single element.
+  # Note: If enabling clients, `client.join` must also be set to the hosts that should be
   # used to join the cluster. In most cases, the `client.join` values
   # should be the same, however, they may be different if you
   # wish to use separate hosts for the HTTPS connections.

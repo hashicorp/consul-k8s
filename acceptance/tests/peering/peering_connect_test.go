@@ -254,7 +254,9 @@ func TestPeering_Connect(t *testing.T) {
 			if c.ACLsEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false,
+						[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", fmt.Sprintf("curl: (6) Could not resolve host: static-server.virtual.%s.consul", staticServerPeer)},
+						"", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
 				} else {
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 				}

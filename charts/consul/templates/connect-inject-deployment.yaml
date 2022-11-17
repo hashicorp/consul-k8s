@@ -100,13 +100,13 @@ spec:
             {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 12 }}
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_LOGIN_AUTH_METHOD
-              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
               value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
               {{- else }}
               value: {{ template "consul.fullname" . }}-k8s-component-auth-method
               {{- end }}
             - name: CONSUL_LOGIN_DATACENTER
-              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
               value: {{ .Values.global.federation.primaryDatacenter }}
               {{- else }}
               value: {{ .Values.global.datacenter }}
