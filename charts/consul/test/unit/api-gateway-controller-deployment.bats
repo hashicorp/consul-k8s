@@ -1359,7 +1359,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is not set when not using clients" {
+@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is not set when using clients" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
