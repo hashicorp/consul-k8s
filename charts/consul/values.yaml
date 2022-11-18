@@ -160,12 +160,6 @@ global:
       # and check the name of `metadata.name`.
       adminPartitionsRole: ""
 
-      # The Vault role to read Consul controller's webhook's
-      # CA and issue a certificate and private key.
-      # A Vault policy must be created which grants issue capabilities to
-      # `global.secretsBackend.vault.controller.tlsCert.secretName`.
-      controllerRole: ""
-
       # The Vault role to read Consul connect-injector webhook's CA
       # and issue a certificate and private key.
       # A Vault policy must be created which grants issue capabilities to
@@ -240,25 +234,6 @@ global:
         # ```
         additionalConfig: |
           {}
-
-      controller:
-        # Configuration to the Vault Secret that Kubernetes will use on
-        # Kubernetes CRD creation, deletion, and update, to get TLS certificates
-        # used issued from vault to send webhooks to the controller.
-        tlsCert:
-          # The Vault secret path that issues TLS certificates for controller
-          # webhooks.
-          # @type: string
-          secretName: null
-
-        # Configuration to the Vault Secret that Kubernetes will use on 
-        # Kubernetes CRD creation, deletion, and update, to get CA certificates
-        # used issued from vault to send webhooks to the controller.
-        caCert:
-          # The Vault secret path that contains the CA certificate for controller
-          # webhooks.
-          # @type: string
-          secretName: null
 
       connectInject:
         # Configuration to the Vault Secret that Kubernetes will use on
