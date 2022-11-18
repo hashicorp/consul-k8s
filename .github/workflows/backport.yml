@@ -2,7 +2,7 @@
 name: Backport Assistant Runner
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - closed
       - labeled
