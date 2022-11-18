@@ -84,20 +84,6 @@ func TestVault(t *testing.T) {
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
-	// Configure controller webhook PKI
-	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
-		BaseURL:             "controller",
-		PolicyName:          "controller-ca-policy",
-		RoleName:            "controller-ca-role",
-		KubernetesNamespace: ns,
-		DataCenter:          "dc1",
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
-		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
-		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
-		AuthMethodPath:      KubernetesAuthMethodPath,
-	}
-	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
-
 	// Configure connect injector webhook PKI
 	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "connect",
@@ -212,15 +198,12 @@ func TestVault(t *testing.T) {
 		"connectInject.replicas": "1",
 		"global.secretsBackend.vault.connectInject.tlsCert.secretName": connectInjectorWebhookPKIConfig.CertPath,
 		"global.secretsBackend.vault.connectInject.caCert.secretName":  connectInjectorWebhookPKIConfig.CAPath,
-		"global.secretsBackend.vault.controller.tlsCert.secretName":    controllerWebhookPKIConfig.CertPath,
-		"global.secretsBackend.vault.controller.caCert.secretName":     controllerWebhookPKIConfig.CAPath,
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
 		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.connectInjectRole":    connectInjectorWebhookPKIConfig.RoleName,
-		"global.secretsBackend.vault.controllerRole":       controllerWebhookPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
