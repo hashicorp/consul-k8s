@@ -1370,3 +1370,49 @@ load _helpers
       yq '.spec.template.spec.containers[0].env[3]' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
+
+@test "apiGateway/Deployment: CONSUL_CACERT is set when using tls and clients even when useSystemRoots is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_CACERT is set when using tls and internal servers" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_CACERT is not set when using tls and useSystemRoots" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
