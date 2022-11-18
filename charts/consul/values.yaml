@@ -11,7 +11,7 @@ global:
 
   # The default log level to apply to all components which do not otherwise override this setting.
   # It is recommended to generally not set this below "info" unless actively debugging due to logging verbosity.
-  # One of "debug", "info", "warn", or "error".
+  # One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: "info"
 
@@ -1844,7 +1844,7 @@ syncCatalog:
       memory: "50Mi"
       cpu: "50m"
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2106,7 +2106,7 @@ connectInject:
   # @type: string
   imageConsul: null
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2856,7 +2856,7 @@ apiGateway:
   # @default: envoyproxy/envoy:<latest supported version>
   imageEnvoy: "envoyproxy/envoy:v1.23.1"
 
-  # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level for api-gateway-controller pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: info
 
