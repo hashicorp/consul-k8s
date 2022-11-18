@@ -57,8 +57,10 @@ spec:
           protocol: TCP
         env:
         {{- if .Values.global.tls.enabled }}
+        {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         - name: CONSUL_CACERT
           value: /consul/tls/ca/tls.crt
+        {{- end }}
         {{- end }}
         - name: HOST_IP
           valueFrom:
