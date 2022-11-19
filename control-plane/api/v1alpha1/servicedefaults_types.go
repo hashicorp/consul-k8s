@@ -87,6 +87,13 @@ type ServiceDefaultsSpec struct {
 	// MaxInboundConnections is the maximum number of concurrent inbound connections to
 	// each service instance. Defaults to 0 (using consul's default) if not set.
 	MaxInboundConnections int `json:"maxInboundConnections,omitempty"`
+	// The number of milliseconds allowed to make connections to the local application
+	// instance before timing out. Defaults to 5000.
+	LocalConnectTimeoutMs int `json:"localConnectTimeoutMs,omitempty"`
+	// In milliseconds, the timeout for HTTP requests to the local application instance.
+	// Applies to HTTP-based protocols only. If not specified, inherits the Envoy default for
+	// route timeouts (15s).
+	LocalRequestTimeoutMs int `json:"localRequestTimeoutMs,omitempty"`
 }
 
 type Upstreams struct {
@@ -263,6 +270,8 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Destination:           in.Spec.Destination.toConsul(),
 		Meta:                  meta(datacenter),
 		MaxInboundConnections: in.Spec.MaxInboundConnections,
+		LocalConnectTimeoutMs: in.Spec.LocalConnectTimeoutMs,
+		LocalRequestTimeoutMs: in.Spec.LocalRequestTimeoutMs,
 	}
 }
 
@@ -291,6 +300,14 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 
 	if in.Spec.MaxInboundConnections < 0 {
 		allErrs = append(allErrs, field.Invalid(path.Child("maxinboundconnections"), in.Spec.MaxInboundConnections, "MaxInboundConnections must be > 0"))
+	}
+
+	if in.Spec.LocalConnectTimeoutMs < 0 {
+		allErrs = append(allErrs, field.Invalid(path.Child("localConnectTimeoutMs"), in.Spec.LocalConnectTimeoutMs, "LocalConnectTimeoutMs must be > 0"))
+	}
+
+	if in.Spec.LocalRequestTimeoutMs < 0 {
+		allErrs = append(allErrs, field.Invalid(path.Child("localRequestTimeoutMs"), in.Spec.LocalRequestTimeoutMs, "LocalRequestTimeoutMs must be > 0"))
 	}
 
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
