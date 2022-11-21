@@ -41,6 +41,9 @@ spec:
       {{- end }}
       containers:
         - name: gossip-encryption-autogen
+          {{- if not .Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" . | nindent 10 }}
+          {{ end -}}
           image: "{{ .Values.global.imageK8S }}"
           command:
             - "/bin/sh"

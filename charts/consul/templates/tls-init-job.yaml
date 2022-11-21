@@ -49,6 +49,9 @@ spec:
       {{- end }}
       containers:
         - name: tls-init
+          {{- if not .Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" . | nindent 10 }}
+          {{ end -}}
           image: "{{ .Values.global.imageK8S }}"
           env:
             - name: NAMESPACE

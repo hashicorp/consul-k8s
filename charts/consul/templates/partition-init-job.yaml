@@ -74,6 +74,9 @@ spec:
       {{- end }}
       containers:
         - name: partition-init-job
+          {{- if not .Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" . | nindent 10 }}
+          {{ end -}}
           image: {{ .Values.global.imageK8S }}
           env:
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}

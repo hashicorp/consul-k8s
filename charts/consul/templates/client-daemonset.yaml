@@ -184,6 +184,7 @@ spec:
         {{- end }}
       containers:
         - name: consul
+          {{ include "consul.securityContextTemplate" . | nindent 10 }}
           image: "{{ default .Values.global.image .Values.client.image }}"
           {{- if .Values.global.acls.manageSystemACLs }}
           lifecycle:

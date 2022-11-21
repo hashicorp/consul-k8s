@@ -114,6 +114,9 @@ spec:
       {{- end }}
       initContainers:
       - name: mesh-gateway-init
+        {{- if not .Values.global.openshift.enabled }}
+        {{- include "consul.securityContextTemplate" . | nindent 8 }}
+        {{ end -}}
         image: {{ .Values.global.imageK8S }}
         env:
         - name: NAMESPACE
@@ -172,6 +175,9 @@ spec:
         {{- end }}
       containers:
       - name: mesh-gateway
+        {{- if not .Values.global.openshift.enabled }}
+        {{- include "consul.securityContextTemplate" . | nindent 8 }}
+        {{ end -}}
         image: {{ .Values.global.imageConsulDataplane | quote }}
         {{- if .Values.meshGateway.resources }}
         resources:

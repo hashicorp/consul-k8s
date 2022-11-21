@@ -15,6 +15,15 @@ spec:
     spec:
       containers:
         - name: static-server
+          securityContext:
+            runAsUser: 100
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:latest
           args:
             - -text="hello world"

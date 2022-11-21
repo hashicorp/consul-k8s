@@ -130,10 +130,6 @@ spec:
     {{- end }}
       terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-server
-      {{- if not .Values.global.openshift.enabled }}
-      securityContext:
-        {{- toYaml .Values.server.securityContext | nindent 8 }}
-      {{- end }}
       volumes:
         - name: config
           configMap:
@@ -482,14 +478,18 @@ spec:
             {{- end }}
           {{- end }}
           {{- if not .Values.global.openshift.enabled }}
-          securityContext:
-            {{- toYaml .Values.server.containerSecurityContext.server | nindent 12 }}
+          {{- include "consul.securityContextTemplate" . | nindent 10 }}
+            fsGroup: 1000
+            runAsGroup: 1000
           {{- end }}
           {{- if .Values.server.extraContainers }}
           {{ toYaml .Values.server.extraContainers | nindent 8 }}
           {{- end }}
         {{- if .Values.server.snapshotAgent.enabled }}
         - name: consul-snapshot-agent
+          {{- if not .Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" . | nindent 10 }}
+          {{- end }}
           image: "{{ default .Values.global.image .Values.server.image }}"
           env:
             {{- if .Values.server.snapshotAgent.caCert }}

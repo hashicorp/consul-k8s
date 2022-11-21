@@ -15,6 +15,15 @@ spec:
     spec:
       containers:
         - name: static-client
+          securityContext:
+            runAsUser: 100
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           image: docker.mirror.hashicorp.services/buildpack-deps:jammy-curl
           command: [ "/bin/sh", "-c", "--" ]
           args: [ "while true; do sleep 30; done;" ]

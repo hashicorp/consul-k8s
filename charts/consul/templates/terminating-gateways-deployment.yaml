@@ -153,6 +153,9 @@ spec:
       initContainers:
         # terminating-gateway-init registers the terminating gateway service with Consul.
         - name: terminating-gateway-init
+          {{- if not $root.Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" $ | nindent 10 }}
+          {{ end -}}
           image: {{ $root.Values.global.imageK8S }}
           env:
           - name: NAMESPACE
@@ -211,6 +214,9 @@ spec:
               cpu: "50m"
       containers:
         - name: terminating-gateway
+          {{- if not $root.Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" $ | nindent 10 }}
+          {{ end -}}
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
           volumeMounts:
             - name: consul-service

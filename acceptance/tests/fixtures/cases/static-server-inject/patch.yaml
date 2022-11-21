@@ -11,6 +11,15 @@ spec:
       containers:
         - name: static-server
           image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          securityContext:
+            runAsUser: 100
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           args:
             - -text="hello world"
             - -listen=:8080

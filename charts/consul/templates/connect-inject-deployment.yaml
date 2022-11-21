@@ -84,6 +84,9 @@ spec:
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
+          {{- if not .Values.global.openshift.enabled }}
+          {{- include "consul.securityContextTemplate" . | nindent 10 }}
+          {{- end }}
           ports:
             - containerPort: 8080
               name: webhook-server
@@ -150,9 +153,6 @@ spec:
                 -enable-cni={{ .Values.connectInject.cni.enabled }} \
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
-                {{- end }}
-                {{- if .Values.global.openshift.enabled }}
-                -enable-openshift \
                 {{- end }}
                 {{- if .Values.connectInject.transparentProxy.defaultOverwriteProbes }}
                 -transparent-proxy-default-overwrite-probes=true \

@@ -15,6 +15,20 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.securityContextTemplate" -}}
+{{- if not .Values.global.enablePodSecurityPolicies }}
+securityContext:
+  runAsUser: 100
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  seccompProfile:
+    type: RuntimeDefault
+{{- end }}
+{{- end -}}
+
 {{- define "consul.vaultSecretTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}

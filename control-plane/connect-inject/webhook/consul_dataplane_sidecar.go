@@ -130,13 +130,29 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			}
 		}
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:           pointer.Bool(true),
-			ReadOnlyRootFilesystem: pointer.Bool(true),
+			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
+			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
+			RunAsNonRoot:             pointer.Bool(true),
+			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			AllowPrivilegeEscalation: pointer.Bool(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+		}
+	} else if !w.EnableOpenShift {
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
+			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
+			RunAsNonRoot:             pointer.Bool(true),
+			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			AllowPrivilegeEscalation: pointer.Bool(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 		}
 	}
-
 	return container, nil
 }
 
