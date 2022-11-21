@@ -3,7 +3,7 @@ module github.com/hashicorp/consul-k8s/control-plane/cni
 require (
 	github.com/containernetworking/cni v1.1.1
 	github.com/containernetworking/plugins v1.1.1
-	github.com/hashicorp/consul/sdk v0.12.0
+	github.com/hashicorp/consul/sdk v0.13.0
 	github.com/hashicorp/go-hclog v0.16.1
 	github.com/stretchr/testify v1.7.1
 	k8s.io/api v0.22.2

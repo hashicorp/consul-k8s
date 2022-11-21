@@ -1,7 +1,7 @@
 apiVersion: v2
 name: consul
-version: 1.1.0-dev
-appVersion: 1.14.0
+version: 1.0.1
+appVersion: 1.14.1
 kubeVersion: ">=1.21.0-0"
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io
@@ -10,12 +10,12 @@ sources:
   - https://github.com/hashicorp/consul
   - https://github.com/hashicorp/consul-k8s
 annotations:
-  artifacthub.io/prerelease: true
+  artifacthub.io/prerelease: false
   artifacthub.io/images: |
     - name: consul
-      image: hashicorp/consul:1.14.0
+      image: hashicorp/consul:1.14.1
     - name: consul-k8s-control-plane
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.1.0-dev
+      image: hashicorp/consul-k8s-control-plane:1.0.1
     - name: consul-dataplane
       image: hashicorp/consul-dataplane:1.0.0
     - name: envoy
