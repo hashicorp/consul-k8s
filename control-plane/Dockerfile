@@ -11,10 +11,14 @@
 #
 # ===================================
 
+# go-discover builds the discover binary (which we don't currently publish
+# either).
+FROM golang:1.19.2-alpine as go-discover
+RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60c093101c9c5f6b04d5b1c80164251a761a6
+
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
-
 FROM alpine:3.16 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
@@ -43,6 +47,7 @@ RUN apk add --no-cache ca-certificates gnupg libcap openssl su-exec iputils libc
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
+COPY --from=go-discover /go/bin/discover /bin/
 COPY pkg/bin/linux_${TARGETARCH}/${BIN_NAME} /bin
 COPY cni/pkg/bin/linux_${TARGETARCH}/${CNI_BIN_NAME} /bin
 
@@ -94,6 +99,7 @@ ARG TARGETARCH
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
+COPY --from=go-discover /go/bin/discover /bin/
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
 COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
@@ -155,6 +161,7 @@ RUN groupadd --gid 1000 ${BIN_NAME} && \
     adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME} && \
     usermod -a -G root ${BIN_NAME}
 
+COPY --from=go-discover /go/bin/discover /bin/
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
 COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
