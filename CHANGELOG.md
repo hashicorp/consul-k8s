@@ -2,7 +2,7 @@
 
 BUG FIXES:
 * Control Plane
-  * Add go-discover binary to control-plane image [[GH-1749](https://github.com/hashicorp/consul-k8s/pull/1749)]
+  * Add discover binary to control-plane image [[GH-1749](https://github.com/hashicorp/consul-k8s/pull/1749)]
 * Helm:
   * Don't pass in a CA file to the API Gateway controller when `externalServers.useSystemRoots` is `true`. [[GH-1743](https://github.com/hashicorp/consul-k8s/pull/1743)]
 
