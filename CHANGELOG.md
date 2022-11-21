@@ -1,4 +1,4 @@
-## 1.1.0 (December 24, 2022)
+## 1.0.1 (November 21, 2022)
 
 BUG FIXES:
 * Control Plane
