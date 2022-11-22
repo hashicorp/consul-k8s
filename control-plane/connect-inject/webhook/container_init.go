@@ -227,6 +227,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		RunAsNonRoot:             pointer.Bool(true),
 		ReadOnlyRootFilesystem:   pointer.Bool(true),
 		AllowPrivilegeEscalation: pointer.Bool(false),
+		Privileged:               pointer.Bool(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
@@ -249,13 +250,16 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		// requires both being a root user and having NET_ADMIN capability.
 		// NOTE: PSA will reject this container for restricted mode due to the above requirements.
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:    pointer.Int64(rootUserAndGroupID),
-			RunAsGroup:   pointer.Int64(rootUserAndGroupID),
-			RunAsNonRoot: pointer.Bool(false),
-			Privileged:   pointer.Bool(true),
+			RunAsUser:                pointer.Int64(rootUserAndGroupID),
+			RunAsGroup:               pointer.Int64(rootUserAndGroupID),
+			RunAsNonRoot:             pointer.Bool(false),
+			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			AllowPrivilegeEscalation: pointer.Bool(true),
+			Privileged:               pointer.Bool(true),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{netAdminCapability},
 			},
+			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 		}
 	}
 

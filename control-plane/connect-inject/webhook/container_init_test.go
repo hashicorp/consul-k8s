@@ -257,25 +257,31 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			pod.Annotations = c.annotations
 
 			var expectedSecurityContext *corev1.SecurityContext
-			if c.cniEnabled {
+			if c.expTproxyEnabled && !c.cniEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(false),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
-				}
-			} else if c.expTproxyEnabled {
-				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(0),
-					RunAsGroup:   pointer.Int64(0),
-					RunAsNonRoot: pointer.Bool(false),
-					Privileged:   pointer.Bool(true),
+					RunAsUser:                pointer.Int64(rootUserAndGroupID),
+					RunAsGroup:               pointer.Int64(rootUserAndGroupID),
+					RunAsNonRoot:             pointer.Bool(false),
+					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					Privileged:               pointer.Bool(true),
+					AllowPrivilegeEscalation: pointer.Bool(true),
 					Capabilities: &corev1.Capabilities{
 						Add: []corev1.Capability{netAdminCapability},
 					},
+					SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+				}
+			} else {
+				expectedSecurityContext = &corev1.SecurityContext{
+					RunAsUser:                pointer.Int64(initContainersUserAndGroupID),
+					RunAsGroup:               pointer.Int64(initContainersUserAndGroupID),
+					RunAsNonRoot:             pointer.Bool(true),
+					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					Privileged:               pointer.Bool(false),
+					AllowPrivilegeEscalation: pointer.Bool(false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 				}
 			}
 			ns := testNS

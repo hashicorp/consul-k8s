@@ -447,20 +447,30 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:           pointer.Bool(true),
-				ReadOnlyRootFilesystem: pointer.Bool(true),
+				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
+				RunAsNonRoot:             pointer.Bool(true),
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 		"tproxy enabled; openshift disabled": {
 			tproxyEnabled:    true,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:           pointer.Bool(true),
-				ReadOnlyRootFilesystem: pointer.Bool(true),
+				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
+				RunAsNonRoot:             pointer.Bool(true),
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 		"tproxy disabled; openshift enabled": {
@@ -468,15 +478,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			openShiftEnabled:   true,
 			expSecurityContext: nil,
 		},
+		// TODO: I'm not sure yet what this `expSecurityContext` should be because we can only support it with CNI enabled.
 		"tproxy enabled; openshift enabled": {
-			tproxyEnabled:    true,
-			openShiftEnabled: true,
-			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:           pointer.Bool(true),
-				ReadOnlyRootFilesystem: pointer.Bool(true),
-			},
+			tproxyEnabled:      true,
+			openShiftEnabled:   true,
+			expSecurityContext: nil,
 		},
 	}
 	for name, c := range cases {
