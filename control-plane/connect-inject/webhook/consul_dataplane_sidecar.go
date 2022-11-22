@@ -112,8 +112,21 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 
 	// If not running in transparent proxy mode and in an OpenShift environment,
 	// skip setting the security context and let OpenShift set it for us.
-	// When transparent proxy is enabled, then consul-dataplane needs to run as our specific user
-	// so that traffic redirection will work.
+	if !w.EnableOpenShift {
+		// Always set the securityContext on the sidecar container and set the sidecarUser/Group.
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
+			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
+			RunAsNonRoot:             pointer.Bool(true),
+			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			AllowPrivilegeEscalation: pointer.Bool(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+		}
+	}
+	// Validate the UID/GID does not conflict with what has been set above.
 	if tproxyEnabled || !w.EnableOpenShift {
 		if pod.Spec.SecurityContext != nil {
 			// User container and consul-dataplane container cannot have the same UID.
@@ -128,29 +141,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == sidecarUserAndGroupID && c.Image != w.ImageConsulDataplane {
 				return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", c.Name, sidecarUserAndGroupID)
 			}
-		}
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:             pointer.Bool(true),
-			ReadOnlyRootFilesystem:   pointer.Bool(true),
-			AllowPrivilegeEscalation: pointer.Bool(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-		}
-	} else if !w.EnableOpenShift {
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:             pointer.Bool(true),
-			ReadOnlyRootFilesystem:   pointer.Bool(true),
-			AllowPrivilegeEscalation: pointer.Bool(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 		}
 	}
 	return container, nil

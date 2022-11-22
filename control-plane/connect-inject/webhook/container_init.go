@@ -219,6 +219,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: w.ConsulPartition,
 			})
 	}
+
 	// Set the securityContext by default
 	container.SecurityContext = &corev1.SecurityContext{
 		RunAsUser:                pointer.Int64(initContainersUserAndGroupID),
@@ -232,31 +233,29 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 	}
 
-	if tproxyEnabled {
-		if !w.EnableCNI {
-			// Set redirect traffic config for the container so that we can apply iptables rules.
-			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
-			if err != nil {
-				return corev1.Container{}, err
-			}
-			container.Env = append(container.Env,
-				corev1.EnvVar{
-					Name:  "CONSUL_REDIRECT_TRAFFIC_CONFIG",
-					Value: redirectTrafficConfig,
-				})
+	if tproxyEnabled && !w.EnableCNI {
+		// Set redirect traffic config for the container so that we can apply iptables rules.
+		redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_REDIRECT_TRAFFIC_CONFIG",
+				Value: redirectTrafficConfig,
+			})
 
-			// Running consul connect redirect-traffic with iptables
-			// requires both being a root user and having NET_ADMIN capability.
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:  pointer.Int64(rootUserAndGroupID),
-				RunAsGroup: pointer.Int64(rootUserAndGroupID),
-				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(true),
-				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{netAdminCapability},
-				},
-			}
+		// Running consul connect redirect-traffic with iptables
+		// requires both being a root user and having NET_ADMIN capability.
+		// NOTE: PSA will reject this container for restricted mode due to the above requirements.
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser:    pointer.Int64(rootUserAndGroupID),
+			RunAsGroup:   pointer.Int64(rootUserAndGroupID),
+			RunAsNonRoot: pointer.Bool(false),
+			Privileged:   pointer.Bool(true),
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{netAdminCapability},
+			},
 		}
 	}
 

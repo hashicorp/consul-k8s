@@ -12,6 +12,8 @@ spec:
       name: static-server
       labels:
         app: static-server
+      annotations:
+        consul.hashicorp.com/transparent-proxy: 'false'
     spec:
       containers:
         - name: static-server
