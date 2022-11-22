@@ -219,6 +219,18 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: w.ConsulPartition,
 			})
 	}
+	// Set the securityContext by default
+	container.SecurityContext = &corev1.SecurityContext{
+		RunAsUser:                pointer.Int64(initContainersUserAndGroupID),
+		RunAsGroup:               pointer.Int64(initContainersUserAndGroupID),
+		RunAsNonRoot:             pointer.Bool(true),
+		ReadOnlyRootFilesystem:   pointer.Bool(true),
+		AllowPrivilegeEscalation: pointer.Bool(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+	}
 
 	if tproxyEnabled {
 		if !w.EnableCNI {
@@ -244,18 +256,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
-			}
-		} else {
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(initContainersUserAndGroupID),
-				RunAsGroup:               pointer.Int64(initContainersUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			}
 		}
 	}
