@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 1.0.1 (November 21, 2022)
+
 BUG FIXES:
 * Control Plane
   * Add discover binary to control-plane image [[GH-1749](https://github.com/hashicorp/consul-k8s/pull/1749)]
