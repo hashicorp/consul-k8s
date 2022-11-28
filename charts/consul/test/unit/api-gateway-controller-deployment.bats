@@ -189,7 +189,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
+@test "apiGateway/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled with clients" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
@@ -197,8 +197,23 @@ load _helpers
       --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: consul-ca-cert volumeMount is added when TLS with auto-encrypt is enabled without clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -532,7 +547,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.volumeMounts[1].name] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
