@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 1.0.1 (November 21, 2022)
+
 BUG FIXES:
 * Helm:
   * Don't pass in a CA file to the API Gateway controller when `externalServers.useSystemRoots` is `true`. [[GH-1743](https://github.com/hashicorp/consul-k8s/pull/1743)]
