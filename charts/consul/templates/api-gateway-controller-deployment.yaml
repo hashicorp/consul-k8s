@@ -222,10 +222,6 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: api-gateway-controller-acl-init
         env:
-        - name: HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
         - name: NAMESPACE
           valueFrom:
             fieldRef:

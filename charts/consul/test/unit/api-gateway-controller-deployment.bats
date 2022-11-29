@@ -330,23 +330,19 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -371,23 +367,19 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -426,23 +418,19 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -527,23 +515,19 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
