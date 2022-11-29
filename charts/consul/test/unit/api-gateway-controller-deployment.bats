@@ -346,7 +346,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq -r '[.env[7].value] | any(contains("5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -367,27 +367,51 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -414,31 +438,59 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_PARTITION") | [.value] | any(contains("default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_LOGIN_PARTITION") | [.value] | any(contains("default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -515,27 +567,51 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
