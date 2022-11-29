@@ -1415,3 +1415,20 @@ load _helpers
       yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].env[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
