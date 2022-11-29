@@ -749,12 +749,12 @@ load _helpers
 #--------------------------------------------------------------------
 # server.securityContext
 
-@test "server/StatefulSet: sets default security context settings" {
+@test "server/StatefulSet: sets default security context settings on container" {
   cd `chart_dir`
   local security_context=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
 
   local actual=$(echo $security_context | jq -r .runAsNonRoot)
   [ "${actual}" = "true" ]
@@ -767,51 +767,6 @@ load _helpers
 
   local actual=$(echo $security_context | jq -r .runAsGroup)
   [ "${actual}" = "1000" ]
-}
-
-@test "server/StatefulSet: can overwrite security context settings" {
-  cd `chart_dir`
-  local security_context=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'server.securityContext.runAsNonRoot=false' \
-      --set 'server.securityContext.privileged=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
-
-  local actual=$(echo $security_context | jq -r .runAsNonRoot)
-  [ "${actual}" = "false" ]
-
-  local actual=$(echo $security_context | jq -r .privileged)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# server.containerSecurityContext
-
-@test "server/StatefulSet: Can set container level securityContexts" {
-  cd `chart_dir`
-  local manifest=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'server.containerSecurityContext.server.privileged=false' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext.privileged')
-  [ "${actual}" = "false" ]
-}
-
-#--------------------------------------------------------------------
-# global.openshift.enabled & client.containerSecurityContext
-
-@test "server/StatefulSet: container level securityContexts are not set when global.openshift.enabled=true" {
-  cd `chart_dir`
-  local manifest=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.openshift.enabled=true' \
-      --set 'server.containerSecurityContext.server.privileged=false' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
-  [ "${actual}" = "null" ]
 }
 
 #--------------------------------------------------------------------

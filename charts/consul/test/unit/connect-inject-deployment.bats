@@ -2,6 +2,7 @@
 
 load _helpers
 
+
 @test "connectInject/Deployment: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \

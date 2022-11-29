@@ -16,7 +16,7 @@ as well as the global.name setting.
 {{- end -}}
 
 {{- define "consul.securityContextTemplate" -}}
-{{- if not .Values.global.enablePodSecurityPolicies }}
+{{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
   runAsUser: 100
   runAsNonRoot: true
@@ -26,7 +26,7 @@ securityContext:
     - ALL
   seccompProfile:
     type: RuntimeDefault
-{{- end }}
+{{- end -}}
 {{- end -}}
 
 {{- define "consul.vaultSecretTemplate" -}}

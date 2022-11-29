@@ -48,7 +48,7 @@ spec:
         - name: server-acl-init-cleanup
           {{- if not .Values.global.openshift.enabled }}
           {{- include "consul.securityContextTemplate" . | nindent 10 }}
-          {{ end -}}
+          {{- end }}
           image: {{ .Values.global.imageK8S }}
           command:
             - consul-k8s-control-plane
