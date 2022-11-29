@@ -56,8 +56,8 @@ spec:
           name: sds
           protocol: TCP
         env:
-        {{- if .Values.global.tls.enabled }}
         {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
+        {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
           value: /consul/tls/ca/tls.crt
         {{- end }}
@@ -149,6 +149,7 @@ spec:
         - name: consul-bin
           mountPath: /consul-bin
         {{- end }}
+        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
         {{- if .Values.global.tls.enabled }}
         {{- if and .Values.client.enabled .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
@@ -157,6 +158,7 @@ spec:
         {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
+        {{- end }}
         {{- end }}
         - mountPath: /consul/login
           name: consul-data
