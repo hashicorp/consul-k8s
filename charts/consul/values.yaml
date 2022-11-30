@@ -1920,6 +1920,11 @@ connectInject:
     # @type: string
     logLevel: null
 
+    # Set the namespace to install the CNI plugin into. Overrides global namespace settings for CNI resources.
+    # Ex: "kube-system" 
+    # @type: string
+    namespace: null
+
     # Location on the kubernetes node where the CNI plugin is installed. Shoud be the absolute path and start with a '/'
     # Example on GKE:
     #
