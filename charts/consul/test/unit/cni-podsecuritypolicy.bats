@@ -30,3 +30,27 @@ load _helpers
   [[ "${actual}" == "true" ]]
 }
 
+@test "cni/PodSecurityPolicy: cni namespace has a default when not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-podsecuritypolicy.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.metadata.namespace' | tee /dev/stderr)
+  [[ "${actual}" == "default" ]]
+}
+
+@test "cni/PodSecurityPolicy: able to set cni namespace" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-podsecuritypolicy.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'connectInject.cni.namespace=kube-system' \
+      . | tee /dev/stderr |
+      yq -r -c '.metadata.namespace' | tee /dev/stderr)
+  [[ "${actual}" == "kube-system" ]]
+}

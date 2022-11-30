@@ -31,3 +31,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "cni/SecurityContextConstraints: cni namespace has a default when not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-securitycontextconstraints.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.metadata.namespace' | tee /dev/stderr)
+  [[ "${actual}" == "default" ]]
+}
+
+@test "cni/SecurityContextConstraints: able to set cni namespace" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-securitycontextconstraints.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      --set 'connectInject.cni.namespace=kube-system' \
+      . | tee /dev/stderr |
+      yq -r -c '.metadata.namespace' | tee /dev/stderr)
+  [[ "${actual}" == "kube-system" ]]
+}
