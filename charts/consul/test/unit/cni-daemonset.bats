@@ -295,3 +295,25 @@ rollingUpdate:
       [ "${actual}" = '{"mountPath":"bar","name":"cni-net-dir"}' ]
 }
 
+@test "cni/DaemonSet: cni namespace has a default when not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.metadata.namespace' | tee /dev/stderr)
+  [[ "${actual}" == "default" ]]
+}
+
+@test "cni/DaemonSet: able to set cni namespace" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.cni.namespace=kube-system' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.metadata.namespace' | tee /dev/stderr)
+  [[ "${actual}" == "kube-system" ]]
+}
