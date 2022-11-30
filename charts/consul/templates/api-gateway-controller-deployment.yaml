@@ -56,8 +56,8 @@ spec:
           name: sds
           protocol: TCP
         env:
-        {{- if .Values.global.tls.enabled }}
         {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
+        {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
           value: /consul/tls/ca/tls.crt
         {{- end }}
@@ -149,14 +149,16 @@ spec:
         - name: consul-bin
           mountPath: /consul-bin
         {{- end }}
+        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
         {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
+        {{- if and .Values.client.enabled .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
         {{- else }}
         - name: consul-ca-cert
         {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
+        {{- end }}
         {{- end }}
         - mountPath: /consul/login
           name: consul-data
@@ -222,10 +224,6 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: api-gateway-controller-acl-init
         env:
-        - name: HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
         - name: NAMESPACE
           valueFrom:
             fieldRef:
@@ -242,14 +240,12 @@ spec:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
+        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
         {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-        {{- else }}
         - name: consul-ca-cert
-        {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
+        {{- end }}
         {{- end }}
         command:
         - "/bin/sh"
@@ -262,10 +258,6 @@ spec:
             {{- else }}
             -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method \
             {{- end }}
-            {{- if .Values.global.adminPartitions.enabled }}
-            -partition={{ .Values.global.adminPartitions.name }} \
-            {{- end }}
-            -api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
         resources:
