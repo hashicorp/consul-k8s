@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Helm:
+  * CNI: Add `connectInject.cni.namespace` stanza which allows the CNI plugin resources to be deployed in a namespace other than the namespace that Consul is installed. [[GH-1756](https://github.com/hashicorp/consul-k8s/pull/1756)]
+
 ## 1.0.1 (November 21, 2022)
 
 BUG FIXES:
