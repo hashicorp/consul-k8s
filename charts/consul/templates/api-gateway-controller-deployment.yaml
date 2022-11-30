@@ -150,7 +150,7 @@ spec:
           mountPath: /consul-bin
         {{- end }}
         {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
+        {{- if and .Values.client.enabled .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
         {{- else }}
         - name: consul-ca-cert
@@ -243,11 +243,7 @@ spec:
           name: consul-data
           readOnly: false
         {{- if .Values.global.tls.enabled }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-        {{- else }}
         - name: consul-ca-cert
-        {{- end }}
           mountPath: /consul/tls/ca
           readOnly: true
         {{- end }}
