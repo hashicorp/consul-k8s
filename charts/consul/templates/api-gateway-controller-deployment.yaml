@@ -179,7 +179,7 @@ spec:
         emptyDir: { }
       {{- end }}
       {{- if .Values.global.tls.enabled }}
-      {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert
         secret:
           {{- if .Values.global.tls.caCert.secretName }}
