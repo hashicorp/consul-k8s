@@ -149,6 +149,19 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				writeResourceInfoToFile(t, service.Name, "service", testDebugDirectory, kubectlOptions)
 			}
 		}
+
+		// Get the Events from Kubernetes, this helps track down scheduling issues.
+		events, err := client.CoreV1().Events(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			logger.Log(t, "unable to get events", "err", err)
+		} else {
+			for _, event := range events.Items {
+				descFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s.txt", event.Name, "event"))
+				require.NoError(t, os.WriteFile(descFilename, []byte(event.String()), 0600))
+				// Describe event and write it to a file.
+				writeResourceInfoToFile(t, event.Name, "event", testDebugDirectory, kubectlOptions)
+			}
+		}
 	}
 }
 
