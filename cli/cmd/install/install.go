@@ -610,6 +610,14 @@ func (c *Command) validateFlags(args []string) error {
 		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
 	}
 
+	if c.flagPreset == preset.PresetPeering {
+		datacenterName := os.Getenv(preset.EnvConsulDatacenter)
+
+		if datacenterName == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetPeering, preset.EnvConsulDatacenter)
+		}
+	}
+
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)

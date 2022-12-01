@@ -9,17 +9,20 @@ const (
 	PresetSecure     = "secure"
 	PresetQuickstart = "quickstart"
 	PresetCloud      = "cloud"
+	PresetPeering    = "peering"
 
 	EnvHCPClientID     = "HCP_CLIENT_ID"
 	EnvHCPClientSecret = "HCP_CLIENT_SECRET"
 	EnvHCPAuthURL      = "HCP_AUTH_URL"
 	EnvHCPAPIHost      = "HCP_API_HOST"
 	EnvHCPScadaAddress = "HCP_SCADA_ADDRESS"
+
+	EnvConsulDatacenter = "CONSUL_DATACENTER"
 )
 
 // Presets is a list of all the available presets for use with CLI's install
 // and uninstall commands.
-var Presets = []string{PresetCloud, PresetQuickstart, PresetSecure}
+var Presets = []string{PresetCloud, PresetQuickstart, PresetSecure, PresetPeering}
 
 // Preset is the interface that each instance must implement.  For demo and
 // secure presets, they merely return a pre-configred value map.  For cloud,
@@ -46,6 +49,8 @@ func GetPreset(config *GetPresetConfig) (Preset, error) {
 		return &QuickstartPreset{}, nil
 	case PresetSecure:
 		return &SecurePreset{}, nil
+	case PresetPeering:
+		return &PeeringPreset{}, nil
 	}
 	return nil, fmt.Errorf("'%s' is not a valid preset", config.Name)
 }
@@ -81,4 +86,13 @@ func GetHCPPresetFromEnv(resourceID string) *HCPConfig {
 	}
 
 	return hcpConfig
+}
+
+func GetConsulDCFromEnv() string {
+
+	if consulDC, ok := os.LookupEnv(EnvConsulDatacenter); ok {
+		return consulDC
+	}
+
+	return ""
 }
