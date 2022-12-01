@@ -330,27 +330,23 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq -r '[.env[7].value] | any(contains("5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -371,31 +367,51 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -422,35 +438,59 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_PARTITION") | [.value] | any(contains("default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_LOGIN_PARTITION") | [.value] | any(contains("default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -527,31 +567,51 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1430,4 +1490,57 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set when using externalServers and useSystemRoots" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "apiGateway/Deployment: consul-auto-encrypt-ca-cert volume mount is set when tls.enabled, client.enabled, externalServers, useSystemRoots, and autoencrypt" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | .mountPath' | tee /dev/stderr)
+  [ "${actual}" = '"/consul/tls/ca"' ]
 }
