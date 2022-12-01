@@ -149,7 +149,7 @@ spec:
         - name: consul-bin
           mountPath: /consul-bin
         {{- end }}
-        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+        {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         {{- if and .Values.client.enabled .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
