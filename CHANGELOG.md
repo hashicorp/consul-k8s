@@ -1,8 +1,14 @@
-## UNRELEASED
+## 0.49.2 (December 1, 2022)
 
 IMPROVEMENTS:
 * Control Plane
    * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.1`. [[GH-1725](https://github.com/hashicorp/consul-k8s/pull/1725)]
+* Helm
+  * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
+
+BUG FIXES:
+* Helm:
+  * Disable PodSecurityPolicies in all templates when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
 
 ## 0.49.1 (November 14, 2022)
 BREAKING CHANGES:
