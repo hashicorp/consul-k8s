@@ -8,7 +8,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Helm:
-  * Disable PodSecurityPolicies in all templates when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
+  * Disable PodSecurityPolicies templating for `gossip-encryption-autogenerate` and `partition-init` when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
 
 ## 0.49.1 (November 14, 2022)
 BREAKING CHANGES:
