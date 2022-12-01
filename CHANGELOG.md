@@ -1,4 +1,8 @@
-## UNRELEASED
+## 1.0.2 (December 1, 2022)
+
+IMPROVEMENTS:
+* Helm:
+  * CNI: Add `connectInject.cni.namespace` stanza which allows the CNI plugin resources to be deployed in a namespace other than the namespace that Consul is installed. [[GH-1756](https://github.com/hashicorp/consul-k8s/pull/1756)]
 
 BUG FIXES:
 * Helm:
@@ -115,7 +119,7 @@ BUG FIXES:
 * Peering
   * Add `peering:read` permissions to mesh gateway token to fix peering connections through the mesh gateways. [[GH-1685](https://github.com/hashicorp/consul-k8s/pull/1685)]
 * Helm:
-  * Disable PodSecurityPolicies in all templates when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
+  * Disable PodSecurityPolicies templating for `gossip-encryption-autogenerate` and `partition-init` when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
 
 ## 0.49.0 (September 29, 2022)
 
