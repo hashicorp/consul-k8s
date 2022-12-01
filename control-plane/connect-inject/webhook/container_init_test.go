@@ -262,7 +262,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					RunAsUser:                pointer.Int64(rootUserAndGroupID),
 					RunAsGroup:               pointer.Int64(rootUserAndGroupID),
 					RunAsNonRoot:             pointer.Bool(false),
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					ReadOnlyRootFilesystem:   pointer.Bool(false),
 					Privileged:               pointer.Bool(true),
 					AllowPrivilegeEscalation: pointer.Bool(true),
 					Capabilities: &corev1.Capabilities{

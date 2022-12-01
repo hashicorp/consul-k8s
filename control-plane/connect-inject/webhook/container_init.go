@@ -253,7 +253,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			RunAsUser:                pointer.Int64(rootUserAndGroupID),
 			RunAsGroup:               pointer.Int64(rootUserAndGroupID),
 			RunAsNonRoot:             pointer.Bool(false),
-			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			ReadOnlyRootFilesystem:   pointer.Bool(false),
 			AllowPrivilegeEscalation: pointer.Bool(true),
 			Privileged:               pointer.Bool(true),
 			Capabilities: &corev1.Capabilities{
