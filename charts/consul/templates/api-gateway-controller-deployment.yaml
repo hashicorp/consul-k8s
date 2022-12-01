@@ -240,7 +240,7 @@ spec:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
-        {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
+        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
         {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
