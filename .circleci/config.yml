@@ -695,7 +695,7 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
 
-  acceptance-tproxy-cni-tproxy-psa:
+  acceptance-tproxy-cni-psa:
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
