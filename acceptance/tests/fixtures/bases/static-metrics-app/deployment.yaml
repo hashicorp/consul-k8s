@@ -19,6 +19,15 @@ spec:
     spec:
       containers:
       - name: static-metrics-app
+        securityContext:
+          runAsUser: 200
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
         image: ishustava/fake-service:0.7.0
         env:
         - name: METRICS_ENABLE_PROMETHEUS

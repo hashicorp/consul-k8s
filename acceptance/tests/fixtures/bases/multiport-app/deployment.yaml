@@ -23,6 +23,15 @@ spec:
     spec:
       containers:
         - name: multiport
+          securityContext:
+            runAsUser: 200
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="hello world"
@@ -50,6 +59,15 @@ spec:
             periodSeconds: 1
         - name: multiport-admin
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          securityContext:
+            runAsUser: 200
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           args:
             - -text="hello world from 9090 admin"
             - -listen=:9090
