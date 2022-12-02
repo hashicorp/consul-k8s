@@ -1,15 +1,16 @@
 package vault
 
 import (
+	"fmt"
 	"os"
 	"testing"
-
-	testsuite "github.com/hashicorp/consul-k8s/acceptance/framework/suite"
 )
 
-var suite testsuite.Suite
+//var suite testsuite.Suite
 
 func TestMain(m *testing.M) {
-	suite = testsuite.NewSuite(m)
-	os.Exit(suite.Run())
+	fmt.Printf("Vault Agent Injector does not currently support Kubernetes-1.25 PSA, skipping.\n")
+	os.Exit(0)
+	//suite = testsuite.NewSuite(m)
+	//os.Exit(suite.Run())
 }
