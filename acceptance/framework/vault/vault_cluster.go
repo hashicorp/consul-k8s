@@ -267,16 +267,21 @@ func defaultHelmValues(releaseName string) map[string]string {
       }`, certSecret, certSecret, caSecret)
 
 	return map[string]string{
-		"global.tlsDisable":                        "false",
-		"server.extraEnvironmentVars.VAULT_CACERT": fmt.Sprintf("/vault/userconfig/%s/tls.crt", caSecret),
-		"server.extraVolumes[0].name":              caSecret,
-		"server.extraVolumes[0].type":              "secret",
-		"server.extraVolumes[1].name":              certSecret,
-		"server.extraVolumes[1].type":              "secret",
-		"server.standalone.enabled":                "true",
-		"server.standalone.config":                 serverConfig,
-		"injector.enabled":                         "true",
-		"ui.enabled":                               "true",
+		"global.tlsDisable":                                           "false",
+		"server.extraEnvironmentVars.VAULT_CACERT":                    fmt.Sprintf("/vault/userconfig/%s/tls.crt", caSecret),
+		"server.extraVolumes[0].name":                                 caSecret,
+		"server.extraVolumes[0].type":                                 "secret",
+		"server.extraVolumes[1].name":                                 certSecret,
+		"server.extraVolumes[1].type":                                 "secret",
+		"server.standalone.enabled":                                   "true",
+		"server.standalone.config":                                    serverConfig,
+		"injector.enabled":                                            "true",
+		"ui.enabled":                                                  "true",
+		"injector.securityContext.container.runAsUser":                "100",
+		"injector.securityContext.container.runAsNonRoot":             "true",
+		"injector.securityContext.container.allowPrivilegeEscalation": "false",
+		"injector.securityContext.container.capabilities.drop":        "{ALL}",
+		"injector.securityContext.container.seccompProfile.type":      "RuntimeDefault",
 	}
 }
 

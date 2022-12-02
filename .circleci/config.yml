@@ -686,7 +686,8 @@ jobs:
             - ~/.go_workspace/pkg/mod
       - build-cli
       - run: mkdir -p $TEST_RESULTS
-      - run: kubectl label --overwrite ns default pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=v1.24
+      - run: kubectl label --overwrite ns default pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=v1.24 --kubecontext="kind-dc1"
+      - run: kubectl label --overwrite ns default pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=v1.24 --kubecontext="kind-dc2"
       - run-acceptance-tests:
           failfast: true
           additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.14-dev
