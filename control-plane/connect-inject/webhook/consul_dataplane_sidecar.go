@@ -105,6 +105,20 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
+	var lifecycle corev1.Lifecycle
+
+	preStop, err := w.envoySidecarGracefulShutdown(pod)
+	if err == nil && preStop != nil {
+		lifecycle.PreStop = preStop
+	}
+
+	postStart, err := w.envoySidecarHoldApplicationUntilProxyStarts(pod)
+	if err == nil && postStart != nil {
+		lifecycle.PostStart = postStart
+	}
+
+	container.Lifecycle = &lifecycle
+
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -138,6 +152,54 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	return container, nil
+}
+
+// Configures graceful shut down for the sidecar.
+func (w *MeshWebhook) envoySidecarGracefulShutdown(pod corev1.Pod) (*corev1.Handler, error) {
+
+	grace, err := strconv.ParseBool(pod.Annotations[constants.AnnotationSidecarProxyGracefulShutdown])
+
+	if err != nil || grace != true {
+		return nil, err
+	}
+
+		preStop := &corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/sh",
+					"-c",
+					"while [ $(netstat -plunt | grep tcp | grep -v envoy | grep -v consul-dataplane | wc -l) -ne 0 ]; do sleep 1; done",
+				},
+			},
+		}
+
+	return preStop, nil
+}
+
+// Ensures that the sidecar is the first container to start up.
+func (w *MeshWebhook) envoySidecarHoldApplicationUntilProxyStarts(pod corev1.Pod) (*corev1.Handler, error) {
+
+	hold, err := strconv.ParseBool(pod.Annotations[constants.AnnotationSidecarProxyHoldApplicationUntilProxyStarts])
+
+	if err != nil || hold != true {
+		return nil, err
+	}
+		postStart := &corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/sh",
+					"-c",
+					`total_time=0; until wget --spider localhost:19000;` +
+					`do echo Waiting for Sidecar;`+
+					`sleep 3; total_time=$(($total_time + 3)); echo $total_time;`+
+					`if [ $total_time -gt 120 ]; then echo Sidecar not running, timeout reached. Exiting....; exit 1; fi; done;`+
+					`echo Sidecar available`,
+				},
+			},
+		}
+
+	return postStart, err
+
 }
 
 func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile string, pod corev1.Pod) ([]string, error) {
