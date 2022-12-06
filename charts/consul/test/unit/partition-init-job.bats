@@ -909,9 +909,11 @@ reservedNameTest() {
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.extraLabels.foo=bar' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
-  [ "${actual}" = "bar" ]
+      . | tee /dev/stderr)
+  local actualBar=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
+  [ "${actualBar}" = "bar" ]
+  local actualTemplateBar=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  [ "${actualTemplateBar}" = "bar" ]
 }
 
 @test "partitionInit/Job: multiple global extra labels can be set" {
@@ -927,8 +929,12 @@ reservedNameTest() {
       --set 'global.extraLabels.foo=bar' \
       --set 'global.extraLabels.baz=qux' \
       . | tee /dev/stderr)
-  local actualFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
-  local actualBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  local actualFoo=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
+  local actualBaz=$(echo "${actual}" | yq -r '.metadata.labels.baz' | tee /dev/stderr)
   [ "${actualFoo}" = "bar" ]
   [ "${actualBaz}" = "qux" ]
+  local actualTemplateFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualTemplateFoo}" = "bar" ]
+  [ "${actualTemplateBaz}" = "qux" ]
 }

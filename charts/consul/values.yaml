@@ -622,7 +622,7 @@ global:
       # @type: string
       secretKey: null
 
-  # Extra labels to attach to all pods. This should be a YAML map.
+  # Extra labels to attach to all pods, deployments, daemonsets, statefulsets, and jobs. This should be a YAML map.
   #
   # Example:
   #
@@ -633,7 +633,7 @@ global:
   # ```
   #
   # @type: map
-  extraLabels: null
+  extraLabels: {}
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
