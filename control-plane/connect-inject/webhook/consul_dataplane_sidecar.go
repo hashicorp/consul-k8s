@@ -163,15 +163,15 @@ func (w *MeshWebhook) envoySidecarGracefulShutdown(pod corev1.Pod) (*corev1.Hand
 		return nil, err
 	}
 
-		preStop := &corev1.Handler{
-			Exec: &corev1.ExecAction{
-				Command: []string{
-					"/bin/sh",
-					"-c",
-					"while [ $(netstat -plunt | grep tcp | grep -v envoy | grep -v consul-dataplane | wc -l) -ne 0 ]; do sleep 1; done",
-				},
+	preStop := &corev1.Handler{
+		Exec: &corev1.ExecAction{
+			Command: []string{
+				"/bin/sh",
+				"-c",
+				"while [ $(netstat -plunt | grep tcp | grep -v envoy | grep -v consul-dataplane | wc -l) -ne 0 ]; do sleep 1; done",
 			},
-		}
+		},
+	}
 
 	return preStop, nil
 }
@@ -184,19 +184,19 @@ func (w *MeshWebhook) envoySidecarHoldApplicationUntilProxyStarts(pod corev1.Pod
 	if err != nil || !hold {
 		return nil, err
 	}
-		postStart := &corev1.Handler{
-			Exec: &corev1.ExecAction{
-				Command: []string{
-					"/bin/sh",
-					"-c",
-					`total_time=0; until wget --spider localhost:19000;` +
-					`do echo Waiting for Sidecar;`+
-					`sleep 3; total_time=$(($total_time + 3)); echo $total_time;`+
-					`if [ $total_time -gt 120 ]; then echo Sidecar not running, timeout reached. Exiting....; exit 1; fi; done;`+
+	postStart := &corev1.Handler{
+		Exec: &corev1.ExecAction{
+			Command: []string{
+				"/bin/sh",
+				"-c",
+				`total_time=0; until wget --spider localhost:19000;` +
+					`do echo Waiting for Sidecar;` +
+					`sleep 3; total_time=$(($total_time + 3)); echo $total_time;` +
+					`if [ $total_time -gt 120 ]; then echo Sidecar not running, timeout reached. Exiting....; exit 1; fi; done;` +
 					`echo Sidecar available`,
-				},
 			},
-		}
+		},
+	}
 
 	return postStart, err
 

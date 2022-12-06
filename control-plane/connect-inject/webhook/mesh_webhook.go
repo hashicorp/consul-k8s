@@ -480,7 +480,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)
 }
 
-
 func injectSidecar(pod corev1.Pod, containers []corev1.Container, sidecar corev1.Container) []corev1.Container {
 	hold, err := strconv.ParseBool(pod.Annotations[constants.AnnotationSidecarProxyHoldApplicationUntilProxyStarts])
 	if err != nil || !hold {

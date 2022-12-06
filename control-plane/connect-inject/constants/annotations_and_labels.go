@@ -96,7 +96,7 @@ const (
 	AnnotationSidecarProxyGracefulShutdown = "consul.hashicorp.com/sidecar-proxy-graceful-shutdown"
 
 	// annotation to hold starting of app containers till sidecar proxy is started.
-	AnnotationSidecarProxyHoldApplicationUntilProxyStarts  = "consul.hashicorp.com/sidecar-hold-app-until-proxy-starts"
+	AnnotationSidecarProxyHoldApplicationUntilProxyStarts = "consul.hashicorp.com/sidecar-hold-app-until-proxy-starts"
 
 	// annotations for sidecar volumes.
 	AnnotationConsulSidecarUserVolume      = "consul.hashicorp.com/consul-sidecar-user-volume"
