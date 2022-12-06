@@ -6,8 +6,16 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
 )
+
+//go:generate mockery --name ServerConnectionManager --inpkg
+type ServerConnectionManager interface {
+	State() (discovery.State, error)
+	Run()
+	Stop()
+}
 
 // NewClient returns a Consul API client. It adds a required User-Agent
 // header that describes the version of consul-k8s making the call.
@@ -48,4 +56,37 @@ func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Clien
 	}
 	client.AddHeader("User-Agent", fmt.Sprintf("consul-k8s/%s", version.GetHumanVersion()))
 	return client, nil
+}
+
+type Config struct {
+	APIClientConfig *capi.Config
+	HTTPPort        int
+	GRPCPort        int
+	APITimeout      time.Duration
+}
+
+// todo (ishustava): replace all usages of this one.
+// NewClientFromConnMgrState creates a new API client with an IP address from the state
+// of the consul-server-connection-manager.
+func NewClientFromConnMgrState(config *Config, state discovery.State) (*capi.Client, error) {
+	ipAddress := state.Address.IP
+	config.APIClientConfig.Address = fmt.Sprintf("%s:%d", ipAddress.String(), config.HTTPPort)
+	if state.Token != "" {
+		config.APIClientConfig.Token = state.Token
+	}
+	return NewClient(config.APIClientConfig, config.APITimeout)
+}
+
+// NewClientFromConnMgr creates a new API client by first getting the state of the passed watcher.
+func NewClientFromConnMgr(config *Config, watcher ServerConnectionManager) (*capi.Client, error) {
+	// Create a new consul client.
+	serverState, err := watcher.State()
+	if err != nil {
+		return nil, err
+	}
+	consulClient, err := NewClientFromConnMgrState(config, serverState)
+	if err != nil {
+		return nil, err
+	}
+	return consulClient, nil
 }

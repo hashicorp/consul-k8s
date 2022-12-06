@@ -15,7 +15,6 @@ load _helpers
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
       .
-
   [ "$status" -eq 1 ]
   [[ "$output" =~ "apiGateway.image must be set to enable api gateway" ]]
 }
@@ -285,6 +284,18 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: CONSUL_LOGIN_DATACENTER is set when acls are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[2].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
@@ -304,12 +315,27 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -330,16 +356,23 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -347,9 +380,8 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
 }
 
 @test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
@@ -371,7 +403,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-auth-method-name=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -379,24 +411,57 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.volumeMounts[1].name] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: primary-datacenter flag provided when federation enabled in non-primary datacenter" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.datacenter=dc2' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc1' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select(.name == "api-gateway-controller")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-api-gateway server"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -422,11 +487,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-acl-auth-method=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-auth-method-name=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-datacenter=dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -447,24 +512,31 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+      yq '[.env[0].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+      yq '[.env[1].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
-      echo $actual
+      yq '[.env[2].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.volumeMounts[1].name] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-api-timeout=5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -877,4 +949,424 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "apiGateway/Deployment: fails when global.cloud.enabled is true and global.cloud.clientId.secretName is not set but global.cloud.clientSecret.secretName and global.cloud.resourceId.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientSecret.secretName=client-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-id-key' \
+      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.authUrl.secretName=auth-url-name' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.authUrl.secretKey=auth-url-key' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.apiHost.secretName=auth-url-name' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.apiHost.secretKey=auth-url-key' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
+}
+
+@test "apiGateway/Deployment: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.datacenter=dc-foo' \
+      --set 'global.domain=bar' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
+}
+
+#--------------------------------------------------------------------
+# CONSUL_HTTP_SSL
+
+@test "apiGateway/Deployment: CONSUL_HTTP_SSL set correctly when not using TLS." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[2].value' | tee /dev/stderr)
+  [ "${actual}" = "\"false\"" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_SSL set correctly when using TLS." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3].value' | tee /dev/stderr)
+  [ "${actual}" = "\"true\"" ]
+}
+
+#--------------------------------------------------------------------
+# CONSUL_HTTP_ADDR
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, TLS, and no clients." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.httpsPort=8501' \
+      --set 'server.enabled=false' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("external-consul.host:8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, no TLS, and no clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.httpsPort=8500' \
+      --set 'server.enabled=false' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("external-consul.host:8500"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("$(HOST_IP):8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=false' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("$(HOST_IP):8500"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and no clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("release-name-consul-server:8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and no clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=false' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("release-name-consul-server:8500"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# externalServers tlsServerName
+
+@test "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME can be set for externalServers" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.httpsPort=8501' \
+      --set 'externalServers.tlsServerName=hashi' \
+      --set 'server.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[4].value == "hashi"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# Admin Partitions
+
+@test "apiGateway/Deployment: CONSUL_PARTITION is set when using admin partitions" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=hashi' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3].value == "hashi"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_LOGIN_PARTITION is set when using admin partitions with ACLs" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=hashi' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[6].value == "hashi"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is set when not using clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3].value == "true"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is not set when using clients" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[3]' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }

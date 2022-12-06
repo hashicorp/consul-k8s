@@ -23,22 +23,21 @@ func TestRun_FlagValidation(t *testing.T) {
 	}{
 		{
 			flags:  nil,
-			expErr: "-server-address must be set at least once",
+			expErr: "addresses must be set",
 		},
 		{
-			flags:  []string{"-server-address", "foo"},
-			expErr: "-partition-name must be set",
-		},
-		{
-			flags: []string{
-				"-server-address", "foo", "-partition-name", "bar"},
-			expErr: "-consul-api-timeout must be set to a value greater than 0",
+			flags:  []string{"-addresses", "foo"},
+			expErr: "-partition must be set",
 		},
 		{
 			flags: []string{
-				"-server-address", "foo",
-				"-partition-name", "bar",
-				"-consul-api-timeout", "5s",
+				"-addresses", "foo", "-partition", "bar", "-api-timeout", "0s"},
+			expErr: "-api-timeout must be set to a value greater than 0",
+		},
+		{
+			flags: []string{
+				"-addresses", "foo",
+				"-partition", "bar",
 				"-log-level", "invalid",
 			},
 			expErr: "unknown log level: invalid",
@@ -75,10 +74,10 @@ func TestRun_PartitionCreate(t *testing.T) {
 	}
 	cmd.init()
 	args := []string{
-		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
-		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
-		"-partition-name", partitionName,
-		"-consul-api-timeout", "5s",
+		"-addresses=" + "127.0.0.1",
+		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
+		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
+		"-partition", partitionName,
 	}
 
 	responseCode := cmd.Run(args)
@@ -114,10 +113,10 @@ func TestRun_PartitionExists(t *testing.T) {
 	}
 	cmd.init()
 	args := []string{
-		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
-		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
-		"-partition-name", partitionName,
-		"-consul-api-timeout", "5s",
+		"-addresses=" + "127.0.0.1",
+		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
+		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
+		"-partition", partitionName,
 	}
 
 	responseCode := cmd.Run(args)
@@ -143,11 +142,11 @@ func TestRun_ExitsAfterTimeout(t *testing.T) {
 	}
 	cmd.init()
 	args := []string{
-		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
-		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
-		"-partition-name", partitionName,
+		"-addresses=" + "127.0.0.1",
+		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
+		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
 		"-timeout", "500ms",
-		"-consul-api-timeout", "5s",
+		"-partition", partitionName,
 	}
 	server.Stop()
 	startTime := time.Now()
@@ -159,5 +158,3 @@ func TestRun_ExitsAfterTimeout(t *testing.T) {
 	// some buffer time required for the task to run and assignments to occur.
 	require.WithinDuration(t, completeTime, startTime, 1*time.Second)
 }
-
-// TODO: Write tests with ACLs enabled

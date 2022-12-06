@@ -2,6 +2,8 @@
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for api gateway" }}{{ end }}
 {{- if not .Values.apiGateway.image}}{{ fail "apiGateway.image must be set to enable api gateway" }}{{ end }}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -65,13 +67,58 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: "/consul/login/acl-token"
+        - name: CONSUL_LOGIN_DATACENTER
+          value: {{ .Values.global.datacenter }}
         {{- end }}
         - name: CONSUL_HTTP_ADDR
+          {{- if .Values.client.enabled }}
+          {{/*
+            We use client agent nodes if we have them to support backwards compatibility for Consul API Gateway
+            v0.4 and older, which requires connectivity between the registered Consul agent node and a
+            deployment for health checking (originating from the Consul node). Always leveraging the agents in
+            the case that they're explicitly opted into allows us to support users with agent node +
+            "externalServers" configuration upgrading a Helm chart without upgrading API gateways.
+          */}}
           {{- if .Values.global.tls.enabled }}
-          value: https://$(HOST_IP):8501
+          value: $(HOST_IP):8501
           {{- else }}
-          value: http://$(HOST_IP):8500
+          value: $(HOST_IP):8500
           {{- end }}
+          {{- else if .Values.externalServers.enabled }}
+          {{/*
+            "externalServers" specified and running in "agentless" mode, this will only work with
+            Consul API Gateway v0.5 or newer
+          */}}
+          value: {{ first .Values.externalServers.hosts }}:{{ .Values.externalServers.httpsPort }}
+          {{- else }}
+          {{/*
+            We have local network connectivity between deployments and the internal cluster, this
+            should be supported in all versions of Consul API Gateway
+          */}}
+          {{- if .Values.global.tls.enabled }}
+          value: {{ template "consul.fullname" . }}-server:8501
+          {{- else }}
+          value: {{ template "consul.fullname" . }}-server:8500
+          {{- end }}
+          {{- end }}
+        - name: CONSUL_HTTP_SSL
+          value: "{{ .Values.global.tls.enabled }}"
+        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+        - name: CONSUL_TLS_SERVER_NAME
+          value: {{ .Values.externalServers.tlsServerName }}
+        {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+        - name: CONSUL_PARTITION
+          value: {{ .Values.global.adminPartitions.name }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_PARTITION
+          value: {{ .Values.global.adminPartitions.name }}
+        {{- end }}
+        {{- end }}
+        {{- if not .Values.client.enabled }}
+        - name: CONSUL_DYNAMIC_SERVER_DISCOVERY
+          value: "true"
+        {{- end }}
         command:
         - "/bin/sh"
         - "-ec"
@@ -89,6 +136,9 @@ spec:
             -mirroring-k8s-prefix={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }} \
             {{- end }}
             {{- end }}
+            {{- end }}
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- end }}
             -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
@@ -174,16 +224,17 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-          {{- if .Values.global.tls.enabled }}
-        - name: CONSUL_CACERT
-          value: /consul/tls/ca/tls.crt
-          {{- end }}
-        - name: CONSUL_HTTP_ADDR
-          {{- if .Values.global.tls.enabled }}
-          value: https://$(HOST_IP):8501
-          {{- else }}
-          value: http://$(HOST_IP):8500
-          {{- end }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CONSUL_LOGIN_META  
+          value: "component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
         - mountPath: /consul/login
@@ -203,17 +254,16 @@ spec:
         - "-ec"
         - |
           consul-k8s-control-plane acl-init \
-            -component-name=api-gateway-controller \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-            -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
+            -datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- else }}
-            -acl-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method \
+            -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method \
             {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
-            -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
+            -api-timeout={{ .Values.global.consulAPITimeout }} \
             -log-level={{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
         resources:
@@ -231,5 +281,9 @@ spec:
       {{- if .Values.apiGateway.controller.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.apiGateway.controller.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.apiGateway.controller.tolerations }}
+      tolerations:
+        {{ tpl .Values.apiGateway.controller.tolerations . | indent 8 | trim }}
       {{- end }}
 {{- end }}

@@ -22,6 +22,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
@@ -32,6 +33,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -c '.spec.hostPorts' | tee /dev/stderr)
@@ -45,6 +47,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'client.grpc=false' \
       . | tee /dev/stderr |
@@ -59,6 +62,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
@@ -73,6 +77,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq '.spec.volumes | any(contains("hostPath"))' | tee /dev/stderr)
@@ -84,6 +89,7 @@ load _helpers
   # Test that hostPath is an allowed volume type.
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'client.dataDirectoryHostPath=/opt/consul' \
       . | tee /dev/stderr |
@@ -93,6 +99,7 @@ load _helpers
   # Test that the path we're allowed to write to is the right one.
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'client.dataDirectoryHostPath=/opt/consul' \
       . | tee /dev/stderr |
@@ -107,6 +114,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -118,6 +126,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=true' \
@@ -133,6 +142,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'client.hostNetwork=true' \
       . | tee /dev/stderr |
@@ -145,6 +155,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'client.hostNetwork=true' \
       . | tee /dev/stderr |
@@ -159,6 +170,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-podsecuritypolicy.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq '.spec.hostNetwork == false' | tee /dev/stderr)

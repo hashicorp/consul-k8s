@@ -3,19 +3,18 @@ package consul
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
-	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -34,6 +33,10 @@ type HelmCluster struct {
 	// a Consul API client. If not provided, we will attempt to read
 	// a bootstrap token from a Kubernetes secret stored in the cluster.
 	ACLToken string
+
+	// SkipCheckForPreviousInstallations is a toggle for skipping the check
+	// if there are any previous installations of this Helm chart in the cluster.
+	SkipCheckForPreviousInstallations bool
 
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
@@ -109,7 +112,9 @@ func (h *HelmCluster) Create(t *testing.T) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	if !h.SkipCheckForPreviousInstallations {
+		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	}
 
 	chartName := config.HelmChartPath
 	if h.helmOptions.Version != config.HelmChartPath {
@@ -134,7 +139,11 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
-	_ = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"--wait": nil,
+	}
+	err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	require.NoError(t, err)
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -293,72 +302,7 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 
 func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) string {
 	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	return h.CreatePortForwardTunnelToResourcePort(t, serverPod, remotePort)
-}
-
-func (h *HelmCluster) CreatePortForwardTunnelToResourcePort(t *testing.T, resourceName string, remotePort int) string {
-	localPort := terratestk8s.GetAvailablePort(t)
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		h.helmOptions.KubectlOptions,
-		terratestk8s.ResourceTypePod,
-		resourceName,
-		localPort,
-		remotePort,
-		h.logger)
-
-	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
-		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
-		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
-		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
-	})
-
-	doneChan := make(chan bool)
-
-	t.Cleanup(func() {
-		close(doneChan)
-	})
-
-	go h.monitorPortForwardedServer(t, localPort, tunnel, doneChan, resourceName, remotePort)
-
-	return fmt.Sprintf("127.0.0.1:%d", localPort)
-}
-
-func (h *HelmCluster) monitorPortForwardedServer(t *testing.T, port int, tunnel *terratestk8s.Tunnel, doneChan chan bool, resourceName string, remotePort int) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-doneChan:
-			logger.Log(t, "stopping monitor of the port-forwarded server")
-			tunnel.Close()
-			return
-		case <-ticker.C:
-			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-			if err != nil {
-				logger.Log(t, "lost connection to port-forwarded server; restarting port-forwarding", "port", port)
-				tunnel.Close()
-				tunnel = terratestk8s.NewTunnelWithLogger(
-					h.helmOptions.KubectlOptions,
-					terratestk8s.ResourceTypePod,
-					resourceName,
-					port,
-					remotePort,
-					h.logger)
-				err = tunnel.ForwardPortE(t)
-				if err != nil {
-					// If we couldn't establish a port forwarding channel, continue, so we can try again.
-					continue
-				}
-			}
-			if conn != nil {
-				// Ignore error because we don't care if connection is closed successfully or not.
-				_ = conn.Close()
-			}
-		}
-	}
+	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {
@@ -565,9 +509,8 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 
 func defaultValues() map[string]string {
 	values := map[string]string{
-		"server.replicas":              "1",
-		"connectInject.envoyExtraArgs": "--log-level debug",
-		"connectInject.logLevel":       "debug",
+		"global.logLevel": "debug",
+		"server.replicas": "1",
 		// Disable DNS since enabling it changes the policy for the anonymous token,
 		// which could result in tests passing due to that token having privileges to read services
 		// (false positive).

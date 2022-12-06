@@ -3,14 +3,19 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -26,8 +31,14 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
 
-		// Create a directory for the test.
-		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)
+		// Create a directory for the test, first remove special characters from test name
+		reg, err := regexp.Compile("[^A-Za-z0-9/_-]+")
+		if err != nil {
+			logger.Log(t, "unable to generate regex for test name special character replacement", "err", err)
+		}
+		tn := reg.ReplaceAllString(t.Name(), "_")
+
+		testDebugDirectory := filepath.Join(debugDirectory, tn, contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
 		logger.Logf(t, "dumping logs, pod info, and envoy config for %s to %s", labelSelector, testDebugDirectory)
@@ -49,30 +60,39 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 			// Describe pod and write it to a file.
 			writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
-		}
 
-		// Get envoy configuration from the mesh gateways, if there are any.
-		meshGatewayPods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "component=mesh-gateway"})
-		require.NoError(t, err)
+			// Check if the pod is connect-injected, and if so, dump envoy config information.
+			_, isServiceMeshPod := pod.Annotations[constants.KeyInjectStatus]
+			_, isGatewayPod := pod.Annotations[constants.AnnotationGatewayKind]
+			if isServiceMeshPod || isGatewayPod {
+				localPort := portforward.CreateTunnelToResourcePort(t, pod.Name, 19000, kubectlOptions, terratestLogger.Discard)
 
-		for _, mpod := range meshGatewayPods.Items {
-			// Get configdump from mesh gateway, passing the discard logger since we only need these logs written to the file (below).
-			configDump, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", mpod.Name, "-c", "consul-sidecar", "--", "curl", "-s", "localhost:19000/config_dump?format=json")
-			if err != nil {
-				configDump = fmt.Sprintf("Error getting config_dump: %s: %s", err, configDump)
+				configDumpResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/config_dump?format=json", localPort))
+				var configDump string
+				if err != nil {
+					configDump = fmt.Sprintf("Error getting config_dump: %s: %s", err, configDump)
+				} else {
+					configDumpRespBytes, err := io.ReadAll(configDumpResp.Body)
+					require.NoError(t, err)
+					configDump = string(configDumpRespBytes)
+				}
+
+				clustersResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/clusters?format=json", localPort))
+				var clusters string
+				if err != nil {
+					clusters = fmt.Sprintf("Error getting clusters: %s: %s", err, clusters)
+				} else {
+					clustersRespBytes, err := io.ReadAll(clustersResp.Body)
+					require.NoError(t, err)
+					clusters = string(clustersRespBytes)
+				}
+
+				// Write config/clusters or err to file name <pod.Name>-envoy-[configdump/clusters].json
+				configDumpFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-envoy-configdump.json", pod.Name))
+				clustersFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-envoy-clusters.json", pod.Name))
+				require.NoError(t, os.WriteFile(configDumpFilename, []byte(configDump), 0600))
+				require.NoError(t, os.WriteFile(clustersFilename, []byte(clusters), 0600))
 			}
-			// Get cluster config from mesh gateway, passing the discard logger since we only need these logs written to the file (below).
-			clusters, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", mpod.Name, "-c", "consul-sidecar", "--", "curl", "-s", "localhost:19000/clusters?format=json")
-			if err != nil {
-				clusters = fmt.Sprintf("Error getting clusters: %s: %s", err, clusters)
-			}
-
-			// Write config/clusters or err to file name <pod.Name>-envoy-[configdump/clusters].json
-			configDumpFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-envoy-configdump.json", mpod.Name))
-			clustersFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-envoy-clusters.json", mpod.Name))
-			require.NoError(t, os.WriteFile(configDumpFilename, []byte(configDump), 0600))
-			require.NoError(t, os.WriteFile(clustersFilename, []byte(clusters), 0600))
-
 		}
 
 		// Describe any stateful sets.

@@ -1,4 +1,4 @@
-{{- if .Values.controller.enabled }}
+{{- if .Values.connectInject.enabled }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -113,6 +113,17 @@ spec:
                   TLS SNI value to be changed to a non-connect value when federating
                   with an external system.
                 type: string
+              localConnectTimeoutMs:
+                description: The number of milliseconds allowed to make connections
+                  to the local application instance before timing out. Defaults to
+                  5000.
+                type: integer
+              localRequestTimeoutMs:
+                description: In milliseconds, the timeout for HTTP requests to the
+                  local application instance. Applies to HTTP-based protocols only.
+                  If not specified, inherits the Envoy default for route timeouts
+                  (15s).
+                type: integer
               maxInboundConnections:
                 description: MaxInboundConnections is the maximum number of concurrent
                   inbound connections to each service instance. Defaults to 0 (using
@@ -241,6 +252,13 @@ spec:
                           upstream proxy instances will be monitored for removal from
                           the load balancing pool.
                         properties:
+                          enforcing_consecutive_5xx:
+                            description: EnforcingConsecutive5xx is the % chance that
+                              a host will be actually ejected when an outlier status
+                              is detected through consecutive 5xx. This setting can
+                              be used to disable ejection or to ramp it up slowly.
+                            format: int32
+                            type: integer
                           interval:
                             description: Interval between health check analysis sweeps.
                               Each sweep may remove hosts or return hosts to the pool.
@@ -333,6 +351,13 @@ spec:
                             how upstream proxy instances will be monitored for removal
                             from the load balancing pool.
                           properties:
+                            enforcing_consecutive_5xx:
+                              description: EnforcingConsecutive5xx is the % chance
+                                that a host will be actually ejected when an outlier
+                                status is detected through consecutive 5xx. This setting
+                                can be used to disable ejection or to ramp it up slowly.
+                              format: int32
+                              type: integer
                             interval:
                               description: Interval between health check analysis
                                 sweeps. Each sweep may remove hosts or return hosts

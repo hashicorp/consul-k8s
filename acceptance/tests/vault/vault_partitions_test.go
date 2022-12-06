@@ -300,7 +300,6 @@ func TestVault_Partitions(t *testing.T) {
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
@@ -346,11 +345,10 @@ func TestVault_Partitions(t *testing.T) {
 	// share the same node network (docker bridge), we can use
 	// a NodePort service so that we can access node(s) in a different Kind cluster.
 	if cfg.UseKind {
-		serverHelmValues["global.adminPartitions.service.type"] = "NodePort"
-		serverHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
 		serverHelmValues["meshGateway.service.type"] = "NodePort"
 		serverHelmValues["meshGateway.service.nodePort"] = "30100"
 		serverHelmValues["server.exposeService.type"] = "NodePort"
+		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
 	}
 
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
@@ -359,7 +357,7 @@ func TestVault_Partitions(t *testing.T) {
 	consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
 	consulCluster.Create(t)
 
-	partitionServiceName := fmt.Sprintf("%s-consul-partition", consulReleaseName)
+	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)

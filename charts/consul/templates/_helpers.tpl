@@ -149,19 +149,6 @@ is passed to consul as a -config-file param on command line.
 {{- end -}}
 
 {{/*
-Sets up a list of recusor flags for Consul agents by iterating over the IPs of every nameserver
-in /etc/resolv.conf and concatenating them into a string of arguments that can be passed directly
-to the consul agent command.
-*/}}
-{{- define "consul.recursors" -}}
-              recursor_flags=""
-              for ip in $(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
-              do
-                 recursor_flags="$recursor_flags -recursor=$ip"
-              done
-{{- end -}}
-
-{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "consul.chart" -}}
@@ -200,7 +187,7 @@ Add a special case for replicas=1, where it should default to 0 as well.
 {{- if eq (int .Values.connectInject.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.connectInject.disruptionBudget.maxUnavailable -}}
-{{ .Values.server.disruptionBudget.maxUnavailable -}}
+{{ .Values.connectInject.disruptionBudget.maxUnavailable -}}
 {{- else -}}
 {{- if eq (int .Values.connectInject.replicas) 3 -}}
 {{- 1 -}}
@@ -236,6 +223,9 @@ This template is for an init container.
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
+        {{- if .Values.global.cloud.enabled }}
+        -tls-server-name=server.{{.Values.global.datacenter}}.{{.Values.global.domain}} \
+        {{- end}}
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
@@ -311,4 +301,114 @@ Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
 {{ end }}
 {{ end }}
+{{- end -}}
+
+{{/*
+Consul server environment variables for consul-k8s commands.
+*/}}
+{{- define "consul.consulK8sConsulServerEnvVars" -}}
+- name: CONSUL_ADDRESSES
+  {{- if .Values.externalServers.enabled }}
+  value: {{ .Values.externalServers.hosts | first }}
+  {{- else }}
+  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+  {{- end }}
+- name: CONSUL_GRPC_PORT
+  {{- if .Values.externalServers.enabled }}
+  value: "{{ .Values.externalServers.grpcPort }}"
+  {{- else }}
+  value: "8502"
+  {{- end }}
+- name: CONSUL_HTTP_PORT
+  {{- if .Values.externalServers.enabled }}
+  value: "{{ .Values.externalServers.httpsPort }}"
+  {{- else if .Values.global.tls.enabled }}
+  value: "8501"
+  {{- else }}
+  value: "8500"
+  {{- end }}
+- name: CONSUL_DATACENTER
+  value: {{ .Values.global.datacenter }}
+- name: CONSUL_API_TIMEOUT
+  value: {{ .Values.global.consulAPITimeout }}
+{{- if .Values.global.adminPartitions.enabled }}
+- name: CONSUL_PARTITION
+  value: {{ .Values.global.adminPartitions.name }}
+{{- if .Values.global.acls.manageSystemACLs }}
+- name: CONSUL_LOGIN_PARTITION
+  value: {{ .Values.global.adminPartitions.name }}
+{{- end }}
+{{- end }}
+{{- if .Values.global.tls.enabled }}
+- name: CONSUL_USE_TLS
+  value: "true"
+{{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+- name: CONSUL_CACERT_FILE
+  {{- if .Values.global.secretsBackend.vault.enabled }}
+  value: "/vault/secrets/serverca.crt"
+  {{- else }}
+  value: "/consul/tls/ca/tls.crt"
+  {{- end }}
+{{- end }}
+{{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+- name: CONSUL_TLS_SERVER_NAME
+  value: {{ .Values.externalServers.tlsServerName }}
+{{- else if .Values.global.cloud.enabled }}
+- name: CONSUL_TLS_SERVER_NAME
+  value: server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
+{{- end }}
+{{- end }}
+{{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
+- name: CONSUL_SKIP_SERVER_WATCH
+  value: "true" 
+{{- end }}
+{{- end -}}
+
+{{/*
+Fails global.cloud.enabled is true and one of the following secrets is nil or empty.
+- global.cloud.resourceId.secretName
+- global.cloud.clientId.secretName
+- global.cloud.clientSecret.secretName
+
+Usage: {{ template "consul.validateRequiredCloudSecretsExist" . }}
+
+*/}}
+{{- define "consul.validateRequiredCloudSecretsExist" -}}
+{{- if (and .Values.global.cloud.enabled (or (not .Values.global.cloud.resourceId.secretName) (not .Values.global.cloud.clientId.secretName) (not .Values.global.cloud.clientSecret.secretName))) }}
+{{fail "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set."}}
+{{- end }}
+{{- end -}}
+
+{{/*
+Fails global.cloud.enabled is true and one of the following secrets has either an empty secretName or secretKey.
+- global.cloud.resourceId.secretName / secretKey
+- global.cloud.clientId.secretName / secretKey
+- global.cloud.clientSecret.secretName / secretKey
+- global.cloud.authUrl.secretName / secretKey
+- global.cloud.apiHost.secretName / secretKey
+- global.cloud.scadaAddress.secretName / secretKey
+Usage: {{ template "consul.validateCloudSecretKeys" . }}
+
+*/}}
+{{- define "consul.validateCloudSecretKeys" -}}
+{{- if and .Values.global.cloud.enabled }} 
+{{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
+{{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.clientId.secretName (not .Values.global.cloud.clientId.secretKey)) (and .Values.global.cloud.clientId.secretKey (not .Values.global.cloud.clientId.secretName)) }}
+{{fail "When either global.cloud.clientId.secretName or global.cloud.clientId.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.clientSecret.secretName (not .Values.global.cloud.clientSecret.secretKey)) (and .Values.global.cloud.clientSecret.secretKey (not .Values.global.cloud.clientSecret.secretName)) }}
+{{fail "When either global.cloud.clientSecret.secretName or global.cloud.clientSecret.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.authUrl.secretName (not .Values.global.cloud.authUrl.secretKey)) (and .Values.global.cloud.authUrl.secretKey (not .Values.global.cloud.authUrl.secretName)) }}
+{{fail "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.apiHost.secretName (not .Values.global.cloud.apiHost.secretKey)) (and .Values.global.cloud.apiHost.secretKey (not .Values.global.cloud.apiHost.secretName)) }}
+{{fail "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.global.cloud.scadaAddress.secretName (not .Values.global.cloud.scadaAddress.secretKey)) (and .Values.global.cloud.scadaAddress.secretKey (not .Values.global.cloud.scadaAddress.secretName)) }}
+{{fail "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set."}}
+{{- end }}
+{{- end }}
 {{- end -}}

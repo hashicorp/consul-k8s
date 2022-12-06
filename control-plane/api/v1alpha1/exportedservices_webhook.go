@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	capi "github.com/hashicorp/consul/api"
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -17,10 +16,9 @@ import (
 
 type ExportedServicesWebhook struct {
 	client.Client
-	ConsulClient *capi.Client
-	Logger       logr.Logger
-	decoder      *admission.Decoder
-	ConsulMeta   common.ConsulMeta
+	Logger     logr.Logger
+	decoder    *admission.Decoder
+	ConsulMeta common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

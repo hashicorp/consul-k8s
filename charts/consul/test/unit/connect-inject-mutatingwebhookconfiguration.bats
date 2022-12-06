@@ -2,11 +2,13 @@
 
 load _helpers
 
-@test "connectInject/MutatingWebhookConfiguration: disabled by default" {
+@test "connectInject/MutatingWebhookConfiguration: enabled by default" {
   cd `chart_dir`
-  assert_empty helm template \
+  local actual=$(helm template \
       -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
-      .
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/MutatingWebhookConfiguration: enable with global.enabled false" {
@@ -33,6 +35,7 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
+      --set 'connectInject.enabled=-' \
       --set 'global.enabled=false' \
       .
 }
@@ -53,15 +56,19 @@ load _helpers
   local actual=$(helm template \
       -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
       --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       . | tee /dev/stderr |
-      yq '.webhooks[1].name | contains("peeringacceptors.consul.hashicorp.com")' | tee /dev/stderr)
+      yq '.webhooks[11].name | contains("peeringacceptors.consul.hashicorp.com")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(helm template \
       -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
       --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       . | tee /dev/stderr |
-      yq '.webhooks[2].name | contains("peeringdialers.consul.hashicorp.com")' | tee /dev/stderr)
+      yq '.webhooks[12].name | contains("peeringdialers.consul.hashicorp.com")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

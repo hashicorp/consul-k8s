@@ -22,6 +22,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
@@ -32,6 +33,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq -c '.allowHostPorts' | tee /dev/stderr)
@@ -46,6 +48,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq '.volumes | any(contains("hostPath"))' | tee /dev/stderr)
@@ -57,6 +60,7 @@ load _helpers
   # Test that hostPath is an allowed volume type.
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       --set 'client.dataDirectoryHostPath=/opt/consul' \
       . | tee /dev/stderr |
@@ -66,6 +70,7 @@ load _helpers
   # Test that the path we're allowed to write to host path.
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       --set 'client.dataDirectoryHostPath=/opt/consul' \
       . | tee /dev/stderr |
@@ -80,6 +85,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       --set 'client.hostNetwork=true' \
       . | tee /dev/stderr |
@@ -91,6 +97,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-securitycontextconstraints.yaml  \
+      --set 'client.enabled=true' \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq '.allowHostNetwork == false' | tee /dev/stderr)

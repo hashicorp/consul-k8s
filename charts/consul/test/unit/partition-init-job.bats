@@ -6,14 +6,15 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
-      .
+      . 
 }
 
-@test "partitionInit/Job: enabled with global.adminPartitions.enabled=true and servers = false" {
+@test "partitionInit/Job: enabled with global.adminPartitions.enabled=true and server.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
@@ -28,6 +29,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=true' \
       .
 }
@@ -37,6 +39,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       .
 }
@@ -46,6 +49,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.enabled=true' \
       .
 }
@@ -55,6 +59,7 @@ load _helpers
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=true' \
       .
 }
@@ -65,62 +70,80 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=false' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "externalServers.enabled needs to be true and configured to create a non-default partition." ]]
 }
 
-@test "partitionInit/Job: command defaults" {
+@test "partitionInit/Job: consul env defaults" {
   cd `chart_dir`
-  local command=$(helm template \
-      -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+  local env=$(helm template \
+      -s templates/partition-init-job.yaml \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
+      --set 'server.enabled=false' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("consul-k8s-control-plane partition-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-consul-api-timeout=5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8502" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_DATACENTER").value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
+  [ "${actual}" = "5s" ]
 }
 
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "partitionInit/Job: sets TLS flags when global.tls.enabled" {
+@test "partitionInit/Job: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
-  local command=$(helm template \
+  local env=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-use-https"))' | tee /dev/stderr)
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_USE_TLS").value' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-ca-file=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-port=8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
-@test "partitionInit/Job: does not set consul ca cert or server-port when .externalServers.useSystemRoots is true" {
+@test "partitionInit/Job: does not set consul ca cert when .externalServers.useSystemRoots is true" {
   cd `chart_dir`
-  local command=$(helm template \
+  local spec=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
@@ -130,11 +153,19 @@ load _helpers
       --set 'externalServers.hosts[0]=foo' \
       --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+      yq -r '.spec.template.spec' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-ca-file=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  local actual=$(echo "$env" |
+    jq -r '.containers[0].env[] | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$env" |
+    jq -r '.volumes[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$env" |
+    jq -r '.spec.volumeMounts[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
 }
 
 @test "partitionInit/Job: can overwrite CA secret with the provided one" {
@@ -144,6 +175,7 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -167,19 +199,20 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken
 
-@test "partitionInit/Job: HTTP_TOKEN is set when global.acls.bootstrapToken is provided" {
+@test "partitionInit/Job: CONSUL_ACL_TOKEN is set when global.acls.bootstrapToken is provided" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.acls.bootstrapToken.secretName=partition-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -229,6 +262,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=boot' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -249,6 +283,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -280,7 +315,7 @@ reservedNameTest() {
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_HTTP_TOKEN_FILE").value')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # Check that no (secret) volumes are not attached
@@ -298,6 +333,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -341,6 +377,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -382,7 +419,7 @@ reservedNameTest() {
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_HTTP_TOKEN_FILE").value')
+  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # Check that the consul-ca-cert volume is not attached
@@ -400,6 +437,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -424,6 +462,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -449,6 +488,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -474,6 +514,7 @@ reservedNameTest() {
     --set 'global.enabled=false' \
     --set 'global.adminPartitions.enabled=true' \
     --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
     --set 'externalServers.enabled=true' \
     --set 'externalServers.hosts[0]=foo' \
     --set 'global.tls.enabled=true' \
@@ -503,6 +544,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -524,6 +566,7 @@ reservedNameTest() {
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
@@ -537,4 +580,302 @@ reservedNameTest() {
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# global.cloud
+
+@test "partitionInit/Job: fails when global.cloud.enabled is true and global.cloud.clientId.secretName is not set but global.cloud.clientSecret.secretName and global.cloud.resourceId.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientSecret.secretName=client-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-id-key' \
+      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.authUrl.secretName=auth-url-name' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.authUrl.secretKey=auth-url-key' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.apiHost.secretName=auth-url-name' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.apiHost.secretKey=auth-url-key' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
+      .
+  [ "$status" -eq 1 ]
+  
+  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
+}
+
+@test "partitionInit/Job: sets TLS server name if global.cloud.enabled is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }

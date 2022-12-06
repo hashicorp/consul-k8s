@@ -5,20 +5,23 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-netaddrs"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/text/cases"
@@ -31,8 +34,9 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags *flag.FlagSet
-	k8s   *k8sflags.K8SFlags
+	flags       *flag.FlagSet
+	k8s         *k8sflags.K8SFlags
+	consulFlags *flags.ConsulFlags
 
 	flagResourcePrefix string
 	flagK8sNamespace   string
@@ -50,8 +54,6 @@ type Command struct {
 	flagAuthMethodHost      string
 	flagBindingRuleSelector string
 
-	flagController bool
-
 	flagCreateEntLicenseToken bool
 
 	flagSnapshotAgent bool
@@ -63,20 +65,13 @@ type Command struct {
 	flagAPIGatewayController bool
 
 	// Flags to configure Consul connection.
-	flagServerAddresses     []string
-	flagServerPort          uint
-	flagConsulCACert        string
-	flagConsulTLSServerName string
-	flagUseHTTPS            bool
-	flagConsulAPITimeout    time.Duration
+	flagServerPort uint
 
 	// Flags for ACL replication.
 	flagCreateACLReplicationToken bool
 	flagACLReplicationTokenFile   string
 
 	// Flags to support partitions.
-	flagEnablePartitions   bool   // true if Admin Partitions are enabled
-	flagPartitionName      string // name of the Admin Partition
 	flagPartitionTokenFile string
 
 	// Flags to support peering.
@@ -105,6 +100,8 @@ type Command struct {
 
 	clientset kubernetes.Interface
 
+	watcher consul.ServerConnectionManager
+
 	// ctx is cancelled when the command timeout is reached.
 	ctx           context.Context
 	retryDuration time.Duration
@@ -112,10 +109,10 @@ type Command struct {
 	// log
 	log hclog.Logger
 
+	state discovery.State
+
 	once sync.Once
 	help string
-
-	providers map[string]discover.Provider
 }
 
 func (c *Command) init() {
@@ -146,9 +143,6 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
 
-	c.flags.BoolVar(&c.flagController, "controller", false,
-		"Toggle for configuring ACL login for the controller.")
-
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
 	c.flags.BoolVar(&c.flagSnapshotAgent, "snapshot-agent", false,
@@ -166,21 +160,8 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagAPIGatewayController, "api-gateway-controller", false,
 		"Toggle for configuring ACL login for the API gateway controller.")
 
-	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
-			"At least one value is required.")
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
-	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
-		"Path to the PEM-encoded CA certificate of the Consul cluster.")
-	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
-		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
-	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
-		"Toggle for using HTTPS for all API calls to Consul.")
 
-	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
-		"[Enterprise Only] Enables Admin Partitions")
-	c.flags.StringVar(&c.flagPartitionName, "partition", "",
-		"[Enterprise Only] Name of the Admin Partition")
 	c.flags.StringVar(&c.flagPartitionTokenFile, "partition-token-file", "",
 		"[Enterprise Only] Path to file containing ACL token to be used in non-default partitions.")
 
@@ -225,11 +206,10 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	c.flags.DurationVar(&c.flagConsulAPITimeout, "consul-api-timeout", 0,
-		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
-
 	c.k8s = &k8sflags.K8SFlags{}
+	c.consulFlags = &flags.ConsulFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
+	flags.Merge(c.flags, c.consulFlags.Flags())
 	c.help = flags.Usage(help, c.flags)
 
 	// Default retry to 1s. This is exposed for setting in tests.
@@ -314,14 +294,16 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.log)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
-		return 1
-	}
-	scheme := "http"
-	if c.flagUseHTTPS {
-		scheme = "https"
+	var ipAddrs []net.IPAddr
+	if err := backoff.Retry(func() error {
+		ipAddrs, err = netaddrs.IPAddrs(c.ctx, c.consulFlags.Addresses, c.log)
+		if err != nil {
+			c.log.Error("Error resolving IP Address", "err", err)
+			return err
+		}
+		return nil
+	}, exponentialBackoffWithMaxInterval()); err != nil {
+		c.UI.Error(err.Error())
 	}
 
 	var bootstrapToken string
@@ -348,30 +330,44 @@ func (c *Command) Run(args []string) int {
 			}
 		}
 
-		bootstrapToken, err = c.bootstrapServers(serverAddresses, bootstrapToken, bootTokenSecretName, scheme)
+		bootstrapToken, err = c.bootstrapServers(ipAddrs, bootstrapToken, bootTokenSecretName)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
 	}
 
-	// For all of the next operations we'll need a Consul client.
-	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	clientConfig := api.DefaultConfig()
-	clientConfig.Address = serverAddr
-	clientConfig.Scheme = scheme
-	clientConfig.Token = bootstrapToken
-	clientConfig.TLSConfig = api.TLSConfig{
-		Address: c.flagConsulTLSServerName,
-		CAFile:  c.flagConsulCACert,
+	// Start Consul server Connection manager
+	var watcher consul.ServerConnectionManager
+	serverConnMgrCfg, err := c.consulFlags.ConsulServerConnMgrConfig()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
+		return 1
+	}
+	serverConnMgrCfg.Credentials.Type = discovery.CredentialsTypeStatic
+	serverConnMgrCfg.Credentials.Static = discovery.StaticTokenCredential{Token: bootstrapToken}
+	if c.watcher == nil {
+		watcher, err = discovery.NewWatcher(c.ctx, serverConnMgrCfg, c.log.Named("consul-server-connection-manager"))
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to create Consul server watcher: %s", err))
+			return 1
+		}
+	} else {
+		watcher = c.watcher
 	}
 
-	if c.flagEnablePartitions {
-		clientConfig.Partition = c.flagPartitionName
-	}
-	consulClient, err := consul.NewClient(clientConfig, c.flagConsulAPITimeout)
+	go watcher.Run()
+	defer watcher.Stop()
+
+	c.state, err = watcher.State()
 	if err != nil {
-		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
+		c.UI.Error(fmt.Sprintf("unable to get Consul server addresses from watcher: %s", err))
+		return 1
+	}
+
+	consulClient, err := consul.NewClientFromConnMgrState(c.consulFlags.ConsulClientConfig(), c.state)
+	if err != nil {
+		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", c.state.Address, err))
 		return 1
 	}
 	consulDC, primaryDC, err := c.consulDatacenterList(consulClient)
@@ -382,7 +378,7 @@ func (c *Command) Run(args []string) int {
 	c.log.Info("Current datacenter", "datacenter", consulDC, "primaryDC", primaryDC)
 	primary := consulDC == primaryDC
 
-	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && primary {
+	if c.consulFlags.Partition == consulDefaultPartition && primary {
 		// Partition token is local because only the Primary datacenter can have Admin Partitions.
 		if c.flagPartitionTokenFile != "" {
 			err = c.createACLWithSecretID("partitions", partitionRules, consulDC, primary, consulClient, partitionToken, true)
@@ -482,11 +478,11 @@ func (c *Command) Run(args []string) int {
 		// DNS lookups. The anonymous policy in the default partition needs to be updated in order to
 		// support this use-case. Creating a separate anonymous token client that updates the anonymous
 		// policy and token in the default partition ensures this works.
-		anonTokenConfig := clientConfig
-		if c.flagEnablePartitions {
-			anonTokenConfig.Partition = consulDefaultPartition
+		anonTokenConfig := c.consulFlags.ConsulClientConfig()
+		if c.consulFlags.Partition != "" {
+			anonTokenConfig.APIClientConfig.Partition = consulDefaultPartition
 		}
-		anonTokenClient, err := consul.NewClient(anonTokenConfig, c.flagConsulAPITimeout)
+		anonTokenClient, err := consul.NewClientFromConnMgrState(anonTokenConfig, c.state)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -545,19 +541,13 @@ func (c *Command) Run(args []string) int {
 		serviceAccountName := c.withPrefix("connect-injector")
 		componentAuthMethodName := localComponentAuthMethodName
 
-		// If namespaces are enabled, the policy and token need to be global
-		// to be allowed to create namespaces.
-		if c.flagEnableNamespaces {
-			// Create the connect-inject ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
-			// ConnectInjector token must be global when namespaces are enabled. This means secondary datacenters need
-			// a token that is known by the primary datacenters.
-			if !primary {
-				componentAuthMethodName = globalComponentAuthMethodName
-			}
-			err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
-		} else {
-			err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
+		// Create the connect-inject ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
+		// ConnectInjector token must be global. This means secondary datacenters need
+		// a token that is known by the primary datacenters.
+		if !primary {
+			componentAuthMethodName = globalComponentAuthMethodName
 		}
+		err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -566,7 +556,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateEntLicenseToken {
 		var err error
-		if c.flagEnablePartitions {
+		if c.consulFlags.Partition != "" {
 			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, primary, consulClient)
 		} else {
 			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, primary, consulClient)
@@ -578,7 +568,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagSnapshotAgent {
-		serviceAccountName := c.withPrefix("snapshot-agent")
+		serviceAccountName := c.withPrefix("server")
 		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -592,7 +582,16 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		serviceAccountName := c.withPrefix("api-gateway-controller")
-		if err := c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
+
+		// API gateways require a global policy/token because they must
+		// create config-entry resources in the primary, even when deployed
+		// to a secondary datacenter
+		authMethodName := localComponentAuthMethodName
+		if !primary {
+			authMethodName = globalComponentAuthMethodName
+		}
+		err = c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
+		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
@@ -672,31 +671,18 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagController {
-		rules, err := c.controllerRules()
-		if err != nil {
-			c.log.Error("Error templating controller token rules", "err", err)
-			return 1
-		}
-
-		serviceAccountName := c.withPrefix("controller")
-
-		// Create the controller ACL Policy, Role and BindingRule but do not issue any ACLTokens or create Kube Secrets.
-		// Controller token must be global because config entry writes all
-		// go to the primary datacenter. This means secondary datacenters need
-		// a token that is known by the primary datacenters.
-		authMethodName := localComponentAuthMethodName
-		if !primary {
-			authMethodName = globalComponentAuthMethodName
-		}
-		err = c.createACLPolicyRoleAndBindingRule("controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
-		}
-	}
 	c.log.Info("server-acl-init completed successfully")
 	return 0
+}
+
+// exponentialBackoffWithMaxInterval creates an exponential backoff but limits the
+// maximum backoff to 10 seconds so that we don't find ourselves in a situation
+// where we are waiting for minutes before retries.
+func exponentialBackoffWithMaxInterval() *backoff.ExponentialBackOff {
+	backoff := backoff.NewExponentialBackOff()
+	backoff.MaxInterval = 10 * time.Second
+	backoff.Reset()
+	return backoff
 }
 
 // configureGlobalComponentAuthMethod sets up an AuthMethod in the primary datacenter,
@@ -809,7 +795,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 		// the words "ingress-gateway" or "terminating-gateway". We need to create unique names for tokens
 		// across all gateway types and so must suffix with either `-ingress-gateway` of `-terminating-gateway`.
 		serviceAccountName := c.withPrefix(name)
-		err = c.createACLPolicyRoleAndBindingRule(serviceAccountName, rules,
+		err = c.createACLPolicyRoleAndBindingRule(name, rules,
 			gatewayParams.ConsulDC, gatewayParams.PrimaryDC, localPolicy,
 			gatewayParams.Primary, gatewayParams.AuthMethodName, serviceAccountName, consulClient)
 		if err != nil {
@@ -943,8 +929,8 @@ func (c *Command) createAnonymousPolicy(isPrimary bool) bool {
 }
 
 func (c *Command) validateFlags() error {
-	if len(c.flagServerAddresses) == 0 {
-		return errors.New("-server-address must be set at least once")
+	if c.consulFlags.Addresses == "" {
+		return errors.New("-addresses must be set")
 	}
 
 	if c.flagResourcePrefix == "" {
@@ -972,14 +958,7 @@ func (c *Command) validateFlags() error {
 		)
 	}
 
-	if c.flagEnablePartitions && c.flagPartitionName == "" {
-		return errors.New("-partition must be set if -enable-partitions is true")
-	}
-	if !c.flagEnablePartitions && c.flagPartitionName != "" {
-		return errors.New("-enable-partitions must be 'true' if -partition is set")
-	}
-
-	if c.flagConsulAPITimeout <= 0 {
+	if c.consulFlags.APITimeout <= 0 {
 		return errors.New("-consul-api-timeout must be set to a value greater than 0")
 	}
 

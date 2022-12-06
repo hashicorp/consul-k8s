@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,13 +14,14 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-netaddrs"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,36 +36,24 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flags *flag.FlagSet
-	k8s   *flags.K8SFlags
-	http  *flags.HTTPFlags
+	flags  *flag.FlagSet
+	k8s    *flags.K8SFlags
+	consul *flags.ConsulFlags
 
-	flagSecretName        string
-	flagInitType          string
-	flagNamespace         string
-	flagPrimaryDatacenter string
-	flagACLDir            string
-	flagTokenSinkFile     string
+	flagSecretName    string
+	flagInitType      string
+	flagACLDir        string
+	flagTokenSinkFile string
+	flagK8sNamespace  string
 
-	flagACLAuthMethod string // Auth Method to use for ACLs.
-	flagLogLevel      string
-	flagLogJSON       bool
-
-	bearerTokenFile   string // Location of the bearer token. Default is defaultBearerTokenFile.
-	flagComponentName string // Name of the component to be used as metadata to ACL Login.
-
-	// Flags to configure Consul connection
-	flagServerAddresses []string
-	flagServerPort      uint
-	flagConsulCACert    string
-	flagUseHTTPS        bool
+	flagLogLevel string
+	flagLogJSON  bool
 
 	k8sClient kubernetes.Interface
 
-	once      sync.Once
-	help      string
-	logger    hclog.Logger
-	providers map[string]discover.Provider
+	once   sync.Once
+	help   string
+	logger hclog.Logger
 
 	ctx          context.Context
 	consulClient *api.Client
@@ -82,19 +72,8 @@ func (c *Command) init() {
 		"Optional filepath to write acl token")
 
 	// Flags related to using consul login to fetch the ACL token.
-	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "", "Name of Kubernetes namespace where the token Kubernetes secret is stored.")
-	c.flags.StringVar(&c.flagPrimaryDatacenter, "primary-datacenter", "", "Name of the primary datacenter when federation is enabled and the command is run in a secondary datacenter.")
-	c.flags.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login with.")
-	c.flags.StringVar(&c.flagComponentName, "component-name", "",
-		"Name of the component to pass to ACL Login as metadata.")
-	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
-			"At least one value is required.")
-	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
-	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
-		"Path to the PEM-encoded CA certificate of the Consul cluster.")
-	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
-		"Toggle for using HTTPS for all API calls to Consul.")
+	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
+		"Name of Kubernetes namespace where the token Kubernetes secret is stored.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -102,9 +81,9 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 
 	c.k8s = &flags.K8SFlags{}
-	c.http = &flags.HTTPFlags{}
+	c.consul = &flags.ConsulFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
-	flags.Merge(c.flags, c.http.Flags())
+	flags.Merge(c.flags, c.consul.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
 
@@ -120,18 +99,18 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if c.bearerTokenFile == "" {
-		c.bearerTokenFile = defaultBearerTokenFile
+	if c.consul.ConsulLogin.BearerTokenFile == "" {
+		c.consul.ConsulLogin.BearerTokenFile = defaultBearerTokenFile
 	}
 	// This allows us to utilize the default path of `/consul/login/acl-token` for the ACL token
 	// but only in the case of when we're using ACL.Login. If flagACLAuthMethod is not set and
 	// the tokenSinkFile is also unset it means we do not want to write an ACL token in the case
 	// of the client token.
-	if c.flagTokenSinkFile == "" && c.flagACLAuthMethod != "" {
+	if c.flagTokenSinkFile == "" {
 		c.flagTokenSinkFile = defaultTokenSinkFile
 	}
-	if c.flagNamespace == "" {
-		c.flagNamespace = corev1.NamespaceDefault
+	if c.flagK8sNamespace == "" {
+		c.flagK8sNamespace = corev1.NamespaceDefault
 	}
 
 	if c.ctx == nil {
@@ -162,45 +141,40 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var secret string
-	if c.flagACLAuthMethod != "" {
-		cfg := api.DefaultConfig()
-		c.http.MergeOntoConfig(cfg)
-
-		if len(c.flagServerAddresses) > 0 {
-			serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.logger)
+	if c.consul.ConsulLogin.AuthMethod != "" {
+		var ipAddrs []net.IPAddr
+		if err := backoff.Retry(func() error {
+			ipAddrs, err = netaddrs.IPAddrs(c.ctx, c.consul.Addresses, c.logger)
 			if err != nil {
-				c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
-				return 1
+				c.logger.Error("Error resolving IP Address", "err", err)
+				return err
 			}
-
-			scheme := "http"
-			if c.flagUseHTTPS {
-				scheme = "https"
-			}
-
-			serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-			cfg.Address = serverAddr
-			cfg.Scheme = scheme
+			return nil
+		}, exponentialBackoffWithMaxInterval()); err != nil {
+			c.UI.Error(err.Error())
+			return 1
 		}
+		firstServerAddr := fmt.Sprintf("%s:%d", ipAddrs[0].IP.String(), c.consul.HTTPPort)
 
-		c.consulClient, err = consul.NewClient(cfg, c.http.ConsulAPITimeout())
+		config := c.consul.ConsulClientConfig().APIClientConfig
+		config.Address = firstServerAddr
+
+		c.consulClient, err = consul.NewClient(config, c.consul.APITimeout)
 		if err != nil {
-			c.logger.Error("Unable to get client connection", "error", err)
+			c.logger.Error("Failed to create Consul client", "error", err)
 			return 1
 		}
 
 		loginParams := common.LoginParams{
-			AuthMethod:      c.flagACLAuthMethod,
-			Datacenter:      c.flagPrimaryDatacenter,
-			BearerTokenFile: c.bearerTokenFile,
+			AuthMethod:      c.consul.ConsulLogin.AuthMethod,
+			Datacenter:      c.consul.Datacenter,
+			BearerTokenFile: c.consul.ConsulLogin.BearerTokenFile,
 			TokenSinkFile:   c.flagTokenSinkFile,
-			Meta: map[string]string{
-				"component": c.flagComponentName,
-			},
+			Meta:            c.consul.ConsulLogin.Meta,
 		}
 		secret, err = common.ConsulLogin(c.consulClient, loginParams, c.logger)
 		if err != nil {
-			c.logger.Error("Consul login failed", "error", err)
+			c.logger.Error("Failed to login to Consul", "error", err)
 			return 1
 		}
 		c.logger.Info("Successfully read ACL token from the server")
@@ -258,7 +232,7 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) getSecret(secretName string) (string, error) {
-	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
+	secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -271,11 +245,21 @@ func (c *Command) validateFlags() error {
 	if len(c.flags.Args()) > 0 {
 		return errors.New("Should have no non-flag arguments.")
 	}
-	if c.http.ConsulAPITimeout() <= 0 {
+	if c.consul.APITimeout <= 0 {
 		return errors.New("-consul-api-timeout must be set to a value greater than 0")
 	}
 
 	return nil
+}
+
+// exponentialBackoffWithMaxInterval creates an exponential backoff but limits the
+// maximum backoff to 10 seconds so that we don't find ourselves in a situation
+// where we are waiting for minutes before retries.
+func exponentialBackoffWithMaxInterval() *backoff.ExponentialBackOff {
+	backoff := backoff.NewExponentialBackOff()
+	backoff.MaxInterval = 10 * time.Second
+	backoff.Reset()
+	return backoff
 }
 
 func (c *Command) Synopsis() string { return synopsis }

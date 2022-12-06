@@ -17,7 +17,7 @@ func WriteTempFile(t *testing.T, contents string) string {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		os.Remove(file.Name())
+		os.RemoveAll(file.Name())
 	})
 	return file.Name()
 }

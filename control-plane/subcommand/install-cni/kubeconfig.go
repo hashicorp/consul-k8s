@@ -3,7 +3,6 @@ package installcni
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -120,7 +119,7 @@ func serviceAccountToken(tokenPath string) (string, error) {
 	if _, err := os.Stat(tokenPath); errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("tokenPath does not exist: %w", err)
 	}
-	token, err := ioutil.ReadFile(tokenPath)
+	token, err := os.ReadFile(tokenPath)
 	if err != nil {
 		return "", fmt.Errorf("could not read service account token: %w", err)
 	}

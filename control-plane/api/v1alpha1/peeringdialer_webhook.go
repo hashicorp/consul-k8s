@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	capi "github.com/hashicorp/consul/api"
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -16,9 +15,8 @@ import (
 
 type PeeringDialerWebhook struct {
 	client.Client
-	ConsulClient *capi.Client
-	Logger       logr.Logger
-	decoder      *admission.Decoder
+	Logger  logr.Logger
+	decoder *admission.Decoder
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

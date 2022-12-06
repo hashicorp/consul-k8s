@@ -31,9 +31,12 @@ func TestComponentMetrics(t *testing.T) {
 		"global.datacenter":                 "dc1",
 		"global.metrics.enabled":            "true",
 		"global.metrics.enableAgentMetrics": "true",
+		// Agents have been removed but there could potentially be customers that are still running them. We
+		// are using client.enabled to cover that scenario and to make sure agent metrics still works with
+		// consul-dataplane.
+		"client.enabled": "true",
 
 		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
 
 		"meshGateway.enabled":      "true",
 		"meshGateway.replicas":     "1",
@@ -77,13 +80,13 @@ func TestComponentMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
-	// Ingress Gateway Metrics
+	logger.Log(t, "ingress gateway metrics")
 	assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
 
-	// Terminating Gateway Metrics
+	logger.Log(t, "terminating gateway metrics")
 	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
 
-	// Mesh Gateway Metrics
+	logger.Log(t, "mesh gateway metrics")
 	assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway"`)
 }
 
@@ -96,9 +99,8 @@ func TestAppMetrics(t *testing.T) {
 	ns := ctx.KubectlOptions(t).Namespace
 
 	helmValues := map[string]string{
-		"global.datacenter":      "dc1",
-		"global.metrics.enabled": "true",
-
+		"global.datacenter":                          "dc1",
+		"global.metrics.enabled":                     "true",
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
 	}

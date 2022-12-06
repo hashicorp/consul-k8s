@@ -2,18 +2,20 @@
 
 load _helpers
 
-@test "serviceResolvers/CustomerResourceDefinition: disabled by default" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-serviceresolvers.yaml  \
-      .
-}
-
-@test "serviceResolvers/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "serviceResolvers/CustomResourceDefinition: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/crd-serviceresolvers.yaml  \
-      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serviceResolvers/CustomResourceDefinition: enabled with connectInject.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/crd-serviceresolvers.yaml  \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       # The generated CRDs have "---" at the top which results in two objects
       # being detected by yq, the first of which is null. We must therefore use

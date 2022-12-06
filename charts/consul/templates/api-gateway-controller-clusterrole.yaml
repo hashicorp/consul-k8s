@@ -27,6 +27,14 @@ rules:
   verbs:
   - update
 - apiGroups:
+  - api-gateway.consul.hashicorp.com
+  resources:
+  - meshservices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -92,8 +100,10 @@ rules:
   resources:
   - secrets
   verbs:
+  - create
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - ""
@@ -234,4 +244,22 @@ rules:
   - get
   - patch
   - update
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+{{- end }}
 {{- end }}

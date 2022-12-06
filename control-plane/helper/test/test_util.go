@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,8 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,44 +22,99 @@ const (
 	componentAuthMethod = "consul-k8s-component-auth-method"
 )
 
+type TestServerClient struct {
+	TestServer *testutil.TestServer
+	APIClient  *api.Client
+	Cfg        *consul.Config
+	Watcher    consul.ServerConnectionManager
+}
+
+func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCallback) *TestServerClient {
+	t.Helper()
+
+	var cfg *testutil.TestServerConfig
+	consulServer, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		if callback != nil {
+			callback(c)
+		}
+		cfg = c
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = consulServer.Stop()
+	})
+	consulServer.WaitForSerfCheck(t)
+
+	consulConfig := &consul.Config{
+		APIClientConfig: &api.Config{Address: consulServer.HTTPAddr},
+		HTTPPort:        cfg.Ports.HTTP,
+	}
+	if cfg.ACL.Tokens.InitialManagement != "" {
+		consulConfig.APIClientConfig.Token = cfg.ACL.Tokens.InitialManagement
+	}
+	client, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+
+	return &TestServerClient{
+		TestServer: consulServer,
+		APIClient:  client,
+		Cfg:        consulConfig,
+		Watcher:    MockConnMgrForIPAndPort("127.0.0.1", cfg.Ports.GRPC),
+	}
+}
+
+func MockConnMgrForIPAndPort(ip string, port int) *consul.MockServerConnectionManager {
+	parsedIP := net.ParseIP(ip)
+	connMgr := &consul.MockServerConnectionManager{}
+	mockState := discovery.State{
+		Address: discovery.Addr{
+			TCPAddr: net.TCPAddr{
+				IP:   parsedIP,
+				Port: port,
+			},
+		}}
+	connMgr.On("State").Return(mockState, nil)
+	connMgr.On("Run").Return(nil)
+	connMgr.On("Stop").Return(nil)
+	return connMgr
+}
+
 // GenerateServerCerts generates Consul CA
 // and a server certificate and saves them to temp files.
 // It returns file names in this order:
 // CA certificate, server certificate, and server key.
 func GenerateServerCerts(t *testing.T) (string, string, string) {
-	require := require.New(t)
-
 	caFile, err := os.CreateTemp("", "ca")
-	require.NoError(err)
+	require.NoError(t, err)
 
 	certFile, err := os.CreateTemp("", "cert")
-	require.NoError(err)
+	require.NoError(t, err)
 
 	certKeyFile, err := os.CreateTemp("", "key")
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Generate CA
 	signer, _, caCertPem, caCertTemplate, err := cert.GenerateCA("Consul Agent CA - Test")
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Generate Server Cert
 	name := "server.dc1.consul"
 	hosts := []string{name, "localhost", "127.0.0.1"}
 	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Write certs and key to files
 	_, err = caFile.WriteString(caCertPem)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = certFile.WriteString(certPem)
-	require.NoError(err)
+	require.NoError(t, err)
 	_, err = certKeyFile.WriteString(keyPem)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		os.Remove(caFile.Name())
-		os.Remove(certFile.Name())
-		os.Remove(certKeyFile.Name())
+		_ = os.RemoveAll(caFile.Name())
+		_ = os.RemoveAll(certFile.Name())
+		_ = os.RemoveAll(certKeyFile.Name())
 	})
 	return caFile.Name(), certFile.Name(), certKeyFile.Name()
 }

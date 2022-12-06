@@ -249,10 +249,9 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
-				Client:       client,
-				ConsulClient: nil,
-				Logger:       logrtest.TestLogger{T: t},
-				decoder:      decoder,
+				Client:  client,
+				Logger:  logrtest.TestLogger{T: t},
+				decoder: decoder,
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
 					Mirroring:         c.mirror,
@@ -439,10 +438,9 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
-				Client:       client,
-				ConsulClient: nil,
-				Logger:       logrtest.TestLogger{T: t},
-				decoder:      decoder,
+				Client:  client,
+				Logger:  logrtest.TestLogger{T: t},
+				decoder: decoder,
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
 					Mirroring:         c.mirror,
@@ -600,10 +598,9 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				require.NoError(t, err)
 
 				validator := &ServiceIntentionsWebhook{
-					Client:       client,
-					ConsulClient: nil,
-					Logger:       logrtest.TestLogger{T: t},
-					decoder:      decoder,
+					Client:  client,
+					Logger:  logrtest.TestLogger{T: t},
+					decoder: decoder,
 					ConsulMeta: common.ConsulMeta{
 						NamespacesEnabled: namespacesEnabled,
 						Mirroring:         true,

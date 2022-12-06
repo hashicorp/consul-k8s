@@ -49,7 +49,7 @@ func removeFile(path string) error {
 		return nil
 	}
 
-	if err := os.Remove(path); err != nil {
+	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("error removing file %s: %w", path, err)
 	}
 	return nil

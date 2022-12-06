@@ -53,6 +53,9 @@ agent_prefix "" {
 partition_prefix "" {
   namespace_prefix "" {
     acl = "write"
+    service_prefix "" {
+      policy = "write"
+    }
   }
 }`
 
@@ -172,13 +175,20 @@ namespace_prefix "" {
 // This assumes users are using the default name for the service, i.e.
 // "mesh-gateway".
 func (c *Command) meshGatewayRules() (string, error) {
-	// Mesh gateways can only act as a proxy for services
-	// that its ACL token has access to. So, in the case of
-	// Consul namespaces, it needs access to all namespaces.
-	meshGatewayRulesTpl := `
-  agent_prefix "" {
-  	policy = "read"
-  }
+	// Mesh gateways can only act as a proxy for services that its ACL token has access to. So, in the case of Consul
+	// namespaces, it needs access to all namespaces. For peering, it requires the ability to list all peers which in
+	// enterprise requires peering:read on all partitions or in OSS requires a top level peering:read. Since we cannot
+	// determine whether we are using an enterprise or OSS consul image based on whether peering is enabled, we include
+	// both permissions here.
+	meshGatewayRulesTpl := `mesh = "write"
+{{- if .EnablePeering }}
+peering = "read"
+{{- if eq .PartitionName "default" }}
+partition_prefix "" {
+  peering = "read"
+}
+{{- end }}
+{{- end }}
 {{- if .EnableNamespaces }}
 namespace "default" {
 {{- end }}
@@ -312,10 +322,11 @@ func (c *Command) injectRules() (string, error) {
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
 {{- else }}
-{{- if .EnableNamespaces }}
   operator = "write"
-{{- end }}
+  acl = "write"
 {{- end }}
 {{- if .EnablePeering }}
   peering = "write"
@@ -332,6 +343,7 @@ partition "{{ .PartitionName }}" {
     acl = "write"
     service_prefix "" {
       policy = "write"
+      intentions = "write"
     }
 {{- if .EnableNamespaces }}
   }
@@ -366,7 +378,7 @@ partition "default" {
 {{- end }}
     acl = "write"
     service_prefix "" {
-      policy = "read"
+      policy = "write"
       intentions = "read"
     }
 {{- if .EnableNamespaces }}
@@ -379,49 +391,11 @@ partition "default" {
 	return c.renderRules(aclReplicationRulesTpl)
 }
 
-// policy = "write" is required when creating namespaces within a partition.
-// acl = "write" is required when creating namespace with a default policy.
-// Attaching a default ACL policy to a namespace requires acl = "write" in the
-// namespace that the policy is defined in, which in our case is "default".
-func (c *Command) controllerRules() (string, error) {
-	controllerRules := `
-{{- if .EnablePartitions }}
-partition "{{ .PartitionName }}" {
-  mesh = "write"
-  acl = "write"
-{{- else }}
-  operator = "write"
-  acl = "write"
-{{- end }}
-{{- if .EnableNamespaces }}
-{{- if .InjectEnableNSMirroring }}
-  namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
-{{- else }}
-  namespace "{{ .InjectConsulDestNS }}" {
-{{- end }}
-{{- end }}
-{{- if .EnablePartitions }}
-    policy = "write"
-{{- end }}
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-{{- if .EnableNamespaces }}
-  }
-{{- end }}
-{{- if .EnablePartitions }}
-}
-{{- end }}
-`
-	return c.renderRules(controllerRules)
-}
-
 func (c *Command) rulesData() rulesData {
 	return rulesData{
-		EnablePartitions:        c.flagEnablePartitions,
+		EnablePartitions:        c.consulFlags.Partition != "",
 		EnablePeering:           c.flagEnablePeering,
-		PartitionName:           c.flagPartitionName,
+		PartitionName:           c.consulFlags.Partition,
 		EnableNamespaces:        c.flagEnableNamespaces,
 		SyncConsulDestNS:        c.flagConsulSyncDestinationNamespace,
 		SyncEnableNSMirroring:   c.flagEnableSyncK8SNSMirroring,

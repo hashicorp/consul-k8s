@@ -2,13 +2,11 @@
 
 load _helpers
 
-@test "client/Role: enabled by default" {
+@test "client/Role: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
+  assert_empty helm template \
       -s templates/client-role.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      . 
 }
 
 @test "client/Role: disabled with global.enabled=false" {

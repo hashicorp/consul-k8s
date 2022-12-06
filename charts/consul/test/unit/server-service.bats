@@ -42,11 +42,6 @@ load _helpers
 # this is such an important part of making everything work we verify it here.
 @test "server/Service: tolerates unready endpoints" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-service.yaml  \
-      . | tee /dev/stderr |
-      yq -r '.metadata.annotations["service.alpha.kubernetes.io/tolerate-unready-endpoints"]' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 
   local actual=$(helm template \
       -s templates/server-service.yaml  \
@@ -103,13 +98,13 @@ load _helpers
 #--------------------------------------------------------------------
 # annotations
 
-@test "server/Service: one annotation by default" {
+@test "server/Service: no annotation by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-service.yaml  \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+  [ "${actual}" = "0" ]
 }
 
 @test "server/Service: can set annotations" {

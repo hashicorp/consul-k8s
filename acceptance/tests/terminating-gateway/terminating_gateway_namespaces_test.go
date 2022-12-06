@@ -10,17 +10,12 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
-	"github.com/stretchr/testify/require"
 )
 
 const testNamespace = "ns1"
 
 // Test we can connect through the terminating gateway when both
 // the terminating gateway and the connect service are in the same namespace.
-// These tests currently only test non-secure and secure without auto-encrypt installations
-// because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
-// and non-auto-encrypt secure installations, so testing just one is enough.
 func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
@@ -31,10 +26,10 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 		secure bool
 	}{
 		{
-			false,
+			secure: false,
 		},
 		{
-			true,
+			secure: true,
 		},
 	}
 	for _, c := range cases {
@@ -42,8 +37,6 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
-			// Install the Helm chart without the terminating gateway first
-			// so that we can create the namespace for it.
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
 				"connectInject.consulNamespaces.consulDestinationNamespace": testNamespace,
@@ -51,32 +44,18 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				"global.enableConsulNamespaces": "true",
 				"global.acls.manageSystemACLs":  strconv.FormatBool(c.secure),
 				"global.tls.enabled":            strconv.FormatBool(c.secure),
-			}
 
-			releaseName := helpers.RandomName()
-			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-
-			consulCluster.Create(t)
-
-			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-
-			// Create the destination namespace in the non-secure case.
-			// In the secure installation, this namespace is created by the server-acl-init job.
-			if !c.secure {
-				logger.Logf(t, "creating the %s namespace in Consul", testNamespace)
-				_, _, err := consulClient.Namespaces().Create(&api.Namespace{
-					Name: testNamespace,
-				}, nil)
-				require.NoError(t, err)
-			}
-
-			logger.Log(t, "upgrading with terminating gateways enabled")
-			consulCluster.Upgrade(t, map[string]string{
 				"terminatingGateways.enabled":                     "true",
 				"terminatingGateways.gateways[0].name":            "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas":        "1",
 				"terminatingGateways.gateways[0].consulNamespace": testNamespace,
-			})
+			}
+
+			releaseName := helpers.RandomName()
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+			consulCluster.Create(t)
+
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
@@ -132,9 +111,6 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 // Test we can connect through the terminating gateway when the terminating gateway,
 // the external service, and the connect service are in different namespace.
-// These tests currently only test non-secure and secure without auto-encrypt installations
-// because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
-// and non-auto-encrypt secure installations, so testing just one is enough.
 func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
@@ -145,10 +121,10 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 		secure bool
 	}{
 		{
-			false,
+			secure: false,
 		},
 		{
-			true,
+			secure: true,
 		},
 	}
 	for _, c := range cases {

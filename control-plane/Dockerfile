@@ -37,7 +37,7 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
-RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates gnupg libcap openssl su-exec iputils libc6-compat iptables
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -84,7 +84,7 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates gnupg libcap openssl su-exec iputils libc6-compat iptables
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -111,7 +111,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6 as ubi
+FROM registry.access.redhat.com/ubi9-minimal:9.1.0 as ubi
 
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
@@ -144,7 +144,7 @@ ARG TARGETOS
 ARG TARGETARCH
 
 # Copy license for Red Hat certification.
-COPY LICENSE.md /licenses/mozilla.txt
+COPY LICENSE /licenses/mozilla.txt
 
 RUN microdnf install -y ca-certificates gnupg libcap openssl shadow-utils iptables
 

@@ -1,7 +1,6 @@
 package partitions
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -16,10 +15,9 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test that Sync Catalog works in a default and ACLsAndAutoEncryptEnabled installations for partitions.
+// Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
 func TestPartitions_Sync(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
@@ -35,10 +33,10 @@ func TestPartitions_Sync(t *testing.T) {
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
 	cases := []struct {
-		name                      string
-		destinationNamespace      string
-		mirrorK8S                 bool
-		ACLsAndAutoEncryptEnabled bool
+		name                 string
+		destinationNamespace string
+		mirrorK8S            bool
+		ACLsEnabled          bool
 	}{
 		{
 			"default destination namespace",
@@ -83,18 +81,14 @@ func TestPartitions_Sync(t *testing.T) {
 			primaryClusterContext := env.DefaultContext(t)
 			secondaryClusterContext := env.Context(t, environment.SecondaryContextName)
 
-			ctx := context.Background()
-
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
+				"global.enableConsulNamespaces":  "true",
 
-				"global.enableConsulNamespaces": "true",
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"syncCatalog.enabled": "true",
 				// When mirroringK8S is set, this setting is ignored.
@@ -114,8 +108,8 @@ func TestPartitions_Sync(t *testing.T) {
 			// share the same node network (docker bridge), we can use
 			// a NodePort service so that we can access node(s) in a different Kind cluster.
 			if cfg.UseKind {
-				serverHelmValues["global.adminPartitions.service.type"] = "NodePort"
-				serverHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
+				serverHelmValues["server.exposeService.type"] = "NodePort"
+				serverHelmValues["server.exposeService.nodePort.https"] = "30000"
 			}
 
 			releaseName := helpers.RandomName()
@@ -133,7 +127,7 @@ func TestPartitions_Sync(t *testing.T) {
 			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
 			k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, caCertSecretName)
 
-			if !c.ACLsAndAutoEncryptEnabled {
+			if !c.ACLsEnabled {
 				// When auto-encrypt is disabled, we need both
 				// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
 				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
@@ -141,12 +135,12 @@ func TestPartitions_Sync(t *testing.T) {
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
 				k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, partitionToken)
 			}
 
-			partitionServiceName := fmt.Sprintf("%s-consul-partition", releaseName)
+			partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
 			partitionSvcAddress := k8s.ServiceHost(t, cfg, primaryClusterContext, partitionServiceName)
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryClusterContext)
@@ -163,13 +157,9 @@ func TestPartitions_Sync(t *testing.T) {
 				"externalServers.enabled":       "true",
 				"externalServers.hosts[0]":      partitionSvcAddress,
 				"externalServers.tlsServerName": "server.dc1.consul",
-
-				"client.enabled":           "true",
-				"client.exposeGossipPorts": "true",
-				"client.join[0]":           partitionSvcAddress,
 			}
 
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				// Setup partition token and auth method host if ACLs enabled.
 				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
 				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
@@ -189,15 +179,6 @@ func TestPartitions_Sync(t *testing.T) {
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)
-
-			// Ensure consul clients are created.
-			agentPodList, err := secondaryClusterContext.KubernetesClient(t).CoreV1().Pods(secondaryClusterContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
-			require.NoError(t, err)
-			require.NotEmpty(t, agentPodList.Items)
-
-			output, err := k8s.RunKubectlAndGetOutputE(t, secondaryClusterContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", secondaryClusterContext.KubectlOptions(t).Namespace)
-			require.NoError(t, err)
-			require.Contains(t, output, "Partition: 'secondary'")
 
 			primaryStaticServerOpts := &terratestk8s.KubectlOptions{
 				ContextName: primaryClusterContext.KubectlOptions(t).ContextName,
@@ -222,7 +203,7 @@ func TestPartitions_Sync(t *testing.T) {
 				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
+			consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			defaultPartitionQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: defaultPartition}
 			secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: secondaryPartition}
@@ -233,12 +214,12 @@ func TestPartitions_Sync(t *testing.T) {
 			}
 
 			// Check that the ACL token is deleted.
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				// We need to register the cleanup function before we create the deployments
 				// because golang will execute them in reverse order i.e. the last registered
 				// cleanup function will be executed first.
 				t.Cleanup(func() {
-					if c.ACLsAndAutoEncryptEnabled {
+					if c.ACLsEnabled {
 						retry.Run(t, func(r *retry.R) {
 							tokens, _, err := consulClient.ACL().TokenList(defaultPartitionQueryOpts)
 							require.NoError(r, err)
@@ -292,7 +273,6 @@ func TestPartitions_Sync(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(service))
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
-
 		})
 	}
 }

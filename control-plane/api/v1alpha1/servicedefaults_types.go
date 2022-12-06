@@ -2,6 +2,9 @@ package v1alpha1
 
 import (
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -12,8 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"net"
-	"strings"
 )
 
 const (
@@ -87,6 +88,13 @@ type ServiceDefaultsSpec struct {
 	// MaxInboundConnections is the maximum number of concurrent inbound connections to
 	// each service instance. Defaults to 0 (using consul's default) if not set.
 	MaxInboundConnections int `json:"maxInboundConnections,omitempty"`
+	// The number of milliseconds allowed to make connections to the local application
+	// instance before timing out. Defaults to 5000.
+	LocalConnectTimeoutMs int `json:"localConnectTimeoutMs,omitempty"`
+	// In milliseconds, the timeout for HTTP requests to the local application instance.
+	// Applies to HTTP-based protocols only. If not specified, inherits the Envoy default for
+	// route timeouts (15s).
+	LocalRequestTimeoutMs int `json:"localRequestTimeoutMs,omitempty"`
 }
 
 type Upstreams struct {
@@ -160,6 +168,10 @@ type PassiveHealthCheck struct {
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
 	MaxFailures uint32 `json:"maxFailures,omitempty"`
+	// EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+	// when an outlier status is detected through consecutive 5xx.
+	// This setting can be used to disable ejection or to ramp it up slowly.
+	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
 }
 
 type ServiceDefaultsDestination struct {
@@ -259,6 +271,8 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Destination:           in.Spec.Destination.toConsul(),
 		Meta:                  meta(datacenter),
 		MaxInboundConnections: in.Spec.MaxInboundConnections,
+		LocalConnectTimeoutMs: in.Spec.LocalConnectTimeoutMs,
+		LocalRequestTimeoutMs: in.Spec.LocalRequestTimeoutMs,
 	}
 }
 
@@ -287,6 +301,14 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 
 	if in.Spec.MaxInboundConnections < 0 {
 		allErrs = append(allErrs, field.Invalid(path.Child("maxinboundconnections"), in.Spec.MaxInboundConnections, "MaxInboundConnections must be > 0"))
+	}
+
+	if in.Spec.LocalConnectTimeoutMs < 0 {
+		allErrs = append(allErrs, field.Invalid(path.Child("localConnectTimeoutMs"), in.Spec.LocalConnectTimeoutMs, "LocalConnectTimeoutMs must be > 0"))
+	}
+
+	if in.Spec.LocalRequestTimeoutMs < 0 {
+		allErrs = append(allErrs, field.Invalid(path.Child("localRequestTimeoutMs"), in.Spec.LocalRequestTimeoutMs, "LocalRequestTimeoutMs must be > 0"))
 	}
 
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
@@ -386,9 +408,11 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 	if in == nil {
 		return nil
 	}
+
 	return &capi.PassiveHealthCheck{
-		Interval:    in.Interval.Duration,
-		MaxFailures: in.MaxFailures,
+		Interval:                in.Interval.Duration,
+		MaxFailures:             in.MaxFailures,
+		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
 	}
 }
 

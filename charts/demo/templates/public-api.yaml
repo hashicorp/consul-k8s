@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-api
+  labels:
+    app: public-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: public-api
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: public-api
+automountServiceAccountToken: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: public-api
+spec:
+  protocol: "http"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: public-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: public-api
+      app: public-api
+  template:
+    metadata:
+      labels:
+        service: public-api
+        app: public-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9102"
+        consul.hashicorp.com/connect-inject: "true"
+        # BEGIN CONSUL-K8S MODIFICATION
+        consul.hashicorp.com/connect-service-upstreams: 'products-api:9090, payments:1800'
+        # END CONSUL-K8S MODIFICATION
+    spec:
+      serviceAccountName: public-api
+      containers:
+        - name: public-api
+          image: hashicorpdemoapp/public-api:v0.0.6
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BIND_ADDRESS
+              value: ":8080"
+            - name: PRODUCT_API_URI
+              value: "http://localhost:9090"
+            - name: PAYMENT_API_URI
+              value: "http://localhost:1800"
+        - name: jaeger-agent
+          image: jaegertracing/jaeger-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5775
+              name: zk-compact-trft
+              protocol: UDP
+            - containerPort: 5778
+              name: config-rest
+              protocol: TCP
+            - containerPort: 6831
+              name: jg-compact-trft
+              protocol: UDP
+            - containerPort: 6832
+              name: jg-binary-trft
+              protocol: UDP
+            - containerPort: 14271
+              name: admin-http
+              protocol: TCP
+          args:
+            - --reporter.grpc.host-port=dns:///jaeger-collector-headless.default:14250
+            - --reporter.type=grpc

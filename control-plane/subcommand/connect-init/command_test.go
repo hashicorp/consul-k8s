@@ -1,23 +1,26 @@
 package connectinit
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
+
+const nodeName = "test-node"
 
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
@@ -37,25 +40,24 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags: []string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod},
+				"-auth-method-name", test.AuthMethod},
 			expErr: "-service-account-name must be set when ACLs are enabled",
 		},
 		{
 			flags: []string{
 				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod,
-				"-service-account-name", "foo"},
-			expErr: "-consul-api-timeout must be set to a value greater than 0",
+				"-pod-namespace", testPodNamespace},
+			expErr: "-consul-node-name must be set",
 		},
 		{
 			flags: []string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod,
+				"-auth-method-name", test.AuthMethod,
 				"-service-account-name", "foo",
-				"-consul-api-timeout", "5s",
-				"-log-level", "invalid"},
+				"-log-level", "invalid",
+				"-consul-node-name", "bar",
+			},
 			expErr: "unknown log level: invalid",
 		},
 	}
@@ -72,14 +74,15 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-// TestRun_ServicePollingWithACLsAndTLS bootstraps and starts a consul server using a mock
-// kubernetes server to provide responses for setting up the consul AuthMethod
-// then validates that the command runs end to end successfully. Also tests with TLS on/off.
-func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
+// TestRun_ConnectServices tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
+// auth method and using the obtained token find the services for the provided pod name
+// and namespace provided and write the proxy ID of the proxy service to a file.
+func TestRun_ConnectServices(t *testing.T) {
 	t.Parallel()
+
 	cases := []struct {
 		name                       string
-		tls                        bool
+		aclsEnabled                bool
 		serviceAccountName         string
 		serviceName                string
 		includeServiceAccountName  bool
@@ -88,44 +91,25 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 		multiport                  bool
 	}{
 		{
-			name:               "ACLs enabled, no tls",
-			tls:                false,
+			name:               "service-name not provided",
 			serviceAccountName: "counting",
 		},
 		{
-			name:               "ACLs enabled, tls",
-			tls:                true,
-			serviceAccountName: "counting",
-		},
-		{
-			name:               "ACLs enabled, K8s service name matches service account name",
-			tls:                false,
-			serviceAccountName: "counting",
-			serviceName:        "",
-		},
-		{
-			name:               "ACLs enabled, service name annotation matches service account name",
-			tls:                false,
-			serviceAccountName: "web",
-			serviceName:        "web",
-		},
-		{
-			name:               "ACLs enabled, multiport service",
-			tls:                false,
+			name:               "multi-port service",
 			serviceAccountName: "counting-admin",
 			serviceName:        "counting-admin",
 			multiport:          true,
 		},
 		{
-			name:               "ACLs enabled, service name annotation doesn't match service account name",
-			tls:                false,
+			name:               "acls enabled; service name annotation doesn't match service account name",
+			aclsEnabled:        true,
 			serviceAccountName: "not-a-match",
 			serviceName:        "web",
 			expFail:            true,
 		},
 		{
-			name:               "ACLs enabled, K8s service name doesn't match service account name",
-			tls:                false,
+			name:               "acls enabled; K8s service name doesn't match service account name",
+			aclsEnabled:        true,
 			serviceAccountName: "not-a-match",
 			serviceName:        "",
 			expFail:            true,
@@ -133,27 +117,17 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
 			tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
 			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
 			t.Cleanup(func() {
-				os.Remove(proxyFile)
-				os.Remove(tokenFile)
+				_ = os.RemoveAll(proxyFile)
+				_ = os.RemoveAll(tokenFile)
 			})
 
-			var caFile, certFile, keyFile string
 			// Start Consul server with ACLs enabled and default deny policy.
-			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+			var serverCfg *testutil.TestServerConfig
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.ACL.Enabled = true
-				c.ACL.DefaultPolicy = "deny"
-				c.ACL.Tokens.InitialManagement = masterToken
-				if tt.tls {
-					caFile, certFile, keyFile = test.GenerateServerCerts(t)
-					c.CAFile = caFile
-					c.CertFile = certFile
-					c.KeyFile = keyFile
-				}
+				serverCfg = c
 			})
 			require.NoError(t, err)
 			defer server.Stop()
@@ -161,27 +135,23 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			cfg := &api.Config{
 				Scheme:  "http",
 				Address: server.HTTPAddr,
-				Token:   masterToken,
-			}
-			if tt.tls {
-				cfg.Address = server.HTTPSAddr
-				cfg.Scheme = "https"
-				cfg.TLSConfig = api.TLSConfig{
-					CAFile: caFile,
-				}
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 
-			test.SetupK8sAuthMethod(t, consulClient, testServiceAccountName, "default")
-
 			// Register Consul services.
-			testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+			testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
 			if tt.multiport {
 				testConsulServices = append(testConsulServices, consulCountingSvcMultiport, consulCountingSvcSidecarMultiport)
 			}
 			for _, svc := range testConsulServices {
-				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+				serviceRegistration := &api.CatalogRegistration{
+					Node:    nodeName,
+					Address: "127.0.0.1",
+					Service: &svc,
+				}
+				_, err := consulClient.Catalog().Register(serviceRegistration, nil)
+				require.NoError(t, err)
 			}
 
 			ui := cli.NewMockUi()
@@ -190,24 +160,24 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				serviceRegistrationPollingAttempts: 3,
 			}
 
-			// We build the http-addr because normally it's defined by the init container setting
+			// We build the consul-addr because normally it's defined by the init container setting
 			// CONSUL_HTTP_ADDR when it processes the command template.
 			flags := []string{"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod,
-				"-service-account-name", tt.serviceAccountName,
 				"-service-name", tt.serviceName,
-				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
-				"-bearer-token-file", bearerFile,
-				"-acl-token-sink", tokenFile,
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
 				"-multiport=" + strconv.FormatBool(tt.multiport),
-				"-consul-api-timeout=5s",
+				"-consul-node-name", nodeName,
 			}
-			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
-			if tt.tls {
-				flags = append(flags, "-ca-file", caFile)
+			if tt.aclsEnabled {
+				flags = append(flags, "-auth-method-name", test.AuthMethod,
+					"-service-account-name", tt.serviceAccountName,
+					"-acl-token-sink", tokenFile)
 			}
+
 			// Run the command.
 			code := cmd.Run(flags)
 			if tt.expFail {
@@ -216,17 +186,19 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			}
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 
-			// Validate the ACL token was written.
-			tokenData, err := os.ReadFile(tokenFile)
-			require.NoError(t, err)
-			require.NotEmpty(t, tokenData)
+			if tt.aclsEnabled {
+				// Validate the ACL token was written.
+				tokenData, err := os.ReadFile(tokenFile)
+				require.NoError(t, err)
+				require.NotEmpty(t, tokenData)
 
-			// Check that the token has the metadata with pod name and pod namespace.
-			consulClient, err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
-			require.NoError(t, err)
-			token, _, err := consulClient.ACL().TokenReadSelf(nil)
-			require.NoError(t, err)
-			require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
+				// Check that the token has the metadata with pod name and pod namespace.
+				consulClient, err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
+				require.NoError(t, err)
+				token, _, err := consulClient.ACL().TokenReadSelf(nil)
+				require.NoError(t, err)
+				require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
+			}
 
 			// Validate contents of proxyFile.
 			data, err := os.ReadFile(proxyFile)
@@ -240,73 +212,100 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 	}
 }
 
-// This test validates service polling works in a happy case scenario with and without TLS.
-func TestRun_ServicePollingOnly(t *testing.T) {
+// TestRun_Gateways tests that the command can log in to Consul (if ACLs are enabled) using a kubernetes
+// auth method and using the obtained token find the service for the provided gateway
+// and namespace provided and write the proxy ID of the gateway service to a file.
+func TestRun_Gateways(t *testing.T) {
 	t.Parallel()
+
 	cases := []struct {
-		name        string
-		tls         bool
-		serviceName string
-		multiport   bool
+		name         string
+		gatewayKind  string
+		agentService api.AgentService
+		serviceName  string
+		expFail      bool
 	}{
 		{
-			name: "ACLs disabled, no tls",
-			tls:  false,
+			name:        "mesh-gateway",
+			gatewayKind: "mesh-gateway",
+			agentService: api.AgentService{
+				ID:      "mesh-gateway",
+				Service: "mesh-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "mesh-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
 		},
 		{
-			name: "ACLs disabled, tls",
-			tls:  true,
+			name:        "ingress-gateway",
+			gatewayKind: "ingress-gateway",
+			agentService: api.AgentService{
+				ID:      "ingress-gateway",
+				Service: "ingress-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "ingress-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
 		},
 		{
-			name:        "Multiport, ACLs disabled, no tls",
-			tls:         false,
-			serviceName: "counting-admin",
-			multiport:   true,
+			name:        "terminating-gateway",
+			gatewayKind: "terminating-gateway",
+			agentService: api.AgentService{
+				ID:      "terminating-gateway",
+				Service: "terminating-gateway",
+				Kind:    api.ServiceKindMeshGateway,
+				Port:    4444,
+				Address: "127.0.0.1",
+				Meta: map[string]string{
+					"component":    "terminating-gateway",
+					metaKeyPodName: testGatewayName,
+					metaKeyKubeNS:  "default-ns",
+				},
+			},
 		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
 			t.Cleanup(func() {
-				os.Remove(proxyFile)
+				_ = os.RemoveAll(proxyFile)
 			})
 
-			var caFile, certFile, keyFile string
-			// Start Consul server with TLS enabled if required.
+			// Start Consul server with ACLs enabled and default deny policy.
+			var serverCfg *testutil.TestServerConfig
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				if tt.tls {
-					caFile, certFile, keyFile = test.GenerateServerCerts(t)
-					c.CAFile = caFile
-					c.CertFile = certFile
-					c.KeyFile = keyFile
-				}
+				serverCfg = c
 			})
 			require.NoError(t, err)
 			defer server.Stop()
 			server.WaitForLeader(t)
-
-			// Get the Consul Client.
 			cfg := &api.Config{
 				Scheme:  "http",
 				Address: server.HTTPAddr,
-			}
-			if tt.tls {
-				cfg.Address = server.HTTPSAddr
-				cfg.Scheme = "https"
-				cfg.TLSConfig = api.TLSConfig{
-					CAFile: caFile,
-				}
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 
 			// Register Consul services.
-			testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
-			if tt.multiport {
-				testConsulServices = append(testConsulServices, consulCountingSvcMultiport, consulCountingSvcSidecarMultiport)
-			}
+			testConsulServices := []api.AgentService{tt.agentService}
 			for _, svc := range testConsulServices {
-				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+				serviceRegistration := &api.CatalogRegistration{
+					Node:    nodeName,
+					Address: "127.0.0.1",
+					Service: &svc,
+				}
+				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				require.NoError(t, err)
 			}
 
 			ui := cli.NewMockUi()
@@ -314,46 +313,38 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 				UI:                                 ui,
 				serviceRegistrationPollingAttempts: 3,
 			}
+
 			// We build the http-addr because normally it's defined by the init container setting
 			// CONSUL_HTTP_ADDR when it processes the command template.
-			flags := []string{
-				"-pod-name", testPodName,
+			flags := []string{"-pod-name", testGatewayName,
 				"-pod-namespace", testPodNamespace,
+				"-gateway-kind", tt.gatewayKind,
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
-				"-multiport=" + strconv.FormatBool(tt.multiport),
-				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
-				"-consul-api-timeout", "5s"}
-
-			// In a multiport case, the service name will be passed in to the test.
-			if tt.serviceName != "" {
-				flags = append(flags, "-service-name", tt.serviceName)
-			}
-
-			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
-			if tt.tls {
-				flags = append(flags, "-ca-file", caFile)
+				"-consul-node-name", nodeName,
 			}
 
 			// Run the command.
 			code := cmd.Run(flags)
+			if tt.expFail {
+				require.Equal(t, 1, code)
+				return
+			}
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 			// Validate contents of proxyFile.
 			data, err := os.ReadFile(proxyFile)
 			require.NoError(t, err)
-			if tt.multiport {
-				require.Contains(t, string(data), "counting-admin-sidecar-proxy-id")
-			} else {
-				require.Contains(t, string(data), "counting-counting-sidecar-proxy")
-			}
+			require.Contains(t, string(data), tt.gatewayKind)
 		})
 	}
-
 }
 
-// TestRun_ServicePollingErrors tests that when registered services could not be found,
+// TestRun_ConnectServices_Errors tests that when registered services could not be found,
 // we error out.
-func TestRun_ServicePollingErrors(t *testing.T) {
+func TestRun_ConnectServices_Errors(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -498,7 +489,103 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
 			t.Cleanup(func() {
-				os.Remove(proxyFile)
+				os.RemoveAll(proxyFile)
+			})
+
+			// Start Consul server.
+			var serverCfg *testutil.TestServerConfig
+			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				serverCfg = c
+			})
+			require.NoError(t, err)
+			defer server.Stop()
+			server.WaitForLeader(t)
+			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+			require.NoError(t, err)
+
+			// Register Consul services.
+			for _, svc := range c.services {
+				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+			}
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                                 ui,
+				serviceRegistrationPollingAttempts: 1,
+			}
+			flags := []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-proxy-id-file", proxyFile,
+				"-consul-node-name", nodeName,
+			}
+
+			code := cmd.Run(flags)
+			require.Equal(t, 1, code)
+		})
+	}
+}
+
+// TestRun_Gateways_Errors tests that when registered services could not be found,
+// we error out.
+func TestRun_Gateways_Errors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		services []api.AgentServiceRegistration
+	}{
+		{
+			name: "gateway without pod-name or k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+				},
+			},
+		},
+		{
+			name: "gateway with pod-name meta but without k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "mesh-gateway",
+					},
+				},
+			},
+		},
+		{
+			name: "service and proxy with k8s-namespace meta but pod-name meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "mesh-gateway",
+					Name:    "mesh-gateway",
+					Kind:    "mesh-gateway",
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyKubeNS: "default-ns",
+					},
+				},
+			}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				os.RemoveAll(proxyFile)
 			})
 
 			// Start Consul server.
@@ -521,10 +608,12 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 			}
 			flags := []string{
 				"-http-addr", server.HTTPAddr,
+				"-gateway-kind", "mesh-gateway",
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
 				"-consul-api-timeout", "5s",
+				"-consul-node-name", nodeName,
 			}
 
 			code := cmd.Run(flags)
@@ -540,7 +629,10 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	proxyFile := common.WriteTempFile(t, "")
 
 	// Start Consul server.
-	server, err := testutil.NewTestServerConfigT(t, nil)
+	var serverCfg *testutil.TestServerConfig
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		serverCfg = c
+	})
 	require.NoError(t, err)
 	defer server.Stop()
 	server.WaitForLeader(t)
@@ -549,14 +641,24 @@ func TestRun_RetryServicePolling(t *testing.T) {
 
 	// Start the consul service registration in a go func and delay it so that it runs
 	// after the cmd.Run() starts.
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		// Wait a moment, this ensures that we are already in the retry logic.
 		time.Sleep(time.Second * 2)
 		// Register counting service.
-		require.NoError(t, consulClient.Agent().ServiceRegister(&consulCountingSvc))
-		time.Sleep(time.Second * 2)
+		serviceRegistration := &api.CatalogRegistration{
+			Node:    nodeName,
+			Address: "127.0.0.1",
+			Service: &consulCountingSvc,
+		}
+		_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+		require.NoError(t, err)
 		// Register proxy sidecar service.
-		require.NoError(t, consulClient.Agent().ServiceRegister(&consulCountingSvcSidecar))
+		serviceRegistration.Service = &consulCountingSvcSidecar
+		_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+		require.NoError(t, err)
 	}()
 
 	ui := cli.NewMockUi()
@@ -567,11 +669,14 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
-		"-http-addr", server.HTTPAddr,
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", proxyFile,
-		"-consul-api-timeout", "5s",
+		"-consul-node-name", nodeName,
 	}
 	code := cmd.Run(flags)
+	wg.Wait()
 	require.Equal(t, 0, code)
 
 	// Validate contents of proxyFile.
@@ -588,7 +693,10 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 
 	// Start Consul server.
-	server, err := testutil.NewTestServerConfigT(t, nil)
+	var serverCfg *testutil.TestServerConfig
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		serverCfg = c
+	})
 	require.NoError(t, err)
 	defer server.Stop()
 	server.WaitForLeader(t)
@@ -596,9 +704,15 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Register Consul services.
-	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+	testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
 	for _, svc := range testConsulServices {
-		require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+		serviceRegistration := &api.CatalogRegistration{
+			Node:    nodeName,
+			Address: "127.0.0.1",
+			Service: &svc,
+		}
+		_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+		require.NoError(t, err)
 	}
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -608,7 +722,9 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
-		"-http-addr", server.HTTPAddr,
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", randFileName,
 		"-consul-api-timeout", "5s",
 	}
@@ -618,234 +734,155 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestRun_FailsWithBadServerResponses tests error handling with invalid server responses.
-func TestRun_FailsWithBadServerResponses(t *testing.T) {
-	t.Parallel()
-	const servicesGetRetries int = 2
-	cases := []struct {
-		name                    string
-		loginResponse           string
-		getServicesListResponse string
-		expectedServiceGets     int
-	}{
-		{
-			name:                "acls enabled, acl login response invalid",
-			loginResponse:       "",
-			expectedServiceGets: 0,
-		},
-		{
-			name:                    "acls enabled, get service response invalid",
-			loginResponse:           testLoginResponse,
-			getServicesListResponse: "",
-			expectedServiceGets:     servicesGetRetries + 1, // Plus 1 because we RETRY after an initial attempt.
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
-			tokenFile := common.WriteTempFile(t, "")
-
-			servicesGetCounter := 0
-			// Start the mock Consul server.
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// ACL login request.
-				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-					w.Write([]byte(c.loginResponse))
-				}
-				// Token read request.
-				if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
-					w.Write([]byte(testTokenReadSelfResponse))
-				}
-				// Agent Services get.
-				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-					servicesGetCounter++
-					w.Write([]byte(c.getServicesListResponse))
-				}
-			}))
-			defer consulServer.Close()
-
-			// Set up the Command.
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:                                 ui,
-				flagBearerTokenFile:                bearerFile,
-				flagACLTokenSink:                   tokenFile,
-				serviceRegistrationPollingAttempts: uint64(servicesGetRetries),
-			}
-
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			flags := []string{
-				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod,
-				"-service-account-name", testServiceAccountName,
-				"-bearer-token-file", bearerFile,
-				"-acl-token-sink", tokenFile,
-				"-http-addr", serverURL.String(),
-				"-consul-api-timeout", "5s",
-			}
-			code := cmd.Run(flags)
-			require.Equal(t, 1, code)
-			// We use the counter to ensure we failed at ACL Login (when counter = 0) or proceeded to the service get portion of the command.
-			require.Equal(t, c.expectedServiceGets, servicesGetCounter)
-		})
-	}
-}
-
-// Tests ACL Login with Retries.
-func TestRun_LoginWithRetries(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		Description        string
-		TestRetry          bool
-		LoginAttemptsCount int
-		ExpCode            int
-	}{
-		{
-			Description:        "Login succeeds without retries",
-			TestRetry:          false,
-			LoginAttemptsCount: 1, // 1 because we dont actually retry.
-			ExpCode:            0,
-		},
-		{
-			Description:        "Login succeeds after 1 retry",
-			TestRetry:          true,
-			LoginAttemptsCount: 2,
-			ExpCode:            0,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.Description, func(t *testing.T) {
-			// Create a fake input bearer token file and an output file.
-			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
-			tokenFile := common.WriteTempFile(t, "")
-			proxyFile := common.WriteTempFile(t, "")
-
-			// Start the mock Consul server.
-			counter := 0
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// ACL Login.
-				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-					counter++
-					if !c.TestRetry || (c.TestRetry && c.LoginAttemptsCount == counter) {
-						w.Write([]byte(testLoginResponse))
-					}
-				}
-				// Token read request.
-				if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
-					w.Write([]byte(testTokenReadSelfResponse))
-				}
-				// Agent Services get.
-				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-					w.Write([]byte(testServiceListResponse))
-				}
-			}))
-			defer consulServer.Close()
-
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI: ui,
-			}
-			code := cmd.Run([]string{
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod,
-				"-service-account-name", testServiceAccountName,
-				"-acl-token-sink", tokenFile,
-				"-bearer-token-file", bearerFile,
-				"-proxy-id-file", proxyFile,
-				"-http-addr", serverURL.String(),
-				"-consul-api-timeout", "5s",
-			})
-			fmt.Println(ui.ErrorWriter.String())
-			require.Equal(t, c.ExpCode, code)
-			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
-			require.Equal(t, c.LoginAttemptsCount, counter)
-			// Validate that the token was written to disk if we succeeded.
-			tokenData, err := os.ReadFile(tokenFile)
-			require.NoError(t, err)
-			require.Equal(t, "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586", string(tokenData))
-			// Validate contents of proxyFile.
-			proxydata, err := os.ReadFile(proxyFile)
-			require.NoError(t, err)
-			require.Equal(t, "counting-counting-sidecar-proxy", string(proxydata))
-		})
-	}
-}
-
-// Test that we check token exists when reading it in the stale consistency mode.
-func TestRun_EnsureTokenExists(t *testing.T) {
-	t.Parallel()
-
+func TestRun_TrafficRedirection(t *testing.T) {
 	cases := map[string]struct {
-		neverSucceed bool
+		proxyConfig           map[string]interface{}
+		tproxyConfig          api.TransparentProxyConfig
+		registerProxyDefaults bool
+		expIptablesParamsFunc func(actual iptables.Config) (bool, string)
 	}{
-		"succeed after first retry": {neverSucceed: false},
-		"never succeed":             {neverSucceed: true},
+		"no extra proxy config provided": {},
+		"envoy bind port is provided in service proxy config": {
+			proxyConfig: map[string]interface{}{"bind_port": "21000"},
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyInboundPort == 21000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+				}
+			},
+		},
+		// This test is to make sure that we use merge-central-config parameter when we query the service
+		// so that we get all config merged into the proxy configuration on the service.
+		"envoy bind port is provided in a config entry": {
+			proxyConfig:           map[string]interface{}{"bind_port": "21000"},
+			registerProxyDefaults: true,
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyInboundPort == 21000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+				}
+			},
+		},
+		"tproxy outbound listener port is provided in service proxy config": {
+			tproxyConfig: api.TransparentProxyConfig{OutboundListenerPort: 16000},
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyOutboundPort == 16000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+				}
+			},
+		},
+		"tproxy outbound listener port is provided in a config entry": {
+			tproxyConfig:          api.TransparentProxyConfig{OutboundListenerPort: 16000},
+			registerProxyDefaults: true,
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if actual.ProxyOutboundPort == 16000 {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+				}
+			},
+		},
+		"envoy stats addr is provided in service proxy config": {
+			proxyConfig: map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+				}
+			},
+		},
+		"envoy stats addr is provided in a config entry": {
+			proxyConfig:           map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
+			registerProxyDefaults: true,
+			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
+					return true, ""
+				} else {
+					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+				}
+			},
+		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			// Create a fake input bearer token file and an output file.
-			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
-			tokenFile := common.WriteTempFile(t, "")
-			proxyFile := common.WriteTempFile(t, "")
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				_ = os.RemoveAll(proxyFile)
+			})
 
-			// Start the mock Consul server.
-			counter := 0
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// ACL Login.
-				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-					w.Write([]byte(testLoginResponse))
-				}
-				// Token read request.
-				if r != nil &&
-					r.URL.Path == "/v1/acl/token/self" &&
-					r.Method == "GET" &&
-					r.URL.Query().Has("stale") {
-
-					// Fail the first request but succeed on the next.
-					if counter == 0 || c.neverSucceed {
-						counter++
-						w.WriteHeader(http.StatusForbidden)
-						w.Write([]byte("ACL not found"))
-					} else {
-						w.Write([]byte(testTokenReadSelfResponse))
-					}
-				}
-				// Agent Services get.
-				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-					w.Write([]byte(testServiceListResponse))
-				}
-			}))
-			defer consulServer.Close()
-
-			serverURL, err := url.Parse(consulServer.URL)
+			// Start Consul server.
+			var serverCfg *testutil.TestServerConfig
+			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				serverCfg = c
+			})
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				_ = server.Stop()
+			})
+			server.WaitForLeader(t)
+			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
 			require.NoError(t, err)
 
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI: ui,
+			// Add additional proxy configuration either to a config entry or to the service itself.
+			if c.registerProxyDefaults {
+				_, _, err = consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
+					Name:             api.ProxyConfigGlobal,
+					Kind:             api.ProxyDefaults,
+					TransparentProxy: &c.tproxyConfig,
+					Config:           c.proxyConfig,
+				}, nil)
+				require.NoError(t, err)
+			} else {
+				consulCountingSvcSidecar.Proxy.TransparentProxy = &c.tproxyConfig
+				consulCountingSvcSidecar.Proxy.Config = c.proxyConfig
 			}
-			code := cmd.Run([]string{
+			// Register Consul services.
+			testConsulServices := []api.AgentService{consulCountingSvc, consulCountingSvcSidecar}
+			for _, svc := range testConsulServices {
+				serviceRegistration := &api.CatalogRegistration{
+					Node:    nodeName,
+					Address: "127.0.0.1",
+					Service: &svc,
+				}
+				_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+				require.NoError(t, err)
+			}
+			ui := cli.NewMockUi()
+
+			iptablesProvider := &fakeIptablesProvider{}
+			iptablesCfg := iptables.Config{
+				ProxyUserID:      "5995",
+				ProxyInboundPort: 20000,
+			}
+			cmd := Command{
+				UI:                                 ui,
+				serviceRegistrationPollingAttempts: 3,
+				iptablesProvider:                   iptablesProvider,
+			}
+			iptablesCfgJSON, err := json.Marshal(iptablesCfg)
+			require.NoError(t, err)
+			flags := []string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", test.AuthMethod,
-				"-service-account-name", testServiceAccountName,
-				"-acl-token-sink", tokenFile,
-				"-bearer-token-file", bearerFile,
+				"-consul-node-name", nodeName,
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
-				"-http-addr", serverURL.String(),
-				"-consul-api-timeout", "5s",
-			})
-			if c.neverSucceed {
-				require.Equal(t, 1, code)
-			} else {
-				require.Equal(t, 0, code)
-				require.Equal(t, 1, counter)
+				"-redirect-traffic-config", string(iptablesCfgJSON),
+			}
+			code := cmd.Run(flags)
+			require.Equal(t, 0, code, ui.ErrorWriter.String())
+			require.Truef(t, iptablesProvider.applyCalled, "redirect traffic rules were not applied")
+			if c.expIptablesParamsFunc != nil {
+				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.iptablesConfig)
+				require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
 			}
 		})
 	}
@@ -857,129 +894,13 @@ const (
 	metaKeyKubeServiceName = "k8s-service-name"
 	testPodNamespace       = "default-ns"
 	testPodName            = "counting-pod"
-	testServiceAccountName = "counting"
-
-	// Sample response from https://consul.io/api-docs/acl#sample-response.
-	testLoginResponse = `{
-  "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
-  "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
-  "Description": "token created via login",
-  "Roles": [
-    {
-      "ID": "3356c67c-5535-403a-ad79-c1d5f9df8fc7",
-      "Name": "demo"
-    }
-  ],
-  "ServiceIdentities": [
-    {
-      "ServiceName": "example"
-    }
-  ],
-  "Local": true,
-  "AuthMethod": "minikube",
-  "CreateTime": "2019-04-29T10:08:08.404370762-05:00",
-  "Hash": "nLimyD+7l6miiHEBmN/tvCelAmE/SbIXxcnTzG3pbGY=",
-  "CreateIndex": 36,
-  "ModifyIndex": 36
-}`
-
-	// Sample response from https://www.consul.io/api-docs/acl/tokens#read-self-token.
-	testTokenReadSelfResponse = `
-{
-  "AccessorID": "6a1253d2-1785-24fd-91c2-f8e78c745511",
-  "SecretID": "45a3bd52-07c7-47a4-52fd-0745e0cfe967",
-  "Description": "Agent token for 'node1'",
-  "Policies": [
-    {
-      "ID": "165d4317-e379-f732-ce70-86278c4558f7",
-      "Name": "node1-write"
-    },
-    {
-      "ID": "e359bd81-baca-903e-7e64-1ccd9fdc78f5",
-      "Name": "node-read"
-    }
-  ],
-  "Local": false,
-  "CreateTime": "2018-10-24T12:25:06.921933-04:00",
-  "Hash": "UuiRkOQPRCvoRZHRtUxxbrmwZ5crYrOdZ0Z1FTFbTbA=",
-  "CreateIndex": 59,
-  "ModifyIndex": 59
-}
-`
-
-	testServiceListResponse = `{
-  "counting-counting": {
-    "ID": "counting-counting",
-    "Service": "counting",
-    "Tags": [],
-    "Meta": {
-      "k8s-namespace": "default",
-      "pod-name": "counting-pod",
-      "k8s-service-name": "counting"
-    },
-    "Port": 9001,
-    "Address": "10.32.3.26",
-    "TaggedAddresses": {
-      "lan_ipv4": {
-        "Address": "10.32.3.26",
-        "Port": 9001
-      },
-      "wan_ipv4": {
-        "Address": "10.32.3.26",
-        "Port": 9001
-      }
-    },
-    "Weights": {
-      "Passing": 1,
-      "Warning": 1
-    },
-    "EnableTagOverride": false,
-    "Datacenter": "dc1"
-  },
-  "counting-counting-sidecar-proxy": {
-    "Kind": "connect-proxy",
-    "ID": "counting-counting-sidecar-proxy",
-    "Service": "counting-sidecar-proxy",
-    "Tags": [],
-    "Meta": {
-      "k8s-namespace": "default",
-      "pod-name": "counting-pod",
-      "k8s-service-name": "counting"
-    },
-    "Port": 20000,
-    "Address": "10.32.3.26",
-    "TaggedAddresses": {
-      "lan_ipv4": {
-        "Address": "10.32.3.26",
-        "Port": 20000
-      },
-      "wan_ipv4": {
-        "Address": "10.32.3.26",
-        "Port": 20000
-      }
-    },
-    "Weights": {
-      "Passing": 1,
-      "Warning": 1
-    },
-    "EnableTagOverride": false,
-    "Proxy": {
-      "DestinationServiceName": "counting",
-      "DestinationServiceID": "counting-counting",
-      "LocalServiceAddress": "127.0.0.1",
-      "LocalServicePort": 9001,
-      "MeshGateway": {},
-      "Expose": {}
-    },
-    "Datacenter": "dc1"
-  }
-}`
+	testGatewayName        = "gateway-pod"
 )
 
 var (
-	consulCountingSvc = api.AgentServiceRegistration{
+	consulCountingSvc = api.AgentService{
 		ID:      "counting-counting",
-		Name:    "counting",
+		Service: "counting",
 		Address: "127.0.0.1",
 		Meta: map[string]string{
 			metaKeyPodName:         "counting-pod",
@@ -987,15 +908,13 @@ var (
 			metaKeyKubeServiceName: "counting",
 		},
 	}
-	consulCountingSvcSidecar = api.AgentServiceRegistration{
-		ID:   "counting-counting-sidecar-proxy",
-		Name: "counting-sidecar-proxy",
-		Kind: "connect-proxy",
+	consulCountingSvcSidecar = api.AgentService{
+		ID:      "counting-counting-sidecar-proxy",
+		Service: "counting-sidecar-proxy",
+		Kind:    "connect-proxy",
 		Proxy: &api.AgentServiceConnectProxyConfig{
 			DestinationServiceName: "counting",
 			DestinationServiceID:   "counting-counting",
-			Config:                 nil,
-			Upstreams:              nil,
 		},
 		Port:    9999,
 		Address: "127.0.0.1",
@@ -1005,9 +924,9 @@ var (
 			metaKeyKubeServiceName: "counting",
 		},
 	}
-	consulCountingSvcMultiport = api.AgentServiceRegistration{
+	consulCountingSvcMultiport = api.AgentService{
 		ID:      "counting-admin-id",
-		Name:    "counting-admin",
+		Service: "counting-admin",
 		Address: "127.0.0.1",
 		Meta: map[string]string{
 			metaKeyPodName:         "counting-pod",
@@ -1015,15 +934,13 @@ var (
 			metaKeyKubeServiceName: "counting-admin",
 		},
 	}
-	consulCountingSvcSidecarMultiport = api.AgentServiceRegistration{
-		ID:   "counting-admin-sidecar-proxy-id",
-		Name: "counting-admin-sidecar-proxy",
-		Kind: "connect-proxy",
+	consulCountingSvcSidecarMultiport = api.AgentService{
+		ID:      "counting-admin-sidecar-proxy-id",
+		Service: "counting-admin-sidecar-proxy",
+		Kind:    "connect-proxy",
 		Proxy: &api.AgentServiceConnectProxyConfig{
 			DestinationServiceName: "counting-admin",
 			DestinationServiceID:   "counting-admin-id",
-			Config:                 nil,
-			Upstreams:              nil,
 		},
 		Port:    9999,
 		Address: "127.0.0.1",
@@ -1034,3 +951,21 @@ var (
 		},
 	}
 )
+
+type fakeIptablesProvider struct {
+	applyCalled bool
+	rules       []string
+}
+
+func (f *fakeIptablesProvider) AddRule(_ string, args ...string) {
+	f.rules = append(f.rules, strings.Join(args, " "))
+}
+
+func (f *fakeIptablesProvider) ApplyRules() error {
+	f.applyCalled = true
+	return nil
+}
+
+func (f *fakeIptablesProvider) Rules() []string {
+	return f.rules
+}

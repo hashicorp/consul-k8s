@@ -9,3 +9,4 @@ bin/
 pkg/
 .idea/
 .vscode
+.bob/

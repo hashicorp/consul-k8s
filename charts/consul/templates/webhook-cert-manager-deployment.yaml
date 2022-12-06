@@ -1,5 +1,5 @@
 {{ $hasConfiguredWebhookCertsUsingVault := (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.controllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName) -}}
-{{- if (and (or .Values.connectInject.enabled .Values.controller.enabled) (not $hasConfiguredWebhookCertsUsingVault)) }}
+{{- if (and .Values.connectInject.enabled (not $hasConfiguredWebhookCertsUsingVault)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -64,6 +64,10 @@ spec:
       {{- if .Values.webhookCertManager.tolerations }}
       tolerations:
         {{ tpl .Values.webhookCertManager.tolerations . | indent 8 | trim }}
-      {{- end}}
+      {{- end }}
+      {{- if .Values.webhookCertManager.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.webhookCertManager.nodeSelector . | indent 8 | trim }}
+      {{- end }}
 
 {{- end }}

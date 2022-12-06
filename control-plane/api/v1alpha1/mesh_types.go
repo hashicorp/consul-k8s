@@ -52,6 +52,8 @@ type MeshSpec struct {
 	TLS *MeshTLSConfig `json:"tls,omitempty"`
 	// HTTP defines the HTTP configuration for the service mesh.
 	HTTP *MeshHTTPConfig `json:"http,omitempty"`
+	// Peering defines the peering configuration for the service mesh.
+	Peering *PeeringMeshConfig `json:"peering,omitempty"`
 }
 
 // TransparentProxyMeshConfig controls configuration specific to proxies in "transparent" mode. Added in v1.10.0.
@@ -73,6 +75,15 @@ type MeshTLSConfig struct {
 
 type MeshHTTPConfig struct {
 	SanitizeXForwardedClientCert bool `json:"sanitizeXForwardedClientCert"`
+}
+
+type PeeringMeshConfig struct {
+	// PeerThroughMeshGateways determines whether peering traffic between
+	// control planes should flow through mesh gateways. If enabled,
+	// Consul servers will advertise mesh gateway addresses as their own.
+	// Additionally, mesh gateways will configure themselves to expose
+	// the local servers using a peering-specific SNI.
+	PeerThroughMeshGateways bool `json:"peerThroughMeshGateways,omitempty"`
 }
 
 type MeshDirectionalTLSConfig struct {
@@ -181,6 +192,7 @@ func (in *Mesh) ToConsul(datacenter string) capi.ConfigEntry {
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
 		TLS:              in.Spec.TLS.toConsul(),
 		HTTP:             in.Spec.HTTP.toConsul(),
+		Peering:          in.Spec.Peering.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -194,11 +206,12 @@ func (in *Mesh) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.MeshConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *Mesh) Validate(_ common.ConsulMeta) error {
+func (in *Mesh) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
 	errs = append(errs, in.Spec.TLS.validate(path.Child("tls"))...)
+	errs = append(errs, in.Spec.Peering.validate(path.Child("peering"), consulMeta.PartitionsEnabled, consulMeta.Partition)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -264,6 +277,28 @@ func (in *MeshDirectionalTLSConfig) toConsul() *capi.MeshDirectionalTLSConfig {
 		TLSMaxVersion: in.TLSMaxVersion,
 		CipherSuites:  in.CipherSuites,
 	}
+}
+
+func (in *PeeringMeshConfig) toConsul() *capi.PeeringMeshConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.PeeringMeshConfig{PeerThroughMeshGateways: in.PeerThroughMeshGateways}
+}
+
+func (in *PeeringMeshConfig) validate(path *field.Path, partitionsEnabled bool, partition string) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	if partitionsEnabled && in.PeerThroughMeshGateways && partition != common.DefaultConsulPartition {
+		errs = append(errs, field.Forbidden(path.Child("peerThroughMeshGateways"),
+			"\"peerThroughMeshGateways\" is only valid in the \"default\" partition"))
+	}
+
+	return errs
 }
 
 // DefaultNamespaceFields has no behaviour here as meshes have no namespace specific fields.

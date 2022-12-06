@@ -33,9 +33,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
 			k8s, testAgent := completeSetup(tt)
-			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
-			require := require.New(tt)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
@@ -44,91 +42,90 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			}
 			cmd.init()
 			args := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+				"-addresses=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+				"-http-port=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port=" + strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-connect-inject",
-				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", consulDestNamespace,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
-				"-consul-api-timeout=5s",
 			}
 
 			responseCode := cmd.Run(args)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testAgent.TestServer.HTTPAddr,
 				Token:   bootToken,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Ensure there's only one auth method.
 			namespaceQuery := &api.QueryOptions{
 				Namespace: consulDestNamespace,
 			}
 			methods, _, err := consul.ACL().AuthMethodList(namespaceQuery)
-			require.NoError(err)
+			require.NoError(t, err)
 			if consulDestNamespace == "default" {
 				// If the destination mamespace is default then AuthMethodList
 				// will return the component-auth-method as well.
-				require.Len(methods, 2)
+				require.Len(t, methods, 2)
 			} else {
-				require.Len(methods, 1)
+				require.Len(t, methods, 1)
 			}
 
 			// Check the ACL auth method is created in the expected namespace.
 			authMethodName := resourcePrefix + "-k8s-auth-method"
 			actMethod, _, err := consul.ACL().AuthMethodRead(authMethodName, namespaceQuery)
-			require.NoError(err)
-			require.NotNil(actMethod)
-			require.Equal("kubernetes", actMethod.Type)
-			require.Equal("Kubernetes Auth Method", actMethod.Description)
-			require.NotContains(actMethod.Config, "MapNamespaces")
-			require.NotContains(actMethod.Config, "ConsulNamespacePrefix")
+			require.NoError(t, err)
+			require.NotNil(t, actMethod)
+			require.Equal(t, "kubernetes", actMethod.Type)
+			require.Equal(t, "Kubernetes Auth Method", actMethod.Description)
+			require.NotContains(t, actMethod.Config, "MapNamespaces")
+			require.NotContains(t, actMethod.Config, "ConsulNamespacePrefix")
 
 			// Check the binding rule is as expected.
 			rules, _, err := consul.ACL().BindingRuleList(authMethodName, namespaceQuery)
-			require.NoError(err)
-			require.Len(rules, 1)
+			require.NoError(t, err)
+			require.Len(t, rules, 1)
 			actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, namespaceQuery)
-			require.NoError(err)
-			require.NotNil(actRule)
-			require.Equal("Kubernetes binding rule", actRule.Description)
-			require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
-			require.Equal("${serviceaccount.name}", actRule.BindName)
-			require.Equal("serviceaccount.name!=default", actRule.Selector)
+			require.NoError(t, err)
+			require.NotNil(t, actRule)
+			require.Equal(t, "Kubernetes binding rule", actRule.Description)
+			require.Equal(t, api.BindingRuleBindTypeService, actRule.BindType)
+			require.Equal(t, "${serviceaccount.name}", actRule.BindName)
+			require.Equal(t, "serviceaccount.name!=default", actRule.Selector)
 
 			// Check that the default namespace got an attached ACL policy
 			defNamespace, _, err := consul.Namespaces().Read("default", &api.QueryOptions{})
-			require.NoError(err)
-			require.NotNil(defNamespace)
-			require.NotNil(defNamespace.ACLs)
-			require.Len(defNamespace.ACLs.PolicyDefaults, 1)
-			require.Equal("cross-namespace-policy", defNamespace.ACLs.PolicyDefaults[0].Name)
+			require.NoError(t, err)
+			require.NotNil(t, defNamespace)
+			require.NotNil(t, defNamespace.ACLs)
+			require.Len(t, defNamespace.ACLs.PolicyDefaults, 1)
+			require.Equal(t, "cross-namespace-policy", defNamespace.ACLs.PolicyDefaults[0].Name)
 
 			if consulDestNamespace != "default" {
 				// Check that only one namespace was created besides the
 				// already existing `default` namespace
 				namespaces, _, err := consul.Namespaces().List(&api.QueryOptions{})
-				require.NoError(err)
-				require.Len(namespaces, 2)
+				require.NoError(t, err)
+				require.Len(t, namespaces, 2)
 
 				// Check the created namespace properties
 				actNamespace, _, err := consul.Namespaces().Read(consulDestNamespace, &api.QueryOptions{})
-				require.NoError(err)
-				require.NotNil(actNamespace)
-				require.Equal(consulDestNamespace, actNamespace.Name)
-				require.Equal("Auto-generated by consul-k8s", actNamespace.Description)
-				require.NotNil(actNamespace.ACLs)
-				require.Len(actNamespace.ACLs.PolicyDefaults, 1)
-				require.Equal("cross-namespace-policy", actNamespace.ACLs.PolicyDefaults[0].Name)
-				require.Contains(actNamespace.Meta, "external-source")
-				require.Equal("kubernetes", actNamespace.Meta["external-source"])
+				require.NoError(t, err)
+				require.NotNil(t, actNamespace)
+				require.Equal(t, consulDestNamespace, actNamespace.Name)
+				require.Equal(t, "Auto-generated by consul-k8s", actNamespace.Description)
+				require.NotNil(t, actNamespace.ACLs)
+				require.Len(t, actNamespace.ACLs.PolicyDefaults, 1)
+				require.Equal(t, "cross-namespace-policy", actNamespace.ACLs.PolicyDefaults[0].Name)
+				require.Contains(t, actNamespace.Meta, "external-source")
+				require.Equal(t, "kubernetes", actNamespace.Meta["external-source"])
 			}
 		})
 	}
@@ -162,9 +159,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
 			k8s, testAgent := completeSetup(tt)
-			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
-			require := require.New(tt)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
@@ -173,53 +168,52 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			}
 			cmd.init()
 			args := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+				"-addresses=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+				"-http-port=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port=" + strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-connect-inject",
-				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
-				"-consul-api-timeout=5s",
 			}
 			args = append(args, c.ExtraFlags...)
 			responseCode := cmd.Run(args)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			bootToken := getBootToken(tt, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testAgent.TestServer.HTTPAddr,
 				Token:   bootToken,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check the ACL auth method is as expected.
 			authMethodName := resourcePrefix + "-k8s-auth-method"
 			method, _, err := consul.ACL().AuthMethodRead(authMethodName, nil)
-			require.NoError(err)
-			require.NotNil(method, authMethodName+" not found")
-			require.Equal("kubernetes", method.Type)
-			require.Equal("Kubernetes Auth Method", method.Description)
-			require.Contains(method.Config, "MapNamespaces")
-			require.Contains(method.Config, "ConsulNamespacePrefix")
-			require.Equal(true, method.Config["MapNamespaces"])
-			require.Equal(c.MirroringPrefix, method.Config["ConsulNamespacePrefix"])
+			require.NoError(t, err)
+			require.NotNil(t, method, authMethodName+" not found")
+			require.Equal(t, "kubernetes", method.Type)
+			require.Equal(t, "Kubernetes Auth Method", method.Description)
+			require.Contains(t, method.Config, "MapNamespaces")
+			require.Contains(t, method.Config, "ConsulNamespacePrefix")
+			require.Equal(t, true, method.Config["MapNamespaces"])
+			require.Equal(t, c.MirroringPrefix, method.Config["ConsulNamespacePrefix"])
 
 			// Check the binding rule is as expected.
 			rules, _, err := consul.ACL().BindingRuleList(authMethodName, nil)
-			require.NoError(err)
-			require.Len(rules, 1)
+			require.NoError(t, err)
+			require.Len(t, rules, 1)
 			actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, nil)
-			require.NoError(err)
-			require.NotNil(actRule)
-			require.Equal("Kubernetes binding rule", actRule.Description)
-			require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
-			require.Equal("${serviceaccount.name}", actRule.BindName)
-			require.Equal("serviceaccount.name!=default", actRule.Selector)
+			require.NoError(t, err)
+			require.NotNil(t, actRule)
+			require.Equal(t, "Kubernetes binding rule", actRule.Description)
+			require.Equal(t, api.BindingRuleBindTypeService, actRule.BindType)
+			require.Equal(t, "${serviceaccount.name}", actRule.BindName)
+			require.Equal(t, "serviceaccount.name!=default", actRule.Selector)
 		})
 	}
 }
@@ -229,8 +223,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	tokenFile := common.WriteTempFile(t, bootToken)
-	server, stopFn := partitionedSetup(t, bootToken, "test")
-	defer stopFn()
+	server := partitionedSetup(t, bootToken, "test")
 	k8s := fake.NewSimpleClientset()
 	setUpK8sServiceAccount(t, k8s, ns)
 
@@ -241,16 +234,15 @@ func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 	}
 	cmd.init()
 	args := []string{
-		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
-		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
+		"-addresses=" + strings.Split(server.HTTPAddr, ":")[0],
+		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
+		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-bootstrap-token-file", tokenFile,
-		"-enable-partitions",
 		"-allow-dns",
 		"-partition=test",
 		"-enable-namespaces",
-		"-consul-api-timeout=5s",
 	}
 	responseCode := cmd.Run(args)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -282,13 +274,12 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
 			k8s, testAgent := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
-			defer testAgent.Stop()
-			require := require.New(t)
 
 			ui := cli.NewMockUi()
 			firstRunArgs := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+				"-addresses=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+				"-http-port=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port=" + strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace", k8sNamespaceFlag,
 				"-client",
@@ -302,13 +293,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-ingress-gateway-name=anotherigw",
 				"-terminating-gateway-name=tgw",
 				"-terminating-gateway-name=anothertgw",
-				"-controller",
-				"-consul-api-timeout=5s",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
 			secondRunArgs := append(firstRunArgs,
-				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
 				"-consul-sync-destination-namespace=sync",
@@ -320,14 +308,14 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				clientset: k8s,
 			}
 			responseCode := cmd.Run(firstRunArgs)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			bootToken := getBootToken(t, k8s, resourcePrefix, k8sNamespaceFlag)
 			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testAgent.TestServer.HTTPAddr,
 				Token:   bootToken,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check that the expected policies were created.
 			firstRunExpectedPolicies := []string{
@@ -337,37 +325,36 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"mesh-gateway-policy",
 				"snapshot-agent-policy",
 				"enterprise-license-token",
-				resourcePrefix + "-igw-policy",
-				resourcePrefix + "-anotherigw-policy",
-				resourcePrefix + "-tgw-policy",
-				resourcePrefix + "-anothertgw-policy",
+				"igw-policy",
+				"anotherigw-policy",
+				"tgw-policy",
+				"anothertgw-policy",
 				"connect-inject-policy",
-				"controller-policy",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check that we have the right number of policies. The actual
 			// policies will have two more than expected because of the
 			// global management and namespace management polices that
 			// are automatically created, the latter in consul-ent v1.7+.
-			require.Equal(len(firstRunExpectedPolicies), len(policies)-2)
+			require.Equal(t, len(firstRunExpectedPolicies), len(policies)-2)
 
 			// Collect the actual policies into a map to make it easier to assert
 			// on their existence and contents.
 			actualPolicies := make(map[string]string)
 			for _, p := range policies {
 				policy, _, err := consul.ACL().PolicyRead(p.ID, nil)
-				require.NoError(err)
+				require.NoError(t, err)
 				actualPolicies[p.Name] = policy.Rules
 			}
 			for _, expected := range firstRunExpectedPolicies {
 				actRules, ok := actualPolicies[expected]
-				require.True(ok, "Did not find policy %s", expected)
+				require.True(t, ok, "Did not find policy %s", expected)
 				// We assert that the policy doesn't have any namespace config
 				// in it because later that's what we're using to test that it
 				// got updated.
-				require.NotContains(actRules, "namespace")
+				require.NotContains(t, actRules, "namespace")
 			}
 
 			// Re-run the command with namespace flags. The policies should be updated.
@@ -378,7 +365,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				clientset: k8s,
 			}
 			responseCode = cmd.Run(secondRunArgs)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the policies have all been updated.
 			secondRunExpectedPolicies := []string{
@@ -390,50 +377,49 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"snapshot-agent-policy",
 				"enterprise-license-token",
 				"cross-namespace-policy",
-				resourcePrefix + "-igw-policy",
-				resourcePrefix + "-anotherigw-policy",
-				resourcePrefix + "-tgw-policy",
-				resourcePrefix + "-anothertgw-policy",
-				"controller-policy",
+				"igw-policy",
+				"anotherigw-policy",
+				"tgw-policy",
+				"anothertgw-policy",
 				"partitions-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check that we have the right number of policies. The actual
 			// policies will have two more than expected because of the
 			// global management and namespace management polices that
 			// are automatically created, the latter in consul-ent v1.7+.
-			require.Equal(len(secondRunExpectedPolicies), len(policies)-2)
+			require.Equal(t, len(secondRunExpectedPolicies), len(policies)-2)
 
 			// Collect the actual policies into a map to make it easier to assert
 			// on their existence and contents.
 			actualPolicies = make(map[string]string)
 			for _, p := range policies {
 				policy, _, err := consul.ACL().PolicyRead(p.ID, nil)
-				require.NoError(err)
+				require.NoError(t, err)
 				actualPolicies[p.Name] = policy.Rules
 			}
 			for _, expected := range secondRunExpectedPolicies {
 				actRules, ok := actualPolicies[expected]
-				require.True(ok, "Did not find policy %s", expected)
+				require.True(t, ok, "Did not find policy %s", expected)
 
 				switch expected {
 				case "connect-inject-policy":
 					// The connect inject token doesn't have namespace config,
 					// but does change to operator:write from an empty string.
-					require.Contains(actRules, "policy = \"write\"")
+					require.Contains(t, actRules, "policy = \"write\"")
 				case "snapshot-agent-policy", "enterprise-license-token":
 					// The snapshot agent and enterprise license tokens shouldn't change.
-					require.NotContains(actRules, "namespace")
-					require.Contains(actRules, "acl = \"write\"")
+					require.NotContains(t, actRules, "namespace")
+					require.Contains(t, actRules, "acl = \"write\"")
 				case "partitions-token":
-					require.Contains(actRules, "operator = \"write\"")
+					require.Contains(t, actRules, "operator = \"write\"")
 				default:
 					// Assert that the policies have the word namespace in them. This
 					// tests that they were updated. The actual contents are tested
 					// in rules_test.go.
-					require.Contains(actRules, "namespace")
+					require.Contains(t, actRules, "namespace")
 				}
 			}
 		})
@@ -594,21 +580,18 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			require := require.New(tt)
 			k8s, testAgent := completeSetup(tt)
-			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s, ns)
 
 			ui := cli.NewMockUi()
 			defaultArgs := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+				"-addresses=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+				"-http-port=" + strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port=" + strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-enable-partitions",
 				"-partition=default",
 				"-connect-inject",
-				"-consul-api-timeout=5s",
 			}
 
 			// First run. NOTE: we don't assert anything here since we've
@@ -619,7 +602,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				clientset: k8s,
 			}
 			responseCode := cmd.Run(append(defaultArgs, c.FirstRunArgs...))
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			// Second run.
 			// NOTE: We're redefining the command so that the old flag values are
@@ -629,39 +612,39 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				clientset: k8s,
 			}
 			responseCode = cmd.Run(append(defaultArgs, c.SecondRunArgs...))
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			// Now check that everything is as expected.
 			bootToken := getBootToken(tt, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testAgent.TestServer.HTTPAddr,
 				Token:   bootToken,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check the ACL auth method is as expected.
 			authMethodName := resourcePrefix + "-k8s-auth-method"
 			method, _, err := consul.ACL().AuthMethodRead(authMethodName, &api.QueryOptions{
 				Namespace: c.AuthMethodExpectedNS,
 			})
-			require.NoError(err)
-			require.NotNil(method, authMethodName+" not found")
+			require.NoError(t, err)
+			require.NotNil(t, method, authMethodName+" not found")
 			if c.AuthMethodExpectMapNamespacesConfig {
-				require.Contains(method.Config, "MapNamespaces")
-				require.Contains(method.Config, "ConsulNamespacePrefix")
-				require.Equal(true, method.Config["MapNamespaces"])
-				require.Equal(c.AuthMethodExpectedNamespacePrefixConfig, method.Config["ConsulNamespacePrefix"])
+				require.Contains(t, method.Config, "MapNamespaces")
+				require.Contains(t, method.Config, "ConsulNamespacePrefix")
+				require.Equal(t, true, method.Config["MapNamespaces"])
+				require.Equal(t, c.AuthMethodExpectedNamespacePrefixConfig, method.Config["ConsulNamespacePrefix"])
 			} else {
-				require.NotContains(method.Config, "MapNamespaces")
-				require.NotContains(method.Config, "ConsulNamespacePrefix")
+				require.NotContains(t, method.Config, "MapNamespaces")
+				require.NotContains(t, method.Config, "ConsulNamespacePrefix")
 			}
 
 			// Check the binding rule is as expected.
 			rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{
 				Namespace: c.BindingRuleExpectedNS,
 			})
-			require.NoError(err)
-			require.Len(rules, 1)
+			require.NoError(t, err)
+			require.Len(t, rules, 1)
 		})
 	}
 }
@@ -692,7 +675,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			LocalToken:  false,
 		},
 		"partitions token": {
-			TokenFlags:  []string{"-enable-partitions", "-partition=default"},
+			TokenFlags:  []string{"-partition=default"},
 			PolicyNames: []string{"partitions-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-partitions-acl-token"},
@@ -703,8 +686,6 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
-			defer testSvr.Stop()
-			require := require.New(t)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -714,42 +695,41 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
-				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-addresses", strings.Split(testSvr.TestServer.HTTPAddr, ":")[0],
+				"-http-port", strings.Split(testSvr.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port", strings.Split(testSvr.TestServer.GRPCAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-enable-partitions",
 				"-partition=default",
 				"-enable-namespaces",
-				"-consul-api-timeout=5s",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the expected policy was created.
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
-				Address: testSvr.HTTPAddr,
+				Address: testSvr.TestServer.HTTPAddr,
 				Token:   bootToken,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check that the expected policy was created.
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
-				require.Equal(c.PolicyDCs, policy.Datacenters)
+				require.Equal(t, c.PolicyDCs, policy.Datacenters)
 				// Test that the token was created as a Kubernetes Secret.
 				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-				require.NoError(err)
-				require.NotNil(tokenSecret)
+				require.NoError(t, err)
+				require.NotNil(t, tokenSecret)
 				token, ok := tokenSecret.Data["token"]
-				require.True(ok)
+				require.True(t, ok)
 				// Test that the token has the expected policies in Consul.
 				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-				require.NoError(err)
-				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
-				require.Equal(c.LocalToken, tokenData.Local)
+				require.NoError(t, err)
+				require.Equal(t, c.PolicyNames[i], tokenData.Policies[0].Name)
+				require.Equal(t, c.LocalToken, tokenData.Local)
 			}
 
 			// Test that if the same command is run again, it doesn't error.
@@ -761,7 +741,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				}
 				cmd.init()
 				responseCode := cmd.Run(cmdArgs)
-				require.Equal(0, responseCode, ui.ErrorWriter.String())
+				require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 			})
 		})
 	}
@@ -782,9 +762,9 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 			TokenFlags: []string{"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
 				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{resourcePrefix + "-ingress-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"ingress-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -831,9 +811,9 @@ partition "default" {
 			TokenFlags: []string{"-ingress-gateway-name=ingress.",
 				"-ingress-gateway-name=gateway.namespace1",
 				"-ingress-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{resourcePrefix + "-ingress-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"ingress-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -880,9 +860,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
 				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{resourcePrefix + "-terminating-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"terminating-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -920,9 +900,9 @@ partition "default" {
 			TokenFlags: []string{"-terminating-gateway-name=terminating.",
 				"-terminating-gateway-name=gateway.namespace1",
 				"-terminating-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{resourcePrefix + "-terminating-policy",
-				resourcePrefix + "-gateway-policy",
-				resourcePrefix + "-another-gateway-policy"},
+			PolicyNames: []string{"terminating-policy",
+				"gateway-policy",
+				"another-gateway-policy"},
 			ExpectedPolicies: []string{`
 partition "default" {
   namespace "default" {
@@ -959,9 +939,7 @@ partition "default" {
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
-			defer testSvr.Stop()
 			setUpK8sServiceAccount(t, k8s, ns)
-			require := require.New(t)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -972,32 +950,31 @@ partition "default" {
 			cmd.init()
 			cmdArgs := append([]string{
 				"-k8s-namespace=" + ns,
-				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-addresses", strings.Split(testSvr.TestServer.HTTPAddr, ":")[0],
+				"-http-port", strings.Split(testSvr.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port", strings.Split(testSvr.TestServer.GRPCAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-enable-namespaces=true",
-				"-enable-partitions",
 				"-partition=default",
-				"-consul-api-timeout=5s",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the expected policy was created.
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
-				Address: testSvr.HTTPAddr,
+				Address: testSvr.TestServer.HTTPAddr,
 				Token:   bootToken,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 
 				fullPolicy, _, err := consul.ACL().PolicyRead(policy.ID, nil)
-				require.NoError(err)
-				require.Equal(c.ExpectedPolicies[i], fullPolicy.Rules)
+				require.NoError(t, err)
+				require.Equal(t, c.ExpectedPolicies[i], fullPolicy.Rules)
 			}
 
 			// Test that if the same command is run again, it doesn't error.
@@ -1009,7 +986,7 @@ partition "default" {
 				}
 				cmd.init()
 				responseCode := cmd.Run(cmdArgs)
-				require.Equal(0, responseCode, ui.ErrorWriter.String())
+				require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 			})
 		})
 	}
@@ -1031,7 +1008,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 		{
 			ComponentName: "connect-injector",
 			TokenFlags:    []string{"-connect-inject"},
-			Roles:         []string{resourcePrefix + "-connect-injector-acl-role"},
+			Roles:         []string{resourcePrefix + "-connect-inject-acl-role"},
 			Namespace:     ns,
 			GlobalToken:   false,
 		},
@@ -1049,7 +1026,6 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
 
 			k8s, testSvr := completeSetup(t)
-			defer testSvr.Stop()
 			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
 
 			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1078,16 +1054,16 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", c.Namespace,
 				"-auth-method-host=" + k8sMockServer.URL,
-				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-				"-consul-api-timeout=5s",
+				"-addresses", strings.Split(testSvr.TestServer.HTTPAddr, ":")[0],
+				"-http-port", strings.Split(testSvr.TestServer.HTTPAddr, ":")[1],
+				"-grpc-port", strings.Split(testSvr.TestServer.GRPCAddr, ":")[1],
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			client, err := api.NewClient(&api.Config{
-				Address: testSvr.HTTPAddr,
+				Address: testSvr.TestServer.HTTPAddr,
 			})
 			require.NoError(t, err)
 
@@ -1123,7 +1099,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 		{
 			ComponentName: "connect-injector",
 			TokenFlags:    []string{"-connect-inject"},
-			Roles:         []string{resourcePrefix + "-connect-injector-acl-role-dc2"},
+			Roles:         []string{resourcePrefix + "-connect-inject-acl-role-dc2"},
 			Namespace:     ns,
 			GlobalToken:   true,
 		},
@@ -1142,8 +1118,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 			authMethodName := fmt.Sprintf("%s-%s-%s", resourcePrefix, componentAuthMethod, "dc2")
 			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
 
-			k8s, _, consulHTTPAddr, cleanup := mockReplicatedSetup(t, bootToken)
-			defer cleanup()
+			k8s, _, consulHTTPAddr, consulGRPCAddr := mockReplicatedSetup(t, bootToken)
 			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
 
 			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1174,9 +1149,9 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 				"-consul-inject-destination-namespace", c.Namespace,
 				"-acl-replication-token-file", tokenFile,
 				"-auth-method-host=" + k8sMockServer.URL,
-				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
-				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
-				"-consul-api-timeout=5s",
+				"-addresses", strings.Split(consulHTTPAddr, ":")[0],
+				"-http-port", strings.Split(consulHTTPAddr, ":")[1],
+				"-grpc-port", strings.Split(consulGRPCAddr, ":")[1],
 			}, c.TokenFlags...)
 			cmd.init()
 			responseCode := cmd.Run(cmdArgs)
@@ -1211,13 +1186,12 @@ func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 	t.Parallel()
 
 	k8s, testSvr := completeSetup(t)
-	defer testSvr.Stop()
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	partitionToken := "123e4567-e89b-12d3-a456-426614174000"
 	partitionTokenFile, err := os.CreateTemp("", "partitiontoken")
 	require.NoError(t, err)
-	defer os.Remove(partitionTokenFile.Name())
+	defer os.RemoveAll(partitionTokenFile.Name())
 
 	partitionTokenFile.WriteString(partitionToken)
 	// Run the command.
@@ -1230,13 +1204,12 @@ func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 	cmdArgs := []string{
 		"-timeout=1m",
 		"-k8s-namespace=" + ns,
-		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-addresses", strings.Split(testSvr.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testSvr.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testSvr.TestServer.GRPCAddr, ":")[1],
 		"-resource-prefix=" + resourcePrefix,
-		"-enable-partitions",
 		"-partition=default",
 		"-partition-token-file", partitionTokenFile.Name(),
-		"-consul-api-timeout=5s",
 	}
 
 	responseCode := cmd.Run(cmdArgs)
@@ -1244,7 +1217,7 @@ func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 
 	// Check that this token is created.
 	consul, err := api.NewClient(&api.Config{
-		Address: testSvr.HTTPAddr,
+		Address: testSvr.TestServer.HTTPAddr,
 		Token:   partitionToken,
 	})
 	require.NoError(t, err)
@@ -1277,35 +1250,18 @@ func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 // a client in the provided partitionName. The bootToken is the token used as the bootstrap token
 // for both the client and the server. The helper creates a server, then creates a partition with
 // the provided partitionName and then creates a client in said partition.
-func partitionedSetup(t *testing.T, bootToken string, partitionName string) (*testutil.TestServer, func()) {
-	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+func partitionedSetup(t *testing.T, bootToken string, partitionName string) *testutil.TestServer {
+	server := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		c.ACL.Tokens.InitialManagement = bootToken
 	})
-	require.NoError(t, err)
-	server.WaitForLeader(t)
 
-	serverAPIClient, err := consul.NewClient(&api.Config{
-		Address: server.HTTPAddr,
-		Token:   bootToken,
-	}, 5*time.Second)
+	server.Cfg.APIClientConfig.Token = bootToken
+	serverAPIClient, err := consul.NewClient(server.Cfg.APIClientConfig, 5*time.Second)
 	require.NoError(t, err)
 
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
 	require.NoError(t, err)
 
-	partitionedClient, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-		c.Server = false
-		c.Bootstrap = false
-		c.Partition = partitionName
-		c.RetryJoin = []string{server.LANAddr}
-		c.ACL.Enabled = true
-		c.ACL.Tokens.Agent = bootToken
-	})
-	require.NoError(t, err)
-
-	return server, func() {
-		server.Stop()
-		partitionedClient.Stop()
-	}
+	return server.TestServer
 }

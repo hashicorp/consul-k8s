@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
@@ -209,7 +210,6 @@ func TestVault(t *testing.T) {
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
-		"controller.enabled":     "true",
 		"global.secretsBackend.vault.connectInject.tlsCert.secretName": connectInjectorWebhookPKIConfig.CertPath,
 		"global.secretsBackend.vault.connectInject.caCert.secretName":  connectInjectorWebhookPKIConfig.CAPath,
 		"global.secretsBackend.vault.controller.tlsCert.secretName":    controllerWebhookPKIConfig.CertPath,
@@ -253,6 +253,9 @@ func TestVault(t *testing.T) {
 		"syncCatalog.enabled":  "true",
 		"syncCatalog.toConsul": "false",
 		"syncCatalog.toK8S":    "false",
+
+		// Enable clients to make sure vault integration still works.
+		"client.enabled": "true",
 	}
 
 	if cfg.EnableEnterprise {
@@ -271,7 +274,7 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, podList.Items)
 	connectInjectorPodName := podList.Items[0].Name
-	connectInjectorPodAddress := consulCluster.CreatePortForwardTunnelToResourcePort(t, connectInjectorPodName, 8080)
+	connectInjectorPodAddress := portforward.CreateTunnelToResourcePort(t, connectInjectorPodName, 8080, kubectlOptions, terratestLogger.Discard)
 	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
 	require.NoError(t, err)
 	logger.Logf(t, "Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String())

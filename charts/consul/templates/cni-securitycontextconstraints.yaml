@@ -1,0 +1,50 @@
+{{- if (and (.Values.connectInject.cni.enabled) (.Values.global.openshift.enabled)) }}
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: cni
+  annotations:
+    kubernetes.io/description: {{ template "consul.fullname" . }}-cni are the security context constraints required
+      to run consul-cni.
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: true
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: MustRunAs
+groups: []
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETUID
+- SETGID
+runAsUser:
+  type: MustRunAsRange
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+users: []
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret
+- hostPath
+{{- end }}

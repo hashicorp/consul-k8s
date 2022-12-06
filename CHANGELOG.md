@@ -1,4 +1,130 @@
-## UNRELEASED
+## 1.0.0 (November 17, 2022)
+
+BREAKING CHANGES:
+* Admin Partitions **(Consul Enterprise only)**: Remove the partition service. When configuring Admin Partitions, the expose-servers service should be used instead.
+* Consul Dataplane:
+  * Consul client agents are no longer deployed by default, and Consul service mesh no longer uses Consul clients to operate. This change affects several main areas listed below. [[GH-1552](https://github.com/hashicorp/consul-k8s/pull/1552)]
+  * A new component `consul-dataplane` is now injected as a sidecar-proxy instead of plain Envoy. `consul-dataplane` manages the Envoy proxy process and proxies xDS requests from Envoy to Consul servers.
+  * All services on the service mesh are now registered directly with the central catalog in Consul servers.
+  * All service-mesh consul-k8s components are configured to talk directly to Consul servers.
+  * Mesh, ingress, and terminating gateways are now registered centrally by the endpoints controller, similar to how service-mesh services are registered.
+* CLI:
+  * Change default behavior of `consul-k8s install` to perform the installation when no answer is provided to the prompt. [[GH-1673](https://github.com/hashicorp/consul-k8s/pull/1673)]
+* Helm:
+  * Kubernetes-1.25 is now supported with the caveat that `global.enablePodSecurityPolicies` is not supported since PodSecurityPolicies have been removed in favor of PodSecurityStandards in Kubernetes-1.25. Full support for PodSecurityStandards will be added in a follow-on commit. [[GH-1726](https://github.com/hashicorp/consul-k8s/pull/1726)]
+  * Support simplified default deployment values to allow for easier quick starts and testing:
+    * Set `connectInject.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+    * Set `meshGateway.affinity` to null and `meshGateway.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+    * Set `ingressGateways.defaults.affinity` to null and `ingressGateways.defaults.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+    * Set `terminatingGateways.defaults.affinity` to null and `terminatingGateways.defaults.replicas` to 1 [[GH-1702](https://github.com/hashicorp/consul-k8s/pull/1702)]
+    * Set `server.replicas` to `1`. Formerly, this defaulted to `3`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+  * `client.enabled` now defaults to `false`. Setting it to `true` will deploy client agents, however, none of the consul-k8s components will use clients for their operation.
+  * `global.imageEnvoy` is no longer used for sidecar proxies, as well as mesh, terminating, and ingress gateways.
+  * `externalServers.grpcPort` default is now `8502` instead of `8503`.
+  * `meshGateway.service.enabled` value is removed. Mesh gateways now will always have a Kubernetes service as this is required to register them as a service with Consul.
+  * `meshGateway.initCopyConsulContainer`, `ingressGateways.initCopyConsulContainer`, `terminatingGateways.initCopyConsulContainer` values are removed.
+  * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
+  * `syncCatalog.consulNamespaces.mirroringK8S` now defaults to `true`. [[GH-1601](https://github.com/hashicorp/consul-k8s/pull/1601)]
+  * `connectInject.consulNamespaces.mirroringK8S` now defaults to `true`. [[GH-1601](https://github.com/hashicorp/consul-k8s/pull/1601)]
+  * Remove `controller` section from the values file as the controller has now been merged into the connect-inject deployment. [[GH-1697](https://github.com/hashicorp/consul-k8s/pull/1697)]
+  * Remove `global.consulSidecarContainer` from values file as there is no longer a consul sidecar. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
+  * Consul snapshot-agent now runs as a sidecar with Consul servers. [[GH-1620](https://github.com/hashicorp/consul-k8s/pull/1620)]
+
+    This results in the following changes to Helm values:
+      * Move `client.snapshotAgent` values to `server.snapshotAgent`, with the exception of the following values:
+        * `client.snaphostAgent.replicas`
+        * `client.snaphostAgent.serviceAccount`
+      * Remove `global.secretsBackend.vault.consulSnapshotAgentRole` value. You should now use the `global.secretsBackend.vault.consulServerRole` for access to any Vault secrets.
+  * Change `dns.enabled` and `dns.enableRedirection` to default to the value of `connectInject.transparentProxy.defaultEnabled`.
+    Previously, `dns.enabled` defaulted to the value of `global.enabled` and `dns.enableRedirection` defaulted to the
+    value to `false`. [[GH-1688](https://github.com/hashicorp/consul-k8s/pull/1688)]
+  * Remove `global.imageEnvoy` and replace with `global.imageConsulDataplane` for running the sidecar proxy.
+  * Add `apiGateway.imageEnvoy` as for configuring the version of Envoy that the API Gateway uses. [[GH-1698](https://github.com/hashicorp/consul-k8s/pull/1698)]
+* Peering:
+  * Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
+  * Remove support for customizing the server addresses in peering token generation. Instead, mesh gateways should be used
+    to establish peering connections if the server pods are not directly reachable. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+  * Require `global.tls.enabled` when peering is enabled. [[GH-1610](https://github.com/hashicorp/consul-k8s/pull/1610)]
+  * Require `meshGateway.enabled` when peering is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
+
+FEATURES:
+* CLI:
+  * Add the ability to install HCP self-managed clusters.  [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
+  * Add the ability to install the HashiCups demo application via the -demo flag. [[GH-1540](https://github.com/hashicorp/consul-k8s/pull/1540)]
+* Consul Dataplane:
+  * Support merged metrics with consul-dataplane. [[GH-1635](https://github.com/hashicorp/consul-k8s/pull/1635)]
+  * Support transparent proxying when using consul-dataplane. [[GH-1625](https://github.com/hashicorp/consul-k8s/pull/1478),[GH-1632](https://github.com/hashicorp/consul-k8s/pull/1632)]
+  * Enable sync-catalog to only talk to Consul servers. [[GH-1659](https://github.com/hashicorp/consul-k8s/pull/1659)]
+* Ingress Gateway
+  * Add support for MaxConnections, MaxConcurrentRequests, and MaxPendingRequests to Ingress Gateway CRD. [[GH-1691](https://github.com/hashicorp/consul-k8s/pull/1691)]
+* Peering:
+  * Support peering over mesh gateways.
+    * Add support for `PeerThroughMeshGateways` in Mesh CRD. [[GH-1478](https://github.com/hashicorp/consul-k8s/pull/1478)]
+
+IMPROVEMENTS:
+* CLI
+  * `consul-k8s status` command will only show status of servers if they are expected to be present in the Kubernetes cluster. [[GH-1603](https://github.com/hashicorp/consul-k8s/pull/1603)]
+  * Update demo charts and CLI command to not presume tproxy when using HCP preset. Also, use the most recent version of hashicups. [[GH-1657](https://github.com/hashicorp/consul-k8s/pull/1657)]
+  * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
+  * Enable `consul-k8s uninstall` to delete custom resources when uninstalling Consul. This is done by default. [[GH-1623](https://github.com/hashicorp/consul-k8s/pull/1623)] 
+* Control Plane
+  * Update minimum go version for project to 1.19 [[GH-1633](https://github.com/hashicorp/consul-k8s/pull/1633)]
+  * Remove unneeded `agent:read` ACL permissions from mesh gateway policy. [[GH-1255](https://github.com/hashicorp/consul-k8s/pull/1255)]
+  * Support updating health checks on consul clients during an upgrade to agentless. [[GH-1690](https://github.com/hashicorp/consul-k8s/pull/1690)]
+  * Remove unused curl from docker images [[1624](https://github.com/hashicorp/consul-k8s/pull/1624)]
+  * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.1`. [[GH-1725][https://github.com/hashicorp/consul-k8s/pull/1725]]
+* Helm:
+  * Remove deprecated annotation `service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"` in the `server-service` template. [[GH-1619](https://github.com/hashicorp/consul-k8s/pull/1619)]
+  * Support `minAvailable` on connect injector `PodDisruptionBudget`. [[GH-1557](https://github.com/hashicorp/consul-k8s/pull/1557)]
+  * Add `tolerations` and `nodeSelector` to Server ACL init jobs and `nodeSelector` to Webhook cert manager. [[GH-1581](https://github.com/hashicorp/consul-k8s/pull/1581)]
+  * API Gateway: Add `tolerations` to `apiGateway.managedGatewayClass` and `apiGateway.controller` [[GH-1650](https://github.com/hashicorp/consul-k8s/pull/1650)]
+  * API Gateway: Create PodSecurityPolicy for controller when `global.enablePodSecurityPolicies=true`. [[GH-1656](https://github.com/hashicorp/consul-k8s/pull/1656)]
+  * API Gateway: Create PodSecurityPolicy and allow controller to bind it to ServiceAccounts that it creates for Gateway Deployments when `global.enablePodSecurityPolicies=true`. [[GH-1672](https://github.com/hashicorp/consul-k8s/pull/1672)]
+  * Deploy `expose-servers` service only when Admin Partitions(ENT) is enabled. [[GH-1683](https://github.com/hashicorp/consul-k8s/pull/1683)]
+  * Use a distroless image for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
+  * The Envoy version is now 1.24.0 for `consul-dataplane`. [[GH-1676](https://github.com/hashicorp/consul-k8s/pull/1676)]
+  * Allow addition of extra labels to Connect Inject pods. [[GH-1678](https://github.com/hashicorp/consul-k8s/pull/1678)]
+  * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
+  * API Gateway: Enable API Gateways to directly connect to Consul servers when running in the agentless configuration. [[GH-1694](https://github.com/hashicorp/consul-k8s/pull/1694)]
+  * Add `connectInject.consulNode.meta` to allow users to provide custom metadata to append to the NodeMeta [[GH-1707](https://github.com/hashicorp/consul-k8s/pull/1707)]
+  * Add `externalServers.skipServerWatch` which prevents consul-dataplane from consuming the server update stream. This is useful for situations where Consul servers are behind a load balancer. [[GH-1686](https://github.com/hashicorp/consul-k8s/pull/1686)]
+  * API Gateway: Allow controller to read MeshServices for use as a route backend. [[GH-1574](https://github.com/hashicorp/consul-k8s/pull/1574)]
+  * API Gateway: Add support for using dynamic server discovery strings when running without agents. [[GH-1732](https://github.com/hashicorp/consul-k8s/pull/1732)]
+
+
+BUG FIXES:
+* CLI
+  * Allow optional environment variables for use in the cloud preset to the CLI for cluster bootstrapping. [[GH-1608](https://github.com/hashicorp/consul-k8s/pull/1608)]
+  * Configure `-tls-server-name` when `global.cloud.enabled=true` so that it matches the server certificate created via HCP [[GH-1591](https://github.com/hashicorp/consul-k8s/pull/1591)]
+  * Do not query clients in the status command since clients no longer exist. [[GH-1573](https://github.com/hashicorp/consul-k8s/pull/1573)]
+* Peering
+  * Add `peering:read` permissions to mesh gateway token to fix peering connections through the mesh gateways. [[GH-1685](https://github.com/hashicorp/consul-k8s/pull/1685)]
+* Helm:
+  * Disable PodSecurityPolicies in all templates when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
+
+## 0.49.0 (September 29, 2022)
+
+FEATURES:
+* CLI:
+  * Add support for tab autocompletion [[GH-1437](https://github.com/hashicorp/consul-k8s/pull/1501)]
+* Consul CNI Plugin
+  * Support for OpenShift and Multus CNI plugin [[GH-1527](https://github.com/hashicorp/consul-k8s/pull/1527)]
+
+BUG FIXES:
+* Control plane
+  * Use global ACL auth method to provision ACL tokens for API Gateway in secondary datacenter [[GH-1481](https://github.com/hashicorp/consul-k8s/pull/1481)]
+  * Peering: pass new `use_auto_cert` value to gRPC TLS config when auto-encrypt is enabled. [[GH-1541](https://github.com/hashicorp/consul-k8s/pull/1541)]
+* Helm:
+  * Only create Federation Secret Job when server.updatePartition is 0 [[GH-1512](https://github.com/hashicorp/consul-k8s/pull/1512)]
+  * Fixes a typo in the templating of `global.connectInject.disruptionBudget.maxUnavailable`. [[GH-1530](https://github.com/hashicorp/consul-k8s/pull/1530)]
+
+IMPROVEMENTS:
+* Helm:
+  * API Gateway: Set primary datacenter flag when deploying controller into secondary datacenter with federation enabled [[GH-1511](https://github.com/hashicorp/consul-k8s/pull/1511)]
+  * API Gateway: Allow controller to create and update Secrets for storing Consul CA cert alongside gateway Deployments [[GH-1542](https://github.com/hashicorp/consul-k8s/pull/1542)]
+  * New parameter `EnforcingConsecutive5xx` which supports a configurable percent chance of automatic ejection of a host when a consecutive number of 5xx response codes are received [[GH-1484](https://github.com/hashicorp/consul-k8s/pull/1484)]
+* Control-plane:
+  * Support escaped commas in service tag annotations for pods which use `consul.hashicorp.com/connect-service-tags` or `consul.hashicorp.com/service-tags`. [[GH-1532](https://github.com/hashicorp/consul-k8s/pull/1532)]
 
 ## 0.48.0 (September 01, 2022)
 
@@ -10,6 +136,9 @@ FEATURES:
 * Kubernetes 1.24 Support
   * Add support for Kubernetes 1.24 where ServiceAccounts no longer have long-term JWT tokens. [[GH-1431](https://github.com/hashicorp/consul-k8s/pull/1431)]
   * Upgrade kubeVersion in helm chart to support Kubernetes 1.21+.
+* Cluster Peering:
+  * Add support for setting failover `Targets` on the Service Resolver CRD.  [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
+  * Add support for redirecting to cluster peers on the Service Resolver CRD.  [[GH-1284](https://github.com/hashicorp/consul-k8s/pull/1284)]
 
 BREAKING CHANGES:
 * Kubernetes 1.24 Support

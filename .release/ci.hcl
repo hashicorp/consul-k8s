@@ -3,12 +3,15 @@ schema = "1"
 project "consul-k8s" {
   team = "consul-k8s"
   slack {
-    notification_channel = "CBXF3CGAF" # team-consul-kubernetes
+    notification_channel = "C0421KHNAV9" # feed-consul-k8s-ci
   }
   github {
     organization = "hashicorp"
     repository = "consul-k8s"
-    release_branches = ["main"]
+    release_branches = [
+      "main",
+      "release/**",
+    ]
   }
 }
 
@@ -188,6 +191,7 @@ event "promote-staging" {
     organization = "hashicorp"
     repository = "crt-workflows-common"
     workflow = "promote-staging"
+    config = "release-metadata.hcl"
   }
 
   notification {

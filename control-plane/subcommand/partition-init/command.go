@@ -11,9 +11,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -21,16 +20,8 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags *flag.FlagSet
-	k8s   *k8sflags.K8SFlags
-	http  *flags.HTTPFlags
-
-	flagPartitionName string
-
-	// Flags to configure Consul connection
-	flagServerAddresses []string
-	flagServerPort      uint
-	flagUseHTTPS        bool
+	flags  *flag.FlagSet
+	consul *flags.ConsulFlags
 
 	flagLogLevel string
 	flagLogJSON  bool
@@ -45,21 +36,11 @@ type Command struct {
 
 	once sync.Once
 	help string
-
-	providers map[string]discover.Provider
 }
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.flags.StringVar(&c.flagPartitionName, "partition-name", "", "The name of the partition being created.")
-
-	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
-			"At least one value is required.")
-	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
-	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
-		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap Partitions for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -68,10 +49,8 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	c.k8s = &k8sflags.K8SFlags{}
-	c.http = &flags.HTTPFlags{}
-	flags.Merge(c.flags, c.k8s.Flags())
-	flags.Merge(c.flags, c.http.Flags())
+	c.consul = &flags.ConsulFlags{}
+	flags.Merge(c.flags, c.consul.Flags())
 	c.help = flags.Usage(help, c.flags)
 
 	// Default retry to 1s. This is exposed for setting in tests.
@@ -116,45 +95,52 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.log)
+	// Start Consul server Connection manager
+	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
+	serverConnMgrCfg.ServerWatchDisabled = true
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
+		return 1
+	}
+	watcher, err := discovery.NewWatcher(c.ctx, serverConnMgrCfg, c.log.Named("consul-server-connection-manager"))
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create Consul server watcher: %s", err))
 		return 1
 	}
 
-	scheme := "http"
-	if c.flagUseHTTPS {
-		scheme = "https"
-	}
-	// For all of the next operations we'll need a Consul client.
-	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	cfg := api.DefaultConfig()
-	cfg.Address = serverAddr
-	cfg.Scheme = scheme
-	c.http.MergeOntoConfig(cfg)
-	consulClient, err := consul.NewClient(cfg, c.http.ConsulAPITimeout())
+	go watcher.Run()
+	defer watcher.Stop()
+
+	state, err := watcher.State()
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
+		c.UI.Error(fmt.Sprintf("unable to get Consul server addresses from watcher: %s", err))
 		return 1
 	}
+
+	consulClient, err := consul.NewClientFromConnMgrState(c.consul.ConsulClientConfig(), state)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create Consul client: %s", err))
+		return 1
+	}
+
 	for {
-		partition, _, err := consulClient.Partitions().Read(c.ctx, c.flagPartitionName, nil)
+		partition, _, err := consulClient.Partitions().Read(c.ctx, c.consul.Partition, nil)
 		// The API does not return an error if the Partition does not exist. It returns a nil Partition.
 		if err != nil {
-			c.log.Error("Error reading Partition from Consul", "name", c.flagPartitionName, "error", err.Error())
+			c.log.Error("Error reading Partition from Consul", "name", c.consul.Partition, "error", err.Error())
 		} else if partition == nil {
 			// Retry Admin Partition creation until it succeeds, or we reach the command timeout.
 			_, _, err = consulClient.Partitions().Create(c.ctx, &api.Partition{
-				Name:        c.flagPartitionName,
+				Name:        c.consul.Partition,
 				Description: "Created by Helm installation",
 			}, nil)
 			if err == nil {
-				c.log.Info("Successfully created Admin Partition", "name", c.flagPartitionName)
+				c.log.Info("Successfully created Admin Partition", "name", c.consul.Partition)
 				return 0
 			}
-			c.log.Error("Error creating partition", "name", c.flagPartitionName, "error", err.Error())
+			c.log.Error("Error creating partition", "name", c.consul.Partition, "error", err.Error())
 		} else {
-			c.log.Info("Admin Partition already exists", "name", c.flagPartitionName)
+			c.log.Info("Admin Partition already exists", "name", c.consul.Partition)
 			return 0
 		}
 		// Wait on either the retry duration (in which case we continue) or the
@@ -164,28 +150,28 @@ func (c *Command) Run(args []string) int {
 		case <-time.After(c.retryDuration):
 			continue
 		case <-c.ctx.Done():
-			c.log.Error("Timed out attempting to create partition", "name", c.flagPartitionName)
+			c.log.Error("Timed out attempting to create partition", "name", c.consul.Partition)
 			return 1
 		}
 	}
 }
 
 func (c *Command) validateFlags() error {
-	if len(c.flagServerAddresses) == 0 {
-		return errors.New("-server-address must be set at least once")
+	if len(c.consul.Addresses) == 0 {
+		return errors.New("-addresses must be set")
 	}
 
-	if c.flagPartitionName == "" {
-		return errors.New("-partition-name must be set")
+	if c.consul.Partition == "" {
+		return errors.New("-partition must be set")
 	}
 
-	if c.http.ConsulAPITimeout() <= 0 {
-		return errors.New("-consul-api-timeout must be set to a value greater than 0")
+	if c.consul.APITimeout <= 0 {
+		return errors.New("-api-timeout must be set to a value greater than 0")
 	}
 	return nil
 }
 
-const synopsis = "Initialize an Admin Partition on Consul."
+const synopsis = "Initialize an Admin Partition in Consul."
 const help = `
 Usage: consul-k8s-control-plane partition-init [options]
 

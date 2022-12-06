@@ -3,6 +3,7 @@ package install
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -14,8 +15,12 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/hashicorp/consul-k8s/cli/release"
 	"github.com/hashicorp/consul-k8s/cli/validation"
+	"github.com/posener/complete"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -24,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/yaml"
 )
 
@@ -52,6 +58,14 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
+
+	flagNameContext    = "context"
+	flagNameKubeconfig = "kubeconfig"
+
+	flagNameHCPResourceID = "hcp-resource-id"
+
+	flagNameDemo = "demo"
+	defaultDemo  = false
 )
 
 type Command struct {
@@ -59,20 +73,26 @@ type Command struct {
 
 	kubernetes kubernetes.Interface
 
+	helmActionsRunner helm.HelmActionsRunner
+
+	httpClient *http.Client
+
 	set *flag.Sets
 
-	flagPreset          string
-	flagNamespace       string
-	flagDryRun          bool
-	flagAutoApprove     bool
-	flagValueFiles      []string
-	flagSetStringValues []string
-	flagSetValues       []string
-	flagFileValues      []string
-	flagTimeout         string
-	timeoutDuration     time.Duration
-	flagVerbose         bool
-	flagWait            bool
+	flagPreset            string
+	flagNamespace         string
+	flagDryRun            bool
+	flagAutoApprove       bool
+	flagValueFiles        []string
+	flagSetStringValues   []string
+	flagSetValues         []string
+	flagFileValues        []string
+	flagTimeout           string
+	timeoutDuration       time.Duration
+	flagVerbose           bool
+	flagWait              bool
+	flagDemo              bool
+	flagNameHCPResourceID string
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -82,12 +102,6 @@ type Command struct {
 }
 
 func (c *Command) init() {
-	// Store all the possible preset values in 'presetList'. Printed in the help message.
-	var presetList []string
-	for name := range config.Presets {
-		presetList = append(presetList, name)
-	}
-
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.BoolVar(&flag.BoolVar{
@@ -118,7 +132,7 @@ func (c *Command) init() {
 		Name:    flagNamePreset,
 		Target:  &c.flagPreset,
 		Default: defaultPreset,
-		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(preset.Presets, ", ")),
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetValues,
@@ -155,17 +169,30 @@ func (c *Command) init() {
 		Default: defaultWait,
 		Usage:   "Wait for Kubernetes resources in installation to be ready before exiting command.",
 	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameDemo,
+		Target:  &c.flagDemo,
+		Default: defaultDemo,
+		Usage: fmt.Sprintf("Install %s immediately after installing %s.",
+			common.ReleaseTypeConsulDemo, common.ReleaseTypeConsul),
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameHCPResourceID,
+		Target:  &c.flagNameHCPResourceID,
+		Default: "",
+		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
+	})
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagNameKubeconfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "context",
+		Name:    flagNameContext,
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
@@ -177,6 +204,9 @@ func (c *Command) init() {
 // Run installs Consul into a Kubernetes cluster.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
 
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("install")
@@ -239,7 +269,11 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Checking if Consul can be installed", terminal.WithHeaderStyle())
 
 	// Ensure there is not an existing Consul installation which would cause a conflict.
-	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err == nil {
+	if found, name, ns, _ := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    settings,
+		ReleaseName: common.DefaultReleaseName,
+		DebugLog:    uiLogger,
+	}); found {
 		c.UI.Output("Cannot install Consul. A Consul cluster is already installed in namespace %s with name %s.", ns, name, terminal.WithErrorStyle())
 		c.UI.Output("Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.", terminal.WithInfoStyle())
 		return 1
@@ -253,6 +287,38 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Output("No existing Consul persistent volume claims found", terminal.WithSuccessStyle())
 
+	release := release.Release{
+		Name:      common.DefaultReleaseName,
+		Namespace: c.flagNamespace,
+	}
+
+	msg, err := c.checkForPreviousSecrets(release)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	c.UI.Output(msg, terminal.WithSuccessStyle())
+
+	if c.flagDemo {
+		c.UI.Output("Checking if %s can be installed",
+			cases.Title(language.English).String(common.ReleaseTypeConsulDemo),
+			terminal.WithHeaderStyle())
+
+		// Ensure there is not an existing Consul demo installation which would cause a conflict.
+		if found, name, ns, _ := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+			Settings:    settings,
+			ReleaseName: common.ConsulDemoAppReleaseName,
+			DebugLog:    uiLogger,
+		}); found {
+			c.UI.Output("Cannot install %s. A %s cluster is already installed in namespace %s with name %s.",
+				common.ReleaseTypeConsulDemo, common.ReleaseTypeConsulDemo, ns, name, terminal.WithErrorStyle())
+			c.UI.Output("Use the command `consul-k8s uninstall` to uninstall the %s from the cluster.",
+				common.ReleaseTypeConsulDemo, terminal.WithInfoStyle())
+			return 1
+		}
+		c.UI.Output("No existing %s installations found.", common.ReleaseTypeConsulDemo, terminal.WithSuccessStyle())
+	}
+
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
 	if err != nil {
@@ -265,28 +331,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var values helm.Values
-	err = yaml.Unmarshal(valuesYaml, &values)
+	var helmVals helm.Values
+	err = yaml.Unmarshal(valuesYaml, &helmVals)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	release := release.Release{
-		Name:          "consul",
-		Namespace:     c.flagNamespace,
-		Configuration: values,
-	}
-
-	msg, err := c.checkForPreviousSecrets(release)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output(msg, terminal.WithSuccessStyle())
+	release.Configuration = helmVals
 
 	// If an enterprise license secret was provided, check that the secret exists and that the enterprise Consul image is set.
-	if values.Global.EnterpriseLicense.SecretName != "" {
+	if helmVals.Global.EnterpriseLicense.SecretName != "" {
 		if err := c.checkValidEnterprise(release.Configuration.Global.EnterpriseLicense.SecretName); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
@@ -294,82 +349,93 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
 	}
 
-	// Print out the installation summary.
-	if !c.flagAutoApprove {
-		c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
+	err = c.installConsul(valuesYaml, vals, settings, uiLogger)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
 
-		if len(vals) == 0 {
-			c.UI.Output("\nNo overrides provided, using the default Helm values.", terminal.WithInfoStyle())
-		} else {
-			c.UI.Output("\nHelm value overrides\n-------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
+	if c.flagDemo {
+		timeout, err := time.ParseDuration(c.flagTimeout)
+		if err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
 		}
+		options := &helm.InstallOptions{
+			ReleaseName:       common.ConsulDemoAppReleaseName,
+			ReleaseType:       common.ReleaseTypeConsulDemo,
+			Namespace:         c.flagNamespace,
+			Values:            make(map[string]interface{}),
+			Settings:          settings,
+			EmbeddedChart:     consulChart.DemoHelmChart,
+			ChartDirName:      "demo",
+			UILogger:          uiLogger,
+			DryRun:            c.flagDryRun,
+			AutoApprove:       c.flagAutoApprove,
+			Wait:              c.flagWait,
+			Timeout:           timeout,
+			UI:                c.UI,
+			HelmActionsRunner: c.helmActionsRunner,
+		}
+		err = helm.InstallDemoApp(options)
+		if err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
+		}
+	}
+
+	if c.flagDryRun {
+		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
+			"Installation can proceed with this configuration.", terminal.WithInfoStyle())
+	}
+
+	return 0
+}
+
+func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) error {
+	// Print out the installation summary.
+	c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
+	c.UI.Output("Name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
+	c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
+
+	if len(vals) == 0 {
+		c.UI.Output("\nNo overrides provided, using the default Helm values.", terminal.WithInfoStyle())
+	} else {
+		c.UI.Output("\nHelm value overrides\n--------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
 	}
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = common.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
+	vals = common.MergeMaps(config.ConvertToMap(config.GlobalNameConsul), vals)
 
-	if c.flagDryRun {
-		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
-			"Installation can proceed with this configuration.", terminal.WithInfoStyle())
-		return 0
-	}
-
-	if !c.flagAutoApprove {
-		confirmation, err := c.UI.Input(&terminal.Input{
-			Prompt: "Proceed with installation? (y/N)",
-			Style:  terminal.InfoStyle,
-			Secret: false,
-		})
-
-		if err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
-			return 1
-		}
-		if common.Abort(confirmation) {
-			c.UI.Output("Install aborted. Use the command `consul-k8s install -help` to learn how to customize your installation.",
-				terminal.WithInfoStyle())
-			return 1
-		}
-	}
-
-	c.UI.Output("Installing Consul", terminal.WithHeaderStyle())
-
-	// Setup action configuration for Helm Go SDK function calls.
-	actionConfig := new(action.Configuration)
-	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	timeout, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+		return err
+	}
+	installOptions := &helm.InstallOptions{
+		ReleaseName:       common.DefaultReleaseName,
+		ReleaseType:       common.ReleaseTypeConsul,
+		Namespace:         c.flagNamespace,
+		Values:            vals,
+		Settings:          settings,
+		EmbeddedChart:     consulChart.ConsulHelmChart,
+		ChartDirName:      common.TopLevelChartDirName,
+		UILogger:          uiLogger,
+		DryRun:            c.flagDryRun,
+		AutoApprove:       c.flagAutoApprove,
+		Wait:              c.flagWait,
+		Timeout:           timeout,
+		UI:                c.UI,
+		HelmActionsRunner: c.helmActionsRunner,
 	}
 
-	// Setup the installation action.
-	install := action.NewInstall(actionConfig)
-	install.ReleaseName = common.DefaultReleaseName
-	install.Namespace = c.flagNamespace
-	install.CreateNamespace = true
-	install.Wait = c.flagWait
-	install.Timeout = c.timeoutDuration
-
-	// Load the Helm chart.
-	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	err = helm.InstallHelmRelease(installOptions)
 	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
-
-	// Run the install.
-	if _, err = install.Run(chart, vals); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+		return err
 	}
 
-	c.UI.Output("Consul installed in namespace %q.", c.flagNamespace, terminal.WithSuccessStyle())
-	return 0
+	return nil
 }
 
 // Help returns a description of the command and how it is used.
@@ -381,6 +447,36 @@ func (c *Command) Help() string {
 // Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
 	return "Install Consul on Kubernetes."
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *Command) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNamePreset):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameNamespace):       complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameDryRun):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameAutoApprove):     complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameConfigFile):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameSetStringValues): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameSetValues):       complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameFileValues):      complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameTimeout):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameVerbose):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameWait):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameDemo):            complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameHCPResourceID):   complete.PredictNothing,
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *Command) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 // checkForPreviousPVCs checks for existing Kubernetes persistent volume claims with a name containing "consul-server"
@@ -468,7 +564,14 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	}
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
+		p, err := c.getPreset(c.flagPreset)
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset provider: %s", err)
+		}
+		presetMap, err := p.GetValueMap()
+		if err != nil {
+			return nil, fmt.Errorf("error getting preset values: %s", err)
+		}
 		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
@@ -485,13 +588,28 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if ok := slices.Contains(preset.Presets, c.flagPreset); c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !common.IsValidLabel(c.flagNamespace) {
 		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
 			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character", c.flagNamespace)
 	}
+
+	if c.flagPreset == preset.PresetCloud {
+		clientID := os.Getenv(preset.EnvHCPClientID)
+		clientSecret := os.Getenv(preset.EnvHCPClientSecret)
+		if clientID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientID)
+		} else if clientSecret == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientSecret)
+		} else if c.flagNameHCPResourceID == "" {
+			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
+		}
+	} else if c.flagNameHCPResourceID != "" {
+		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
+	}
+
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
@@ -519,4 +637,23 @@ func (c *Command) checkValidEnterprise(secretName string) error {
 		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
 	return nil
+}
+
+// getPreset is a factory function that, given a string, produces a struct that
+// implements the Preset interface.  If the string is not recognized an error is
+// returned.
+func (c *Command) getPreset(name string) (preset.Preset, error) {
+	hcpConfig := preset.GetHCPPresetFromEnv(c.flagNameHCPResourceID)
+	getPresetConfig := &preset.GetPresetConfig{
+		Name: name,
+		CloudPreset: &preset.CloudPreset{
+			KubernetesClient:    c.kubernetes,
+			KubernetesNamespace: c.flagNamespace,
+			HCPConfig:           hcpConfig,
+			UI:                  c.UI,
+			HTTPClient:          c.httpClient,
+			Context:             c.Ctx,
+		},
+	}
+	return preset.GetPreset(getPresetConfig)
 }

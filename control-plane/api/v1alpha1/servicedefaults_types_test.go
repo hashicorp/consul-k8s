@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 func TestServiceDefaults_ToConsul(t *testing.T) {
@@ -82,7 +83,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Interval: metav1.Duration{
 									Duration: 2 * time.Second,
 								},
-								MaxFailures: uint32(20),
+								MaxFailures:             uint32(20),
+								EnforcingConsecutive5xx: pointer.Uint32(100),
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -106,7 +108,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									Interval: metav1.Duration{
 										Duration: 2 * time.Second,
 									},
-									MaxFailures: uint32(10),
+									MaxFailures:             uint32(10),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -129,7 +132,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									Interval: metav1.Duration{
 										Duration: 2 * time.Second,
 									},
-									MaxFailures: uint32(10),
+									MaxFailures:             uint32(10),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -142,6 +146,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						Port:      443,
 					},
 					MaxInboundConnections: 20,
+					LocalConnectTimeoutMs: 5000,
+					LocalRequestTimeoutMs: 15000,
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -188,8 +194,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							MaxConcurrentRequests: intPointer(10),
 						},
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
-							Interval:    2 * time.Second,
-							MaxFailures: uint32(20),
+							Interval:                2 * time.Second,
+							MaxFailures:             uint32(20),
+							EnforcingConsecutive5xx: pointer.Uint32(100),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -210,8 +217,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								MaxConcurrentRequests: intPointer(5),
 							},
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
-								Interval:    2 * time.Second,
-								MaxFailures: uint32(10),
+								Interval:                2 * time.Second,
+								MaxFailures:             uint32(10),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -231,8 +239,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								MaxConcurrentRequests: intPointer(2),
 							},
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
-								Interval:    2 * time.Second,
-								MaxFailures: uint32(10),
+								Interval:                2 * time.Second,
+								MaxFailures:             uint32(10),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -245,6 +254,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					Port:      443,
 				},
 				MaxInboundConnections: 20,
+				LocalConnectTimeoutMs: 5000,
+				LocalRequestTimeoutMs: 15000,
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -335,7 +346,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Interval: metav1.Duration{
 									Duration: 2 * time.Second,
 								},
-								MaxFailures: uint32(20),
+								MaxFailures:             uint32(20),
+								EnforcingConsecutive5xx: pointer.Uint32(100),
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -358,7 +370,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									Interval: metav1.Duration{
 										Duration: 2 * time.Second,
 									},
-									MaxFailures: uint32(10),
+									MaxFailures:             uint32(10),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -380,7 +393,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									Interval: metav1.Duration{
 										Duration: 2 * time.Second,
 									},
-									MaxFailures: uint32(10),
+									MaxFailures:             uint32(10),
+									EnforcingConsecutive5xx: pointer.Uint32(60),
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -436,8 +450,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							MaxConcurrentRequests: intPointer(10),
 						},
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
-							Interval:    2 * time.Second,
-							MaxFailures: uint32(20),
+							Interval:                2 * time.Second,
+							MaxFailures:             uint32(20),
+							EnforcingConsecutive5xx: pointer.Uint32(100),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -457,8 +472,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								MaxConcurrentRequests: intPointer(5),
 							},
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
-								Interval:    2 * time.Second,
-								MaxFailures: uint32(10),
+								Interval:                2 * time.Second,
+								MaxFailures:             uint32(10),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -477,8 +493,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								MaxConcurrentRequests: intPointer(2),
 							},
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
-								Interval:    2 * time.Second,
-								MaxFailures: uint32(10),
+								Interval:                2 * time.Second,
+								MaxFailures:             uint32(10),
+								EnforcingConsecutive5xx: pointer.Uint32(60),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",

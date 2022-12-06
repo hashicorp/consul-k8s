@@ -6,8 +6,6 @@ import (
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
-	cmdConsulSidecar "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-sidecar"
-	cmdController "github.com/hashicorp/consul-k8s/control-plane/subcommand/controller"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
@@ -16,7 +14,6 @@ import (
 	cmdInstallCNI "github.com/hashicorp/consul-k8s/control-plane/subcommand/install-cni"
 	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
-	cmdServiceAddress "github.com/hashicorp/consul-k8s/control-plane/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
 	cmdTLSInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/tls-init"
 	cmdVersion "github.com/hashicorp/consul-k8s/control-plane/subcommand/version"
@@ -44,10 +41,6 @@ func init() {
 			return &cmdInjectConnect.Command{UI: ui}, nil
 		},
 
-		"consul-sidecar": func() (cli.Command, error) {
-			return &cmdConsulSidecar.Command{UI: ui}, nil
-		},
-
 		"consul-logout": func() (cli.Command, error) {
 			return &cmdConsulLogout.Command{UI: ui}, nil
 		},
@@ -68,10 +61,6 @@ func init() {
 			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
 		},
 
-		"service-address": func() (cli.Command, error) {
-			return &cmdServiceAddress.Command{UI: ui}, nil
-		},
-
 		"get-consul-client-ca": func() (cli.Command, error) {
 			return &cmdGetConsulClientCA.Command{UI: ui}, nil
 		},
@@ -82,10 +71,6 @@ func init() {
 
 		"create-federation-secret": func() (cli.Command, error) {
 			return &cmdCreateFederationSecret.Command{UI: ui}, nil
-		},
-
-		"controller": func() (cli.Command, error) {
-			return &cmdController.Command{UI: ui}, nil
 		},
 
 		"webhook-cert-manager": func() (cli.Command, error) {

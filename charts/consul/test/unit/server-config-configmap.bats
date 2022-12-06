@@ -63,6 +63,36 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# grpc
+
+@test "server/ConfigMap: if tls is disabled, grpc port is set and grpc_tls port is disabled" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $configmap | jq -r .ports.grpc |  tee /dev/stderr)
+  [ "${actual}" = "8502" ]
+  local actual=$(echo $configmap | jq -r .ports.grpc_tls |  tee /dev/stderr)
+  [ "${actual}" = "-1" ]
+}
+
+@test "server/ConfigMap: if tls is enabled, grpc_tls port is set and grpc port is disabled" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      --set 'global.tls.enabled=true' \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $configmap | jq -r .ports.grpc_tls |  tee /dev/stderr)
+  [ "${actual}" = "8502" ]
+  local actual=$(echo $configmap | jq -r .ports.grpc |  tee /dev/stderr)
+  [ "${actual}" = "-1" ]
+}
+
+#--------------------------------------------------------------------
 # serflan
 
 @test "server/ConfigMap: server.ports.serflan.port is set to 8301 by default" {
@@ -118,7 +148,7 @@ load _helpers
       -s templates/server-config-configmap.yaml  \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq .bootstrap_expect | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "server/ConfigMap: bootstrap_expect can be set by server.bootstrapExpect" {
@@ -678,22 +708,22 @@ load _helpers
       yq -r '.data["tls-config.json"]' | tee /dev/stderr)
 
   local actual
-  actual=$(echo $config | jq -r .ca_file | tee /dev/stderr)
+  actual=$(echo $config | jq -r .tls.defaults.ca_file | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 
-  actual=$(echo $config | jq -r .cert_file | tee /dev/stderr)
+  actual=$(echo $config | jq -r .tls.defaults.cert_file | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/server/tls.crt" ]
 
-  actual=$(echo $config | jq -r .key_file | tee /dev/stderr)
+  actual=$(echo $config | jq -r .tls.defaults.key_file | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/server/tls.key" ]
 
-  actual=$(echo $config | jq -r .verify_incoming_rpc | tee /dev/stderr)
+  actual=$(echo $config | jq -r .tls.internal_rpc.verify_incoming | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $config | jq -r .verify_outgoing | tee /dev/stderr)
+  actual=$(echo $config | jq -r .tls.defaults.verify_outgoing | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $config | jq -r .verify_server_hostname | tee /dev/stderr)
+  actual=$(echo $config | jq -r .tls.internal_rpc.verify_server_hostname | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   actual=$(echo $config | jq -c .ports | tee /dev/stderr)
@@ -705,6 +735,7 @@ load _helpers
   local config=$(helm template \
       -s templates/server-config-configmap.yaml \
       --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -758,6 +789,7 @@ load _helpers
   local config=$(helm template \
       -s templates/server-config-configmap.yaml \
       --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.verify=false' \
@@ -816,13 +848,13 @@ load _helpers
     . | tee /dev/stderr |
     yq -r '.data["tls-config.json"]' | tee /dev/stderr)
 
-  local actual=$(echo $object | jq -r .ca_file | tee /dev/stderr)
+  local actual=$(echo $object | jq -r .tls.defaults.ca_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/serverca.crt" ]
 
-  local actual=$(echo $object | jq -r .cert_file | tee /dev/stderr)
+  local actual=$(echo $object | jq -r .tls.defaults.cert_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/servercert.crt" ]
 
-  local actual=$(echo $object | jq -r .key_file | tee /dev/stderr)
+  local actual=$(echo $object | jq -r .tls.defaults.key_file | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/servercert.key" ]
 }
 
@@ -831,6 +863,7 @@ load _helpers
   local object=$(helm template \
     -s templates/server-config-configmap.yaml  \
     --set 'global.tls.enabled=true' \
+    --set 'meshGateway.enabled=true' \
     --set 'global.peering.enabled=true' \
     --set 'connectInject.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
@@ -924,6 +957,8 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.peering.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .peering.enabled | tee /dev/stderr)

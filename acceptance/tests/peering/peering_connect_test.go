@@ -34,8 +34,8 @@ func TestPeering_Connect(t *testing.T) {
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
 	cases := []struct {
-		name                      string
-		ACLsAndAutoEncryptEnabled bool
+		name        string
+		ACLsEnabled bool
 	}{
 		{
 			"default installation",
@@ -55,18 +55,15 @@ func TestPeering_Connect(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled": "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
-
-				"controller.enabled": "true",
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
@@ -87,8 +84,6 @@ func TestPeering_Connect(t *testing.T) {
 				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-				staticServerPeerHelmValues["server.exposeService.type"] = "NodePort"
-				staticServerPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			releaseName := helpers.RandomName()
@@ -104,15 +99,13 @@ func TestPeering_Connect(t *testing.T) {
 			}
 
 			if !cfg.UseKind {
-				staticServerPeerHelmValues["server.replicas"] = "3"
+				staticClientPeerHelmValues["server.replicas"] = "3"
 			}
 
 			if cfg.UseKind {
 				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-				staticClientPeerHelmValues["server.exposeService.type"] = "NodePort"
-				staticClientPeerHelmValues["server.exposeService.nodePort.grpc"] = "30200"
 			}
 
 			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
@@ -121,6 +114,41 @@ func TestPeering_Connect(t *testing.T) {
 			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
 			staticClientPeerCluster.Create(t)
 
+			// Create Mesh resource to use mesh gateways.
+			logger.Log(t, "creating mesh config")
+			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
+
+			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			})
+
+			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
+			})
+
+			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
+			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
+
+			// Ensure mesh config entries are created in Consul.
+			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			retry.RunWith(timer, t, func(r *retry.R) {
+				ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
+				require.NoError(r, err)
+				configEntryServer, ok := ceServer.(*api.MeshConfigEntry)
+				require.True(r, ok)
+				require.Equal(r, configEntryServer.GetName(), "mesh")
+				require.NoError(r, err)
+
+				ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
+				require.NoError(r, err)
+				configEntryClient, ok := ceClient.(*api.MeshConfigEntry)
+				require.True(r, ok)
+				require.Equal(r, configEntryClient.GetName(), "mesh")
+				require.NoError(r, err)
+			})
+
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
@@ -128,7 +156,6 @@ func TestPeering_Connect(t *testing.T) {
 			})
 
 			// Ensure the secret is created.
-			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
 				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
@@ -167,9 +194,6 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
-
-			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
-			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways.
@@ -227,10 +251,12 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
 			})
 
-			if c.ACLsAndAutoEncryptEnabled {
+			if c.ACLsEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false,
+						[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", fmt.Sprintf("curl: (6) Could not resolve host: static-server.virtual.%s.consul", staticServerPeer)},
+						"", fmt.Sprintf("http://static-server.virtual.%s.consul", staticServerPeer))
 				} else {
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 				}
@@ -258,6 +284,7 @@ func TestPeering_Connect(t *testing.T) {
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
+
 		})
 	}
 }

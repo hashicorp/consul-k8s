@@ -31,10 +31,10 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 		secure bool
 	}{
 		{
-			false,
+			secure: false,
 		},
 		{
-			true,
+			secure: true,
 		},
 	}
 	for _, c := range cases {
@@ -42,8 +42,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
-			// Install the Helm chart without the ingress gateway first
-			// so that we can create the namespace for it.
+			igName := "ingress-gateway"
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
 				"connectInject.consulNamespaces.consulDestinationNamespace": testNamespace,
@@ -51,6 +50,11 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 				"global.enableConsulNamespaces": "true",
 				"global.acls.manageSystemACLs":  strconv.FormatBool(c.secure),
 				"global.tls.enabled":            strconv.FormatBool(c.secure),
+
+				"ingressGateways.enabled":                     "true",
+				"ingressGateways.gateways[0].name":            igName,
+				"ingressGateways.gateways[0].replicas":        "1",
+				"ingressGateways.gateways[0].consulNamespace": testNamespace,
 			}
 
 			releaseName := helpers.RandomName()
@@ -59,25 +63,6 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			consulCluster.Create(t)
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-
-			// Create the destination namespace in the non-secure case.
-			// In the secure installation, this namespace is created by the server-acl-init job.
-			if !c.secure {
-				logger.Logf(t, "creating the %s namespace in Consul", testNamespace)
-				_, _, err := consulClient.Namespaces().Create(&api.Namespace{
-					Name: testNamespace,
-				}, nil)
-				require.NoError(t, err)
-			}
-
-			igName := "ingress-gateway"
-			logger.Log(t, "upgrading with ingress gateways enabled")
-			consulCluster.Upgrade(t, map[string]string{
-				"ingressGateways.enabled":                     "true",
-				"ingressGateways.gateways[0].name":            igName,
-				"ingressGateways.gateways[0].replicas":        "1",
-				"ingressGateways.gateways[0].consulNamespace": testNamespace,
-			})
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
@@ -158,9 +143,6 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 
 // Test we can connect through the ingress gateway when both
 // the ingress gateway and the connect service are in different namespaces.
-// These tests currently only test non-secure and secure without auto-encrypt installations
-// because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
-// and non-auto-encrypt secure installations, so testing just one is enough.
 func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
@@ -171,10 +153,10 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 		secure bool
 	}{
 		{
-			false,
+			secure: false,
 		},
 		{
-			true,
+			secure: true,
 		},
 	}
 	for _, c := range cases {
@@ -183,8 +165,6 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			igName := "ingress"
-			// Install the Helm chart without the ingress gateway first
-			// so that we can create the namespace for it.
 			helmValues := map[string]string{
 				"connectInject.enabled":                       "true",
 				"connectInject.consulNamespaces.mirroringK8S": "true",

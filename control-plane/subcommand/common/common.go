@@ -42,6 +42,11 @@ const (
 
 // Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
 func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
+	return NamedLogger(level, jsonLogging, "")
+}
+
+// NamedLogger Logger returns a named hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
+func NamedLogger(level string, jsonLogging bool, name string) (hclog.Logger, error) {
 	parsedLevel := hclog.LevelFromString(level)
 	if parsedLevel == hclog.NoLevel {
 		return nil, fmt.Errorf("unknown log level: %s", level)
@@ -50,7 +55,7 @@ func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
 		JSONFormat: jsonLogging,
 		Level:      parsedLevel,
 		Output:     os.Stderr,
-	}), nil
+	}).Named(name), nil
 }
 
 // ZapLogger returns a logr.Logger instance with log level set and JSON logging enabled/disabled, or an error if the level is invalid.
@@ -99,8 +104,8 @@ type LoginParams struct {
 	// Meta is the metadata to set on the token.
 	Meta map[string]string
 
-	// numRetries is only used in tests to make them run faster.
-	numRetries uint64
+	// NumRetries is the number of times to try to log in.
+	NumRetries uint64
 }
 
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
@@ -116,8 +121,8 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 		return "", fmt.Errorf("no bearer token found in %q", params.BearerTokenFile)
 	}
 
-	if params.numRetries == 0 {
-		params.numRetries = numLoginRetries
+	if params.NumRetries == 0 {
+		params.NumRetries = numLoginRetries
 	}
 	var token *api.ACLToken
 	err = backoff.Retry(func() error {
@@ -144,7 +149,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 			}
 		}
 		return err
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), params.numRetries))
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), params.NumRetries))
 	if err != nil {
 		log.Error("Hit maximum retries for consul login", "error", err)
 		return "", err
@@ -202,7 +207,7 @@ func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 	// os.WriteFile truncates existing files and overwrites them, but only if they are writable.
 	// If the file exists it will already likely be read-only. Remove it first.
 	if _, err := os.Stat(outputFile); err == nil {
-		if err = os.Remove(outputFile); err != nil {
+		if err = os.RemoveAll(outputFile); err != nil {
 			return fmt.Errorf("unable to delete existing file: %s", err)
 		}
 	}

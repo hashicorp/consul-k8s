@@ -27,4 +27,12 @@ rules:
   - {{ template "consul.fullname" . }}-cni
   verbs:
   - use
+{{- if .Values.global.openshift.enabled}}
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-cni
+  verbs:
+  - use
+{{- end }}
 {{- end }}
