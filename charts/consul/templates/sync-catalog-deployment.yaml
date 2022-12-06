@@ -32,6 +32,9 @@ spec:
         {{- if .Values.syncCatalog.extraLabels }}
           {{- toYaml .Values.syncCatalog.extraLabels | nindent 8 }}
         {{- end }}
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.syncCatalog.annotations }}
