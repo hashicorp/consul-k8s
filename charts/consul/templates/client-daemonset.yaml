@@ -47,6 +47,9 @@ spec:
         {{- if .Values.client.extraLabels }}
           {{- toYaml .Values.client.extraLabels | nindent 8 }}
         {{- end }}
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         {{- if .Values.global.secretsBackend.vault.enabled }}
         "vault.hashicorp.com/agent-inject": "true"

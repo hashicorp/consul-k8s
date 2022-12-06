@@ -41,6 +41,9 @@ spec:
         {{- if .Values.connectInject.extraLabels }}
           {{- toYaml .Values.connectInject.extraLabels | nindent 8 }}
         {{- end }}
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.connectInject.annotations }}
