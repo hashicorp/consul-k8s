@@ -11,6 +11,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: cni 
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   {{- if .Values.connectInject.cni.updateStrategy }}
   updateStrategy:

@@ -31,6 +31,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: server
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   serviceName: {{ template "consul.fullname" . }}-server
   podManagementPolicy: Parallel
