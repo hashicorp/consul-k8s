@@ -29,8 +29,6 @@ connectInject:
      enableGatewayMetrics: true
 server:
   replicas: 1
-controller:
-  enabled: true
 ui:
   enabled: true
   service:
