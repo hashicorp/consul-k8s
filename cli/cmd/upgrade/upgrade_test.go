@@ -452,7 +452,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  +   metrics:\n  +     defaultEnableMerging: true\n  +     defaultEnabled: true\n  +     enableGatewayMetrics: true\n  + controller:\n  +   enabled: true\n  + global:\n  +   metrics:\n  +     enableAgentMetrics: true\n  +     enabled: true\n  +   name: consul\n  + prometheus:\n  +   enabled: true\n  + server:\n  +   replicas: 1\n  + ui:\n  +   enabled: true\n  +   service:\n  +     enabled: true\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  +   metrics:\n  +     defaultEnableMerging: true\n  +     defaultEnabled: true\n  +     enableGatewayMetrics: true\n  + global:\n  +   metrics:\n  +     enableAgentMetrics: true\n  +     enabled: true\n  +   name: consul\n  + prometheus:\n  +   enabled: true\n  + server:\n  +   replicas: 1\n  + ui:\n  +   enabled: true\n  +   service:\n  +     enabled: true\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
@@ -477,7 +477,7 @@ func TestUpgrade(t *testing.T) {
 			messages: []string{
 				"\n==> Checking if Consul can be upgraded\n ✓ Existing Consul installation found to be upgraded.\n    Name: consul\n    Namespace: consul\n",
 				"\n==> Checking if Consul demo application can be upgraded\n    No existing Consul demo application installation found.\n",
-				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  + controller:\n  +   enabled: true\n  + global:\n  +   acls:\n  +     manageSystemACLs: true\n  +   gossipEncryption:\n  +     autoGenerate: true\n  +   name: consul\n  +   tls:\n  +     enableAutoEncrypt: true\n  +     enabled: true\n  + server:\n  +   replicas: 1\n  \n",
+				"\n==> Consul Upgrade Summary\n ✓ Downloaded charts.\n    \n    Difference between user overrides for current and upgraded charts\n    -----------------------------------------------------------------\n  + connectInject:\n  +   enabled: true\n  + global:\n  +   acls:\n  +     manageSystemACLs: true\n  +   gossipEncryption:\n  +     autoGenerate: true\n  +   name: consul\n  +   tls:\n  +     enableAutoEncrypt: true\n  +     enabled: true\n  + server:\n  +   replicas: 1\n  \n",
 				"\n==> Upgrading Consul\n ✓ Consul upgraded in namespace \"consul\".\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
