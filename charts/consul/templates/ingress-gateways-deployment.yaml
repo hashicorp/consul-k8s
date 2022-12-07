@@ -46,6 +46,9 @@ metadata:
     release: {{ $root.Release.Name }}
     component: ingress-gateway
     ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    {{- if $root.Values.global.extraLabels }}
+      {{- toYaml $root.Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ default $defaults.replicas .replicas }}
   selector:
@@ -65,6 +68,9 @@ spec:
         release: {{ $root.Release.Name }}
         component: ingress-gateway
         ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+        {{- if $root.Values.global.extraLabels }}
+          {{- toYaml $root.Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         {{- if (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"

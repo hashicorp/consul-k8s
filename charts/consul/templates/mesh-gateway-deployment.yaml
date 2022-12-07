@@ -19,6 +19,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: mesh-gateway
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.meshGateway.replicas }}
   selector:
@@ -34,6 +37,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: mesh-gateway
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
@@ -352,7 +358,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: 
+                command:
                 - "/bin/sh"
                 - "-ec"
                 - "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""

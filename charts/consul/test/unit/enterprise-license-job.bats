@@ -212,3 +212,53 @@ load _helpers
   actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
 }
+
+#--------------------------------------------------------------------
+# extraLabels
+
+@test "enterpriseLicense/Job: no extra labels defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/enterprise-license-job.yaml \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component") | del(."app.kubernetes.io/managed-by") | del(."app.kubernetes.io/instance") | del(."helm.sh/chart")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "enterpriseLicense/Job: extra global labels can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/enterprise-license-job.yaml \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.extraLabels.foo=bar' \
+      . | tee /dev/stderr)
+  local actualBar=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
+  [ "${actualBar}" = "bar" ]
+  local actualTemplateBar=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  [ "${actualTemplateBar}" = "bar" ]
+}
+
+@test "enterpriseLicense/Job: multiple global extra labels can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/enterprise-license-job.yaml \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.extraLabels.foo=bar' \
+      --set 'global.extraLabels.baz=qux' \
+      . | tee /dev/stderr)
+  local actualFoo=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
+  local actualBaz=$(echo "${actual}" | yq -r '.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualFoo}" = "bar" ]
+  [ "${actualBaz}" = "qux" ]
+  local actualTemplateFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualTemplateFoo}" = "bar" ]
+  [ "${actualTemplateBaz}" = "qux" ]
+}
