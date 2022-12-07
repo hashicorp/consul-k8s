@@ -48,6 +48,9 @@ metadata:
     release: {{ $root.Release.Name }}
     component: terminating-gateway
     terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+    {{- if $root.Values.global.extraLabels }}
+      {{- toYaml $root.Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ default $defaults.replicas .replicas }}
   selector:
@@ -68,6 +71,9 @@ spec:
         component: terminating-gateway
         terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
         consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
+        {{- if $root.Values.global.extraLabels }}
+          {{- toYaml $root.Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"

@@ -15,6 +15,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: api-gateway-controller
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.apiGateway.controller.replicas }}
   selector:
@@ -46,6 +49,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: api-gateway-controller
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-api-gateway-controller
       containers:

@@ -29,6 +29,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: server-acl-init
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   template:
     metadata:
@@ -38,6 +41,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: server-acl-init
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.global.secretsBackend.vault.enabled }}

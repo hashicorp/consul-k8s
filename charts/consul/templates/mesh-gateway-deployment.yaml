@@ -19,6 +19,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: mesh-gateway
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.meshGateway.replicas }}
   selector:
@@ -35,6 +38,9 @@ spec:
         release: {{ .Release.Name }}
         component: mesh-gateway
         consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/gateway-kind": "mesh-gateway"
