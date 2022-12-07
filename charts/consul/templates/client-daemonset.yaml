@@ -24,6 +24,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: client
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   {{- if .Values.client.updateStrategy }}
   updateStrategy:
@@ -46,6 +49,9 @@ spec:
         hasDNS: "true"
         {{- if .Values.client.extraLabels }}
           {{- toYaml .Values.client.extraLabels | nindent 8 }}
+        {{- end }}
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
       annotations:
         {{- if .Values.global.secretsBackend.vault.enabled }}

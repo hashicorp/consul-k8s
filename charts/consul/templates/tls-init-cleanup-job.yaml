@@ -13,6 +13,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: tls-init-cleanup
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
   annotations:
     "helm.sh/hook": pre-delete
     "helm.sh/hook-delete-policy": hook-succeeded
@@ -27,6 +30,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: tls-init-cleanup
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
