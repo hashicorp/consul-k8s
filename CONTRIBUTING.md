@@ -1017,7 +1017,7 @@ So that the documentation can look like:
 ```
 
 ## Using Acceptance Test Framework to Debug
-#### Acceptance Tests
+### Acceptance Tests
 
 The [consul-k8s](https://github.com/hashicorp/consul-k8s) repository has an extensive list of [acceptance](https://github.com/hashicorp/consul-k8s/tree/main/acceptance/tests)
 tests that are used by CI to run per-PR and nightly acceptance tests.
@@ -1050,7 +1050,7 @@ acceptance/tests
 └── wan-federation
 ```
 
-#### Basic Running of Tests
+### Basic Running of Tests
 Any given test can be run either through GoLand or another IDE, or via command line using `go test -run`.
 
 To run all of the connect tests from command line:
@@ -1066,8 +1066,7 @@ When running from command line a few things are important:
 * Multi-cluster tests require `-enable-multi-cluster` + `-kubecontext=<kind-dc1>` + `-secondary-kubecontext=<kind-dc2>`
 * Using `./<test-directory>/...` is required as part of the command-line to pick up necessary environmental config.
 
-
-#### Using the framework to debug in an environment
+### Using the framework to debug in an environment
 => NOTE: It is helpful to tune the docker desktop resource settings so that docker has at least 4GB memory, plenty of cpu cores and 2GB of swap.
 
 * If using Kind, `-use-kind` should be added, and be sure you cluster is up and running:
@@ -1090,8 +1089,8 @@ You can interact with the running kubernetes clusters now using `kubectl [COMMAN
 
 * `kind delete clusters --all` is helpful for cleanup!
 
-#### Example Debugging session using the Acceptance test framework to bootstrap a Vault backed Federated Consul installation:
-This test utilizes the `consul-k8s` acceptance test framework, I built a custom branch which:
+### Example Debugging session using the acceptance test framework to bootstrap and debug a Vault backed federated Consul installation:
+This test utilizes the `consul-k8s` acceptance test framework, with a custom consul-k8s branch which:
 * Modifies the acceptance test to use custom consul+consul-k8s images and sleeps at the end of the test to allow analysis.
 * Modifies the helm chart to pass in `connect_ca.intermediate_cert_ttl` and `connect_ca.leaf_cert_ttl` in the `server-configmap`
 
@@ -1204,9 +1203,5 @@ Certificate:
 
             X509v3 Subject Alternative Name:
                 DNS:pri-1dchdli.vault.ca.34a76791.consul, URI:spiffe://34a76791-b9b2-b93e-b0e4-1989ed11a28e.consul
-    Signature Algorithm: ecdsa-with-SHA256
-         30:46:02:21:00:ad:ab:82:e2:67:39:22:20:a5:04:4b:d3:2b:
-         cd:41:1f:96:0e:f0:73:04:1f:ec:a9:be:f1:17:0e:19:06:f3:
-         f5:02:21:00:d5:87:5a:dd:5f:7b:c1:e5:d7:04:39:e6:ac:6c:
-         57:99:52:7c:ea:46:02:8c:79:58:7a:60:9e:c0:42:ed:cc:14
+<snip>
 ```         
