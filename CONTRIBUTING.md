@@ -22,8 +22,8 @@
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
-1. [Helm Reference Docs](#helm-reference-docs)
 1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
+1. [Helm Reference Docs](#helm-reference-docs)
 
 ## Contributing 101
 
@@ -940,82 +940,6 @@ Here are some things to consider before adding a test:
 
 ---
 
-## Helm Reference Docs
- 
-The Helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
-generated from our `values.yaml` file.
-
-### Generating Helm Reference Docs
- 
-To generate the docs and update the `helm.mdx` file:
-
-1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
-1. Clone your fork:
-   ```shell-session
-   git clone https://github.com/<your-username>/consul.git
-   ```
-1. Change directory into your `consul-k8s` repo: 
-   ```shell-session
-   cd /path/to/consul-k8s
-   ```
-1. Run `make gen-helm-docs` using the path to your consul (not consul-k8s) repo:
-   ```shell-session
-   make gen-helm-docs consul=<path-to-consul-repo>
-   # Examples:
-   # make gen-helm-docs consul=/Users/my-name/code/hashicorp/consul
-   # make gen-helm-docs consul=../consul
-   ```
-1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
-
-### values.yaml Annotations
-
-The code generation will attempt to parse the `values.yaml` file and extract all
-the information needed to create the documentation but depending on the yaml
-you may need to add some annotations.
-
-#### @type
-If the type is unknown because the field is `null` or you wish to override
-the type, use `@type`:
-
-```yaml
-# My docs
-# @type: string
-myKey: null
-```
-
-#### @default
-The default will be set to the current value but you may want to override
-it for specific use cases:
-
-```yaml
-server:
-  # My docs
-  # @default: global.enabled
-  enabled: "-"
-```
-
-#### @recurse
-In rare cases, we don't want the documentation generation to recurse deeper
-into the object. To stop the recursion, set `@recurse: false`.
-For example, the ingress gateway ports config looks like:
-
-```yaml
-# Port docs
-# @type: array<map>
-# @default: [{port: 8080, port: 8443}]
-# @recurse: false
-ports:
-- port: 8080
-  nodePort: null
-- port: 8443
-  nodePort: null
-```
-
-So that the documentation can look like:
-```markdown
-- `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
-```
-
 ## Using Acceptance Test Framework to Debug
 ### Acceptance Tests
 
@@ -1205,3 +1129,81 @@ Certificate:
                 DNS:pri-1dchdli.vault.ca.34a76791.consul, URI:spiffe://34a76791-b9b2-b93e-b0e4-1989ed11a28e.consul
 <snip>
 ```         
+
+---
+
+## Helm Reference Docs
+ 
+The Helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
+generated from our `values.yaml` file.
+
+### Generating Helm Reference Docs
+ 
+To generate the docs and update the `helm.mdx` file:
+
+1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
+1. Clone your fork:
+   ```shell-session
+   git clone https://github.com/<your-username>/consul.git
+   ```
+1. Change directory into your `consul-k8s` repo: 
+   ```shell-session
+   cd /path/to/consul-k8s
+   ```
+1. Run `make gen-helm-docs` using the path to your consul (not consul-k8s) repo:
+   ```shell-session
+   make gen-helm-docs consul=<path-to-consul-repo>
+   # Examples:
+   # make gen-helm-docs consul=/Users/my-name/code/hashicorp/consul
+   # make gen-helm-docs consul=../consul
+   ```
+1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
+
+### values.yaml Annotations
+
+The code generation will attempt to parse the `values.yaml` file and extract all
+the information needed to create the documentation but depending on the yaml
+you may need to add some annotations.
+
+#### @type
+If the type is unknown because the field is `null` or you wish to override
+the type, use `@type`:
+
+```yaml
+# My docs
+# @type: string
+myKey: null
+```
+
+#### @default
+The default will be set to the current value but you may want to override
+it for specific use cases:
+
+```yaml
+server:
+  # My docs
+  # @default: global.enabled
+  enabled: "-"
+```
+
+#### @recurse
+In rare cases, we don't want the documentation generation to recurse deeper
+into the object. To stop the recursion, set `@recurse: false`.
+For example, the ingress gateway ports config looks like:
+
+```yaml
+# Port docs
+# @type: array<map>
+# @default: [{port: 8080, port: 8443}]
+# @recurse: false
+ports:
+- port: 8080
+  nodePort: null
+- port: 8443
+  nodePort: null
+```
+
+So that the documentation can look like:
+```markdown
+- `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
+```
