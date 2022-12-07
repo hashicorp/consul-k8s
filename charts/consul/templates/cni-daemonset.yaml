@@ -41,6 +41,8 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
+        - operator: Exists
+          effect: NoSchedule
       # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
       priorityClassName: system-node-critical
       serviceAccountName: {{ template "consul.fullname" . }}-cni
