@@ -23,6 +23,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: connect-injector
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.connectInject.replicas }}
   selector:
@@ -40,6 +43,9 @@ spec:
         component: connect-injector
         {{- if .Values.connectInject.extraLabels }}
           {{- toYaml .Values.connectInject.extraLabels | nindent 8 }}
+        {{- end }}
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
