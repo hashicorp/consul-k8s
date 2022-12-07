@@ -77,7 +77,7 @@ func TestStatus(t *testing.T) {
 		"status with servers returns success": {
 			input: []string{},
 			messages: []string{
-				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated             \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
+				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \nConsul servers healthy 3/3\n",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) error {
@@ -102,7 +102,7 @@ func TestStatus(t *testing.T) {
 		"status with pre-install and pre-upgrade hooks returns success and outputs hook status": {
 			input: []string{},
 			messages: []string{
-				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated             \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
+				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \n",
 				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul servers healthy 3/3\n",
 			},
