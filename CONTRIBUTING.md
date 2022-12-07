@@ -22,8 +22,8 @@
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
+1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
 1. [Helm Reference Docs](#helm-reference-docs)
-
 
 ## Contributing 101
 
@@ -937,6 +937,198 @@ Here are some things to consider before adding a test:
   either Consul itself or consul-k8s? In that case, it should be tested there rather than in the Helm chart.
   For example, we don't expect acceptance tests to include all the permutations of the consul-k8s commands
   and their respective flags. Something like that should be tested in the consul-k8s repository.
+
+---
+
+## Using Acceptance Test Framework to Debug
+### Acceptance Tests
+
+The [consul-k8s](https://github.com/hashicorp/consul-k8s) repository has an extensive list of [acceptance](https://github.com/hashicorp/consul-k8s/tree/main/acceptance/tests)
+tests that are used by CI to run per-PR and nightly acceptance tests.
+It is built on its own framework that uses Helm and the consul-k8s CLI to deploy consul (and other tools) in various
+configurations that provide test coverage for most features that exist and provides coverage for more advanced deployments
+than are typically covered in guides.
+Importantly, it is **automated**, so you are able to rapidly deploy known working
+configurations in known working environments.
+It can be very helpful for bootstrapping complex environments such as when using Vault as a CA for Consul or for federating test clusters.
+
+The tests are organized like this :
+```shell
+demo $ tree -L 1 -d acceptance/tests
+acceptance/tests
+├── basic
+├── cli
+├── config-entries
+├── connect
+├── consul-dns
+├── example
+├── fixtures
+├── ingress-gateway
+├── metrics
+├── partitions
+├── peering
+├── snapshot-agent
+├── sync
+├── terminating-gateway
+├── vault
+└── wan-federation
+```
+
+### Basic Running of Tests
+Any given test can be run either through GoLand or another IDE, or via command line using `go test -run`.
+
+To run all of the connect tests from command line:
+```shell
+$ cd acceptance/test
+$ go test ./connect/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-enterprise -enable-multi-cluster -debug-directory=/tmp/debug -consul-k8s-image=kyleschochenmaier/consul-k8s-acls 
+```
+
+When running from command line a few things are important:
+* Some tests use Enterprise features, in which case you need:
+    * Set environment variables `CONSUL_ENT_LICENSE` and possibly `VAULT_LICENSE`.
+    * Use `-enable-enterprise` on command line when running the test.
+* Multi-cluster tests require `-enable-multi-cluster` + `-kubecontext=<kind-dc1>` + `-secondary-kubecontext=<kind-dc2>`
+* Using `./<test-directory>/...` is required as part of the command-line to pick up necessary environmental config.
+
+### Using the framework to debug in an environment
+=> NOTE: It is helpful to tune the docker desktop resource settings so that docker has at least 4GB memory, plenty of cpu cores and 2GB of swap.
+
+* If using Kind, `-use-kind` should be added, and be sure you cluster is up and running:
+```shell
+$ kind create cluster --name=dc1 && kind create cluster --name=dc2
+```
+* Pick a test which replicates the environment you are wanting to work with.
+  Ex: pick a test from `partitions/` or `vault/` or `connect/`.
+* If you need the environment to persist, add a `time.Sleep(1*time.Hour)` to the end of the test in the test file.
+* Use the following flags if you need to use or test out a specific consul/k8s image:
+  `-consul-k8s-image=<your-custom-image>` && `-consul-image=<your-custom-image>`
+* You can set custom helm flags by modifying the test file directly in the respective directory.
+
+Finally, run the test like shown above:
+```shell
+$ cd acceptance/tests
+$ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-multi-cluster -debug-directory=/tmp/debug
+```
+You can interact with the running kubernetes clusters now using `kubectl [COMMAND] --context=<kind-dc1/kind-dc2>`
+
+* `kind delete clusters --all` is helpful for cleanup!
+
+### Example Debugging session using the acceptance test framework to bootstrap and debug a Vault backed federated Consul installation:
+This test utilizes the `consul-k8s` acceptance test framework, with a custom consul-k8s branch which:
+* Modifies the acceptance test to use custom consul+consul-k8s images and sleeps at the end of the test to allow analysis.
+* Modifies the helm chart to pass in `connect_ca.intermediate_cert_ttl` and `connect_ca.leaf_cert_ttl` in the `server-configmap`
+
+1. First clone the consul-k8s repo and then check out the branch locally: `git checkout origin/consul-vault-provider-wanfed-acceptance`.
+2. Start the kind clusters: `kind create cluster --name=dc1 && kind create cluster --name=dc2`
+3. run the `TestVault_WANFederationViaGateways` acceptance test in `acceptance/tests/vault/vault_wan_fed_test.go` - I use goland, but this command should get you most of the way:
+```shell
+$ cd acceptance/tests
+$ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-multi-cluster -debug-directory=/tmp/debug
+```
+NOTE: This specific acceptance test is considered FLAKY with Kind, if things don't come up it's best to run against GKE/AKS/etc, in which case you just modify the `kubecontext` command parameters to point to your clusters. It is worth noting that you will need to setup any necessary networking for non-Kind clusters manually.
+
+NOTE: This test requires a VAULT_LICENSE set as an environment variable in the shell where you run `go test`
+
+4. Wait 10-20 minutes to allow the first intermediate ca renewal, this test is particularly resource intensive so it can take time for everything to come online on a laptop, use `kubectl get pods` to validate that `static-server` and `static-client` have been deployed and are online.
+
+You can validate the ICA rotation by doing:
+```shell
+# Fetch the vault root token:
+$ kubectl get secrets <vault-release-name>-root-token -o json //----> b64 decode the `data.token` field.
+$ kubectl exec -it <vault-server> -- sh
+$ export VAULT_TOKEN=<from above>
+$ export VAULT_ADDR=https://<vault-release-name>-vault:8200
+
+# Fetch the consul bootstrap token
+$ vault kv get consul/secret/bootstrap
+
+# Examine the vault issuers, there should be 2 by now if ICA renewal has occured:
+# NOTE: for a federated setup the issuers url for dc2 is `vault list dc2/connect_inter/issuers`!
+$ vault list dc1/connect_inter/issuers
+
+Keys
+----
+29bdffbd-87ec-cfe0-fd05-b78f99eba243
+344eea3c-f085-943a-c3ff-66721ef408f4
+
+# Now login to the consul-server
+$ kubectl exec -it <consul-server> -- sh
+$ export CONSUL_HTTP_TOKEN=<bootstrap token from above>
+$ export CONSUL_HTTP_ADDR=https://localhost:8501
+$ export CONSUL_HTTP_SSL_VERIFY=false
+
+# Read the `connect/ca/roots` endpoint:
+# It should change + rotate with the expiration of the ICA (defined by `intermediate_cert_ttl` which is `15m` in the branch for this gist.
+
+$ curl -k --header "X-Consul-Token: 1428da53-5e88-db1a-6ad5-e50212b011da" https://127.0.0.1:8501/v1/agent/connect/ca/roots | jq
+ .
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  3113  100  3113    0     0   6222      0 --:--:-- --:--:-- --:--:--  7705
+{
+  "ActiveRootID": "36:be:19:0e:56:d1:c2:1a:d8:54:22:97:88:3c:91:17:1d:d2:d3:e0",
+  "TrustDomain": "34a76791-b9b2-b93e-b0e4-1989ed11a28e.consul",
+  "Roots": [
+    {
+      "ID": "36:be:19:0e:56:d1:c2:1a:d8:54:22:97:88:3c:91:17:1d:d2:d3:e0",
+      "Name": "Vault CA Primary Cert",
+      "SerialNumber": 15998414315735550000,
+      "SigningKeyID": "fe:b9:d6:0b:c6:ce:2c:25:4f:d8:59:cb:11:ea:a5:42:5f:8e:41:4b",
+      "ExternalTrustDomain": "34a76791-b9b2-b93e-b0e4-1989ed11a28e",
+      "NotBefore": "2022-11-16T20:16:15Z",
+      "NotAfter": "2032-11-13T20:16:45Z",
+      "RootCert": "-----BEGIN CERTIFICATE-----\nMIICLDCCAdKgAwIBAgIUKQ9BPHF9mtC7yFPC3gXJDpLxCHIwCgYIKoZIzj0EAwIw\nLzEtMCsGA1UEAxMkcHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3Vs\nMB4XDTIyMTExNjIwMTYxNVoXDTMyMTExMzIwMTY0NVowLzEtMCsGA1UEAxMkcHJp\nLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VsMFkwEwYHKoZIzj0CAQYI\nKoZIzj0DAQcDQgAETnpGixC1kW8ep2JcGjRR2jbdESvjlEm9nSIWVAcilemUGFwi\nJ0YW0XUmJeEzRyfwLXnOw6voPzXRf1zXKjdTD6OByzCByDAOBgNVHQ8BAf8EBAMC\nAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUtb6EjDxyI+myIjDc+7KbiN8u\n8XowHwYDVR0jBBgwFoAUtb6EjDxyI+myIjDc+7KbiN8u8XowZQYDVR0RBF4wXIIk\ncHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VshjRzcGlmZmU6Ly8z\nNGE3Njc5MS1iOWIyLWI5M2UtYjBlNC0xOTg5ZWQxMWEyOGUuY29uc3VsMAoGCCqG\nSM49BAMCA0gAMEUCIHBezFSQAK5Nolf0rs3ErvlDcA8Z9esldh6gHupuGsNkAiEA\n9qL+P9PJAW4CrbTL0iF2yZUyJC2nwSSa2K0nYG8bXWQ=\n-----END CERTIFICATE-----\n",
+      "IntermediateCerts": [
+        "-----BEGIN CERTIFICATE-----\nMIICLzCCAdSgAwIBAgIUbILCP3ODM4ScNBOm0jw59Fxju0swCgYIKoZIzj0EAwIw\nLzEtMCsGA1UEAxMkcHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3Vs\nMB4XDTIyMTExNjIwMzIxNloXDTIyMTExNjIwNDc0NlowMDEuMCwGA1UEAxMlcHJp\nLTE4MThxNWlnLnZhdWx0LmNhLjM0YTc2NzkxLmNvbnN1bDBZMBMGByqGSM49AgEG\nCCqGSM49AwEHA0IABI30ikgrwTjbPaGgfNYkushvrEUUpxLzxMMEBlE82ilog1RW\nqwuEU29Qsa+N4SrfOf37xNv/Ey8SXPs5l2HmXJWjgcwwgckwDgYDVR0PAQH/BAQD\nAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFCZpC/BTdaggL2kj6Dfyk3+a\nNqBvMB8GA1UdIwQYMBaAFLW+hIw8ciPpsiIw3Puym4jfLvF6MGYGA1UdEQRfMF2C\nJXByaS0xODE4cTVpZy52YXVsdC5jYS4zNGE3Njc5MS5jb25zdWyGNHNwaWZmZTov\nLzM0YTc2NzkxLWI5YjItYjkzZS1iMGU0LTE5ODllZDExYTI4ZS5jb25zdWwwCgYI\nKoZIzj0EAwIDSQAwRgIhAJ8RHgR5qkyW2q866vGYJy+7BJ4zUXs3OJ76QLmxxU3K\nAiEA70S7wBEm1ZduTAk1ZfZPJEUGxvAXAcgy7EWeO/6MJ5o=\n-----END CERTIFICATE-----\n",
+        "-----BEGIN CERTIFICATE-----\nMIICLTCCAdKgAwIBAgIUU3qwESuhh4PgW3/tnHDn3qnBMrAwCgYIKoZIzj0EAwIw\nLzEtMCsGA1UEAxMkcHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3Vs\nMB4XDTIyMTExNjIwNDAxNloXDTIyMTExNjIwNTU0NlowLzEtMCsGA1UEAxMkcHJp\nLTFkY2hkbGkudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VsMFkwEwYHKoZIzj0CAQYI\nKoZIzj0DAQcDQgAEpj0BWPkcH82su9XGOo9rN5Zr5+Jyp68LiHy+qlIgH3L+OAir\nYgmXmJfuNwI8S2BB8cu0Gk3w5cTF7O0p/qAghaOByzCByDAOBgNVHQ8BAf8EBAMC\nAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQU/rnWC8bOLCVP2FnLEeqlQl+O\nQUswHwYDVR0jBBgwFoAUtb6EjDxyI+myIjDc+7KbiN8u8XowZQYDVR0RBF4wXIIk\ncHJpLTFkY2hkbGkudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VshjRzcGlmZmU6Ly8z\nNGE3Njc5MS1iOWIyLWI5M2UtYjBlNC0xOTg5ZWQxMWEyOGUuY29uc3VsMAoGCCqG\nSM49BAMCA0kAMEYCIQCtq4LiZzkiIKUES9MrzUEflg7wcwQf7Km+8RcOGQbz9QIh\nANWHWt1fe8Hl1wQ55qxsV5lSfOpGAox5WHpgnsBC7cwU\n-----END CERTIFICATE-----\n"
+      ],
+      "Active": true,
+      "PrivateKeyType": "ec",
+      "PrivateKeyBits": 256,
+      "CreateIndex": 11,
+      "ModifyIndex": 797
+    }
+  ]
+}
+
+# You can x509 decode the ICA certs to verify they have been updated and have correct expiry:
+$ openssl x509 -in cert.crt -text -noout
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            53:7a:b0:11:2b:a1:87:83:e0:5b:7f:ed:9c:70:e7:de:a9:c1:32:b0
+    Signature Algorithm: ecdsa-with-SHA256
+        Issuer: CN=pri-1092nu1.vault.ca.34a76791.consul
+        Validity
+            Not Before: Nov 16 20:40:16 2022 GMT
+            Not After : Nov 16 20:55:46 2022 GMT
+        Subject: CN=pri-1dchdli.vault.ca.34a76791.consul
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:a6:3d:01:58:f9:1c:1f:cd:ac:bb:d5:c6:3a:8f:
+                    6b:37:96:6b:e7:e2:72:a7:af:0b:88:7c:be:aa:52:
+                    20:1f:72:fe:38:08:ab:62:09:97:98:97:ee:37:02:
+                    3c:4b:60:41:f1:cb:b4:1a:4d:f0:e5:c4:c5:ec:ed:
+                    29:fe:a0:20:85
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Certificate Sign, CRL Sign
+            X509v3 Basic Constraints: critical
+                CA:TRUE
+            X509v3 Subject Key Identifier:
+                FE:B9:D6:0B:C6:CE:2C:25:4F:D8:59:CB:11:EA:A5:42:5F:8E:41:4B
+            X509v3 Authority Key Identifier:
+                keyid:B5:BE:84:8C:3C:72:23:E9:B2:22:30:DC:FB:B2:9B:88:DF:2E:F1:7A
+
+            X509v3 Subject Alternative Name:
+                DNS:pri-1dchdli.vault.ca.34a76791.consul, URI:spiffe://34a76791-b9b2-b93e-b0e4-1989ed11a28e.consul
+<snip>
+```         
 
 ---
 
