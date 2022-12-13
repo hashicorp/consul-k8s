@@ -65,7 +65,7 @@ jobs:
           extraFields: '{ "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}",
                           "customfield_10371": { "value": "GitHub" },            
                           "components": [{ "name": "${{ github.event.repository.name }}" }],
-                          "labels": "${{ steps.set-ticket-labels.outputs.labels }}" }'
+                          "labels": [{ "${{ steps.set-ticket-labels.outputs.labels }}" }] }'
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
