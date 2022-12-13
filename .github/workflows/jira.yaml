@@ -31,26 +31,10 @@ jobs:
         run: |
           LABELS="[consul-k8s]"
           echo "::set-output name=labels::${LABELS}"
-          
-      - name: Check if team member
-        if: github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'Task'
-        id: is-team-member
-        run: |
-          TEAM=consul-kubernetes
-          ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
-          if [[ -n ${ROLE} ]]; then
-            echo "Actor ${{ github.actor }} is a ${TEAM} team member"
-            echo "::set-output name=message::true"
-          else
-            echo "Actor ${{ github.actor }} is NOT a ${TEAM} team member"
-            echo "::set-output name=message::false"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.JIRA_SYNC_GITHUB_TOKEN }}
 
       - name: Create ticket
-        if: ( github.event.action == 'opened' && steps.set-ticket-type.outputs.type != 'Task' ) || ( github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'Task' && steps.is-team-member.outputs.message == 'false' )
-        uses: tomhjp/gh-action-jira-create@v0.2.0
+        if: ( github.event.action == 'opened' && steps.set-ticket-type.outputs.type != 'Task' ) || ( github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'Task' )
+        uses: tomhjp/gh-action-jira-create@v0.1.3
         with:
           project: NET
           issuetype: "${{ steps.set-ticket-type.outputs.type }}"
