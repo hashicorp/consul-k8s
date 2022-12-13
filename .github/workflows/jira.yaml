@@ -34,7 +34,10 @@ jobs:
         if: github.event.action == 'opened'
         id: set-ticket-labels
         run: |
-          LABELS="[consul-k8s]"
+          LABELS="["
+          if [[ "${{ contains(github.event.issue.labels.*.name, 'type/bug') }}" == "true" ]]; then LABELS+="\"type/bug\", "; fi
+          if [[ "${{ contains(github.event.issue.labels.*.name, 'type/enhancement') }}" == "true" ]]; then LABELS+="\"type/enhancement\", "; fi
+          if [[ ${#LABELS} != 1 ]]; then LABELS=${LABELS::-2}"]"; else LABELS+="]"; fi
           echo "LABELS=${LABELS}" >> $GITHUB_OUTPUT
           
       - name: Check if team member
@@ -65,7 +68,7 @@ jobs:
           extraFields: '{ "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}",
                           "customfield_10371": { "value": "GitHub" },            
                           "components": [{ "name": "${{ github.event.repository.name }}" }],
-                          "labels": [{ "${{ steps.set-ticket-labels.outputs.LABELS }}" }] }'
+                          "labels": ${{ steps.set-ticket-labels.outputs.LABELS }} }'
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
