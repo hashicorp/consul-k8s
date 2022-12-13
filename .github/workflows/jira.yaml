@@ -25,9 +25,9 @@ jobs:
         id: set-ticket-type
         run: |
           if [[ "${{ github.event_name == 'pull_request' && github.event.action == 'opened' }}" == "true" ]]; then
-            echo "::set-output name=type::PR"
+            echo "TYPE=PR" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=type::GH Issue"
+            echo "TYPE=GH Issue" >> $GITHUB_OUTPUT
           fi
           
       - name: Set ticket labels
@@ -35,37 +35,37 @@ jobs:
         id: set-ticket-labels
         run: |
           LABELS="[consul-k8s]"
-          echo "::set-output name=labels::${LABELS}"
+          echo "LABELS=${LABELS}" >> $GITHUB_OUTPUT
           
       - name: Check if team member
-        if: github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'Task'
+        if: github.event.action == 'opened' && steps.set-ticket-type.outputs.TYPE == 'PR'
         id: is-team-member
         run: |
           TEAM=consul
           ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
           if [[ -n ${ROLE} ]]; then
             echo "Actor ${{ github.actor }} is a ${TEAM} team member"
-            echo "::set-output name=message::true"
+            echo "MESSAGE=true" >> $GITHUB_OUTPUT
           else
             echo "Actor ${{ github.actor }} is NOT a ${TEAM} team member"
-            echo "::set-output name=message::false"
+            echo "MESSAGE=false" >> $GITHUB_OUTPUT
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.JIRA_SYNC_GITHUB_TOKEN }}
 
       - name: Create ticket if an issue is filed, or if PR not by a team member is opened
-        if: ( github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'GH Issue' ) || ( github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'PR' && steps.is-team-member.outputs.message == 'false' )
+        if: ( github.event.action == 'opened' && steps.set-ticket-type.outputs.TYPE == 'GH Issue' ) || ( github.event.action == 'opened' && steps.is-team-member.outputs.MESSAGE == 'false' )
         uses: tomhjp/gh-action-jira-create@v0.2.0
         with:
           project: NET
-          issuetype: "${{ steps.set-ticket-type.outputs.type }}"
-          summary: "${{ github.event.repository.name }} [${{ steps.set-ticket-type.outputs.type }} #${{ github.event.issue.number || github.event.pull_request.number }}]: ${{ github.event.issue.title || github.event.pull_request.title }}"
+          issuetype: "${{ steps.set-ticket-type.outputs.TYPE }}"
+          summary: "${{ github.event.repository.name }} [${{ steps.set-ticket-type.outputs.TYPE }} #${{ github.event.issue.number || github.event.pull_request.number }}]: ${{ github.event.issue.title || github.event.pull_request.title }}"
           description: "${{ github.event.issue.body || github.event.pull_request.body }}\n\n_Created in GitHub by ${{ github.actor }}._"
           # customfield_10089 is "Issue Link", customfield_10371 is "Source" (use JIRA API to retrieve)
           extraFields: '{ "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}",
                           "customfield_10371": { "value": "GitHub" },            
                           "components": [{ "name": "${{ github.event.repository.name }}" }],
-                          "labels": "${{ steps.set-ticket-labels.outputs.labels }}" }'
+                          "labels": [{ "${{ steps.set-ticket-labels.outputs.LABELS }}" }] }'
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
@@ -77,7 +77,7 @@ jobs:
         uses: tomhjp/gh-action-jira-search@v0.2.1
         with:
           # cf[10089] is Issue Link (use JIRA API to retrieve)
-          jql: 'issuetype = "${{ steps.set-ticket-type.outputs.type }}" and cf[10089] = "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
+          jql: 'issuetype = "${{ steps.set-ticket-type.outputs.TYPE }}" and cf[10089] = "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
 
       - name: Sync comment
         if: github.event.action == 'created' && steps.search.outputs.issue
