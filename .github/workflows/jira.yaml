@@ -37,7 +37,7 @@ jobs:
           LABELS="[consul-k8s]"
           echo "::set-output name=labels::${LABELS}"
           
-      - name: Check if team member PR
+      - name: Check if team member
         if: github.event.action == 'opened' && steps.set-ticket-type.outputs.type == 'Task'
         id: is-team-member
         run: |
