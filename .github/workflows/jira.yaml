@@ -24,7 +24,7 @@ jobs:
       - name: Set ticket type
         id: set-ticket-type
         run: |
-          if [[ "${{ github.event_name == 'pull_request' && github.event.action == 'opened' ]]; then
+          if [[ "${{ github.event_name == 'pull_request' && github.event.action == 'opened' }}" == "true" ]]; then
             echo "::set-output name=type::PR"
           else
             echo "::set-output name=type::GH Issue"
