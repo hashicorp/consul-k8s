@@ -5,7 +5,7 @@ on:
     types: [created]
   workflow_dispatch:
 
-name: Jira Issue Sync
+name: Jira Community Issue Sync
 
 jobs:
   sync:
