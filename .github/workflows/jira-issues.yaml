@@ -10,7 +10,7 @@ name: Jira Issue Sync
 jobs:
   sync:
     runs-on: ubuntu-latest
-    name: Jira Issue sync
+    name: Jira Community Issue sync
     steps:    
       - name: Login
         uses: atlassian/gajira-login@v3.0.0
