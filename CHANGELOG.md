@@ -4,6 +4,10 @@ IMPROVEMENTS:
 * Helm:
   * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
 
+BUG FIXES:
+* Control Plane
+   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
+
 ## 0.49.2 (December 1, 2022)
 
 IMPROVEMENTS:
