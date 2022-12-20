@@ -325,7 +325,7 @@ global:
     # If true, the Helm chart will enable TLS for Consul
     # servers and clients and all consul-k8s-control-plane components, as well as generate certificate
     # authority (optional) and server and client certificates.
-    # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
+    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
     enabled: false
 
     # If true, turns on the auto-encrypt feature on clients and servers.
@@ -2343,11 +2343,11 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
-# [Mesh Gateways](/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
+# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
-  # If [mesh gateways](/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
+  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
-  # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
+  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
