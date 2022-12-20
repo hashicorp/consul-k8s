@@ -236,7 +236,7 @@ global:
           {}
 
       connectInject:
-        # Configuration to the Vault Secret that Kubernetes will use on
+        # Configuration to the Vault Secret that Kubernetes uses on
         # Kubernetes pod creation, deletion, and update, to get CA certificates
         # used issued from vault to send webhooks to the ConnectInject.
         caCert:
@@ -245,7 +245,7 @@ global:
           # @type: string
           secretName: null
 
-        # Configuration to the Vault Secret that Kubernetes will use on
+        # Configuration to the Vault Secret that Kubernetes uses on
         # Kubernetes pod creation, deletion, and update, to get TLS certificates
         # used issued from vault to send webhooks to the ConnectInject.
         tlsCert:
@@ -832,9 +832,9 @@ server:
   # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
   # for the server cluster.
   disruptionBudget:
-    # This will enable/disable registering a PodDisruptionBudget for the server
-    # cluster. If this is enabled, it will only register the budget so long as
-    # the server cluster is enabled.
+    # Enables registering a PodDisruptionBudget for the server
+    # cluster. If enabled, it only registers the budget so long as
+    # the server cluster is enabled. To disable, set to `false`.
     enabled: true
 
     # The maximum number of unavailable pods. By default, this will be
@@ -1924,7 +1924,7 @@ connectInject:
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
-    # If true, then all traffic redirection setup will use the consul-cni plugin.
+    # If true, then all traffic redirection setup uses the consul-cni plugin.
     # Requires connectInject.enabled to also be true.
     # @type: boolean
     enabled: false
@@ -2871,9 +2871,9 @@ apiGateway:
     # @type: string
     nodeSelector: null
 
-    # This value defines the tolerations that will be assigned to a gateway pod.
+    # Toleration settings for gateway pods created with the managed gateway class. 
     # This should be a multi-line string matching the
-    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     #
     # @type: string
     tolerations: null
