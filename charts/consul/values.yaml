@@ -236,7 +236,7 @@ global:
           {}
 
       connectInject:
-        # Configuration to the Vault Secret that Kubernetes will use on
+        # Configuration to the Vault Secret that Kubernetes uses on
         # Kubernetes pod creation, deletion, and update, to get CA certificates
         # used issued from vault to send webhooks to the ConnectInject.
         caCert:
@@ -245,7 +245,7 @@ global:
           # @type: string
           secretName: null
 
-        # Configuration to the Vault Secret that Kubernetes will use on
+        # Configuration to the Vault Secret that Kubernetes uses on
         # Kubernetes pod creation, deletion, and update, to get TLS certificates
         # used issued from vault to send webhooks to the ConnectInject.
         tlsCert:
@@ -300,7 +300,7 @@ global:
     # If true, the Helm chart will enable TLS for Consul
     # servers and clients and all consul-k8s-control-plane components, as well as generate certificate
     # authority (optional) and server and client certificates.
-    # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
+    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
     enabled: false
 
     # If true, turns on the auto-encrypt feature on clients and servers.
@@ -832,9 +832,9 @@ server:
   # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
   # for the server cluster.
   disruptionBudget:
-    # This will enable/disable registering a PodDisruptionBudget for the server
-    # cluster. If this is enabled, it will only register the budget so long as
-    # the server cluster is enabled.
+    # Enables registering a PodDisruptionBudget for the server
+    # cluster. If enabled, it only registers the budget so long as
+    # the server cluster is enabled. To disable, set to `false`.
     enabled: true
 
     # The maximum number of unavailable pods. By default, this will be
@@ -1924,7 +1924,7 @@ connectInject:
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
-    # If true, then all traffic redirection setup will use the consul-cni plugin.
+    # If true, then all traffic redirection setup uses the consul-cni plugin.
     # Requires connectInject.enabled to also be true.
     # @type: boolean
     enabled: false
@@ -2318,11 +2318,11 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
-# [Mesh Gateways](/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
+# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
-  # If [mesh gateways](/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
+  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
-  # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
+  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
@@ -2871,9 +2871,9 @@ apiGateway:
     # @type: string
     nodeSelector: null
 
-    # This value defines the tolerations that will be assigned to a gateway pod.
+    # Toleration settings for gateway pods created with the managed gateway class. 
     # This should be a multi-line string matching the
-    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     #
     # @type: string
     tolerations: null
