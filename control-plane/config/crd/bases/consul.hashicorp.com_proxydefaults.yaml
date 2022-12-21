@@ -50,6 +50,38 @@ spec:
           spec:
             description: ProxyDefaultsSpec defines the desired state of ProxyDefaults.
             properties:
+              accessLogs:
+                description: AccessLogs controls all envoy instances' access logging
+                  configuration.
+                properties:
+                  disableListenerLogs:
+                    description: DisableListenerLogs turns off just listener logs
+                      for connections rejected by Envoy because they don't have a
+                      matching listener filter.
+                    type: boolean
+                  enabled:
+                    description: Enabled turns on all access logging
+                    type: boolean
+                  jsonFormat:
+                    description: 'JSONFormat is a JSON-formatted string of an Envoy
+                      access log format dictionary. See for more info on formatting:
+                      https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#format-dictionaries
+                      Defining JSONFormat and TextFormat is invalid.'
+                    type: string
+                  path:
+                    description: Path is the output file to write logs for file-type
+                      logging
+                    type: string
+                  textFormat:
+                    description: 'TextFormat is a representation of Envoy access logs
+                      format. See for more info on formatting: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#format-strings
+                      Defining JSONFormat and TextFormat is invalid.'
+                    type: string
+                  type:
+                    description: Type selects the output for logs one of "file", "stderr".
+                      "stdout"
+                    type: string
+                type: object
               config:
                 description: Config is an arbitrary map of configuration values used
                   by Connect proxies. Any values that your proxy allows can be configured
