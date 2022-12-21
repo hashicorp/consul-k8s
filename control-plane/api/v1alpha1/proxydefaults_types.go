@@ -75,6 +75,8 @@ type ProxyDefaultsSpec struct {
 	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
 	Expose Expose `json:"expose,omitempty"`
+	// AccessLogs controls all envoy instances' access logging configuration.
+	AccessLogs *AccessLogs `json:"accessLogs,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -165,6 +167,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Expose:           in.Spec.Expose.toConsul(),
 		Config:           consulConfig,
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		AccessLogs:       in.Spec.AccessLogs.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -193,6 +196,9 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 		allErrs = append(allErrs, err)
 	}
 	if err := in.validateConfig(path.Child("config")); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.AccessLogs.validate(path.Child("accessLogs")); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
@@ -236,4 +242,90 @@ func (in *ProxyDefaults) validateConfig(path *field.Path) *field.Error {
 		return field.Invalid(path, in.Spec.Config, fmt.Sprintf(`must be valid map value: %s`, err))
 	}
 	return nil
+}
+
+// LogSinkType represents the destination for Envoy access logs.
+// One of "file", "stderr", or "stdout".
+type LogSinkType string
+
+const (
+	DefaultLogSinkType LogSinkType = ""
+	FileLogSinkType    LogSinkType = "file"
+	StdErrLogSinkType  LogSinkType = "stderr"
+	StdOutLogSinkType  LogSinkType = "stdout"
+)
+
+// AccessLogs describes the access logging configuration for all Envoy proxies in the mesh.
+type AccessLogs struct {
+	// Enabled turns on all access logging
+	Enabled bool `json:"enabled,omitempty"`
+
+	// DisableListenerLogs turns off just listener logs for connections rejected by Envoy because they don't
+	// have a matching listener filter.
+	DisableListenerLogs bool `json:"disableListenerLogs,omitempty"`
+
+	// Type selects the output for logs
+	// one of "file", "stderr". "stdout"
+	Type LogSinkType `json:"type,omitempty"`
+
+	// Path is the output file to write logs for file-type logging
+	Path string `json:"path,omitempty"`
+
+	// JSONFormat is a JSON-formatted string of an Envoy access log format dictionary.
+	// See for more info on formatting: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#format-dictionaries
+	// Defining JSONFormat and TextFormat is invalid.
+	JSONFormat string `json:"jsonFormat,omitempty"`
+
+	// TextFormat is a representation of Envoy access logs format.
+	// See for more info on formatting: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#format-strings
+	// Defining JSONFormat and TextFormat is invalid.
+	TextFormat string `json:"textFormat,omitempty"`
+}
+
+func (in *AccessLogs) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return nil
+	}
+
+	switch in.Type {
+	case DefaultLogSinkType, StdErrLogSinkType, StdOutLogSinkType:
+		// OK
+	case FileLogSinkType:
+		if in.Path == "" {
+			return field.Invalid(path.Child("path"), in.Path, "path must be specified when using file type access logs")
+		}
+	default:
+		return field.Invalid(path.Child("type"), in.Type, "invalid access log type (must be one of \"stdout\", \"stderr\", \"file\"")
+	}
+
+	if in.JSONFormat != "" && in.TextFormat != "" {
+		return field.Invalid(path.Child("textFormat"), in.TextFormat, "cannot specify both access log jsonFormat and textFormat")
+	}
+
+	if in.Type != FileLogSinkType && in.Path != "" {
+		return field.Invalid(path.Child("path"), in.Path, "path is only valid for file type access logs")
+	}
+
+	if in.JSONFormat != "" {
+		msg := json.RawMessage{}
+		if err := json.Unmarshal([]byte(in.JSONFormat), &msg); err != nil {
+			return field.Invalid(path.Child("jsonFormat"), in.JSONFormat, "invalid access log json")
+		}
+	}
+
+	return nil
+}
+
+func (in *AccessLogs) toConsul() *capi.AccessLogsConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.AccessLogsConfig{
+		Enabled:             in.Enabled,
+		DisableListenerLogs: in.DisableListenerLogs,
+		JSONFormat:          in.JSONFormat,
+		Path:                in.Path,
+		TextFormat:          in.TextFormat,
+		Type:                capi.LogSinkType(in.Type),
+	}
 }

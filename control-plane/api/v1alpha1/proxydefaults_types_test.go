@@ -71,6 +71,13 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					AccessLogs: &AccessLogs{
+						Enabled:             true,
+						DisableListenerLogs: true,
+						Type:                FileLogSinkType,
+						Path:                "/var/log/envoy.logs",
+						TextFormat:          "ITS WORKING %START_TIME%",
+					},
 				},
 			},
 			Theirs: &capi.ProxyConfigEntry{
@@ -102,6 +109,13 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
+				},
+				AccessLogs: &capi.AccessLogsConfig{
+					Enabled:             true,
+					DisableListenerLogs: true,
+					Type:                capi.FileLogSinkType,
+					Path:                "/var/log/envoy.logs",
+					TextFormat:          "ITS WORKING %START_TIME%",
 				},
 			},
 			Matches: true,
@@ -236,6 +250,13 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					AccessLogs: &AccessLogs{
+						Enabled:             true,
+						DisableListenerLogs: true,
+						Type:                FileLogSinkType,
+						Path:                "/var/log/envoy.logs",
+						TextFormat:          "ITS WORKING %START_TIME%",
+					},
 				},
 			},
 			Exp: &capi.ProxyConfigEntry{
@@ -268,6 +289,13 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
+				},
+				AccessLogs: &capi.AccessLogsConfig{
+					Enabled:             true,
+					DisableListenerLogs: true,
+					Type:                capi.FileLogSinkType,
+					Path:                "/var/log/envoy.logs",
+					TextFormat:          "ITS WORKING %START_TIME%",
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -366,6 +394,72 @@ func TestProxyDefaults_Validate(t *testing.T) {
 			},
 			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
 		},
+		"accessLogs.type": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					AccessLogs: &AccessLogs{
+						Type: "foo",
+					},
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.type: Invalid value: \"foo\": invalid access log type (must be one of \"stdout\", \"stderr\", \"file\"",
+		},
+		"accessLogs.path missing": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					AccessLogs: &AccessLogs{
+						Type: "file",
+					},
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.path: Invalid value: \"\": path must be specified when using file type access logs",
+		},
+		"accessLogs.path for wrong type": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					AccessLogs: &AccessLogs{
+						Path: "/var/log/envoy.logs",
+					},
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.path: Invalid value: \"/var/log/envoy.logs\": path is only valid for file type access logs",
+		},
+		"accessLogs.jsonFormat": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					AccessLogs: &AccessLogs{
+						JSONFormat: "{ \"start_time\": \"%START_TIME\"", // intentionally missing the closing brace
+					},
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.jsonFormat: Invalid value: \"{ \\\"start_time\\\": \\\"%START_TIME\\\"\": invalid access log json",
+		},
+		"accessLogs.textFormat": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					AccessLogs: &AccessLogs{
+						JSONFormat: "{ \"start_time\": \"%START_TIME\" }",
+						TextFormat: "MY START TIME %START_TIME",
+					},
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.textFormat: Invalid value: \"MY START TIME %START_TIME\": cannot specify both access log jsonFormat and textFormat",
+		},
 		"multi-error": {
 			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -386,10 +480,14 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
 					},
+					AccessLogs: &AccessLogs{
+						JSONFormat: "{ \"start_time\": \"%START_TIME\" }",
+						TextFormat: "MY START TIME %START_TIME",
+					},
 					Mode: proxyModeRef("transparent"),
 				},
 			},
-			"proxydefaults.consul.hashicorp.com \"global\" is invalid: [spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: [spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.accessLogs.textFormat: Invalid value: \"MY START TIME %START_TIME\": cannot specify both access log jsonFormat and textFormat, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
 		},
 	}
 	for name, testCase := range cases {
