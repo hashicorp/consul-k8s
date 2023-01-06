@@ -65,7 +65,7 @@ func TestSyncCatalog(t *testing.T) {
 
 			service, _, err := consulClient.Catalog().Service(syncedServiceName, "", nil)
 			require.NoError(t, err)
-			require.Equal(t, 1, len(service))
+			require.Len(t, service, 1)
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 		})
 	}

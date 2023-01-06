@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
-	apiv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -33,6 +33,12 @@ const (
 	ConsulK8SRefKind  = "external-k8s-ref-kind"
 	ConsulK8SRefValue = "external-k8s-ref-name"
 	ConsulK8SNodeName = "external-k8s-node-name"
+
+	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
+	consulKubernetesCheckType = "kubernetes-readiness"
+	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
+	consulKubernetesCheckName  = "Kubernetes Readiness Check"
+	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )
 
 type NodePortSyncType string
@@ -131,11 +137,11 @@ type ServiceResource struct {
 
 	// serviceMap holds services we should sync to Consul. Keys are the
 	// in the form <kube namespace>/<kube svc name>.
-	serviceMap map[string]*apiv1.Service
+	serviceMap map[string]*corev1.Service
 
 	// endpointsMap uses the same keys as serviceMap but maps to the endpoints
 	// of each service.
-	endpointsMap map[string]*apiv1.Endpoints
+	endpointsMap map[string]*corev1.Endpoints
 
 	// consulMap holds the services in Consul that we've registered from kube.
 	// It's populated via Consul's API and lets us diff what is actually in
@@ -157,7 +163,7 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(t.Ctx, options)
 			},
 		},
-		&apiv1.Service{},
+		&corev1.Service{},
 		0,
 		cache.Indexers{},
 	)
@@ -166,7 +172,7 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 // Upsert implements the controller.Resource interface.
 func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// We expect a Service. If it isn't a service then just ignore it.
-	service, ok := raw.(*apiv1.Service)
+	service, ok := raw.(*corev1.Service)
 	if !ok {
 		t.Log.Warn("upsert got invalid type", "raw", raw)
 		return nil
@@ -176,7 +182,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	defer t.serviceLock.Unlock()
 
 	if t.serviceMap == nil {
-		t.serviceMap = make(map[string]*apiv1.Service)
+		t.serviceMap = make(map[string]*corev1.Service)
 	}
 
 	if !t.shouldSync(service) {
@@ -205,7 +211,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 				"err", err)
 		} else {
 			if t.endpointsMap == nil {
-				t.endpointsMap = make(map[string]*apiv1.Endpoints)
+				t.endpointsMap = make(map[string]*corev1.Endpoints)
 			}
 			t.endpointsMap[key] = endpoints
 			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoints to endpointsMap", "key", key, "service", service, "endpoints", endpoints)
@@ -254,7 +260,7 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 }
 
 // shouldSync returns true if resyncing should be enabled for the given service.
-func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
+func (t *ServiceResource) shouldSync(svc *corev1.Service) bool {
 	// Namespace logic
 	// If in deny list, don't sync
 	if t.DenyK8sNamespacesSet.Contains(svc.Namespace) {
@@ -269,7 +275,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	}
 
 	// Ignore ClusterIP services if ClusterIP sync is disabled
-	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync {
+	if svc.Spec.Type == corev1.ServiceTypeClusterIP && !t.ClusterIPSync {
 		t.Log.Debug("[shouldSync] ignoring clusterip service", "svc.Namespace", svc.Namespace, "service", svc)
 		return false
 	}
@@ -310,9 +316,9 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort ||
-		svc.Spec.Type == apiv1.ServiceTypeClusterIP ||
-		(t.LoadBalancerEndpointsSync && svc.Spec.Type == apiv1.ServiceTypeLoadBalancer)
+	return svc.Spec.Type == corev1.ServiceTypeNodePort ||
+		svc.Spec.Type == corev1.ServiceTypeClusterIP ||
+		(t.LoadBalancerEndpointsSync && svc.Spec.Type == corev1.ServiceTypeLoadBalancer)
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -380,7 +386,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	var overridePortNumber int
 	if len(svc.Spec.Ports) > 0 {
 		var port int
-		isNodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
+		isNodePort := svc.Spec.Type == corev1.ServiceTypeNodePort
 
 		// If a specific port is specified, then use that port value
 		portAnnotation, ok := svc.Annotations[annotationServicePort]
@@ -479,7 +485,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// each LoadBalancer entry. We only support entries that have an IP
 	// address assigned (not hostnames).
 	// If LoadBalancerEndpointsSync is true sync LB endpoints instead of loadbalancer ingress.
-	case apiv1.ServiceTypeLoadBalancer:
+	case corev1.ServiceTypeLoadBalancer:
 		if t.LoadBalancerEndpointsSync {
 			t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, false)
 		} else {
@@ -512,7 +518,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// endpoint of the service, which corresponds to the nodes the service's
 	// pods are running on. This way we don't register _every_ K8S
 	// node as part of the service.
-	case apiv1.ServiceTypeNodePort:
+	case corev1.ServiceTypeNodePort:
 		if t.endpointsMap == nil {
 			return
 		}
@@ -538,11 +544,11 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				}
 
 				// Set the expected node address type
-				var expectedType apiv1.NodeAddressType
+				var expectedType corev1.NodeAddressType
 				if t.NodePortSync == InternalOnly {
-					expectedType = apiv1.NodeInternalIP
+					expectedType = corev1.NodeInternalIP
 				} else {
-					expectedType = apiv1.NodeExternalIP
+					expectedType = corev1.NodeExternalIP
 				}
 
 				// Find the ip address for the node and
@@ -571,7 +577,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				// use an InternalIP
 				if t.NodePortSync == ExternalFirst && !found {
 					for _, address := range node.Status.Addresses {
-						if address.Type == apiv1.NodeInternalIP {
+						if address.Type == corev1.NodeInternalIP {
 							r := baseNode
 							rs := baseService
 							r.Service = &rs
@@ -593,7 +599,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	// For ClusterIP services, we register a service instance
 	// for each endpoint.
-	case apiv1.ServiceTypeClusterIP:
+	case corev1.ServiceTypeClusterIP:
 		t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, true)
 	}
 }
@@ -674,6 +680,16 @@ func (t *ServiceResource) registerServiceInstance(
 				r.Service.Meta[ConsulK8SNodeName] = *subsetAddr.NodeName
 			}
 
+			r.Check = &consulapi.AgentCheck{
+				CheckID:   consulHealthCheckID(endpoints.Namespace, serviceID(r.Service.Service, addr)),
+				Name:      consulKubernetesCheckName,
+				Namespace: baseService.Namespace,
+				Type:      consulKubernetesCheckType,
+				Status:    consulapi.HealthPassing,
+				ServiceID: serviceID(r.Service.Service, addr),
+				Output:    kubernetesSuccessReasonMsg,
+			}
+
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 	}
@@ -723,7 +739,7 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 					Watch(t.Ctx, options)
 			},
 		},
-		&apiv1.Endpoints{},
+		&corev1.Endpoints{},
 		0,
 		cache.Indexers{},
 	)
@@ -731,7 +747,7 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 
 func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 	svc := t.Service
-	endpoints, ok := raw.(*apiv1.Endpoints)
+	endpoints, ok := raw.(*corev1.Endpoints)
 	if !ok {
 		svc.Log.Warn("upsert got invalid type", "raw", raw)
 		return nil
@@ -747,7 +763,7 @@ func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 
 	// We are tracking this service so let's keep track of the endpoints
 	if svc.endpointsMap == nil {
-		svc.endpointsMap = make(map[string]*apiv1.Endpoints)
+		svc.endpointsMap = make(map[string]*corev1.Endpoints)
 	}
 	svc.endpointsMap[key] = endpoints
 
@@ -787,4 +803,9 @@ func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) strin
 	}
 
 	return name
+}
+
+// consulHealthCheckID deterministically generates a health check ID based on service ID and Kubernetes namespace.
+func consulHealthCheckID(k8sNS string, serviceID string) string {
+	return fmt.Sprintf("%s/%s", k8sNS, serviceID)
 }
