@@ -86,6 +86,11 @@ const (
 	// e.g. consul.hashicorp.com/service-meta-foo:bar.
 	AnnotationMeta = "consul.hashicorp.com/service-meta-"
 
+	// AnnotationUseProxyHealthCheck creates a readiness listener on the sidecar proxy and
+	// queries this instead of the application health check for the status of the application.
+	// Enable this only if the application does not support health checks.
+	AnnotationUseProxyHealthCheck = "consul.hashicorp.com/use-proxy-health-check"
+
 	// annotations for sidecar proxy resource limits.
 	AnnotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
 	AnnotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
