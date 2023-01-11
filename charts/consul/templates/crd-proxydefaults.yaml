@@ -96,7 +96,7 @@ spec:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               envoyExtensions:
-                description: EnvoyExtensions are list of extensions to modify Envoy
+                description: EnvoyExtensions are a list of extensions to modify Envoy
                   proxy configuration.
                 items:
                   description: EnvoyExtension has configuration for an extension that
