@@ -588,6 +588,23 @@ func TestProxyDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: [spec.envoyExtensions.envoyExtension[0].arguments: Required value: arguments must be defined, spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined]`,
 		},
+		"envoyExtension.arguments invalid json": {
+			input: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
+							Required:  false,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
+		},
 		"multi-error": {
 			input: &ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{

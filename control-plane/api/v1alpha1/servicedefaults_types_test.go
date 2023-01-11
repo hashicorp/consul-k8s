@@ -1103,6 +1103,23 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.envoyExtensions.envoyExtension[0].arguments: Required value: arguments must be defined, spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined]`,
 		},
+		"envoyExtension.arguments (invalid json)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
+							Required:  false,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
+		},
 	}
 
 	for name, testCase := range cases {

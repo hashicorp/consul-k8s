@@ -244,7 +244,7 @@ func (in *ProxyDefaults) validateConfig(path *field.Path) *field.Error {
 	}
 	var outConfig map[string]interface{}
 	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
-		return field.Invalid(path, in.Spec.Config, fmt.Sprintf(`must be valid map value: %s`, err))
+		return field.Invalid(path, string(in.Spec.Config), fmt.Sprintf(`must be valid map value: %s`, err))
 	}
 	return nil
 }
