@@ -19,3 +19,14 @@ spec:
       - path: /health
         listenerPort: 22000
         localPathPort: 8080
+  envoyExtensions:
+    - name: builtin/aws/lambda
+      required: false
+      arguments:
+        payloadPassthrough: false
+        region: us-west-2
+    - name: builtin/aws/lambda
+      required: false
+      arguments:
+        payloadPassthrough: false
+        region: us-east-1
