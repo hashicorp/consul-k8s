@@ -88,6 +88,22 @@ spec:
                   globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
+              envoyExtensions:
+                description: EnvoyExtensions are a list of extensions to modify Envoy
+                  proxy configuration.
+                items:
+                  description: EnvoyExtension has configuration for an extension that
+                    patches Envoy resources.
+                  properties:
+                    arguments:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    name:
+                      type: string
+                    required:
+                      type: boolean
+                  type: object
+                type: array
               expose:
                 description: Expose controls the default expose path configuration
                   for Envoy.

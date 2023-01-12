@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -78,6 +79,19 @@ type HTTPHeaderModifiers struct {
 	// or response.
 	Remove []string `json:"remove,omitempty"`
 }
+
+// EnvoyExtension has configuration for an extension that patches Envoy resources.
+type EnvoyExtension struct {
+	Name     string `json:"name,omitempty"`
+	Required bool   `json:"required,omitempty"`
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+}
+
+// EnvoyExtensions represents a list of the EnvoyExtension configuration.
+type EnvoyExtensions []EnvoyExtension
 
 func (in MeshGateway) toConsul() capi.MeshGatewayConfig {
 	mode := capi.MeshGatewayMode(in.Mode)
@@ -174,6 +188,58 @@ func (in *HTTPHeaderModifiers) toConsul() *capi.HTTPHeaderModifiers {
 		Set:    in.Set,
 		Remove: in.Remove,
 	}
+}
+
+func (in EnvoyExtensions) toConsul() []capi.EnvoyExtension {
+	if in == nil {
+		return nil
+	}
+
+	outConfig := make([]capi.EnvoyExtension, 0)
+
+	for _, e := range in {
+		consulExtension := capi.EnvoyExtension{
+			Name:     e.Name,
+			Required: e.Required,
+		}
+
+		// We already validate that arguments is present
+		var args map[string]interface{}
+		_ = json.Unmarshal(e.Arguments, &args)
+		consulExtension.Arguments = args
+		outConfig = append(outConfig, consulExtension)
+	}
+
+	return outConfig
+}
+
+func (in EnvoyExtensions) validate(path *field.Path) field.ErrorList {
+	if len(in) == 0 {
+		return nil
+	}
+
+	var errs field.ErrorList
+	for i, e := range in {
+		if err := e.validate(path.Child("envoyExtension").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func (in EnvoyExtension) validate(path *field.Path) *field.Error {
+	// Validate that the arguments are not nil
+	if in.Arguments == nil {
+		err := field.Required(path.Child("arguments"), "arguments must be defined")
+		return err
+	}
+	// Validate that the arguments are valid json
+	var outConfig map[string]interface{}
+	if err := json.Unmarshal(in.Arguments, &outConfig); err != nil {
+		return field.Invalid(path.Child("arguments"), string(in.Arguments), fmt.Sprintf(`must be valid map value: %s`, err))
+	}
+	return nil
 }
 
 func notInSliceMessage(slice []string) string {

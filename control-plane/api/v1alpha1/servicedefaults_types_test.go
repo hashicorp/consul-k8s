@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -141,6 +142,19 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							},
 						},
 					},
+					BalanceInboundConnections: "exact_balance",
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Required:  false,
+						},
+						EnvoyExtension{
+							Name:      "zipkin",
+							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Required:  true,
+						},
+					},
 					Destination: &ServiceDefaultsDestination{
 						Addresses: []string{"api.google.com"},
 						Port:      443,
@@ -247,6 +261,26 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Mode: "remote",
 							},
 						},
+					},
+				},
+				BalanceInboundConnections: "exact_balance",
+				EnvoyExtensions: []capi.EnvoyExtension{
+					{
+						Name: "aws_request_signing",
+						Arguments: map[string]interface{}{
+							"AWSServiceName": "s3",
+							"Region":         "us-west-2",
+						},
+						Required: false,
+					},
+					{
+						Name: "zipkin",
+						Arguments: map[string]interface{}{
+							"ClusterName":       "zipkin_cluster",
+							"Port":              "9411",
+							"CollectorEndpoint": "/api/v2/spans",
+						},
+						Required: true,
 					},
 				},
 				Destination: &capi.DestinationConfig{
@@ -402,6 +436,19 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							},
 						},
 					},
+					BalanceInboundConnections: "exact_balance",
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Required:  false,
+						},
+						EnvoyExtension{
+							Name:      "zipkin",
+							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Required:  true,
+						},
+					},
 					Destination: &ServiceDefaultsDestination{
 						Addresses: []string{"api.google.com"},
 						Port:      443,
@@ -501,6 +548,26 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Mode: "remote",
 							},
 						},
+					},
+				},
+				BalanceInboundConnections: "exact_balance",
+				EnvoyExtensions: []capi.EnvoyExtension{
+					{
+						Name: "aws_request_signing",
+						Arguments: map[string]interface{}{
+							"AWSServiceName": "s3",
+							"Region":         "us-west-2",
+						},
+						Required: false,
+					},
+					{
+						Name: "zipkin",
+						Arguments: map[string]interface{}{
+							"ClusterName":       "zipkin_cluster",
+							"Port":              "9411",
+							"CollectorEndpoint": "/api/v2/spans",
+						},
+						Required: true,
 					},
 				},
 				Destination: &capi.DestinationConfig{
@@ -633,6 +700,39 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Destination: &ServiceDefaultsDestination{
 						Addresses: []string{"www.google.com"},
 						Port:      443,
+					},
+				},
+			},
+			expectedErrMsg: "",
+		},
+		"valid - balanceInboundConnections": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					BalanceInboundConnections: "exact_balance",
+				},
+			},
+			expectedErrMsg: "",
+		},
+		"valid - envoyExtension": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Required:  false,
+						},
+						EnvoyExtension{
+							Name:      "zipkin",
+							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Required:  true,
+						},
 					},
 				},
 			},
@@ -914,6 +1014,111 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.destination.port: Invalid value: 0x0: invalid port number`,
+		},
+		"MaxInboundConnections (invalid value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MaxInboundConnections: -1,
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.maxinboundconnections: Invalid value: -1: MaxInboundConnections must be > 0`,
+		},
+		"LocalConnectTimeoutMs (invalid value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					LocalConnectTimeoutMs: -1,
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.localConnectTimeoutMs: Invalid value: -1: LocalConnectTimeoutMs must be > 0`,
+		},
+		"LocalRequestTimeoutMs (invalid value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					LocalRequestTimeoutMs: -1,
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.localRequestTimeoutMs: Invalid value: -1: LocalRequestTimeoutMs must be > 0`,
+		},
+		"balanceInboundConnections (invalid value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					BalanceInboundConnections: "not_exact_balance",
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.balanceInboundConnections: Invalid value: "not_exact_balance": BalanceInboundConnections must be an empty string or exact_balance`,
+		},
+		"envoyExtension.arguments (single empty)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Required:  false,
+						},
+						EnvoyExtension{
+							Name:      "zipkin",
+							Arguments: nil,
+							Required:  true,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined`,
+		},
+		"envoyExtension.arguments (multi empty)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: nil,
+							Required:  false,
+						},
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: nil,
+							Required:  false,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.envoyExtensions.envoyExtension[0].arguments: Required value: arguments must be defined, spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined]`,
+		},
+		"envoyExtension.arguments (invalid json)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					EnvoyExtensions: EnvoyExtensions{
+						EnvoyExtension{
+							Name:      "aws_request_signing",
+							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
+							Required:  false,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
 		},
 	}
 
