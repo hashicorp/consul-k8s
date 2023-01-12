@@ -4,6 +4,8 @@ IMPROVEMENTS:
 * Helm:
   * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
   * Add the `accessLogs` field to the `ProxyDefaults` CRD. [[GH-1816](https://github.com/hashicorp/consul-k8s/pull/1816)]
+  * Add the `envoyExtensions` field to the `ProxyDefaults` and `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
+  * Add the `balanceInboundConnections` field to the `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
 * Control-Plane
   * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)]
 

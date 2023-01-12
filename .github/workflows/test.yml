@@ -10,6 +10,20 @@ env:
   CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.14-dev # Consul's enterprise version to use in tests
 
 jobs:
+  terraform-fmt-check:
+    name: "Terraform format check"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: TERRAFORM_VERSION
+          terraform_wrapper: false
+      - name: Run Terraform checks
+        run: |
+          make terraform-fmt-check TERRAFORM_DIR="${{ github.workspace }}"
+
   get-go-version:
     name: "Determine Go toolchain version"
     runs-on: ubuntu-latest
