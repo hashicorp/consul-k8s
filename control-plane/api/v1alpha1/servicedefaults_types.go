@@ -88,13 +88,19 @@ type ServiceDefaultsSpec struct {
 	// MaxInboundConnections is the maximum number of concurrent inbound connections to
 	// each service instance. Defaults to 0 (using consul's default) if not set.
 	MaxInboundConnections int `json:"maxInboundConnections,omitempty"`
-	// The number of milliseconds allowed to make connections to the local application
+	// LocalConnectTimeoutMs is the number of milliseconds allowed to make connections to the local application
 	// instance before timing out. Defaults to 5000.
 	LocalConnectTimeoutMs int `json:"localConnectTimeoutMs,omitempty"`
-	// In milliseconds, the timeout for HTTP requests to the local application instance.
+	// LocalRequestTimeoutMs is the timeout for HTTP requests to the local application instance in milliseconds.
 	// Applies to HTTP-based protocols only. If not specified, inherits the Envoy default for
 	// route timeouts (15s).
 	LocalRequestTimeoutMs int `json:"localRequestTimeoutMs,omitempty"`
+	// BalanceInboundConnections sets the strategy for allocating inbound connections to the service across
+	// proxy threads. The only supported value is exact_balance. By default, no connection balancing is used.
+	// Refer to the Envoy Connection Balance config for details.
+	BalanceInboundConnections string `json:"balanceInboundConnections,omitempty"`
+	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
+	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
 }
 
 type Upstreams struct {
@@ -260,19 +266,21 @@ func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
-		Kind:                  in.ConsulKind(),
-		Name:                  in.ConsulName(),
-		Protocol:              in.Spec.Protocol,
-		MeshGateway:           in.Spec.MeshGateway.toConsul(),
-		Expose:                in.Spec.Expose.toConsul(),
-		ExternalSNI:           in.Spec.ExternalSNI,
-		TransparentProxy:      in.Spec.TransparentProxy.toConsul(),
-		UpstreamConfig:        in.Spec.UpstreamConfig.toConsul(),
-		Destination:           in.Spec.Destination.toConsul(),
-		Meta:                  meta(datacenter),
-		MaxInboundConnections: in.Spec.MaxInboundConnections,
-		LocalConnectTimeoutMs: in.Spec.LocalConnectTimeoutMs,
-		LocalRequestTimeoutMs: in.Spec.LocalRequestTimeoutMs,
+		Kind:                      in.ConsulKind(),
+		Name:                      in.ConsulName(),
+		Protocol:                  in.Spec.Protocol,
+		MeshGateway:               in.Spec.MeshGateway.toConsul(),
+		Expose:                    in.Spec.Expose.toConsul(),
+		ExternalSNI:               in.Spec.ExternalSNI,
+		TransparentProxy:          in.Spec.TransparentProxy.toConsul(),
+		UpstreamConfig:            in.Spec.UpstreamConfig.toConsul(),
+		Destination:               in.Spec.Destination.toConsul(),
+		Meta:                      meta(datacenter),
+		MaxInboundConnections:     in.Spec.MaxInboundConnections,
+		LocalConnectTimeoutMs:     in.Spec.LocalConnectTimeoutMs,
+		LocalRequestTimeoutMs:     in.Spec.LocalRequestTimeoutMs,
+		BalanceInboundConnections: in.Spec.BalanceInboundConnections,
+		EnvoyExtensions:           in.Spec.EnvoyExtensions.toConsul(),
 	}
 }
 
@@ -311,8 +319,13 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 		allErrs = append(allErrs, field.Invalid(path.Child("localRequestTimeoutMs"), in.Spec.LocalRequestTimeoutMs, "LocalRequestTimeoutMs must be > 0"))
 	}
 
+	if in.Spec.BalanceInboundConnections != "" && in.Spec.BalanceInboundConnections != "exact_balance" {
+		allErrs = append(allErrs, field.Invalid(path.Child("balanceInboundConnections"), in.Spec.BalanceInboundConnections, "BalanceInboundConnections must be an empty string or exact_balance"))
+	}
+
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
+	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(

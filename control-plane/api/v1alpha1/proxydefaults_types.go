@@ -77,6 +77,8 @@ type ProxyDefaultsSpec struct {
 	Expose Expose `json:"expose,omitempty"`
 	// AccessLogs controls all envoy instances' access logging configuration.
 	AccessLogs *AccessLogs `json:"accessLogs,omitempty"`
+	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
+	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -168,6 +170,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Config:           consulConfig,
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
 		AccessLogs:       in.Spec.AccessLogs.toConsul(),
+		EnvoyExtensions:  in.Spec.EnvoyExtensions.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -202,6 +205,8 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 		allErrs = append(allErrs, err)
 	}
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
+	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
+
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ProxyDefaultsKubeKind},
@@ -239,7 +244,7 @@ func (in *ProxyDefaults) validateConfig(path *field.Path) *field.Error {
 	}
 	var outConfig map[string]interface{}
 	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
-		return field.Invalid(path, in.Spec.Config, fmt.Sprintf(`must be valid map value: %s`, err))
+		return field.Invalid(path, string(in.Spec.Config), fmt.Sprintf(`must be valid map value: %s`, err))
 	}
 	return nil
 }

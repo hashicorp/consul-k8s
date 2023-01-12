@@ -46,7 +46,7 @@ func TestValidateProxyDefault(t *testing.T) {
 			},
 			expAllow: false,
 			// This error message is because the value "1" is valid JSON but is an invalid map
-			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.config: Invalid value: json.RawMessage{0x31}: must be valid map value: json: cannot unmarshal number into Go value of type map[string]interface {}",
+			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.config: Invalid value: \"1\": must be valid map value: json: cannot unmarshal number into Go value of type map[string]interface {}",
 		},
 		"proxy default exists": {
 			existingResources: []runtime.Object{&ProxyDefaults{
