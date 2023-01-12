@@ -55,6 +55,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		InitialDelaySeconds: 1,
 	}
+
 	container := corev1.Container{
 		Name:      containerName,
 		Image:     w.ImageConsulDataplane,
