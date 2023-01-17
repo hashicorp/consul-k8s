@@ -138,3 +138,6 @@ require (
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20221021205723-cc843c4be892
 
 go 1.19
+
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul 07d54ee65d554620733216daf764fc53168a5563
+replace github.com/hashicorp/consul/api/watch => github.com/hashicorp/consul 07d54ee65d554620733216daf764fc53168a5563
