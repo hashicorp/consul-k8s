@@ -8,6 +8,7 @@ IMPROVEMENTS:
   * Add the `balanceInboundConnections` field to the `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
 * Control-Plane
   * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)]
+  * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
 
 BUG FIXES:
 * Control Plane
