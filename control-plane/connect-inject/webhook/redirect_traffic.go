@@ -52,6 +52,12 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		return "", err
 	}
 
+	// Exclude the port on which the proxy health check port will be configured if
+	// using the proxy health check for a service.
+	if useProxyHealthCheck(pod) {
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(constants.ProxyDefaultHealthPort))
+	}
+
 	if overwriteProbes {
 		for i, container := range pod.Spec.Containers {
 			// skip the "envoy-sidecar" container from having its probes overridden
