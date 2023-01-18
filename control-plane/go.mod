@@ -10,7 +10,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20220831174802-b8af65262de8
 	github.com/hashicorp/consul-server-connection-manager v0.1.0
-	github.com/hashicorp/consul/api v1.10.1-0.20230106171340-8d923c178919
+	github.com/hashicorp/consul/api v1.10.1-0.20230113220858-07d54ee65d55
 	github.com/hashicorp/consul/sdk v0.13.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v1.2.2
@@ -137,6 +137,3 @@ require (
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20221021205723-cc843c4be892
 
 go 1.19
-
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul 07d54ee65d554620733216daf764fc53168a5563
-replace github.com/hashicorp/consul/api/watch => github.com/hashicorp/consul 07d54ee65d554620733216daf764fc53168a5563
