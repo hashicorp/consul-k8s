@@ -419,10 +419,14 @@ func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequireme
 }
 
 // useProxyHealthCheck returns true if the pod has the annotation 'consul.hashicorp.com/use-proxy-health-check'
-// set to "true".
+// set to truthy values.
 func useProxyHealthCheck(pod corev1.Pod) bool {
-	if v, ok := pod.Annotations[constants.AnnotationUseProxyHealthCheck]; ok || v == "true" {
-		return true
+	if v, ok := pod.Annotations[constants.AnnotationUseProxyHealthCheck]; ok {
+		useProxyHealthCheck, err := strconv.ParseBool(v)
+		if err != nil {
+			return false
+		}
+		return useProxyHealthCheck
 	}
 	return false
 }
