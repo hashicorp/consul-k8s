@@ -5,8 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -85,6 +88,42 @@ func TestOutputForGettingLogLevel(t *testing.T) {
 		require.Regexp(t, regexp.MustCompile(logger+`\s*`+level), actual)
 	}
 }
+
+func TestHelp(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	c := setupCommand(buf)
+	expectedSynposis := "Inspect and Modify the Envoy Log configuration for a given Pod."
+	expectedUsage := `Usage: consul-k8s proxy log <pod-name> \[flags\]`
+	actual := c.Help()
+	require.Regexp(t, expectedSynposis, actual)
+	require.Regexp(t, expectedUsage, actual)
+}
+
+func TestFetchLogLevel(t *testing.T) {
+	rawLogLevels, err := os.ReadFile("testdata/fetch_debug_levels.txt")
+	require.NoError(t, err)
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(rawLogLevels)
+	}))
+
+	defer mockServer.Close()
+
+	mpf := &mockPortForwarder{
+		openBehavior: func(ctx context.Context) (string, error) {
+			return strings.Replace(mockServer.URL, "http://", "", 1), nil
+		},
+	}
+	logLevels, err := FetchLogLevel(context.Background(), mpf)
+	require.NoError(t, err)
+	require.Equal(t, testLogConfig, logLevels)
+}
+
+type mockPortForwarder struct {
+	openBehavior func(context.Context) (string, error)
+}
+
+func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
+func (m *mockPortForwarder) Close()                                   {}
 
 var testLogConfig = LoggerConfig{
 	"admin":                     "debug",
