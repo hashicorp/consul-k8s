@@ -61,6 +61,9 @@ const (
 
 	// proxyDefaultInboundPort is the default inbound port for the proxy.
 	proxyDefaultInboundPort = 20000
+
+	// proxyDefaultHealthPort is the default health check port for the proxy.
+	proxyDefaultHealthPort = 21000
 )
 
 type EndpointsController struct {
@@ -501,6 +504,31 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
 		proxyPort += idx
 	}
+	var publicListenerCheck api.AgentServiceCheck
+	if useProxyHealthCheck(pod) {
+		// When using the proxy's health check, create an HTTP check on the ready endpoint
+		// that will be configured on the proxy sidecar container.
+		healthCheckPort := proxyDefaultHealthPort
+		if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
+			healthCheckPort += idx
+		}
+		publicListenerCheck = api.AgentServiceCheck{
+			Name:                           "Proxy Public Listener",
+			HTTP:                           fmt.Sprintf("http://%s:%d/ready", pod.Status.PodIP, healthCheckPort),
+			TLSSkipVerify:                  true,
+			Interval:                       "10s",
+			DeregisterCriticalServiceAfter: "10m",
+		}
+	} else {
+		// Configure the default application health check.
+		publicListenerCheck = api.AgentServiceCheck{
+			Name:                           "Proxy Public Listener",
+			TCP:                            fmt.Sprintf("%s:%d", pod.Status.PodIP, proxyPort),
+			Interval:                       "10s",
+			DeregisterCriticalServiceAfter: "10m",
+		}
+	}
+
 	proxyService := &api.AgentServiceRegistration{
 		Kind:      api.ServiceKindConnectProxy,
 		ID:        proxyServiceID,
@@ -511,12 +539,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Namespace: r.consulNamespace(pod.Namespace),
 		Proxy:     proxyConfig,
 		Checks: api.AgentServiceChecks{
-			{
-				Name:                           "Proxy Public Listener",
-				TCP:                            fmt.Sprintf("%s:%d", pod.Status.PodIP, proxyPort),
-				Interval:                       "10s",
-				DeregisterCriticalServiceAfter: "10m",
-			},
+			&publicListenerCheck,
 			{
 				Name:         "Destination Alias",
 				AliasService: serviceID,

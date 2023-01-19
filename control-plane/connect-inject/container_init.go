@@ -56,6 +56,12 @@ type initContainerCommandData struct {
 	// EnvoyUID is the Linux user id that will be used when tproxy is enabled.
 	EnvoyUID int
 
+	// EnableProxyHealthChecks configures a readiness endpoint on the envoy sidecar.
+	EnableProxyHealthChecks bool
+	// EnableProxyHealthChecks is the port on which the readiness endpoint is configured
+	// on the envoy sidecar.
+	EnvoyHealthCheckPort int
+
 	// EnableTransparentProxy configures this init container to run in transparent proxy mode,
 	// i.e. run consul connect redirect-traffic command and add the required privileges to the
 	// container to do that.
@@ -166,6 +172,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		ConsulCACert:               w.ConsulCACert,
 		EnableTransparentProxy:     tproxyEnabled,
 		EnableCNI:                  w.EnableCNI,
+		EnableProxyHealthChecks:    useProxyHealthCheck(pod),
+		EnvoyHealthCheckPort:       proxyDefaultHealthPort + mpi.serviceIndex,
 		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
@@ -436,6 +444,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- else }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   {{- end }}
+  {{- if .EnableProxyHealthChecks }}
+  -envoy-ready-bind-address="${POD_IP}" \
+  -envoy-ready-bind-port={{ .EnvoyHealthCheckPort }} \
+  {{- end }}
   {{- if .PrometheusScrapePath }}
   -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
   {{- end }}
@@ -497,6 +509,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- range .TProxyExcludeOutboundPorts }}
   -exclude-outbound-port="{{ . }}" \
+  {{- end }}
+  {{- if .EnableProxyHealthChecks }}
+  -exclude-inbound-port={{ .EnvoyHealthCheckPort }} \
   {{- end }}
   {{- range .TProxyExcludeOutboundCIDRs }}
   -exclude-outbound-cidr="{{ . }}" \
