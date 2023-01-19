@@ -214,7 +214,6 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				InitialDelaySeconds: 1,
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
-			require.Equal(t, expectedProbe, container.LivenessProbe)
 			require.Nil(t, container.StartupProbe)
 			require.Len(t, container.Env, 3)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
@@ -306,6 +305,158 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 	require.NoError(t, err)
 	require.Contains(t, container.Args, "-consul-dns-bind-port=8600")
+}
+
+func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
+	h := MeshWebhook{
+		ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+		ConsulAddress: "1.1.1.1",
+		LogLevel:      "info",
+	}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				constants.AnnotationUseProxyHealthCheck: "true",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+	expectedProbe := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Port: intstr.FromInt(21000),
+				Path: "/ready",
+			},
+		},
+		InitialDelaySeconds: 1,
+	}
+	require.NoError(t, err)
+	require.Contains(t, container.Args, "-envoy-ready-bind-port=21000")
+	require.Equal(t, expectedProbe, container.ReadinessProbe)
+	require.Contains(t, container.Env, corev1.EnvVar{
+		Name: "DP_ENVOY_READY_BIND_ADDRESS",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+		},
+	})
+	require.Contains(t, container.Ports, corev1.ContainerPort{
+		Name:          "proxy-health-0",
+		ContainerPort: 21000,
+	})
+}
+
+func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) {
+	h := MeshWebhook{
+		ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+		ConsulAddress: "1.1.1.1",
+		LogLevel:      "info",
+	}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod",
+			Annotations: map[string]string{
+				constants.AnnotationService:             "web,web-admin",
+				constants.AnnotationUseProxyHealthCheck: "true",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "web-admin-service-account",
+				},
+			},
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+				{
+					Name: "web-side",
+				},
+				{
+					Name: "web-admin",
+				},
+				{
+					Name: "web-admin-side",
+				},
+				{
+					Name: "auth-method-secret",
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "service-account-secret",
+							MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+						},
+					},
+				},
+			},
+			ServiceAccountName: "web",
+		},
+	}
+	multiPortInfos := []multiPortInfo{
+		{
+			serviceIndex: 0,
+			serviceName:  "web",
+		},
+		{
+			serviceIndex: 1,
+			serviceName:  "web-admin",
+		},
+	}
+	expectedArgs := []string{
+		"-envoy-ready-bind-port=21000",
+		"-envoy-ready-bind-port=21001",
+	}
+	expectedProbe := []*corev1.Probe{
+		{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port: intstr.FromInt(21000),
+					Path: "/ready",
+				},
+			},
+			InitialDelaySeconds: 1,
+		},
+		{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port: intstr.FromInt(21001),
+					Path: "/ready",
+				},
+			},
+			InitialDelaySeconds: 1,
+		},
+	}
+	expectedPort := []corev1.ContainerPort{
+		{
+			Name:          "proxy-health-0",
+			ContainerPort: 21000,
+		},
+		{
+			Name:          "proxy-health-1",
+			ContainerPort: 21001,
+		},
+	}
+	expectedEnvVar := corev1.EnvVar{
+		Name: "DP_ENVOY_READY_BIND_ADDRESS",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+		},
+	}
+	for i, info := range multiPortInfos {
+		container, err := h.consulDataplaneSidecar(testNS, pod, info)
+		require.NoError(t, err)
+		require.Contains(t, container.Args, expectedArgs[i])
+		require.Equal(t, expectedProbe[i], container.ReadinessProbe)
+		require.Contains(t, container.Ports, expectedPort[i])
+		require.Contains(t, container.Env, expectedEnvVar)
+	}
 }
 
 func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
@@ -430,7 +581,6 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 					InitialDelaySeconds: 1,
 				}
 				require.Equal(t, expectedProbe, container.ReadinessProbe)
-				require.Equal(t, expectedProbe, container.LivenessProbe)
 				require.Nil(t, container.StartupProbe)
 			}
 		})
