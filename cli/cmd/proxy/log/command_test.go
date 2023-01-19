@@ -22,6 +22,10 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{},
 			out:  1,
 		},
+		"With pod name": {
+			args: []string{"now-this-is-pod-racing"},
+			out:  0,
+		},
 	}
 
 	for name, tc := range testCases {
