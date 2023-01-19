@@ -47,13 +47,28 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		containerName = fmt.Sprintf("%s-%s", sidecarContainer, mpi.serviceName)
 	}
 
-	probe := &corev1.Probe{
-		Handler: corev1.Handler{
-			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
+	var probe *corev1.Probe
+	if useProxyHealthCheck(pod) {
+		// If using the proxy health check for a service, configure an HTTP handler
+		// that queries the '/ready' endpoint of the proxy.
+		probe = &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port: intstr.FromInt(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
+					Path: "/ready",
+				},
 			},
-		},
-		InitialDelaySeconds: 1,
+			InitialDelaySeconds: 1,
+		}
+	} else {
+		probe = &corev1.Probe{
+			Handler: corev1.Handler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
+				},
+			},
+			InitialDelaySeconds: 1,
+		}
 	}
 
 	container := corev1.Container{
@@ -89,11 +104,25 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		Args:           args,
 		ReadinessProbe: probe,
-		LivenessProbe:  probe,
 	}
 
 	if w.AuthMethod != "" {
 		container.VolumeMounts = append(container.VolumeMounts, saTokenVolumeMount)
+	}
+
+	if useProxyHealthCheck(pod) {
+		// Configure the Readiness Address for the proxy's health check to be the Pod IP.
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name: "DP_ENVOY_READY_BIND_ADDRESS",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+			},
+		})
+		// Configure the port on which the readiness probe will query the proxy for its health.
+		container.Ports = append(container.Ports, corev1.ContainerPort{
+			Name:          fmt.Sprintf("%s-%d", "proxy-health", mpi.serviceIndex),
+			ContainerPort: int32(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
+		})
 	}
 
 	// Add any extra VolumeMounts.
@@ -204,6 +233,11 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 	} else {
 		args = append(args, "-tls-disabled")
+	}
+
+	// Configure the readiness port on the dataplane sidecar if proxy health checks are enabled.
+	if useProxyHealthCheck(pod) {
+		args = append(args, fmt.Sprintf("%s=%d", "-envoy-ready-bind-port", constants.ProxyDefaultHealthPort+mpi.serviceIndex))
 	}
 
 	if mpi.serviceName != "" {
@@ -382,4 +416,17 @@ func (w *MeshWebhook) sidecarResources(pod corev1.Pod) (corev1.ResourceRequireme
 	}
 
 	return resources, nil
+}
+
+// useProxyHealthCheck returns true if the pod has the annotation 'consul.hashicorp.com/use-proxy-health-check'
+// set to truthy values.
+func useProxyHealthCheck(pod corev1.Pod) bool {
+	if v, ok := pod.Annotations[constants.AnnotationUseProxyHealthCheck]; ok {
+		useProxyHealthCheck, err := strconv.ParseBool(v)
+		if err != nil {
+			return false
+		}
+		return useProxyHealthCheck
+	}
+	return false
 }
