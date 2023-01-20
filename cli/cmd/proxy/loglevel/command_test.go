@@ -234,14 +234,14 @@ var testLogConfig = LoggerConfig{
 	"websocket":                 "debug",
 }
 
-func setupCommand(buf io.Writer) *LogCommand {
+func setupCommand(buf io.Writer) *LogLevelCommand {
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "test",
 		Level:  hclog.Debug,
 		Output: os.Stdout,
 	})
 
-	command := &LogCommand{
+	command := &LogLevelCommand{
 		BaseCommand: &common.BaseCommand{
 			Log: log,
 			UI:  terminal.NewUI(context.Background(), buf),
