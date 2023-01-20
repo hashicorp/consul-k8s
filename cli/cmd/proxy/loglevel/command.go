@@ -197,7 +197,7 @@ func (l *LogLevelCommand) initKubernetes() error {
 	return nil
 }
 
-// fetchAdminPorts retrieves all admin ports for Envoy Proxies running in a pod given namespace
+// fetchAdminPorts retrieves all admin ports for Envoy Proxies running in a pod given namespace.
 func (l *LogLevelCommand) fetchAdminPorts() (map[string]int, error) {
 	adminPorts := make(map[string]int, 0)
 	pod, err := l.kubernetes.CoreV1().Pods(l.namespace).Get(l.Ctx, l.podName, metav1.GetOptions{})
@@ -257,6 +257,9 @@ func FetchLogLevel(ctx context.Context, portForward common.PortForwarder) (Logge
 		return nil, err
 	}
 	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reach envoy: %v", err)
+	}
 	loggers := strings.Split(string(body), "\n")
 	logLevels := make(map[string]string)
 	var name string
