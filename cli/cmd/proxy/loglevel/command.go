@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	defaultAdminPort    int = 19000
-	flagNameNamespace       = "namespace"
-	flagNameKubeConfig      = "kubeconfig"
-	flagNameKubeContext     = "context"
+	defaultAdminPort    = 19000
+	flagNameNamespace   = "namespace"
+	flagNameKubeConfig  = "kubeconfig"
+	flagNameKubeContext = "context"
 )
 
 type LoggerConfig map[string]string
