@@ -23,6 +23,18 @@ const defaultAdminPort int = 19000
 
 type LoggerConfig map[string]string
 
+var ErrMissingPodName = errors.New("Exactly one positional argument is required: <pod-name>")
+
+var levelToColor = map[string]string{
+	"trace":    terminal.Green,
+	"debug":    terminal.HiWhite,
+	"info":     terminal.Blue,
+	"warning":  terminal.Yellow,
+	"error":    terminal.Red,
+	"critical": terminal.Magenta,
+	"off":      "",
+}
+
 type LogCommand struct {
 	*common.BaseCommand
 
@@ -37,8 +49,6 @@ type LogCommand struct {
 	restConfig      *rest.Config
 	logLevelFetcher func(context.Context, common.PortForwarder) (LoggerConfig, error)
 }
-
-var ErrMissingPodName = errors.New("Exactly one positional argument is required: <pod-name>")
 
 func (l *LogCommand) init() {
 	l.set = flag.NewSets()
@@ -215,7 +225,7 @@ func (l *LogCommand) outputLevels(logLevels map[string]LoggerConfig) {
 		l.UI.Output(fmt.Sprintf("Log Levels for %s", n), terminal.WithHeaderStyle())
 		table := terminal.NewTable("Name", "Level")
 		for name, level := range levels {
-			table.AddRow([]string{name, level}, []string{})
+			table.AddRow([]string{name, level}, []string{"", levelToColor[level]})
 		}
 		l.UI.Table(table)
 		l.UI.Output("")
