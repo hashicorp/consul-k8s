@@ -68,23 +68,23 @@ func TestFlagParsingFails(t *testing.T) {
 
 func TestFlagParsingSucceeds(t *testing.T) {
 	t.Parallel()
+	podName := "now-this-is-pod-racing"
 	testCases := map[string]struct {
 		args         []string
 		podNamespace string
 		out          int
 	}{
 		"With single pod name": {
-			args:         []string{"now-this-is-pod-racing"},
+			args:         []string{podName},
 			podNamespace: "default",
 			out:          0,
 		},
 		"With single pod name and namespace": {
-			args:         []string{"now-this-is-pod-racing", "-n", "another"},
+			args:         []string{podName, "-n", "another"},
 			podNamespace: "another",
 			out:          0,
 		},
 	}
-	podName := "now-this-is-pod-racing"
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
