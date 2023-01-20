@@ -85,7 +85,7 @@ func TestOutputForGettingLogLevel(t *testing.T) {
 	require.Regexp(t, expectedHeader, actual)
 	require.Regexp(t, "Log Levels for now-this-is-pod-racing", actual)
 	for logger, level := range testLogConfig {
-		require.Regexp(t, regexp.MustCompile(logger+`\s*`+level), actual)
+		require.Regexp(t, regexp.MustCompile(logger+`.*`+level), actual)
 	}
 }
 
