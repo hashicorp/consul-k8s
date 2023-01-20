@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestFlagParsing(t *testing.T) {
+func TestFlagParsingFails(t *testing.T) {
 	t.Parallel()
 	testCases := map[string]struct {
 		args []string
@@ -31,9 +31,17 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{},
 			out:  1,
 		},
-		"With pod name": {
-			args: []string{"now-this-is-pod-racing"},
-			out:  0,
+		"Multiple podnames passed": {
+			args: []string{"podname", "podname2"},
+			out:  1,
+		},
+		"Nonexistent flag passed, -foo bar": {
+			args: []string{"podName", "-foo", "bar"},
+			out:  1,
+		},
+		"Invalid argument passed, -namespace YOLO": {
+			args: []string{"podName", "-namespace", "YOLO"},
+			out:  1,
 		},
 	}
 	podName := "now-this-is-pod-racing"
@@ -46,6 +54,47 @@ func TestFlagParsing(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			c := setupCommand(bytes.NewBuffer([]byte{}))
+			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
+			c.logLevelFetcher = func(context.Context, common.PortForwarder) (LoggerConfig, error) {
+				return testLogConfig, nil
+			}
+
+			out := c.Run(tc.args)
+			require.Equal(t, tc.out, out)
+		})
+	}
+}
+
+func TestFlagParsingSucceeds(t *testing.T) {
+	t.Parallel()
+	testCases := map[string]struct {
+		args         []string
+		podNamespace string
+		out          int
+	}{
+		"With single pod name": {
+			args:         []string{"now-this-is-pod-racing"},
+			podNamespace: "default",
+			out:          0,
+		},
+		"With single pod name and namespace": {
+			args:         []string{"now-this-is-pod-racing", "-n", "another"},
+			podNamespace: "another",
+			out:          0,
+		},
+	}
+	podName := "now-this-is-pod-racing"
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fakePod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: tc.podNamespace,
+				},
+			}
+
 			c := setupCommand(bytes.NewBuffer([]byte{}))
 			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
 			c.logLevelFetcher = func(context.Context, common.PortForwarder) (LoggerConfig, error) {

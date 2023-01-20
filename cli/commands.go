@@ -69,7 +69,7 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 			}, nil
 		},
 		"proxy log": func() (cli.Command, error) {
-			return &loglevel.LogCommand{
+			return &loglevel.LogLevelCommand{
 				BaseCommand: baseCommand,
 			}, nil
 		},
