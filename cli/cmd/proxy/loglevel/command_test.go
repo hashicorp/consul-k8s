@@ -139,6 +139,7 @@ func TestOutputForGettingLogLevel(t *testing.T) {
 }
 
 func TestHelp(t *testing.T) {
+	t.Parallel()
 	buf := bytes.NewBuffer([]byte{})
 	c := setupCommand(buf)
 	expectedSynposis := "Inspect and Modify the Envoy Log configuration for a given Pod."
@@ -149,6 +150,7 @@ func TestHelp(t *testing.T) {
 }
 
 func TestFetchLogLevel(t *testing.T) {
+	t.Parallel()
 	rawLogLevels, err := os.ReadFile("testdata/fetch_debug_levels.txt")
 	require.NoError(t, err)
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
