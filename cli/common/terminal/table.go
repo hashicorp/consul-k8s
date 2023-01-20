@@ -5,15 +5,21 @@ import (
 )
 
 const (
-	Yellow = "yellow"
-	Green  = "green"
-	Red    = "red"
+	Yellow  = "yellow"
+	Green   = "green"
+	Red     = "red"
+	Blue    = "blue"
+	Magenta = "magenta"
+	HiWhite = "hiwhite"
 )
 
 var colorMapping = map[string]int{
-	Green:  tablewriter.FgGreenColor,
-	Yellow: tablewriter.FgYellowColor,
-	Red:    tablewriter.FgRedColor,
+	Green:   tablewriter.FgGreenColor,
+	Yellow:  tablewriter.FgYellowColor,
+	Red:     tablewriter.FgRedColor,
+	Blue:    tablewriter.FgBlueColor,
+	Magenta: tablewriter.FgMagentaColor,
+	HiWhite: tablewriter.FgHiWhiteColor,
 }
 
 // Passed to UI.Table to provide a nicely formatted table.
