@@ -64,6 +64,7 @@ type LogLevelCommand struct {
 }
 
 func (l *LogLevelCommand) init() {
+	l.Log.ResetNamed("loglevel")
 	l.set = flag.NewSets()
 	f := l.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
@@ -91,7 +92,6 @@ func (l *LogLevelCommand) init() {
 
 func (l *LogLevelCommand) Run(args []string) int {
 	l.once.Do(l.init)
-	l.Log.ResetNamed("loglevel")
 	defer common.CloseWithError(l.BaseCommand)
 
 	err := l.parseFlags(args)
