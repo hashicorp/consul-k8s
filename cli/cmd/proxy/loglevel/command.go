@@ -30,7 +30,10 @@ const (
 
 type LoggerConfig map[string]string
 
-var ErrMissingPodName = errors.New("Exactly one positional argument is required: <pod-name>")
+var (
+	ErrIncorrectArgFormat = errors.New("Exactly one positional argument is required: <pod-name>")
+	ErrNoLoggersReturned  = errors.New("No loggers were returned from Envoy")
+)
 
 var levelToColor = map[string]string{
 	"trace":    terminal.Green,
@@ -93,16 +96,11 @@ func (l *LogLevelCommand) Run(args []string) int {
 
 	err := l.parseFlags(args)
 	if err != nil {
-		l.UI.Output(err.Error(), terminal.WithErrorStyle())
-		l.UI.Output(fmt.Sprintf("\n%s", l.Help()))
-		return 1
+		return l.logOutputAndDie(err)
 	}
-
 	err = l.validateFlags()
 	if err != nil {
-		l.UI.Output(err.Error(), terminal.WithErrorStyle())
-		l.UI.Output(fmt.Sprintf("\n%s", l.Help()))
-		return 1
+		return l.logOutputAndDie(err)
 	}
 
 	if l.logLevelFetcher == nil {
@@ -111,29 +109,27 @@ func (l *LogLevelCommand) Run(args []string) int {
 
 	err = l.initKubernetes()
 	if err != nil {
-		l.UI.Output(err.Error(), terminal.WithErrorStyle())
-		l.UI.Output(fmt.Sprintf("\n%s", l.Help()))
-		return 1
+		return l.logOutputAndDie(err)
 	}
 
 	adminPorts, err := l.fetchAdminPorts()
 	if err != nil {
-		l.UI.Output(err.Error(), terminal.WithErrorStyle())
-		l.UI.Output(fmt.Sprintf("\n%s", l.Help()))
-		return 1
+		return l.logOutputAndDie(err)
 	}
 
 	logLevels, err := l.fetchLogLevels(adminPorts)
 	if err != nil {
-		l.UI.Output(err.Error(), terminal.WithErrorStyle())
-		l.UI.Output(fmt.Sprintf("\n%s", l.Help()))
-		return 1
+		return l.logOutputAndDie(err)
 	}
 	l.outputLevels(logLevels)
 	return 0
 }
 
 func (l *LogLevelCommand) parseFlags(args []string) error {
+	if len(args) == 0 {
+		return ErrIncorrectArgFormat
+	}
+
 	positional := []string{}
 	// Separate positional args from keyed args
 	for _, arg := range args {
@@ -145,7 +141,7 @@ func (l *LogLevelCommand) parseFlags(args []string) error {
 	keyed := args[len(positional):]
 
 	if len(positional) != 1 {
-		return ErrMissingPodName
+		return ErrIncorrectArgFormat
 	}
 
 	l.podName = positional[0]
@@ -158,9 +154,15 @@ func (l *LogLevelCommand) parseFlags(args []string) error {
 }
 
 func (l *LogLevelCommand) validateFlags() error {
-	if errs := validation.ValidateNamespaceName(l.namespace, false); l.namespace != "" && len(errs) > 0 {
+	if l.namespace == "" {
+		return nil
+	}
+
+	errs := validation.ValidateNamespaceName(l.namespace, false)
+	if len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
+
 	return nil
 }
 
@@ -256,11 +258,21 @@ func FetchLogLevel(ctx context.Context, portForward common.PortForwarder) (Logge
 	if err != nil {
 		return nil, err
 	}
+
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reach envoy: %v", err)
 	}
+
+	if response.StatusCode >= 400 {
+		return nil, fmt.Errorf("call to envoy failed with status code: %d, and message: %s", response.StatusCode, body)
+	}
+
 	loggers := strings.Split(string(body), "\n")
+	if len(loggers) == 0 {
+		return nil, ErrNoLoggersReturned
+	}
+
 	logLevels := make(map[string]string)
 	var name string
 	var level string
@@ -274,6 +286,7 @@ func FetchLogLevel(ctx context.Context, portForward common.PortForwarder) (Logge
 		name = strings.TrimRight(name, ":")
 		logLevels[name] = level
 	}
+
 	return logLevels, nil
 }
 
@@ -315,4 +328,10 @@ func (l *LogLevelCommand) AutocompleteFlags() complete.Flags {
 // complete.PredictNothing.
 func (l *LogLevelCommand) AutocompleteArgs() complete.Predictor {
 	return complete.PredictNothing
+}
+
+func (l *LogLevelCommand) logOutputAndDie(err error) int {
+	l.UI.Output(err.Error(), terminal.WithErrorStyle())
+	l.UI.Output(fmt.Sprintf("\n%s", l.Help()))
+	return 1
 }
