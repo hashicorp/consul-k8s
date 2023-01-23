@@ -1,8 +1,10 @@
-package read
+package envoy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,11 +14,13 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 )
 
+var ErrNoLoggersReturned = errors.New("No loggers were returned from Envoy")
+
 // EnvoyConfig represents the configuration retrieved from a config dump at the
 // admin endpoint. It wraps the Envoy ConfigDump struct to give us convenient
 // access to the different sections of the config.
 type EnvoyConfig struct {
-	rawCfg    []byte
+	RawCfg    []byte
 	Clusters  []Cluster
 	Endpoints []Endpoint
 	Listeners []Listener
@@ -69,6 +73,54 @@ type Secret struct {
 	LastUpdated string
 }
 
+// CallLoggingEndpoint requests the logging endpoint from Envoy Admin Interface for a given port
+// This is used to both read and update the logging levels (the envoy admin interface uses the same endpoint for both)
+// more can be read about that endpoint https://www.envoyproxy.io/docs/envoy/latest/operations/admin#post--logging
+func CallLoggingEndpoint(ctx context.Context, portForward common.PortForwarder, params *LoggerParams) (map[string]string, error) {
+	endpoint, err := portForward.Open(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer portForward.Close()
+
+	// this endpoint does not support returning json, so we've gotta parse the plain text
+	response, err := http.Post(fmt.Sprintf("http://%s/logging%s", endpoint, params), "text/plain", bytes.NewBuffer([]byte{}))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reach envoy: %v", err)
+	}
+
+	if response.StatusCode >= 400 {
+		return nil, fmt.Errorf("call to envoy failed with status code: %d, and message: %s", response.StatusCode, body)
+	}
+
+	loggers := strings.Split(string(body), "\n")
+	if len(loggers) == 0 {
+		return nil, ErrNoLoggersReturned
+	}
+
+	logLevels := make(map[string]string)
+	var name string
+	var level string
+
+	// the first line here is just a header
+	for _, logger := range loggers[1:] {
+		if len(logger) == 0 {
+			continue
+		}
+		fmt.Sscanf(logger, "%s %s", &name, &level)
+		name = strings.TrimRight(name, ":")
+		logLevels[name] = level
+	}
+
+	return logLevels, nil
+}
+
 // FetchConfig opens a port forward to the Envoy admin API and fetches the
 // configuration from the config dump endpoint.
 func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyConfig, error) {
@@ -117,7 +169,7 @@ func FetchConfig(ctx context.Context, portForward common.PortForwarder) (*EnvoyC
 // JSON returns the original JSON Envoy config dump data which was used to create
 // the Config object.
 func (c *EnvoyConfig) JSON() []byte {
-	return c.rawCfg
+	return c.RawCfg
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface to unmarshal the raw
@@ -126,7 +178,7 @@ func (c *EnvoyConfig) JSON() []byte {
 func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	// Save the original config dump bytes for marshalling. We should treat this
 	// struct as immutable so this should be safe.
-	c.rawCfg = b
+	c.RawCfg = b
 
 	var root root
 	err := json.Unmarshal(b, &root)

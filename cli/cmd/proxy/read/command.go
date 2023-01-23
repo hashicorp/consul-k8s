@@ -7,9 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -17,6 +14,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/strings/slices"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/envoy"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
 // defaultAdminPort is the port where the Envoy admin API is exposed.
@@ -67,7 +69,7 @@ type ReadCommand struct {
 	flagKubeConfig  string
 	flagKubeContext string
 
-	fetchConfig func(context.Context, common.PortForwarder) (*EnvoyConfig, error)
+	fetchConfig func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error)
 
 	restConfig *rest.Config
 
@@ -77,7 +79,7 @@ type ReadCommand struct {
 
 func (c *ReadCommand) init() {
 	if c.fetchConfig == nil {
-		c.fetchConfig = FetchConfig
+		c.fetchConfig = envoy.FetchConfig
 	}
 
 	c.set = flag.NewSets()
@@ -320,8 +322,8 @@ func (c *ReadCommand) fetchAdminPorts() (map[string]int, error) {
 	return adminPorts, nil
 }
 
-func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*EnvoyConfig, error) {
-	configs := make(map[string]*EnvoyConfig, 0)
+func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*envoy.EnvoyConfig, error) {
+	configs := make(map[string]*envoy.EnvoyConfig, 0)
 
 	for name, adminPort := range adminPorts {
 		pf := common.PortForward{
@@ -343,7 +345,7 @@ func (c *ReadCommand) fetchConfigs(adminPorts map[string]int) (map[string]*Envoy
 	return configs, nil
 }
 
-func (c *ReadCommand) outputConfigs(configs map[string]*EnvoyConfig) error {
+func (c *ReadCommand) outputConfigs(configs map[string]*envoy.EnvoyConfig) error {
 	switch c.flagOutput {
 	case Table:
 		return c.outputTables(configs)
@@ -396,7 +398,7 @@ func (c *ReadCommand) filterWarnings() []string {
 	return warnings
 }
 
-func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
+func (c *ReadCommand) outputTables(configs map[string]*envoy.EnvoyConfig) error {
 	if c.flagFQDN != "" || c.flagAddress != "" || c.flagPort != -1 {
 		c.UI.Output("Filters applied", terminal.WithHeaderStyle())
 
@@ -431,7 +433,7 @@ func (c *ReadCommand) outputTables(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
-func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
+func (c *ReadCommand) outputJSON(configs map[string]*envoy.EnvoyConfig) error {
 	cfgs := make(map[string]interface{})
 	for name, config := range configs {
 		cfg := make(map[string]interface{})
@@ -467,11 +469,11 @@ func (c *ReadCommand) outputJSON(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
-func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
+func (c *ReadCommand) outputRaw(configs map[string]*envoy.EnvoyConfig) error {
 	cfgs := make(map[string]interface{}, 0)
 	for name, config := range configs {
 		var cfg interface{}
-		if err := json.Unmarshal(config.rawCfg, &cfg); err != nil {
+		if err := json.Unmarshal(config.RawCfg, &cfg); err != nil {
 			return err
 		}
 
@@ -488,7 +490,7 @@ func (c *ReadCommand) outputRaw(configs map[string]*EnvoyConfig) error {
 	return nil
 }
 
-func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
+func (c *ReadCommand) outputClustersTable(clusters []envoy.Cluster) {
 	if !c.shouldPrintTable(c.flagClusters) {
 		return
 	}
@@ -496,14 +498,16 @@ func (c *ReadCommand) outputClustersTable(clusters []Cluster) {
 	c.UI.Output(fmt.Sprintf("Clusters (%d)", len(clusters)), terminal.WithHeaderStyle())
 	table := terminal.NewTable("Name", "FQDN", "Endpoints", "Type", "Last Updated")
 	for _, cluster := range clusters {
-		table.AddRow([]string{cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
-			cluster.Type, cluster.LastUpdated}, []string{})
+		table.AddRow([]string{
+			cluster.Name, cluster.FullyQualifiedDomainName, strings.Join(cluster.Endpoints, ", "),
+			cluster.Type, cluster.LastUpdated,
+		}, []string{})
 	}
 	c.UI.Table(table)
 	c.UI.Output("")
 }
 
-func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
+func (c *ReadCommand) outputEndpointsTable(endpoints []envoy.Endpoint) {
 	if !c.shouldPrintTable(c.flagEndpoints) {
 		return
 	}
@@ -512,7 +516,7 @@ func (c *ReadCommand) outputEndpointsTable(endpoints []Endpoint) {
 	c.UI.Table(formatEndpoints(endpoints))
 }
 
-func (c *ReadCommand) outputListenersTable(listeners []Listener) {
+func (c *ReadCommand) outputListenersTable(listeners []envoy.Listener) {
 	if !c.shouldPrintTable(c.flagListeners) {
 		return
 	}
@@ -521,7 +525,7 @@ func (c *ReadCommand) outputListenersTable(listeners []Listener) {
 	c.UI.Table(formatListeners(listeners))
 }
 
-func (c *ReadCommand) outputRoutesTable(routes []Route) {
+func (c *ReadCommand) outputRoutesTable(routes []envoy.Route) {
 	if !c.shouldPrintTable(c.flagRoutes) {
 		return
 	}
@@ -530,7 +534,7 @@ func (c *ReadCommand) outputRoutesTable(routes []Route) {
 	c.UI.Table(formatRoutes(routes))
 }
 
-func (c *ReadCommand) outputSecretsTable(secrets []Secret) {
+func (c *ReadCommand) outputSecretsTable(secrets []envoy.Secret) {
 	if !c.shouldPrintTable(c.flagSecrets) {
 		return
 	}
