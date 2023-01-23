@@ -44,6 +44,12 @@ func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns cor
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, prometheusScrapePort)
 	}
 
+	// Exclude the port on which the proxy health check port will be configured if
+	// using the proxy health check for a service.
+	if useProxyHealthCheck(*pod) {
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(proxyDefaultHealthPort))
+	}
+
 	// Exclude any overwritten liveness/readiness/startup ports from redirection.
 	overwriteProbes, err := shouldOverwriteProbes(*pod, w.TProxyOverwriteProbes)
 	if err != nil {

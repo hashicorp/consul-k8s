@@ -50,6 +50,14 @@ func (w *MeshWebhook) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, m
 		Command: cmd,
 	}
 
+	if useProxyHealthCheck(pod) {
+		// Add a port on the sidecar where the sidecar proxy will be queried for its health.
+		container.Ports = append(container.Ports, corev1.ContainerPort{
+			Name:          fmt.Sprintf("%s-%d", "proxy-health", mpi.serviceIndex),
+			ContainerPort: int32(proxyDefaultHealthPort + mpi.serviceIndex),
+		})
+	}
+
 	// Add any extra Envoy VolumeMounts.
 	if _, ok := pod.Annotations[annotationConsulSidecarUserVolumeMount]; ok {
 		var volumeMount []corev1.VolumeMount
@@ -105,7 +113,7 @@ func (w *MeshWebhook) getContainerSidecarCommand(pod corev1.Pod, multiPortSvcNam
 	}
 	if multiPortSvcName != "" {
 		// --base-id is needed so multiple Envoy proxies can run on the same host.
-		cmd = append(cmd, "--base-id", fmt.Sprintf("%d", multiPortSvcIdx))
+		cmd = append(cmd, "--base-id", strconv.Itoa(multiPortSvcIdx))
 	}
 
 	// Check to see if the user has overriden concurrency via an annotation.
@@ -214,4 +222,17 @@ func (w *MeshWebhook) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequ
 	}
 
 	return resources, nil
+}
+
+// useProxyHealthCheck returns true if the pod has the annotation 'consul.hashicorp.com/use-proxy-health-check'
+// set to truthy values.
+func useProxyHealthCheck(pod corev1.Pod) bool {
+	if v, ok := pod.Annotations[annotationUseProxyHealthCheck]; ok {
+		useProxyHealthCheck, err := strconv.ParseBool(v)
+		if err != nil {
+			return false
+		}
+		return useProxyHealthCheck
+	}
+	return false
 }

@@ -12,10 +12,10 @@ import (
 )
 
 func TestHandlerEnvoySidecar(t *testing.T) {
-	require := require.New(t)
 	cases := map[string]struct {
 		annotations map[string]string
 		expCommand  []string
+		expPort     *corev1.ContainerPort
 		expErr      string
 	}{
 		"default settings, no annotations": {
@@ -37,6 +37,21 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 				"--concurrency", "42",
+			},
+		},
+		"default settings, proxy health check annotations": {
+			annotations: map[string]string{
+				annotationService:             "foo",
+				annotationUseProxyHealthCheck: "true",
+			},
+			expCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--concurrency", "0",
+			},
+			expPort: &corev1.ContainerPort{
+				Name:          "proxy-health-0",
+				ContainerPort: int32(proxyDefaultHealthPort),
 			},
 		},
 		"default settings, invalid concurrency annotation negative number": {
@@ -64,28 +79,31 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			}
 			container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
 			if c.expErr != "" {
-				require.Contains(err.Error(), c.expErr)
+				require.Contains(t, err.Error(), c.expErr)
 			} else {
-				require.NoError(err)
-				require.Equal(c.expCommand, container.Command)
-				require.Equal(container.VolumeMounts, []corev1.VolumeMount{
+				require.NoError(t, err)
+				require.Equal(t, c.expCommand, container.Command)
+				require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
 					{
 						Name:      volumeName,
 						MountPath: "/consul/connect-inject",
 					},
 				})
+				if c.expPort != nil {
+					require.Contains(t, container.Ports, *c.expPort)
+				}
 			}
 		})
 	}
 }
 
 func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
-	require := require.New(t)
 	w := MeshWebhook{}
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				annotationService: "web,web-admin",
+				annotationService:             "web,web-admin",
+				annotationUseProxyHealthCheck: "true",
 			},
 		},
 
@@ -114,17 +132,29 @@ func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
 		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0", "--concurrency", "0"},
 		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1", "--concurrency", "0"},
 	}
+	expPorts := map[int]corev1.ContainerPort{
+		0: {
+			Name:          "proxy-health-0",
+			ContainerPort: int32(proxyDefaultHealthPort),
+		},
+		1: {
+			Name:          "proxy-health-1",
+			ContainerPort: int32(proxyDefaultHealthPort + 1),
+		},
+	}
 	for i := 0; i < 2; i++ {
 		container, err := w.envoySidecar(testNS, pod, multiPortInfos[i])
-		require.NoError(err)
-		require.Equal(expCommand[i], container.Command)
+		require.NoError(t, err)
+		require.Equal(t, expCommand[i], container.Command)
 
-		require.Equal(container.VolumeMounts, []corev1.VolumeMount{
+		require.Equal(t, container.VolumeMounts, []corev1.VolumeMount{
 			{
 				Name:      volumeName,
 				MountPath: "/consul/connect-inject",
 			},
 		})
+
+		require.Contains(t, container.Ports, expPorts[i])
 	}
 }
 

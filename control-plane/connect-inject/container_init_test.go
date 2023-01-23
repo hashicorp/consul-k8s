@@ -74,7 +74,29 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			"",
 			"",
 		},
+		{
+			"Proxy Health Checks",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUseProxyHealthCheck] = "true"
+				return pod
+			},
+			MeshWebhook{},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-api-timeout=0s \
 
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -envoy-ready-bind-address="${POD_IP}" \
+  -envoy-ready-bind-port=21000 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+			"",
+			"",
+		},
 		{
 			"When auth method is set -service-account-name and -service-name are passed in",
 			func(pod *corev1.Pod) *corev1.Pod {
@@ -384,7 +406,6 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-uid=5995`,
 			map[string]string{keyTransparentProxy: "true"},
 		},
-
 		"enabled globally, ns not set, annotation not set, cni enabled": {
 			true,
 			true,
@@ -393,6 +414,17 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
+			nil,
+		},
+		"enabled globally, ns not set, annotation is true, cni disabled, proxy health checks": {
+			true,
+			false,
+			map[string]string{keyTransparentProxy: "true", annotationUseProxyHealthCheck: "true"},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -exclude-inbound-port=21000 \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
 			nil,
 		},
 	}
@@ -994,6 +1026,60 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
+  -admin-bind=127.0.0.1:19001 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
+			},
+		},
+		{
+			"Whole template, multiport, proxy health check",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationUseProxyHealthCheck] = "true"
+				return pod
+			},
+			MeshWebhook{ConsulAPITimeout: 5 * time.Second},
+			2,
+			[]multiPortInfo{
+				{
+					serviceIndex: 0,
+					serviceName:  "web",
+				},
+				{
+					serviceIndex: 1,
+					serviceName:  "web-admin",
+				},
+			},
+			[]string{
+				`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-api-timeout=5s \
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-web \
+  -service-name="web" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
+  -envoy-ready-bind-address="${POD_IP}" \
+  -envoy-ready-bind-port=21000 \
+  -admin-bind=127.0.0.1:19000 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
+
+				`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-api-timeout=5s \
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
+  -service-name="web-admin" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
+  -envoy-ready-bind-address="${POD_IP}" \
+  -envoy-ready-bind-port=21001 \
   -admin-bind=127.0.0.1:19001 \
   -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
 			},
