@@ -527,8 +527,8 @@ func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m
 func (m *mockPortForwarder) Close()                                   {}
 
 func testLogConfig() map[string]string {
-	cfg := make(map[string]string, len(envoyLoggers))
-	for k := range envoyLoggers {
+	cfg := make(map[string]string, len(EnvoyLoggers))
+	for k := range EnvoyLoggers {
 		cfg[k] = "debug"
 	}
 	return cfg
