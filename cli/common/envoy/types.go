@@ -1,4 +1,4 @@
-package read
+package envoy
 
 /* Envoy Types
 These types are based on the JSON returned from the Envoy Config Dump API on the
