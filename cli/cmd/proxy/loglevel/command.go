@@ -24,6 +24,7 @@ const (
 	defaultAdminPort    = 19000
 	flagNameNamespace   = "namespace"
 	flagNameUpdateLevel = "update-level"
+	flagNameReset       = "reset"
 	flagNameKubeConfig  = "kubeconfig"
 	flagNameKubeContext = "context"
 )
@@ -52,6 +53,7 @@ type LogLevelCommand struct {
 	podName     string
 	namespace   string
 	level       string
+	reset       bool
 	kubeConfig  string
 	kubeContext string
 
@@ -77,6 +79,13 @@ func (l *LogLevelCommand) init() {
 		Target:  &l.level,
 		Usage:   "Update the level for the logger. Can be either `-update-level warning` to change all loggers to warning, or a comma delineated list of loggers with level can be passed like `-update-level grpc:warning,http:info` to only modify specific loggers.",
 		Aliases: []string{"u"},
+	})
+
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameReset,
+		Target:  &l.reset,
+		Usage:   "Reset the log level for all loggers in a pod to the Envoy default (info).",
+		Aliases: []string{"r"},
 	})
 
 	f = l.set.NewSet("Global Options")
@@ -106,6 +115,11 @@ func (l *LogLevelCommand) Run(args []string) int {
 	err = l.validateFlags()
 	if err != nil {
 		return l.logOutputAndDie(err)
+	}
+
+	// if we're resetting the default log level for envoy is info: https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy#debugging-envoy
+	if l.reset {
+		l.level = "info"
 	}
 
 	if l.envoyLoggingCaller == nil {
@@ -160,6 +174,9 @@ func (l *LogLevelCommand) parseFlags(args []string) error {
 }
 
 func (l *LogLevelCommand) validateFlags() error {
+	if l.level != "" && l.reset {
+		return fmt.Errorf("cannot set log level to %q and reset to 'info' at the same time", l.level)
+	}
 	if l.namespace == "" {
 		return nil
 	}

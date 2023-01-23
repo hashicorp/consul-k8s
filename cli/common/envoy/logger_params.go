@@ -56,7 +56,7 @@ func validateLogLevel(level string) error {
 }
 
 func validateLoggerName(name string) error {
-	if _, ok := envoyLoggers[name]; !ok {
+	if _, ok := EnvoyLoggers[name]; !ok {
 		loggers := []string{}
 		for loggerName := range envoyLevels {
 			loggers = append(loggers, loggerName)
@@ -105,7 +105,7 @@ var envoyLevels = map[string]struct{}{
 	"off":      {},
 }
 
-var envoyLoggers = map[string]struct{}{
+var EnvoyLoggers = map[string]struct{}{
 	"admin":                     {},
 	"alternate_protocols_cache": {},
 	"aws":                       {},
