@@ -9,7 +9,7 @@ variable "cluster_count" {
 }
 
 variable "tags" {
-  type        = map
+  type        = map(any)
   default     = {}
   description = "Tags to attach to the created resources."
 }

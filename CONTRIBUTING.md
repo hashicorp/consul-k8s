@@ -424,20 +424,27 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
    manage your resource type.
 
 ### Testing A New CRD
-1. Build a Docker image for consul-k8s via `make dev-docker` and tagging your image appropriately. Remember to CD into the `control-plane` directory!
+1. Build a Docker image for consul-k8s via `make control-plane-dev-docker` and push to a docker repository:
+    ```
+    docker tag consul-k8s-control-plane-dev <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev:<version>
+    docker push <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev:<version>
+    ```
 1. Install using the updated Helm repository, with a values like:
     ```yaml
     global:
-      imageK8S: ghcr.io/lkysow/consul-k8s-dev:nov26
+      imageK8S: lkysow/consul-k8s-control-plane-dev:nov26
       name: consul
     server:
       replicas: 1
       bootstrapExpect: 1
-    controller:
+    ui:
+      enabled: true
+    connectInject:
       enabled: true
     ```
-1. `kubectl apply` your sample CRD.
-1. Check its synced status:
+1. Create a sample CRD
+1. Run `kubectl apply -f <path-to-crd>` to apply your sample CRD.
+1. Check its synced status (for example CRD called ingressgateway):
     ```bash
     kubectl get ingressgateway
     NAME                    SYNCED   AGE

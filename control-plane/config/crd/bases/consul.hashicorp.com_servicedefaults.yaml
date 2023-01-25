@@ -50,6 +50,12 @@ spec:
           spec:
             description: ServiceDefaultsSpec defines the desired state of ServiceDefaults.
             properties:
+              balanceInboundConnections:
+                description: BalanceInboundConnections sets the strategy for allocating
+                  inbound connections to the service across proxy threads. The only
+                  supported value is exact_balance. By default, no connection balancing
+                  is used. Refer to the Envoy Connection Balance config for details.
+                type: string
               destination:
                 description: Destination is an address(es)/port combination that represents
                   an endpoint outside the mesh. This is only valid when the mesh is
@@ -69,6 +75,22 @@ spec:
                     format: int32
                     type: integer
                 type: object
+              envoyExtensions:
+                description: EnvoyExtensions are a list of extensions to modify Envoy
+                  proxy configuration.
+                items:
+                  description: EnvoyExtension has configuration for an extension that
+                    patches Envoy resources.
+                  properties:
+                    arguments:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    name:
+                      type: string
+                    required:
+                      type: boolean
+                  type: object
+                type: array
               expose:
                 description: Expose controls the default expose path configuration
                   for Envoy.
@@ -107,15 +129,15 @@ spec:
                   with an external system.
                 type: string
               localConnectTimeoutMs:
-                description: The number of milliseconds allowed to make connections
-                  to the local application instance before timing out. Defaults to
-                  5000.
+                description: LocalConnectTimeoutMs is the number of milliseconds allowed
+                  to make connections to the local application instance before timing
+                  out. Defaults to 5000.
                 type: integer
               localRequestTimeoutMs:
-                description: In milliseconds, the timeout for HTTP requests to the
-                  local application instance. Applies to HTTP-based protocols only.
-                  If not specified, inherits the Envoy default for route timeouts
-                  (15s).
+                description: LocalRequestTimeoutMs is the timeout for HTTP requests
+                  to the local application instance in milliseconds. Applies to HTTP-based
+                  protocols only. If not specified, inherits the Envoy default for
+                  route timeouts (15s).
                 type: integer
               maxInboundConnections:
                 description: MaxInboundConnections is the maximum number of concurrent

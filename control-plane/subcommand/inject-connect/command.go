@@ -35,7 +35,6 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
-	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -645,61 +644,61 @@ func (c *Command) Run(args []string) int {
 	// Note: The path here should be identical to the one on the kubebuilder
 	// annotation in each webhook file.
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.MeshWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.MeshWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceSplitter),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceIntentions),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
 			ConsulMeta: consulMeta,
