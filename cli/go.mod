@@ -28,6 +28,8 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+require go.opentelemetry.io/proto/otlp v0.11.0 // indirect
+
 require (
 	cloud.google.com/go v0.99.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
@@ -66,7 +68,7 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
-	github.com/envoyproxy/go-control-plane v0.10.3 // indirect
+	github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
@@ -100,7 +102,7 @@ require (
 	github.com/hashicorp/consul/api v1.18.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
@@ -124,7 +126,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/mitchellh/mapstructure v1.4.3 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
@@ -190,12 +192,7 @@ require (
 // chart. When the CLI compiles, all changes to the local charts directory are picked up automatically. This directive
 // works because of the monorepo setup, where the charts module and CLI module are in the same repository. Otherwise,
 // this won't work.
-replace github.com/hashicorp/consul-k8s/charts => ../charts
-
-replace github.com/hashicorp/consul/troubleshoot => /Users/curtbushko/workspace/github.com/hashicorp/consul/troubleshoot
-
 replace (
-	github.com/hashicorp/consul/api => /Users/curtbushko/workspace/github.com/hashicorp/extensions/api
-	github.com/hashicorp/consul/proto-publick => /Users/curtbushko/workspace/github.com/hashicorp/extensions/proto-public
-	github.com/hashicorp/consul/sdk => /Users/curtbushko/workspace/github.com/hashicorp/extensions/sdk
+	github.com/hashicorp/consul-k8s/charts => ../charts
+	github.com/hashicorp/consul/troubleshoot => /Users/curtbushko/workspace/github.com/hashicorp/consul/troubleshoot
 )

@@ -206,6 +206,7 @@ func (c *ProxyCommand) Troubleshoot() error {
 		return err
 	}
 
+	c.UI.Output("Troubleshoot", terminal.WithHeaderStyle())
 	for _, msg := range output {
 		c.UI.Output(fmt.Sprintf("%v", msg))
 	}

@@ -195,6 +195,7 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		return fmt.Errorf("error getting upstreams: %v", err)
 	}
 
+	c.UI.Output("Upsteams", terminal.WithHeaderStyle())
 	for _, u := range upstreams {
 		c.UI.Output(fmt.Sprintf("%v", u))
 	}
