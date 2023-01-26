@@ -60,7 +60,7 @@ module "eks" {
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
   cluster_version = "1.23"
   subnets         = module.vpc[count.index].private_subnets
-  enable_irsa     = true
+  enable_irsa = true
 
   vpc_id = module.vpc[count.index].vpc_id
 
@@ -83,7 +83,6 @@ module "eks" {
 
 resource "aws_iam_role" "csi-driver-role" {
   count = var.cluster_count
-  name  = "AmazonEKS_EBS_CSI_DriverRole-${count.index}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
