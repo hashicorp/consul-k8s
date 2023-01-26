@@ -203,10 +203,11 @@ func (c *ProxyCommand) Troubleshoot() error {
 	}
 	output, err := t.RunAllTests(c.flagUpstream)
 	if err != nil {
-		return err
+		c.UI.Output("Errors", terminal.WithHeaderStyle())
+		c.UI.Output("%v", err.Error(), terminal.WithErrorStyle())
 	}
 
-	c.UI.Output("Troubleshoot", terminal.WithHeaderStyle())
+	c.UI.Output("Output", terminal.WithHeaderStyle())
 	for _, msg := range output {
 		c.UI.Output(fmt.Sprintf("%v", msg))
 	}
