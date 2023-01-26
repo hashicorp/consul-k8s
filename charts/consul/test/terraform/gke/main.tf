@@ -10,7 +10,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.23."
+  version_prefix = "1.25."
 }
 
 resource "google_container_cluster" "cluster" {
@@ -29,7 +29,7 @@ resource "google_container_cluster" "cluster" {
     machine_type = "e2-standard-4"
   }
   pod_security_policy_config {
-    enabled = true
+    enabled = false
   }
 
   resource_labels = var.labels
