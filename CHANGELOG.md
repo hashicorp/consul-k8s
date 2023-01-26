@@ -22,6 +22,7 @@ IMPROVEMENTS:
   * Add the `accessLogs` field to the `ProxyDefaults` CRD. [[GH-1816](https://github.com/hashicorp/consul-k8s/pull/1816)]
   * Add the `envoyExtensions` field to the `ProxyDefaults` and `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
   * Add the `balanceInboundConnections` field to the `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
+  * Add the `upstreamConfig.overrides[].peer` field to the `ServiceDefaults` CRD. [[GH-1853]](https://github.com/hashicorp/consul-k8s/pull/1853)
 * Control-Plane
   * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
   * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]

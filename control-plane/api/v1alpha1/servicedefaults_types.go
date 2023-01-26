@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -113,12 +114,14 @@ type Upstreams struct {
 }
 
 type Upstream struct {
-	// Name is only accepted within a service-defaults config entry.
+	// Name is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
 	Name string `json:"name,omitempty"`
-	// Namespace is only accepted within a service-defaults config entry.
+	// Namespace is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
 	Namespace string `json:"namespace,omitempty"`
-	// Partition is only accepted within a service-defaults config entry.
+	// Partition is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
 	Partition string `json:"partition,omitempty"`
+	// Peer is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
+	Peer string `json:"peer,omitempty"`
 	// EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
 	// listener.
 	// Note: This escape hatch is NOT compatible with the discovery chain and
@@ -374,9 +377,24 @@ func (in *Upstream) validate(path *field.Path, kind string, partitionsEnabled bo
 		if in.Name != "" {
 			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for a default upstream must be \"\""))
 		}
+		if in.Namespace != "" {
+			errs = append(errs, field.Invalid(path.Child("namespace"), in.Namespace, "upstream.namespace for a default upstream must be \"\""))
+		}
+		if in.Partition != "" {
+			errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, "upstream.partition for a default upstream must be \"\""))
+		}
+		if in.Peer != "" {
+			errs = append(errs, field.Invalid(path.Child("peer"), in.Peer, "upstream.peer for a default upstream must be \"\""))
+		}
 	} else if kind == overrideUpstream {
 		if in.Name == "" {
 			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for an override upstream cannot be \"\""))
+		}
+		if in.Namespace != "" && in.Peer != "" {
+			errs = append(errs, field.Invalid(path, in, "both namespace and peer cannot be specified."))
+		}
+		if in.Partition != "" && in.Peer != "" {
+			errs = append(errs, field.Invalid(path, in, "both partition and peer cannot be specified."))
 		}
 	}
 	if !partitionsEnabled && in.Partition != "" {
@@ -396,6 +414,7 @@ func (in *Upstream) toConsul() *capi.UpstreamConfig {
 		Name:               in.Name,
 		Namespace:          in.Namespace,
 		Partition:          in.Partition,
+		Peer:               in.Peer,
 		EnvoyListenerJSON:  in.EnvoyListenerJSON,
 		EnvoyClusterJSON:   in.EnvoyClusterJSON,
 		Protocol:           in.Protocol,
