@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestServiceDefaults_ToConsul(t *testing.T) {
@@ -854,6 +855,21 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.name: Invalid value: "foobar": upstream.name for a default upstream must be ""`,
 		},
+		"upstreamConfig.defaults.namespace": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Namespace: "foobar",
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.namespace: Invalid value: "foobar": upstream.namespace for a default upstream must be ""`,
+		},
 		"upstreamConfig.defaults.partition": {
 			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -868,7 +884,22 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			partitionsEnabled: false,
-			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
+			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.defaults.partition: Invalid value: "upstream": upstream.partition for a default upstream must be "", spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
+		},
+		"upstreamConfig.defaults.peer": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Peer: "foobar",
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.peer: Invalid value: "foobar": upstream.peer for a default upstream must be ""`,
 		},
 		"upstreamConfig.overrides.meshGateway": {
 			input: &ServiceDefaults{
@@ -924,6 +955,44 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
+		},
+		"upstreamConfig.overrides.partition and namespace": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								Name:      "service",
+								Namespace: "namespace",
+								Peer:      "peer",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"namespace", Partition:"", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both namespace and peer cannot be specified.`,
+		},
+		"upstreamConfig.overrides.partition and peer": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								Name:      "service",
+								Partition: "upstream",
+								Peer:      "peer",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"", Partition:"upstream", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both partition and peer cannot be specified., spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
 		},
 		"multi-error": {
 			input: &ServiceDefaults{
