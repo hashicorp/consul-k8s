@@ -14,10 +14,16 @@ annotations:
   artifacthub.io/images: |
     - name: consul
       image: hashicorp/consul:1.14.2
+    - name: consul-windows
+      image: hashicorp/consul-windows:1.14.2  
     - name: consul-k8s-control-plane
       image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.1.0-dev
+    - name: consul-k8s-control-plane-windows
+      image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane-windows:1.1.0-dev  
     - name: consul-dataplane
       image: hashicorp/consul-dataplane:1.0.0
+    - name: consul-dataplane-windows
+      image: hashicorp/consul-dataplane-windows:1.0.0  
     - name: envoy
       image: envoyproxy/envoy:v1.23.1
   artifacthub.io/license: MPL-2.0
