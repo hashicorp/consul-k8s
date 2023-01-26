@@ -60,7 +60,7 @@ module "eks" {
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
   cluster_version = "1.23"
   subnets         = module.vpc[count.index].private_subnets
-  enable_irsa = true
+  enable_irsa     = true
 
   vpc_id = module.vpc[count.index].vpc_id
 

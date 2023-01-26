@@ -573,7 +573,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.25.3"
+          version: "v1.26.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -606,7 +606,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.25.3"
+          version: "v1.26.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -1261,12 +1261,18 @@ workflows:
           context: consul-ci
           requires:
             - build-distros-linux
-      - acceptance-eks-1-23:
+      - acceptance:
+          context: consul-ci
           requires:
           - dev-upload-docker
-      - acceptance-eks-cni-1-23:
+      - acceptance-tproxy-cni:
+          context: consul-ci
           requires:
-          - acceptance-eks-1-23
+          - dev-upload-docker
+      - acceptance-tproxy:
+          context: consul-ci
+          requires:
+          - dev-upload-docker
 
 
   nightly-cleanup:
@@ -1305,24 +1311,15 @@ workflows:
             - build-distros-linux
       # Disable until we can use UBI images.
       # - acceptance-openshift
-      - acceptance:
-          context: consul-ci
+      - acceptance-gke-1-25:
           requires:
           - dev-upload-docker
-      - acceptance-tproxy-cni:
-          context: consul-ci
+      - acceptance-gke-cni-1-25:
           requires:
-          - dev-upload-docker
+          - acceptance-gke-1-25
       - acceptance-tproxy:
-          context: consul-ci
           requires:
           - dev-upload-docker
-      - acceptance-eks-1-23:
-          requires:
-          - dev-upload-docker
-      - acceptance-eks-cni-1-23:
-          requires:
-          - acceptance-eks-1-23
 
   nightly-acceptance-tests-main:
     description: |
