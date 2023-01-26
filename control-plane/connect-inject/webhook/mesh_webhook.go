@@ -60,14 +60,20 @@ type MeshWebhook struct {
 
 	// ImageConsul is the container image for Consul to use.
 	// ImageConsulDataplane is the container image for Envoy to use.
+	// ImageConsulWindows is the Windows container image for Consul to use.
+	// ImageConsulDataplaneWindows is the Windows container image for Envoy to use.
 	//
 	// Both of these MUST be set.
-	ImageConsul          string
-	ImageConsulDataplane string
+	ImageConsul                 string
+	ImageConsulDataplane        string
+	ImageConsulWindows          string
+	ImageConsulDataplaneWindows string
 
 	// ImageConsulK8S is the container image for consul-k8s to use.
+	// ImageConsulK8SWindows is the Windows container image for consul-k8s to use.
 	// This image is used for the consul-sidecar container.
-	ImageConsulK8S string
+	ImageConsulK8S        string
+	ImageConsulK8SWindows string
 
 	// Optional: set when you need extra options to be set when running envoy
 	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
@@ -207,6 +213,12 @@ type MeshWebhook struct {
 type multiPortInfo struct {
 	serviceIndex int
 	serviceName  string
+}
+
+func isWindows(pod corev1.Pod) bool {
+	podOS := pod.Spec.NodeSelector["kubernetes.io/os"]
+
+	return podOS == "windows"
 }
 
 // Handle is the admission.Webhook implementation that actually handles the

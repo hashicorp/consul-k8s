@@ -42,17 +42,20 @@ const WebhookCAFilename = "ca.crt"
 type Command struct {
 	UI cli.Ui
 
-	flagListen                string
-	flagCertDir               string // Directory with TLS certs for listening (PEM)
-	flagDefaultInject         bool   // True to inject by default
-	flagConsulImage           string // Docker image for Consul
-	flagConsulDataplaneImage  string // Docker image for Envoy
-	flagConsulK8sImage        string // Docker image for consul-k8s
-	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
-	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
-	flagEnableWebhookCAUpdate bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flagListen                      string
+	flagCertDir                     string // Directory with TLS certs for listening (PEM)
+	flagDefaultInject               bool   // True to inject by default
+	flagConsulImage                 string // Docker image for Consul
+	flagConsulImageWindows          string // Windows Docker image for Consul
+	flagConsulDataplaneImage        string // Docker image for Envoy
+	flagConsulDataplaneImageWindows string // Windows Docker image for Envoy
+	flagConsulK8sImage              string // Docker image for consul-k8s
+	flagConsulK8sImageWindows       string // Windows Docker image for consul-k8s
+	flagACLAuthMethod               string // Auth Method to use for ACLs, if enabled
+	flagEnvoyExtraArgs              string // Extra envoy args when starting envoy
+	flagEnableWebhookCAUpdate       bool
+	flagLogLevel                    string
+	flagLogJSON                     bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -146,10 +149,16 @@ func (c *Command) init() {
 		"Directory with PEM-encoded TLS certificate and key to serve.")
 	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", "",
 		"Docker image for Consul.")
+	c.flagSet.StringVar(&c.flagConsulImageWindows, "consul-image-windows", "",
+		"Windows Docker image for Consul.")
 	c.flagSet.StringVar(&c.flagConsulDataplaneImage, "consul-dataplane-image", "",
 		"Docker image for Consul Dataplane.")
+	c.flagSet.StringVar(&c.flagConsulDataplaneImageWindows, "consul-dataplane-image-windows", "",
+		"Windows Docker image for Consul Dataplane.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
+	c.flagSet.StringVar(&c.flagConsulK8sImageWindows, "consul-k8s-image-windows", "",
+		"Windows Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
 	c.flagSet.BoolVar(&c.flagEnableFederation, "enable-federation", false, "Enable Consul WAN Federation.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
@@ -606,9 +615,12 @@ func (c *Command) Run(args []string) int {
 			ConsulConfig:                 consulConfig,
 			ConsulServerConnMgr:          watcher,
 			ImageConsul:                  c.flagConsulImage,
+			ImageConsulWindows:           c.flagConsulImageWindows,
 			ImageConsulDataplane:         c.flagConsulDataplaneImage,
+			ImageConsulDataplaneWindows:  c.flagConsulDataplaneImageWindows,
 			EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
 			ImageConsulK8S:               c.flagConsulK8sImage,
+			ImageConsulK8SWindows:        c.flagConsulK8sImageWindows,
 			RequireAnnotation:            !c.flagDefaultInject,
 			AuthMethod:                   c.flagACLAuthMethod,
 			ConsulCACert:                 string(caCertPem),
@@ -738,11 +750,20 @@ func (c *Command) validateFlags() error {
 	if c.flagConsulK8sImage == "" {
 		return errors.New("-consul-k8s-image must be set")
 	}
+	if c.flagConsulK8sImageWindows == "" {
+		return errors.New("-consul-k8s-image-windows must be set")
+	}
 	if c.flagConsulImage == "" {
 		return errors.New("-consul-image must be set")
 	}
+	if c.flagConsulImageWindows == "" {
+		return errors.New("-consul-image-windows must be set")
+	}
 	if c.flagConsulDataplaneImage == "" {
 		return errors.New("-consul-dataplane-image must be set")
+	}
+	if c.flagConsulDataplaneImageWindows == "" {
+		return errors.New("-consul-dataplane-image-windows must be set")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {
