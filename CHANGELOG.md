@@ -2,9 +2,10 @@
 
 IMPROVEMENTS:
 * Helm:
+  * Kubernetes v1.26 is now supported. Minimum tested version of Kubernetes is now v1.23. [[GH-1852](https://github.com/hashicorp/consul-k8s/pull/1852)]
   * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
 * Control-Plane
-  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1824)]
+  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
   * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
 
 BUG FIXES:
