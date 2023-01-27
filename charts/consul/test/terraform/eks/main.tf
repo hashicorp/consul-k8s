@@ -3,8 +3,8 @@ provider "aws" {
   region  = var.region
 
   assume_role {
-    role_arn         = var.role_arn
-    duration_seconds = 2700
+    role_arn = var.role_arn
+    duration = "2700s"
   }
 }
 
@@ -58,8 +58,9 @@ module "eks" {
   kubeconfig_api_version = "client.authentication.k8s.io/v1beta1"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
-  cluster_version = "1.21"
+  cluster_version = "1.23"
   subnets         = module.vpc[count.index].private_subnets
+  enable_irsa     = true
 
   vpc_id = module.vpc[count.index].vpc_id
 
@@ -78,6 +79,47 @@ module "eks" {
   kubeconfig_output_path = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
 
   tags = var.tags
+}
+
+resource "aws_iam_role" "csi-driver-role" {
+  count = var.cluster_count
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "sts:AssumeRoleWithWebIdentity",
+        Principal = {
+          Federated = module.eks[count.index].oidc_provider_arn
+        },
+        Condition = {
+          StringEquals = {
+            join(":", [trimprefix(module.eks[count.index].cluster_oidc_issuer_url, "https://"), "aud"]) = ["sts.amazonaws.com"],
+            join(":", [trimprefix(module.eks[count.index].cluster_oidc_issuer_url, "https://"), "sub"]) = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"],
+          }
+        }
+      }
+    ]
+  })
+}
+
+data "aws_iam_policy" "csi-driver-policy" {
+  name = "AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "csi" {
+  count      = var.cluster_count
+  role       = aws_iam_role.csi-driver-role[count.index].name
+  policy_arn = data.aws_iam_policy.csi-driver-policy.arn
+}
+
+resource "aws_eks_addon" "csi-driver" {
+  count                    = var.cluster_count
+  cluster_name             = module.eks[count.index].cluster_id
+  addon_name               = "aws-ebs-csi-driver"
+  addon_version            = "v1.15.0-eksbuild.1"
+  service_account_role_arn = aws_iam_role.csi-driver-role[count.index].arn
+  resolve_conflicts        = "OVERWRITE"
 }
 
 data "aws_eks_cluster" "cluster" {

@@ -573,7 +573,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.25.3"
+          version: "v1.26.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -606,7 +606,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.25.3"
+          version: "v1.26.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -723,7 +723,7 @@ jobs:
   #############################
   # CLOUD ACCEPTANCE TEST JOBS
   #############################
-  acceptance-gke-1-23:
+  acceptance-gke-1-25:
     parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -773,7 +773,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
 
       - store_test_results:
           path: /tmp/test-results
@@ -792,7 +792,7 @@ jobs:
           fail_only: true
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-gke-cni-1-23:
+  acceptance-gke-cni-1-25:
     parallelism: 2
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -842,7 +842,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
 
       - store_test_results:
           path: /tmp/test-results
@@ -861,7 +861,7 @@ jobs:
           fail_only: true
           failure_message: "GKE CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-22:
+  acceptance-aks-1-24:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -918,7 +918,7 @@ jobs:
           fail_only: true
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-cni-1-22:
+  acceptance-aks-cni-1-24:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -974,7 +974,7 @@ jobs:
           fail_only: true
           failure_message: "AKS CNI acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-1-21:
+  acceptance-eks-1-23:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1037,7 +1037,7 @@ jobs:
           fail_only: true
           failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-cni-1-21:
+  acceptance-eks-cni-1-23:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -1193,7 +1193,7 @@ jobs:
       - slack/status:
           channel: *slack-channel
           fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.25 with Consul 1.12 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-kind-1-23-consul-compat-nightly-1-13:
     environment:
@@ -1234,7 +1234,7 @@ jobs:
       - slack/status:
           channel: *slack-channel
           fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.23 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.25 with Consul 1.13 nightly failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
 ########################
 # WORKFLOWS
@@ -1264,15 +1264,16 @@ workflows:
       - acceptance:
           context: consul-ci
           requires:
-            - dev-upload-docker
+          - dev-upload-docker
       - acceptance-tproxy-cni:
           context: consul-ci
           requires:
-            - dev-upload-docker
+          - dev-upload-docker
       - acceptance-tproxy:
           context: consul-ci
           requires:
           - dev-upload-docker
+
 
   nightly-cleanup:
     triggers:
@@ -1310,15 +1311,15 @@ workflows:
             - build-distros-linux
       # Disable until we can use UBI images.
       # - acceptance-openshift
-      - acceptance-gke-1-23:
+      - acceptance-gke-1-25:
           requires:
-            - dev-upload-docker
-      - acceptance-gke-cni-1-23:
+          - dev-upload-docker
+      - acceptance-gke-cni-1-25:
           requires:
-            - acceptance-gke-1-23
+          - acceptance-gke-1-25
       - acceptance-tproxy:
           requires:
-            - dev-upload-docker
+          - dev-upload-docker
 
   nightly-acceptance-tests-main:
     description: |
@@ -1342,24 +1343,24 @@ workflows:
             - build-distros-linux
       # Disable until we can use UBI images.
       # - acceptance-openshift
-      - acceptance-gke-1-23:
+      - acceptance-gke-1-25:
           requires:
             - dev-upload-docker
-      - acceptance-gke-cni-1-23:
+      - acceptance-gke-cni-1-25:
           requires:
-            - acceptance-gke-1-23
-      - acceptance-eks-1-21:
-          requires:
-            - dev-upload-docker
-      - acceptance-eks-cni-1-21:
-          requires:
-            - acceptance-eks-1-21
-      - acceptance-aks-1-22:
+            - acceptance-gke-1-25
+      - acceptance-eks-1-23:
           requires:
             - dev-upload-docker
-      - acceptance-aks-cni-1-22:
+      - acceptance-eks-cni-1-23:
           requires:
-            - acceptance-aks-1-22
+            - acceptance-eks-1-23
+      - acceptance-aks-1-24:
+          requires:
+            - dev-upload-docker
+      - acceptance-aks-cni-1-24:
+          requires:
+            - acceptance-aks-1-24
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
