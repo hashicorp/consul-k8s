@@ -1920,6 +1920,54 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 	}
 }
 
+func TestIsWindows(t *testing.T) {
+
+	cases := []struct {
+		Name     string
+		Pod      func(*corev1.Pod) *corev1.Pod
+		expValue bool
+	}{
+		{
+			"Nodeselector not set",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			false,
+		},
+		{
+			"Nodeselector.kubernetes.io/os set to linux",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec = corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "linux",
+					},
+				}
+				return pod
+			},
+			false,
+		},
+		{
+			"Nodeselector.kubernetes.io/os set to windows",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec = corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "windows",
+					},
+				}
+				return pod
+			},
+			true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			actual := isWindows(*tt.Pod(&corev1.Pod{}))
+			require.EqualValues(t, tt.expValue, actual)
+		})
+	}
+}
+
 // encodeRaw is a helper to encode some data into a RawExtension.
 func encodeRaw(t *testing.T, input interface{}) runtime.RawExtension {
 	data, err := json.Marshal(input)
