@@ -64,6 +64,7 @@ global:
   # ```
   # @default: hashicorp/consul:<latest version>
   image: "hashicorp/consul:1.14.2"
+  imageWindows: "hashicorp/consul-windows:1.14.0"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -84,6 +85,7 @@ global:
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
   imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.1.0-dev
+  imageK8SWindows: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane-windows:1.1.0-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -543,6 +545,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: "hashicorp/consul-dataplane:1.0.0"
+  imageConsulDataplaneWindows: "hashicorp/consul-dataplane-windows:1.0.0"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -1877,6 +1880,7 @@ connectInject:
   # Image for consul-k8s-control-plane that contains the injector.
   # @type: string
   image: null
+  imageWindows: null
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
@@ -2098,6 +2102,7 @@ connectInject:
   # Defaults to global.image.
   # @type: string
   imageConsul: null
+  imageConsulWindows: null
 
   # Override global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
