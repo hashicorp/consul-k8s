@@ -1,5 +1,20 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm:
+  * Change defaults to exclude the `openebs` namespace from sidecar injection. If you previously had pods in that namespace
+    that you wanted to be injected, you must now set `namespaceSelector` as follows:
+  
+    ```yaml
+    connectInject:
+      namespaceSelector: |
+        matchExpressions:
+        - key: "kubernetes.io/metadata.name"
+          operator: "NotIn"
+          values: ["kube-system","local-path-storage"]
+    ```
+    [[GH-1869](https://github.com/hashicorp/consul-k8s/pull/1869)]
+
 IMPROVEMENTS:
 * Helm:
   * Kubernetes v1.26 is now supported. Minimum tested version of Kubernetes is now v1.23. [[GH-1852](https://github.com/hashicorp/consul-k8s/pull/1852)]
