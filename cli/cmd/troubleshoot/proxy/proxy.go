@@ -201,6 +201,12 @@ func (c *ProxyCommand) Troubleshoot() error {
 	if err != nil {
 		return err
 	}
+
+	err = t.GetEnvoyConfigDump()
+	if err != nil {
+		return err
+	}
+
 	output, err := t.RunAllTests(c.flagUpstream)
 	if err != nil {
 		c.UI.Output("Errors", terminal.WithHeaderStyle())
