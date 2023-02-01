@@ -1358,7 +1358,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{GRPCPort: 8502},
 				LogLevel:      "info",
 				LogJSON:       false,
@@ -1377,7 +1377,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{GRPCPort: 8602},
 				LogLevel:      "info",
 				LogJSON:       false,
@@ -1396,7 +1396,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{GRPCPort: 8502},
 				LogLevel:      "info",
 				LogJSON:       false,
@@ -1417,7 +1417,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:        "consul-server.default.svc",
+				ConsulAddress:        "consul-server.default.svc.cluster.local",
 				ConsulConfig:         &consul.Config{GRPCPort: 8502},
 				LogLevel:             "info",
 				LogJSON:              false,
@@ -1440,7 +1440,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:              "consul-server.default.svc",
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{GRPCPort: 8502},
 				LogLevel:                   "info",
 				LogJSON:                    false,
@@ -1463,7 +1463,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:   "consul-server.default.svc",
+				ConsulAddress:   "consul-server.default.svc.cluster.local",
 				ConsulConfig:    &consul.Config{GRPCPort: 8502},
 				LogLevel:        "info",
 				LogJSON:         false,
@@ -1485,7 +1485,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:       "consul-server.default.svc",
+				ConsulAddress:       "consul-server.default.svc.cluster.local",
 				ConsulConfig:        &consul.Config{GRPCPort: 8502},
 				LogLevel:            "info",
 				LogJSON:             false,
@@ -1507,7 +1507,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:       "consul-server.default.svc",
+				ConsulAddress:       "consul-server.default.svc.cluster.local",
 				ConsulConfig:        &consul.Config{GRPCPort: 8502},
 				LogLevel:            "info",
 				LogJSON:             false,
@@ -1528,7 +1528,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:              "consul-server.default.svc",
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{GRPCPort: 8502},
 				LogLevel:                   "info",
 				LogJSON:                    false,
@@ -1549,7 +1549,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:        "consul-server.default.svc",
+				ConsulAddress:        "consul-server.default.svc.cluster.local",
 				ConsulConfig:         &consul.Config{GRPCPort: 8502},
 				LogLevel:             "info",
 				LogJSON:              false,
@@ -1570,7 +1570,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:        "consul-server.default.svc",
+				ConsulAddress:        "consul-server.default.svc.cluster.local",
 				ConsulConfig:         &consul.Config{GRPCPort: 8502},
 				LogLevel:             "info",
 				LogJSON:              false,
@@ -1592,7 +1592,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:   "consul-server.default.svc",
+				ConsulAddress:   "consul-server.default.svc.cluster.local",
 				ConsulConfig:    &consul.Config{GRPCPort: 8502},
 				LogLevel:        "info",
 				LogJSON:         false,
@@ -1612,7 +1612,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{GRPCPort: 8502},
 				LogLevel:      "debug",
 				LogJSON:       false,
@@ -1631,7 +1631,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{GRPCPort: 8502},
 				LogLevel:      "debug",
 				LogJSON:       true,
@@ -1650,7 +1650,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress:   "consul-server.default.svc",
+				ConsulAddress:   "consul-server.default.svc.cluster.local",
 				ConsulConfig:    &consul.Config{GRPCPort: 8502},
 				LogLevel:        "info",
 				LogJSON:         false,
@@ -1670,7 +1670,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{GRPCPort: 8502},
 				LogLevel:      "info",
 				LogJSON:       false,

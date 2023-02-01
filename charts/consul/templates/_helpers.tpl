@@ -286,7 +286,7 @@ Consul server environment variables for consul-k8s commands.
   {{- if .Values.externalServers.enabled }}
   value: {{ .Values.externalServers.hosts | first }}
   {{- else }}
-  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc.cluster.local
   {{- end }}
 - name: CONSUL_GRPC_PORT
   {{- if .Values.externalServers.enabled }}

@@ -189,14 +189,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 }
 
 func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi multiPortInfo, bearerTokenFile string, pod corev1.Pod) ([]string, error) {
-	var proxyIDFileName, consulAddress string
+	var proxyIDFileName string
 	if isWindows(pod) {
 		proxyIDFileName = "C:\\consul\\connect-inject\\proxyid"
-		// Windows resolves DNS addresses differently. Read more: https://github.com/hashicorp-education/learn-consul-k8s-windows/blob/main/WindowsTroubleshooting.md#encountered-issues
-		consulAddress, _, _ = strings.Cut(w.ConsulAddress, ".")
 	} else {
 		proxyIDFileName = "/consul/connect-inject/proxyid"
-		consulAddress = w.ConsulAddress
 	}
 
 	if mpi.serviceName != "" {
@@ -219,7 +216,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	}
 
 	args := []string{
-		"-addresses", consulAddress,
+		"-addresses", w.ConsulAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
