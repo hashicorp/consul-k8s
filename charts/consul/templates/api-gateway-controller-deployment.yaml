@@ -75,6 +75,7 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: "/consul/login/acl-token"
+          # CONSUL_LOGIN_DATACENTER is passed to the gateway that gets created. The controller does not use this to log in
         - name: CONSUL_LOGIN_DATACENTER
           value: {{ .Values.global.datacenter }}
         {{- end }}
@@ -240,6 +241,12 @@ spec:
               fieldPath: metadata.name
         - name: CONSUL_LOGIN_META  
           value: "component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"
+        - name: CONSUL_LOGIN_DATACENTER
+        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          value: {{ .Values.global.federation.primaryDatacenter }}
+        {{- else }}
+          value: {{ .Values.global.datacenter }}
+        {{- end}}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
@@ -260,7 +267,6 @@ spec:
           consul-k8s-control-plane acl-init \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
             -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-            -datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- else }}
             -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method \
             {{- end }}

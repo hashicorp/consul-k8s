@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/hashicorp/go-netaddrs"
 	"net"
 	"os"
 	"path/filepath"
@@ -21,7 +22,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-netaddrs"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,7 +167,7 @@ func (c *Command) Run(args []string) int {
 
 		loginParams := common.LoginParams{
 			AuthMethod:      c.consul.ConsulLogin.AuthMethod,
-			Datacenter:      c.consul.Datacenter,
+			Datacenter:      c.consul.ConsulLogin.Datacenter,
 			BearerTokenFile: c.consul.ConsulLogin.BearerTokenFile,
 			TokenSinkFile:   c.flagTokenSinkFile,
 			Meta:            c.consul.ConsulLogin.Meta,
