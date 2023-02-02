@@ -139,7 +139,6 @@ spec:
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \
-                -consul-image-windows="{{ default .Values.global.imageWindows .Values.connectInject.imageConsulWindows }}" \
                 -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
                 -consul-dataplane-image-windows="{{ .Values.global.imageConsulDataplaneWindows }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \

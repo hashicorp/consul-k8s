@@ -1880,7 +1880,6 @@ connectInject:
   # Image for consul-k8s-control-plane that contains the injector.
   # @type: string
   image: null
-  imageWindows: null
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
@@ -2102,7 +2101,6 @@ connectInject:
   # Defaults to global.image.
   # @type: string
   imageConsul: null
-  imageConsulWindows: null
 
   # Override global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string

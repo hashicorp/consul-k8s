@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -55,6 +56,10 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
+		return corev1.Container{}, err
+	}
+	if tproxyEnabled && isWindows(pod) {
+		err = errors.New("transparent proxy is not supported on windows")
 		return corev1.Container{}, err
 	}
 
@@ -235,7 +240,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 
 	if tproxyEnabled {
-		if !w.EnableCNI && !isWindows(pod) {
+		if !w.EnableCNI {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
 			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
 			if err != nil {
@@ -259,7 +264,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 					Add: []corev1.Capability{netAdminCapability},
 				},
 			}
-		} else if w.EnableCNI && !isWindows(pod) {
+		} else {
 			container.SecurityContext = &corev1.SecurityContext{
 				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
@@ -269,14 +274,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 					Drop: []corev1.Capability{"ALL"},
 				},
 			}
-		} else if !w.EnableCNI && isWindows(pod) {
-			// To disable ip tables on Windows, we just need to pass an empty string as a value for this envVar.
-			redirectTrafficConfig := ""
-			container.Env = append(container.Env,
-				corev1.EnvVar{
-					Name:  "CONSUL_REDIRECT_TRAFFIC_CONFIG",
-					Value: redirectTrafficConfig,
-				})
 		}
 	}
 
