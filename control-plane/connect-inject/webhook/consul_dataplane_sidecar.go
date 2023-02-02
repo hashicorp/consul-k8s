@@ -174,7 +174,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", c.Name, sidecarUserAndGroupID)
 			}
 		}
-		// Security Context should not be set when using Windows.
+		// Security Context is not supported on Windows. See https://kubernetes.io/docs/concepts/windows/intro/#compatibility-v1-pod-spec-containers-securitycontext.
 		if !isWindows(pod) {
 			container.SecurityContext = &corev1.SecurityContext{
 				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
