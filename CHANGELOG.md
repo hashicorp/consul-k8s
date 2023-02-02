@@ -27,6 +27,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Control Plane
+   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
 
 ## 0.49.3 (January 30, 2023)
 
