@@ -163,7 +163,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			MeshWebhook{
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 				LogLevel:      "info",
 			},
@@ -173,7 +173,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -210,7 +210,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			},
 			MeshWebhook{
 				AuthMethod:    "an-auth-method",
-				ConsulAddress: "consul-server.default.svc",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
 				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 				LogLevel:      "debug",
 				LogJSON:       true,
@@ -223,7 +223,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -775,7 +775,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "",
-				ConsulAddress:              "consul-server.default.svc",
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -784,7 +784,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -819,7 +819,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				ConsulPartition:            "default",
-				ConsulAddress:              "consul-server.default.svc",
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -828,7 +828,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -867,7 +867,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "",
-				ConsulAddress:              "consul-server.non-default.svc",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -876,7 +876,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.non-default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -911,7 +911,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "non-default-part",
-				ConsulAddress:              "consul-server.non-default.svc",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -920,7 +920,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.non-default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -960,7 +960,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				ConsulPartition:            "default",
-				ConsulAddress:              "consul-server.non-default.svc",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -971,7 +971,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.non-default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
@@ -1032,7 +1032,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				ConsulPartition:            "non-default",
-				ConsulAddress:              "consul-server.non-default.svc",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
@@ -1043,7 +1043,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
-					Value: "consul-server",
+					Value: "consul-server.non-default.svc.cluster.local",
 				},
 				{
 					Name:  "CONSUL_GRPC_PORT",
