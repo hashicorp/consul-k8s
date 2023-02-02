@@ -1,5 +1,20 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm:
+  * Change defaults to exclude the `openebs` namespace from sidecar injection. If you previously had pods in that namespace
+    that you wanted to be injected, you must now set `namespaceSelector` as follows:
+
+    ```yaml
+    connectInject:
+      namespaceSelector: |
+        matchExpressions:
+        - key: "kubernetes.io/metadata.name"
+          operator: "NotIn"
+          values: ["kube-system","local-path-storage"]
+    ```
+    [[GH-1869](https://github.com/hashicorp/consul-k8s/pull/1869)]
+
 ## 0.49.3 (January 30, 2023)
 
 IMPROVEMENTS:
