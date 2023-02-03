@@ -7,6 +7,7 @@
   - [Enabling Pod OS detection](#enabling-pod-os-detection)
   - [Assigning Values Depending on the OS](#assigning-values-depending-on-the-os)
   - [Adding New Config Flags](#adding-new-config-flags)
+  - [Transparent Proxy](#transparent-proxy)
   - [Unit Tests](#unit-tests)
 - [Consul Helm Chart Changes](#consul-helm-chart-changes)
   - [Changes in values.yaml](#changes-in-valuesyaml)
@@ -62,22 +63,24 @@ As you can see in the example above, we also updated the **MeshWebhook struct** 
 
 ### Adding New Config Flags
 
-To be able to set the values for **ImageConsulDataplaneWindows** and **ImageConsulK8SWindows** through the Helm chart, we created 3 new flags for the **inject-connect** subcommand.  
+To be able to set the values for **ImageConsulDataplaneWindows** and **ImageConsulK8SWindows** through the Helm chart, we created 2 new flags for the **inject-connect** subcommand.  
 The new flags that enable setting this values are:
 
-- consul-image-windows
 - consul-dataplane-image-windows
 - consul-k8s-image-windows
 
 > **Warning**  
-> These flags require a default value, just like their Linux counterpart do, otherwise the `validateFlags()` function (line 750 in [command.go](./control-plane/subcommand/inject-connect/command.go)) will throw an error.
+> These flags are optional, not providing values for them will not trigger any errors.
+
+### Transparent Proxy
+
+Transparent proxy is a feature that relies on Ip Tables, these are not supported on Windows. We
 
 ### Unit Tests  
 
-#### command_test.go
+#### consul_dataplane_sidecar_test.go
 
-After adding the new command flags to *inject-connect/command.go*, and updating the `validateFlags()` function, we updated the unit test in command_test.go to account for these changes.
-The updates were focused on the `TestRun_FlagValidation` test.
+Created TestHandlerConsulDataplaneSidecar_Windows. This test is composed of 16 cases, just like its Linux counterpart, it evaluates that the correct args are appended to the command used to start the Consul dataplane binary.
 
 #### container_init_test.go
 
@@ -89,13 +92,16 @@ We updated test coverage by creating new cases to account for the init container
 
 These new cases evaluate that the command and the env vars are set appropriately for a Windows pod.
 
+#### mesh_webhook_test.go
+
+Created TestIsWindows test with that evaluates that the `isWindows()` function works correctly, whether `nodeSelector["kubernetes.io/os"]` is set or not.
+
 ## Consul Helm Chart Changes
 
 ### Changes in values.yaml
 
 New fields were added as part of the **global** stanza:
 
-- global.imageWindows: sets the default Windows Consul image.
 - global.imageK8SWindows: sets the default Windows Consul K8s control-plane image.
 - global.imageConsulDataplaneWindows: sets the default Windows Consul dataplane image.
 
