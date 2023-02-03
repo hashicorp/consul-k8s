@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	troubleshoot "github.com/hashicorp/consul/troubleshoot/connect"
+	troubleshoot "github.com/hashicorp/consul/troubleshoot/proxy"
 	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -195,7 +195,7 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		return fmt.Errorf("error getting upstreams: %v", err)
 	}
 
-	c.UI.Output("Upsteams", terminal.WithHeaderStyle())
+	c.UI.Output("Upstreams", terminal.WithHeaderStyle())
 	for _, u := range upstreams {
 		c.UI.Output(fmt.Sprintf("%v", u))
 	}

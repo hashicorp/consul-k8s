@@ -163,7 +163,7 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
 	go.mongodb.org/mongo-driver v1.11.1 // indirect
-	go.starlark.net v0.0.0-20200707032745-474f21a9602d // indirect
+	go.starlark.net v0.0.0-20230128213706-3f75dec8e403 // indirect
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
@@ -196,7 +196,7 @@ require (
 // this won't work.
 replace (
 	github.com/hashicorp/consul-k8s/charts => ../charts
+	github.com/hashicorp/consul/api => /Users/curtbushko/workspace/github.com/hashicorp/consul/api
 	github.com/hashicorp/consul/envoyextensions => /Users/curtbushko/workspace/github.com/hashicorp/consul/envoyextensions
 	github.com/hashicorp/consul/troubleshoot => /Users/curtbushko/workspace/github.com/hashicorp/consul/troubleshoot
-	github.com/hashicorp/consul/api => /Users/curtbushko/workspace/github.com/hashicorp/consul/api
 )

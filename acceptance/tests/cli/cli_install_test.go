@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
@@ -82,6 +84,21 @@ func TestInstall(t *testing.T) {
 					}
 				}
 			})
+
+			// Run troubleshoot validation
+			pods, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Pods(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: "app=static-client",
+			})
+			require.NoError(t, err)
+			podName := pods.Items[0].Name
+			upstreamsOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", podName)
+			require.NoError(t, err)
+			require.Regexp(t, "static-server", string(upstreamsOut))
+			logger.Log(t, string(upstreamsOut))
+
+			proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", podName, "-upstream", "static-server")
+			require.NoError(t, err)
+			logger.Log(t, string(proxyOut))
 
 			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)

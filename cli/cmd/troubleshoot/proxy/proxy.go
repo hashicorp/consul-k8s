@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	troubleshoot "github.com/hashicorp/consul/troubleshoot/connect"
+	troubleshoot "github.com/hashicorp/consul/troubleshoot/proxy"
 	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
