@@ -74,7 +74,7 @@ The new flags that enable setting this values are:
 
 ### Transparent Proxy
 
-Transparent proxy is a feature that relies on Ip Tables, these are not supported on Windows. We
+Transparent proxy is a feature that relies on Ip Tables, these are not supported on Windows. We updated the code in [container_init.go](./control-plane/connect-inject/webhook/mesh_webhook.go) (Line 61), to throw an error whenever transparent proxy is enabled and a Windows pod makes the request to inject Consul. Also the error is logged on the connect-injector's logs.  
 
 ### Unit Tests  
 
