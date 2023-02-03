@@ -64,7 +64,6 @@ global:
   # ```
   # @default: hashicorp/consul:<latest version>
   image: "hashicorp/consul:1.14.2"
-  imageWindows: "hashicorp/consul-windows:1.14.0"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -1880,7 +1879,6 @@ connectInject:
   # Image for consul-k8s-control-plane that contains the injector.
   # @type: string
   image: null
-  imageWindows: null
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
@@ -2102,7 +2100,6 @@ connectInject:
   # Defaults to global.image.
   # @type: string
   imageConsul: null
-  imageConsulWindows: null
 
   # Override global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string

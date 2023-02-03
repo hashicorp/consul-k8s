@@ -60,13 +60,11 @@ type MeshWebhook struct {
 
 	// ImageConsul is the container image for Consul to use.
 	// ImageConsulDataplane is the container image for Envoy to use.
-	// ImageConsulWindows is the Windows container image for Consul to use.
 	// ImageConsulDataplaneWindows is the Windows container image for Envoy to use.
 	//
 	// Both of these MUST be set.
 	ImageConsul                 string
 	ImageConsulDataplane        string
-	ImageConsulWindows          string
 	ImageConsulDataplaneWindows string
 
 	// ImageConsulK8S is the container image for consul-k8s to use.
