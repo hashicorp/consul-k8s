@@ -40,7 +40,6 @@ func ConfigurePKICerts(t *testing.T,
 		"allow_bare_domains": "true",
 		"allow_localhost":    "true",
 		"allow_subdomains":   "true",
-		"generate_lease":     "true",
 		"max_ttl":            maxTTL,
 	}
 
