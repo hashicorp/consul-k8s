@@ -346,7 +346,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '[.env[7].value] | any(contains("5s"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '[.env[8].value] | any(contains("5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -546,7 +550,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-datacenter=dc1"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
