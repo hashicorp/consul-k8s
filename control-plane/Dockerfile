@@ -89,7 +89,7 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates gnupg libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -152,7 +152,7 @@ ARG TARGETARCH
 # Copy license for Red Hat certification.
 COPY LICENSE /licenses/mozilla.txt
 
-RUN microdnf install -y ca-certificates gnupg libcap openssl shadow-utils iptables
+RUN microdnf install -y ca-certificates libcap openssl shadow-utils iptables
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
