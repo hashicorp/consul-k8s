@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.49.4 (February 7, 2023)
 
 BREAKING CHANGES:
 * Helm:
