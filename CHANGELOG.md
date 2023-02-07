@@ -17,7 +17,7 @@ BREAKING CHANGES:
 
 IMPROVEMENTS:
 * Control Plane
-  * Remove extraneous `gnupg` depdency from `consul-k8s-control-plane` since it is no longer needed for validating binary artifacts prior to release. [[GH-1882](https://github.com/hashicorp/consul-k8s/pull/1882)]
+  * Remove extraneous `gnupg` dependency from `consul-k8s-control-plane` since it is no longer needed for validating binary artifacts prior to release. [[GH-1882](https://github.com/hashicorp/consul-k8s/pull/1882)]
 
 ## 0.49.3 (January 30, 2023)
 

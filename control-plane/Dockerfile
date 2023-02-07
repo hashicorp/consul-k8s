@@ -37,7 +37,7 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
-RUN apk add --no-cache ca-certificates curl gnupg libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates curl libcap openssl su-exec iputils libc6-compat iptables
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
