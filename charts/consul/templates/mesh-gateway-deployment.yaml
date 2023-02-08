@@ -333,6 +333,9 @@ spec:
             {{- if .Values.global.adminPartitions.enabled }}
             - -partition={{ .Values.global.adminPartitions.name }}
             {{- end }}
+            {{- if eq .Values.global.logLevel "debug"}}
+            - -enable-config-gen-logging
+            {{- end }}
           livenessProbe:
             tcpSocket:
               port: {{ .Values.meshGateway.containerPort }}

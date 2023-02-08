@@ -1476,6 +1476,36 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# envoy bootstrap logging
+
+@test "terminatingGateways/Deployment: envoy bootstrap logging is not present by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.command | any(contains("-enable-config-gen-logging"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: envoy bootstrap logging flag is present if global.logLevel == debug" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.command | any(contains("-enable-config-gen-logging"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # multiple gateways
 
 @test "terminatingGateways/Deployment: multiple gateways" {
