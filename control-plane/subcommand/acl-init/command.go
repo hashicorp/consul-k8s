@@ -167,7 +167,7 @@ func (c *Command) Run(args []string) int {
 
 		loginParams := common.LoginParams{
 			AuthMethod:      c.consul.ConsulLogin.AuthMethod,
-			Datacenter:      c.consul.Datacenter,
+			Datacenter:      c.consul.ConsulLogin.Datacenter,
 			BearerTokenFile: c.consul.ConsulLogin.BearerTokenFile,
 			TokenSinkFile:   c.flagTokenSinkFile,
 			Meta:            c.consul.ConsulLogin.Meta,
