@@ -98,7 +98,8 @@ global:
   # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
   # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
   # and have necessary secrets, policies and roles created prior to installing Consul.
-  # Refer to https://developer.hashicorp.com/consul/docs/k8s/deployment-configurations/vault for full instructions.
+  # Refer to [Vault as the Secrets Backend](https://developer.hashicorp.com/consul/docs/k8s/deployment-configurations/vault)
+  # documentation for full instructions.
   #
   # The Vault cluster _must_ not have the Consul cluster installed by this Helm chart as its storage backend
   # as that would cause a circular dependency.
@@ -198,8 +199,8 @@ global:
       # The provider will be configured to use the Vault Kubernetes auth method
       # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
       # to have permissions to the root and intermediate PKI paths.
-      # Please refer to https://developer.hashicorp.com/consul/docs/connect/ca/vault#vault-acl-policies
-      # for information on how to configure the Vault policies.
+      # Please refer to [Vault ACL policies](https://developer.hashicorp.com/consul/docs/connect/ca/vault#vault-acl-policies)
+      # documentation for information on how to configure the Vault policies.
       connectCA:
         # The address of the Vault server.
         address: ""
@@ -288,12 +289,12 @@ global:
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
-  # Refer to https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_recursor for more details.
+  # Refer to [`-recursor`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_recursor) for more details.
   # If this is an empty array (the default), then Consul DNS will only resolve queries for the Consul top level domain (by default `.consul`).
   # @type: array<string>
   recursors: [ ]
 
-  # Enables TLS (https://developer.hashicorp.com/consul/tutorials/security/tls-encryption-secure)
+  # Enables [TLS](https://developer.hashicorp.com/consul/tutorials/security/tls-encryption-secure)
   # across the cluster to verify authenticity of the Consul servers and clients.
   # Requires Consul v1.4.1+.
   tls:
@@ -323,7 +324,7 @@ global:
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming` for internal RPC communication will be set to `true` for Consul servers and clients.
     # Set this to false to incrementally roll out TLS on an existing Consul cluster.
-    # Please refer to https://developer.hashicorp.com/consul/docs/k8s/operations/tls-on-existing-cluster
+    # Please refer to [TLS on existing clusters](https://developer.hashicorp.com/consul/docs/k8s/operations/tls-on-existing-cluster)
     # for more details.
     verify: true
 
@@ -436,10 +437,10 @@ global:
 
     # tolerations configures the taints and tolerations for the server-acl-init
     # and server-acl-init-cleanup jobs. This should be a multi-line string matching the
-    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     tolerations: ""
 
-    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
     # labels for the server-acl-init and server-acl-init-cleanup jobs pod assignment, formatted as a multi-line string.
     #
     # Example:
@@ -653,7 +654,7 @@ server:
   image: null
 
   # The number of server agents to run. This determines the fault tolerance of
-  # the cluster. Please refer to the deployment table (https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
+  # the cluster. Please refer to the [deployment table](https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
   # for more information.
   replicas: 1
 
@@ -695,8 +696,8 @@ server:
   # Vault Secrets backend:
   # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
   # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`.
-  # Please refer to the following guide for steps to generate a compatible certificate:
-  # https://developer.hashicorp.com/consul/tutorials/vault-secure/vault-pki-consul-secure-tls
+  # Complete [this tutorial](https://developer.hashicorp.com/consul/tutorials/vault-secure/vault-pki-consul-secure-tls)
+  # to learn how to generate a compatible certificate.
   # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
   # must be provided.
   serverCert:
@@ -749,7 +750,7 @@ server:
   # @type: string
   storageClass: null
 
-  # This will enable/disable Connect (https://developer.hashicorp.com/consul/docs/connect). Setting this to true
+  # This will enable/disable [Connect](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
   # a new CA and set of certificates. Additional Connect settings can be configured
@@ -771,7 +772,7 @@ server:
 
   # The resource requests (CPU, memory, etc.)
   # for each of the server agents. This should be a YAML map corresponding to a Kubernetes
-  # ResourceRequirements (https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#resourcerequirements-v1-core)
+  # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#resourcerequirements-v1-core)
   # object. NOTE: The use of a YAML string is deprecated.
   #
   # Example:
@@ -824,12 +825,13 @@ server:
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
-  # partition (https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#partitions)
-  # for performing a rolling update. Please read the linked Kubernetes documentation
-  # and https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-consul-servers for more information.
+  # [partition](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#partitions)
+  # for performing a rolling update. Please read the linked Kubernetes
+  # and [Upgrade Consul](https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-consul-servers)
+  # documentation for more information.
   updatePartition: 0
 
-  # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+  # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
   # for the server cluster.
   disruptionBudget:
     # Enables registering a PodDisruptionBudget for the server
@@ -845,7 +847,7 @@ server:
     # @type: integer
     maxUnavailable: null
 
-  # A raw string of extra JSON configuration (https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
+  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # servers. This will be saved as-is into a ConfigMap that is read by the Consul
   # server agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -908,7 +910,7 @@ server:
   # @type: array<map>
   extraContainers: [ ]
 
-  # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
+  # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for server pods. It defaults to allowing only a single server pod on each node, which
   # minimizes risk of the cluster becoming unusable if a node is lost. If you need
   # to run more pods per node (for example, testing on Minikube), set this value
@@ -938,13 +940,15 @@ server:
           topologyKey: kubernetes.io/hostname
 
   # Toleration settings for server pods. This
-  # should be a multi-line string matching the Tolerations
-  # (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+  # should be a multi-line string matching the 
+  # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) 
+  # array in a Pod spec.
   tolerations: ""
 
   # Pod topology spread constraints for server pods.
-  # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
-  # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+  # This should be a multi-line YAML string matching the 
+  # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) 
+  # array in a Pod Spec.
   #
   # This requires K8S >= 1.18 (beta) or 1.19 (stable).
   #
@@ -963,7 +967,7 @@ server:
   # ```
   topologySpreadConstraints: ""
 
-  # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+  # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
   # labels for server pod assignment, formatted as a multi-line string.
   #
   # Example:
@@ -977,7 +981,7 @@ server:
   nodeSelector: null
 
   # This value references an existing
-  # Kubernetes `priorityClassName` (https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
+  # Kubernetes [`priorityClassName`](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
   # that can be assigned to server pods.
   priorityClassName: ""
 
@@ -1062,15 +1066,15 @@ server:
   # @type: map
   extraEnvironmentVars: { }
 
-  # [Enterprise Only] Values for setting up and running snapshot agents
-  # (https://developer.hashicorp.com/consul/commands/snapshot/agent)
+  # [Enterprise Only] Values for setting up and running 
+  # [snapshot agents](https://developer.hashicorp.com/consul/commands/snapshot/agent)
   # within the Consul clusters. They run as a sidecar with Consul servers.
   snapshotAgent:
     # If true, the chart will install resources necessary to run the snapshot agent.
     enabled: false
 
     # Interval at which to perform snapshots.
-    # Refer to https://developer.hashicorp.com/consul/commands/snapshot/agent#interval
+    # Refer to [`interval`](https://developer.hashicorp.com/consul/commands/snapshot/agent#interval)
     # @type: string
     interval: 1h
 
@@ -1184,7 +1188,7 @@ client:
   # @type: string
   image: null
 
-  # A list of valid `-retry-join` values (https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_retry_join).
+  # A list of valid [`-retry-join` values](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
   # This means that with `server.enabled` set to true, clients will automatically
@@ -1210,7 +1214,7 @@ client:
   grpc: true
 
   # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node
-  # (refer to https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_node_meta)
+  # (refer to [`-node-meta`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_node_meta))
   nodeMeta:
     pod-name: ${HOSTNAME}
     host-ip: ${HOST_IP}
@@ -1281,7 +1285,7 @@ client:
     # @recurse: false
     tlsInit: null
 
-  # A raw string of extra JSON configuration (https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
+  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -1386,7 +1390,7 @@ client:
   affinity: null
 
   # This value references an existing
-  # Kubernetes `priorityClassName` (https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
+  # Kubernetes [`priorityClassName`](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
   # that can be assigned to client pods.
   priorityClassName: ""
 
@@ -1422,7 +1426,7 @@ client:
   # @type: map
   extraEnvironmentVars: { }
 
-  # This value defines the Pod DNS policy (https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy)
+  # This value defines the [Pod DNS policy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy)
   # for client pods to use.
   # @type: string
   dnsPolicy: null
@@ -1435,7 +1439,8 @@ client:
   hostNetwork: false
 
   # updateStrategy for the DaemonSet.
-  # Refer to https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
+  # Refer to the Kubernetes [Daemonset upgrade strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy)
+  # documentation.
   # This should be a multi-line string mapping directly to the updateStrategy
   #
   # Example:
@@ -1610,7 +1615,7 @@ ui:
     # @default: global.metrics.enabled
     enabled: "-"
     # Provider for metrics. Refer to
-    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_metrics_provider
+    # [`metrics_provider`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_metrics_provider)
     # This value is only used if `ui.enabled` is set to true.
     # @type: string
     provider: "prometheus"
@@ -1620,9 +1625,10 @@ ui:
     # @type: string
     baseURL: http://prometheus-server
 
-  # Corresponds to https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates configuration.
+  # Corresponds to [`dashboard_url_templates`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates)
+  # configuration.
   dashboardURLTemplates:
-    # Sets https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates_service.
+    # Sets [`dashboardURLTemplates.service`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates_service).
     service: ""
 
 # Configure the catalog sync process to sync K8S with Consul
@@ -1644,8 +1650,8 @@ syncCatalog:
   image: null
 
   # If true, all valid services in K8S are
-  # synced by default. If false, the service must be annotated
-  # (https://developer.hashicorp.com/consul/docs/k8s/service-sync#sync-enable-disable) properly to sync.
+  # synced by default. If false, the service must be [annotated](https://developer.hashicorp.com/consul/docs/k8s/service-sync#enable-and-disable-sync)
+  # properly to sync.
   # In either case an annotation can override the default.
   default: true
 
@@ -1784,7 +1790,7 @@ syncCatalog:
     # @type: string
     secretKey: null
 
-  # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+  # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
   # labels for catalog sync pod assignment, formatted as a multi-line string.
   #
   # Example:
@@ -1880,7 +1886,7 @@ connectInject:
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
-  # injection annotation (https://developer.hashicorp.com/consul/docs/k8s/connect#consul-hashicorp-com-connect-inject)
+  # [injection annotation](https://developer.hashicorp.com/consul/docs/k8s/connect#consul-hashicorp-com-connect-inject)
   # to opt-in to Connect injection. If this is true, pods can use the same annotation
   # to explicitly opt-out of injection.
   default: false
@@ -1901,7 +1907,7 @@ connectInject:
     # Note: This value has no effect if transparent proxy is disabled on the pod.
     defaultOverwriteProbes: true
 
-  # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+  # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
   # for the service mesh sidecar injector.
   disruptionBudget:
     # This will enable/disable registering a PodDisruptionBudget for the
@@ -1992,7 +1998,8 @@ connectInject:
       runAsUser: 0
 
     # updateStrategy for the CNI installer DaemonSet.
-    # Refer to https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
+    # Refer to the Kubernetes [Daemonset upgrade strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy)
+    # documentation.
     # This should be a multi-line string mapping directly to the updateStrategy
     #
     # Example:
@@ -2142,7 +2149,7 @@ connectInject:
   #
   # By default, we exclude kube-system since usually users won't
   # want those pods injected and local-path-storage and openebs so that
-  # Kind (Kubernetes In Docker) and OpenEBS (https://openebs.io/) respectively can provision Pods used to create PVCs.
+  # Kind (Kubernetes In Docker) and [OpenEBS](https://openebs.io/) respectively can provision Pods used to create PVCs.
   # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
@@ -2243,8 +2250,8 @@ connectInject:
   # If set to an empty string all service accounts can log in.
   # This only has effect if ACLs are enabled.
   #
-  # Refer to https://developer.hashicorp.com/consul/docs/security/acl/auth-methods#binding-rules
-  # and https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes#trusted-identity-attributes
+  # Refer to Auth methods [Binding rules](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods#binding-rules)
+  # and [Trusted identiy attributes](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes#trusted-identity-attributes)
   # for more details.
   # Requires Consul >= v1.5.
   aclBindingRuleSelector: "serviceaccount.name!=default"
@@ -2462,7 +2469,7 @@ meshGateway:
         memory: "50Mi"
         cpu: "50m"
 
-  # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
+  # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for mesh gateway pods. It defaults to `null` thereby allowing multiple gateway pods on each node. But if one would prefer
   # a mode which minimizes risk of the cluster becoming unusable if a node is lost, set this value
   # to the value in the example below.
@@ -2488,8 +2495,9 @@ meshGateway:
   tolerations: null
 
   # Pod topology spread constraints for mesh gateway pods.
-  # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
-  # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+  # This should be a multi-line YAML string matching the 
+  # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/)
+  # array in a Pod Spec.
   #
   # This requires K8S >= 1.18 (beta) or 1.19 (stable).
   #
@@ -2609,7 +2617,7 @@ ingressGateways:
         memory: "100Mi"
         cpu: "100m"
 
-    # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
+    # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
     # for ingress gateway pods. It defaults to `null` thereby allowing multiple gateway pods on each node. But if one would prefer
     # a mode which minimizes risk of the cluster becoming unusable if a node is lost, set this value
     # to the value in the example below.
@@ -2635,8 +2643,9 @@ ingressGateways:
     tolerations: null
 
     # Pod topology spread constraints for ingress gateway pods.
-    # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
-    # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+    # This should be a multi-line YAML string matching the 
+    # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/)
+    # array in a Pod Spec.
     #
     # This requires K8S >= 1.18 (beta) or 1.19 (stable).
     #
@@ -2739,7 +2748,7 @@ terminatingGateways:
         memory: "100Mi"
         cpu: "100m"
 
-    # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
+    # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
     # for terminating gateway pods. It defaults to `null` thereby allowing multiple gateway pods on each node. But if one would prefer
     # a mode which minimizes risk of the cluster becoming unusable if a node is lost, set this value
     # to the value in the example below.
@@ -2765,8 +2774,9 @@ terminatingGateways:
     tolerations: null
 
     # Pod topology spread constraints for terminating gateway pods.
-    # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
-    # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
+    # This should be a multi-line YAML string matching the
+    # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/)
+    # array in a Pod Spec.
     #
     # This requires K8S >= 1.18 (beta) or 1.19 (stable).
     #
@@ -2858,7 +2868,7 @@ apiGateway:
     # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
     enabled: true
 
-    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
     # labels for gateway pod assignment, formatted as a multi-line string.
     #
     # Example:
@@ -2943,11 +2953,11 @@ apiGateway:
     annotations: null
 
     # This value references an existing
-    # Kubernetes `priorityClassName` (https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
+    # Kubernetes [`priorityClassName`](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
     # that can be assigned to api-gateway-controller pods.
     priorityClassName: ""
 
-    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
     # labels for api-gateway-controller pod assignment, formatted as a multi-line string.
     #
     # Example:
@@ -2961,7 +2971,7 @@ apiGateway:
     nodeSelector: null
 
     # This value defines the tolerations for api-gateway-controller pod, this should be a multi-line string matching the
-    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     #
     # @type: string
     tolerations: null
@@ -3011,7 +3021,7 @@ webhookCertManager:
   # @type: string
   tolerations: null
 
-  # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+  # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
   # labels for the webhook-cert-manager pod assignment, formatted as a multi-line string.
   #
   # Example:
