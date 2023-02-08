@@ -190,14 +190,19 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		return fmt.Errorf("error creating new troubleshoot: %v", err)
 	}
 
-	upstreams, err := t.GetUpstreams()
+	envoyIDs, upstreamIPs, err := t.GetUpstreams()
 	if err != nil {
 		return fmt.Errorf("error getting upstreams: %v", err)
 	}
 
-	c.UI.Output("Upstreams", terminal.WithHeaderStyle())
-	for _, u := range upstreams {
-		c.UI.Output(fmt.Sprintf("%v", u))
+	c.UI.Output("IDs", terminal.WithHeaderStyle())
+	for _, e := range envoyIDs {
+		c.UI.Output(e)
+	}
+
+	c.UI.Output("IPs", terminal.WithHeaderStyle())
+	for _, u := range upstreamIPs {
+		c.UI.Output(fmt.Sprintf("%+v   %v   %+v", u.IPs, u.IsVirtual, u.ClusterNames))
 	}
 
 	return nil

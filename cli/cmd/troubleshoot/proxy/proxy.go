@@ -207,15 +207,21 @@ func (c *ProxyCommand) Troubleshoot() error {
 		return err
 	}
 
-	output, err := t.RunAllTests(c.flagUpstream)
+	messages, err := t.RunAllTests(c.flagUpstream)
 	if err != nil {
-		c.UI.Output("Errors", terminal.WithHeaderStyle())
-		c.UI.Output("%v", err.Error(), terminal.WithErrorStyle())
+		return err
 	}
 
-	c.UI.Output("Output", terminal.WithHeaderStyle())
-	for _, msg := range output {
-		c.UI.Output(fmt.Sprintf("%v", msg))
+	c.UI.Output("Validation", terminal.WithHeaderStyle())
+	for _, o := range messages {
+		if o.Success {
+			c.UI.Output(o.Message, terminal.WithSuccessStyle())
+		} else {
+			c.UI.Output(o.Message, terminal.WithErrorStyle())
+			if o.PossibleActions != "" {
+				c.UI.Output(fmt.Sprintf("possible actions: %v", o.PossibleActions), terminal.WithInfoStyle())
+			}
+		}
 	}
 
 	return nil
