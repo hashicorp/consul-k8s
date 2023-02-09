@@ -18,12 +18,14 @@ import (
 )
 
 const (
-	defaultAdminPort    int = 19000
-	flagNameKubeConfig      = "kubeconfig"
-	flagNameKubeContext     = "context"
-	flagNameNamespace       = "namespace"
-	flagNamePod             = "pod"
-	flagNameUpstream        = "upstream"
+	defaultAdminPort        int = 19000
+	flagNameKubeConfig          = "kubeconfig"
+	flagNameKubeContext         = "context"
+	flagNameNamespace           = "namespace"
+	flagNamePod                 = "pod"
+	flagNameUpstreamEnvoyID     = "upstream-envoy-id"
+	flagNameUpstreamIP          = "upstream-ip"
+	DebugColor                  = "\033[0;36m%s\033[0m"
 )
 
 type ProxyCommand struct {
@@ -37,8 +39,9 @@ type ProxyCommand struct {
 	flagKubeContext string
 	flagNamespace   string
 
-	flagPod      string
-	flagUpstream string
+	flagPod             string
+	flagUpstreamEnvoyID string
+	flagUpstreamIP      string
 
 	restConfig *rest.Config
 
@@ -59,10 +62,17 @@ func (c *ProxyCommand) init() {
 	})
 
 	f.StringVar(&flag.StringVar{
-		Name:    flagNameUpstream,
-		Target:  &c.flagUpstream,
-		Usage:   "The upstream service that recieves the communication.",
-		Aliases: []string{"u"},
+		Name:    flagNameUpstreamEnvoyID,
+		Target:  &c.flagUpstreamEnvoyID,
+		Usage:   "The envoy identifier of the upstream service that receives the communication. (explicit upstreams only)",
+		Aliases: []string{"id"},
+	})
+
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameUpstreamIP,
+		Target:  &c.flagUpstreamIP,
+		Usage:   "The IP address of the upstream service that receives the communication. (transparent proxy only)",
+		Aliases: []string{"ip"},
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -126,8 +136,8 @@ func (c *ProxyCommand) Run(args []string) int {
 // validateFlags ensures that the flags passed in by the can be used.
 func (c *ProxyCommand) validateFlags() error {
 
-	if c.flagUpstream == "" {
-		return fmt.Errorf("-upstream service SNI is required")
+	if c.flagUpstreamEnvoyID == "" && c.flagUpstreamIP == "" {
+		return fmt.Errorf("-upstream-envoy-id OR -upstream-ip is required.\n Please run `consul troubleshoot upstreams` to find the corresponding upstream.")
 	}
 
 	if c.flagPod == "" {
@@ -207,7 +217,7 @@ func (c *ProxyCommand) Troubleshoot() error {
 		return err
 	}
 
-	messages, err := t.RunAllTests(c.flagUpstream)
+	messages, err := t.RunAllTests(c.flagUpstreamEnvoyID, c.flagUpstreamIP)
 	if err != nil {
 		return err
 	}

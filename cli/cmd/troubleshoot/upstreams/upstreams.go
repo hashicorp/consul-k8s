@@ -3,6 +3,7 @@ package upstreams
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -195,15 +196,17 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		return fmt.Errorf("error getting upstreams: %v", err)
 	}
 
-	c.UI.Output("IDs", terminal.WithHeaderStyle())
+	c.UI.Output(fmt.Sprintf("Upstreams (explicit upstreams only) (%v)", len(envoyIDs)), terminal.WithHeaderStyle())
 	for _, e := range envoyIDs {
 		c.UI.Output(e)
 	}
 
-	c.UI.Output("IPs", terminal.WithHeaderStyle())
+	c.UI.Output(fmt.Sprintf("Upstream IPs (transparent proxy only) (%v)", len(upstreamIPs)), terminal.WithHeaderStyle())
+	table := terminal.NewTable("IPs ", "Virtual ", "Cluster Names")
 	for _, u := range upstreamIPs {
-		c.UI.Output(fmt.Sprintf("%+v   %v   %+v", u.IPs, u.IsVirtual, u.ClusterNames))
+		table.AddRow([]string{formatIPs(u.IPs), strconv.FormatBool(u.IsVirtual), formatClusterNames(u.ClusterNames)}, []string{})
 	}
+	c.UI.Table(table)
 
 	return nil
 }
@@ -232,6 +235,18 @@ func (c *UpstreamsCommand) Synopsis() string {
 
 func (c *UpstreamsCommand) Help() string {
 	return help
+}
+
+func formatIPs(ips []string) string {
+	return strings.Join(ips, ", ")
+}
+
+func formatClusterNames(names map[string]struct{}) string {
+	var out []string
+	for k := range names {
+		out = append(out, k)
+	}
+	return strings.Join(out, ", ")
 }
 
 const (
