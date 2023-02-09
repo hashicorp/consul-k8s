@@ -986,15 +986,15 @@ Any given test can be run either through GoLand or another IDE, or via command l
 
 To run all of the connect tests from command line:
 ```shell
-$ cd acceptance/test
-$ go test ./connect/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-enterprise -enable-multi-cluster -debug-directory=/tmp/debug -consul-k8s-image=kyleschochenmaier/consul-k8s-acls 
+$ cd acceptance/tests
+$ go test ./connect/... -v -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-enterprise -enable-multi-cluster -debug-directory=/tmp/debug -consul-k8s-image=kyleschochenmaier/consul-k8s-acls 
 ```
 
 When running from command line a few things are important:
 * Some tests use Enterprise features, in which case you need:
     * Set environment variables `CONSUL_ENT_LICENSE` and possibly `VAULT_LICENSE`.
     * Use `-enable-enterprise` on command line when running the test.
-* Multi-cluster tests require `-enable-multi-cluster` + `-kubecontext=<kind-dc1>` + `-secondary-kubecontext=<kind-dc2>`
+* Multi-cluster tests require `-enable-multi-cluster -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2`
 * Using `./<test-directory>/...` is required as part of the command-line to pick up necessary environmental config.
 
 ### Using the framework to debug in an environment
