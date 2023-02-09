@@ -47,7 +47,22 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.global.secretsBackend.vault.enabled }}
-        "vault.hashicorp.com/agent-pre-populate-only": "true"
+
+        {{- /* Run the Vault agent as both an init container and sidecar.
+        The Vault agent sidecar is needed when server-acl-init bootstraps ACLs
+        and writes the bootstrap token back to Vault.
+          * agent-prepopulate: true - Run the Vault agent init container.
+          * agent-pre-populate-only: false - Also, run the Vault agent sidecar.
+          * agent-cache-enable: true - Enable the Agent cache listener.
+          * agent-cache-listener-port: 8200 - (optional) Listen on 127.0.0.1:8200.
+          * agent-enable-quit: true - Enable a "quit" endpoint. server-acl-init
+            tells the Vault agent to stop (without this the Job will complete).
+        */}}
+        "vault.hashicorp.com/agent-pre-populate": "true"
+        "vault.hashicorp.com/agent-pre-populate-only": "false"
+        "vault.hashicorp.com/agent-cache-enable": "true"
+        "vault.hashicorp.com/agent-cache-listener-port": "8200"
+        "vault.hashicorp.com/agent-enable-quit": "true"
         "vault.hashicorp.com/agent-inject": "true"
         {{- if .Values.global.acls.bootstrapToken.secretName }}
         {{- with .Values.global.acls.bootstrapToken }}
@@ -161,10 +176,13 @@ spec:
             -resource-prefix=${CONSUL_FULLNAME} \
             -k8s-namespace={{ .Release.Namespace }} \
             -set-server-tokens={{ $serverEnabled }} \
-
+            {{- if .Values.global.secretsBackend.vault.enabled }}
+            -secrets-backend=vault \
+            {{- end }}
             {{- if .Values.global.acls.bootstrapToken.secretName }}
             {{- if .Values.global.secretsBackend.vault.enabled }}
-            -bootstrap-token-file=/vault/secrets/bootstrap-token \
+            -bootstrap-token-secret-name={{ .Values.global.acls.bootstrapToken.secretName }} \
+            -bootstrap-token-secret-key={{ .Values.global.acls.bootstrapToken.secretKey }} \
             {{- else }}
             -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
             {{- end }}

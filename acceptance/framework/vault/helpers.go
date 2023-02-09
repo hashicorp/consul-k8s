@@ -167,6 +167,20 @@ func (config *KV2Secret) SaveSecretAndAddReadPolicy(t *testing.T, vaultClient *v
 	path "%s" {
 	  capabilities = ["read"]
 	}`, config.Path)
+	config.saveSecretAndAddPolicy(t, vaultClient, policy)
+}
+
+// SaveSecretAndAddUpdatePolicy will create an update policy for the PolicyName
+// on the KV2Secret and then will save the secret in the KV2 store.
+func (config *KV2Secret) SaveSecretAndAddUpdatePolicy(t *testing.T, vaultClient *vapi.Client) {
+	policy := fmt.Sprintf(`
+	path "%s" {
+	  capabilities = ["read", "update"]
+	}`, config.Path)
+	config.saveSecretAndAddPolicy(t, vaultClient, policy)
+}
+
+func (config *KV2Secret) saveSecretAndAddPolicy(t *testing.T, vaultClient *vapi.Client, policy string) {
 	// Create the Vault Policy for the secret.
 	logger.Log(t, "Creating policy")
 	err := vaultClient.Sys().PutPolicy(config.PolicyName, policy)

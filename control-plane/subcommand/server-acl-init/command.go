@@ -22,12 +22,11 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-netaddrs"
+	vaultApi "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -89,6 +88,10 @@ type Command struct {
 	// Flag to support a custom bootstrap token.
 	flagBootstrapTokenFile string
 
+	flagSecretsBackend           string
+	flagBootstrapTokenSecretName string
+	flagBootstrapTokenSecretKey  string
+
 	flagLogLevel string
 	flagLogJSON  bool
 	flagTimeout  time.Duration
@@ -98,7 +101,8 @@ type Command struct {
 	// flagFederation indicates if federation has been enabled in the cluster.
 	flagFederation bool
 
-	clientset kubernetes.Interface
+	clientset   kubernetes.Interface
+	vaultClient *vaultApi.Client
 
 	watcher consul.ServerConnectionManager
 
@@ -197,6 +201,12 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
+	c.flags.StringVar(&c.flagSecretsBackend, "secrets-backend", "kubernetes",
+		`The secrets backend to use. Either "vault" or "kubernetes". Defaults to "kubernetes"`)
+	c.flags.StringVar(&c.flagBootstrapTokenSecretName, "bootstrap-token-secret-name", "",
+		"The name of the Vault or Kuberenetes secret for the bootstrap token.")
+	c.flags.StringVar(&c.flagBootstrapTokenSecretKey, "bootstrap-token-secret-key", "",
+		"The key within the Vault or Kuberenetes containing the bootstrap token.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
@@ -231,6 +241,7 @@ func (c *Command) Help() string {
 // The function will retry its tasks indefinitely until they are complete.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+	defer c.quitVaultAgent()
 	if err := c.flags.Parse(args); err != nil {
 		return 1
 	}
@@ -306,8 +317,38 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 	}
 
-	var bootstrapToken string
+	var backend SecretsBackend
+	switch SecretsBackendType(c.flagSecretsBackend) {
+	case SecretsBackendKubernetes:
+		backend = &KubernetesSecretsBackend{
+			ctx:          c.ctx,
+			clientset:    c.clientset,
+			k8sNamespace: c.flagK8sNamespace,
+			// TODO: should these use the global.acls.bootstrapToken.{secretName,secretKey}?
+			secretName: c.withPrefix("bootstrap-acl-token"),
+			secretKey:  common.ACLTokenSecretKey,
+		}
+	case SecretsBackendVault:
+		cfg := vaultApi.DefaultConfig()
+		cfg.Address = ""
+		cfg.AgentAddress = "http://127.0.0.1:8200"
+		vaultClient, err := vaultApi.NewClient(cfg)
+		if err != nil {
+			c.log.Error("Error initializing Vault client: %w", "error", err)
+			return 1
+		}
+		c.vaultClient = vaultClient // must set this for c.quitVaultAgent.
+		backend = &VaultSecretsBackend{
+			vaultClient: c.vaultClient,
+			secretName:  c.flagBootstrapTokenSecretName,
+			secretKey:   c.flagBootstrapTokenSecretKey,
+		}
+	default:
+		c.log.Error(fmt.Sprintf("invalid value for -secrets-backend: %q", c.flagSecretsBackend))
+		return 1
+	}
 
+	var bootstrapToken string
 	if c.flagACLReplicationTokenFile != "" && !c.flagCreateACLReplicationToken {
 		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
 		// since they will be performing replication.
@@ -317,20 +358,18 @@ func (c *Command) Run(args []string) int {
 		bootstrapToken = aclReplicationToken
 	} else {
 		// Check if we've already been bootstrapped.
-		var bootTokenSecretName string
 		if providedBootstrapToken != "" {
 			c.log.Info("Using provided bootstrap token")
 			bootstrapToken = providedBootstrapToken
 		} else {
-			bootTokenSecretName = c.withPrefix("bootstrap-acl-token")
-			bootstrapToken, err = c.getBootstrapToken(bootTokenSecretName)
+			bootstrapToken, err = backend.BootstrapToken()
 			if err != nil {
 				c.log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
 				return 1
 			}
 		}
 
-		bootstrapToken, err = c.bootstrapServers(ipAddrs, bootstrapToken, bootTokenSecretName)
+		bootstrapToken, err = c.bootstrapServers(ipAddrs, bootstrapToken, backend)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -806,24 +845,6 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 	return nil
 }
 
-// getBootstrapToken returns the existing bootstrap token if there is one by
-// reading the Kubernetes Secret with name secretName.
-// If there is no bootstrap token yet, then it returns an empty string (not an error).
-func (c *Command) getBootstrapToken(secretName string) (string, error) {
-	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			return "", nil
-		}
-		return "", err
-	}
-	token, ok := secret.Data[common.ACLTokenSecretKey]
-	if !ok {
-		return "", fmt.Errorf("secret %q does not have data key 'token'", secretName)
-	}
-	return string(token), nil
-}
-
 func (c *Command) configureKubeClient() error {
 	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
 	if err != nil {
@@ -975,6 +996,25 @@ func loadTokenFromFile(tokenFile string) (string, error) {
 		return "", fmt.Errorf("token file %q is empty", tokenFile)
 	}
 	return strings.TrimSpace(string(tokenBytes)), nil
+}
+
+func (c *Command) quitVaultAgent() {
+	if c.vaultClient != nil {
+		// Tell the Vault agent to quit.
+		// TODO: RawRequest is deprecated, but there is also
+		// not a high level method for this in the Vault client.
+		//nolint:staticcheck // SA1004 ignore this!
+		_, err := c.vaultClient.RawRequest(
+			c.vaultClient.NewRequest("POST", "/agent/v1/quit"),
+		)
+		if err != nil {
+			c.log.Warn(fmt.Sprintf("Unexpected error telling Vault agent to quit: %s", err))
+			// proceed anyway. maybe the Vault agent sidecar is still running,
+			// but what could go wrong with a request to localhost that retrying would fix?
+		} else {
+			c.log.Debug("Success: told Vault agent to quit")
+		}
+	}
 }
 
 const (
