@@ -364,8 +364,9 @@ global:
     #
     # Note that we need the CA key so that we can generate server and client certificates.
     # It is particularly important for the client certificates since they need to have host IPs
-    # as Subject Alternative Names. In the future, we may support bringing your own server
-    # certificates.
+    # as Subject Alternative Names. If you are setting server certs yourself via `server.serverCert`
+    # and you are not enabling clients (or clients are enabled with autoEncrypt) then you do not
+    # need to provide the CA key.
     caKey:
       # The name of the Kubernetes or Vault secret that holds the CA key.
       # @type: string
