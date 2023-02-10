@@ -31,6 +31,14 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{"-namespace", "notaname"},
 			out:  1,
 		},
+		"Cannot pass both -upstream-envoy-id and -upstream-ip flags, should fail": {
+			args: []string{"-upstream-envoy-id", "1234", "-upstream-ip", "127.0.0.1"},
+			out:  1,
+		},
+		"Cannot pass empty -upstream-envoy-id and -upstream-ip flags, should fail": {
+			args: []string{"-upstream-envoy-id", "-upstream-ip"},
+			out:  1,
+		},
 	}
 
 	for name, tc := range cases {

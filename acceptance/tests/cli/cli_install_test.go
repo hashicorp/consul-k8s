@@ -25,8 +25,9 @@ func TestInstall(t *testing.T) {
 		secure bool
 		tproxy bool
 	}{
-		"not-secure": {secure: false, tproxy: false},
-		"secure":     {secure: true, tproxy: false},
+		"not-secure":        {secure: false, tproxy: false},
+		"secure":            {secure: true, tproxy: false},
+		"not-secure-tproxy": {secure: false, tproxy: true},
 	}
 
 	for name, c := range cases {
@@ -99,8 +100,7 @@ func TestInstall(t *testing.T) {
 			require.NoError(t, err)
 
 			if c.tproxy {
-				// With tproxy disabled and explicit upstreams we need the upstream ip of the static-server. This is the
-				// ClusterIP of the service
+				// If tproxy is enabled we are looking for the upstream ip which is the ClusterIP of the Kubernetes Service
 				serverService, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Services(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
 					FieldSelector: "metadata.name=static-server",
 				})
@@ -112,9 +112,8 @@ func TestInstall(t *testing.T) {
 				require.Regexp(t, "upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))
 			} else {
-				// If tproxy is enabled we are looking for the upstream envoy id
+				// With tproxy disabled and explicit upstreams we need the envoy-id of the server
 				require.Regexp(t, "static-server", string(upstreamsOut))
-				logger.Log(t, string(upstreamsOut))
 
 				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
 				require.NoError(t, err)

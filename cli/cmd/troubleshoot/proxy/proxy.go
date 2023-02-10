@@ -136,7 +136,7 @@ func (c *ProxyCommand) Run(args []string) int {
 // validateFlags ensures that the flags passed in by the can be used.
 func (c *ProxyCommand) validateFlags() error {
 
-	if c.flagUpstreamEnvoyID == "" && c.flagUpstreamIP == "" {
+	if (c.flagUpstreamEnvoyID == "" && c.flagUpstreamIP == "") || (c.flagUpstreamEnvoyID != "" && c.flagUpstreamIP != "") {
 		return fmt.Errorf("-upstream-envoy-id OR -upstream-ip is required.\n Please run `consul troubleshoot upstreams` to find the corresponding upstream.")
 	}
 
@@ -212,10 +212,10 @@ func (c *ProxyCommand) Troubleshoot() error {
 		return err
 	}
 
-	err = t.GetEnvoyConfigDump()
-	if err != nil {
-		return err
-	}
+	// err = t.GetEnvoyConfigDump()
+	// if err != nil {
+	// 	return err
+	// }
 
 	messages, err := t.RunAllTests(c.flagUpstreamEnvoyID, c.flagUpstreamIP)
 	if err != nil {
