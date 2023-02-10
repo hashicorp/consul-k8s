@@ -24,7 +24,6 @@ const (
 	flagNameKubeContext     = "context"
 	flagNameNamespace       = "namespace"
 	flagNamePod             = "pod"
-	flagNameUpstream        = "upstream"
 )
 
 type UpstreamsCommand struct {
