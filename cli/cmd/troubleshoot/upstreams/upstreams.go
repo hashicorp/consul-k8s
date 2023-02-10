@@ -196,7 +196,7 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		return fmt.Errorf("error getting upstreams: %v", err)
 	}
 
-	c.UI.Output(fmt.Sprintf("Upstreams (explicit upstreams only) (%v)", len(envoyIDs)), terminal.WithHeaderStyle())
+	c.UI.Output(fmt.Sprintf("Envoy Identifiers (explicit upstreams only) (%v)", len(envoyIDs)), terminal.WithHeaderStyle())
 	for _, e := range envoyIDs {
 		c.UI.Output(e)
 	}

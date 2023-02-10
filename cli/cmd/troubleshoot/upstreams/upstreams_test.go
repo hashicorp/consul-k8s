@@ -43,6 +43,69 @@ func TestFlagParsing(t *testing.T) {
 	}
 }
 
+func TestFormatIPs(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		actual   []string
+		expected string
+	}{
+		{
+			name:     "single IPs",
+			actual:   []string{"1.1.1.1"},
+			expected: "1.1.1.1",
+		},
+
+		{
+			name:     "several IPs",
+			actual:   []string{"1.1.1.1", "2.2.2.2"},
+			expected: "1.1.1.1, 2.2.2.2",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := formatIPs(c.actual)
+			if c.expected != got {
+				t.Errorf("expected %v, got %v", c.expected, got)
+			}
+		})
+	}
+}
+
+func TestFormatClusterNames(t *testing.T) {
+	cases := []struct {
+		name     string
+		actual   map[string]struct{}
+		expected string
+	}{
+		{
+			name: "single cluster",
+			actual: map[string]struct{}{
+				"cluster1": {},
+			},
+			expected: "cluster1",
+		},
+		{
+			name: "several clusters",
+			actual: map[string]struct{}{
+				"cluster1": {},
+				"cluster2": {},
+				"cluster3": {},
+			},
+			expected: "cluster1, cluster2, cluster3",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := formatClusterNames(c.actual)
+			if c.expected != got {
+				t.Errorf("expected %v, got %v", c.expected, got)
+			}
+		})
+	}
+}
+
 func setupCommand(buf io.Writer) *UpstreamsCommand {
 	// Log at a test level to standard out.
 	log := hclog.New(&hclog.LoggerOptions{

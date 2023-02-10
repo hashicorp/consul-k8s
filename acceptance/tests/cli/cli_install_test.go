@@ -23,9 +23,10 @@ const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]
 func TestInstall(t *testing.T) {
 	cases := map[string]struct {
 		secure bool
+		tproxy bool
 	}{
-		"not-secure": {secure: false},
-		"secure":     {secure: true},
+		"not-secure": {secure: false, tproxy: false},
+		"secure":     {secure: true, tproxy: false},
 	}
 
 	for name, c := range cases {
@@ -34,6 +35,7 @@ func TestInstall(t *testing.T) {
 			require.NoError(t, err)
 
 			cfg := suite.Config()
+			cfg.EnableTransparentProxy = c.tproxy
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := connhelper.ConnectHelper{
@@ -85,20 +87,40 @@ func TestInstall(t *testing.T) {
 				}
 			})
 
-			// Run troubleshoot validation
-			pods, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Pods(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+			// Troubleshoot: Get the client pod so we can portForward to it and get the 'troubleshoot upstreams' output
+			clientPod, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Pods(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "app=static-client",
 			})
 			require.NoError(t, err)
-			podName := pods.Items[0].Name
-			upstreamsOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", podName)
-			require.NoError(t, err)
-			require.Regexp(t, "static-server", string(upstreamsOut))
-			logger.Log(t, string(upstreamsOut))
 
-			proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", podName, "-upstream", "static-server")
+			clientPodName := clientPod.Items[0].Name
+			upstreamsOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", clientPodName)
+			logger.Log(t, string(upstreamsOut))
 			require.NoError(t, err)
-			logger.Log(t, string(proxyOut))
+
+			if c.tproxy {
+				// With tproxy disabled and explicit upstreams we need the upstream ip of the static-server. This is the
+				// ClusterIP of the service
+				serverService, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Services(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+					FieldSelector: "metadata.name=static-server",
+				})
+				require.NoError(t, err)
+				serverIP := serverService.Items[0].Spec.ClusterIP
+
+				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
+				require.NoError(t, err)
+				require.Regexp(t, "upstream resources are valid", string(proxyOut))
+				logger.Log(t, string(proxyOut))
+			} else {
+				// If tproxy is enabled we are looking for the upstream envoy id
+				require.Regexp(t, "static-server", string(upstreamsOut))
+				logger.Log(t, string(upstreamsOut))
+
+				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
+				require.NoError(t, err)
+				require.Regexp(t, "upstream resources are valid", string(proxyOut))
+				logger.Log(t, string(proxyOut))
+			}
 
 			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
