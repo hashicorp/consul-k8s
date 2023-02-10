@@ -8,7 +8,7 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/google/go-cmp v0.5.8
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
-	github.com/hashicorp/consul/troubleshoot v0.0.0-20230209233903-78a4b5fd6f81
+	github.com/hashicorp/consul/troubleshoot v0.0.0-20230210154717-4f2ce606547b
 	github.com/hashicorp/go-hclog v1.2.1
 	github.com/hashicorp/hcp-sdk-go v0.23.1-0.20220921131124-49168300a7dc
 	github.com/kr/text v0.2.0
@@ -100,7 +100,7 @@ require (
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/hashicorp/consul/api v1.10.1-0.20230209203402-db2bd404bf72 // indirect
-	github.com/hashicorp/consul/envoyextensions v0.0.0-20230209212012-3b9c56956132 // indirect
+	github.com/hashicorp/consul/envoyextensions v0.0.0-20230210154717-4f2ce606547b // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
@@ -194,9 +194,4 @@ require (
 // chart. When the CLI compiles, all changes to the local charts directory are picked up automatically. This directive
 // works because of the monorepo setup, where the charts module and CLI module are in the same repository. Otherwise,
 // this won't work.
-replace (
-	github.com/hashicorp/consul-k8s/charts => ../charts
-	github.com/hashicorp/consul/api => /Users/curtbushko/workspace/github.com/hashicorp/consul/api
-	github.com/hashicorp/consul/envoyextensions => /Users/curtbushko/workspace/github.com/hashicorp/consul/envoyextensions
-	github.com/hashicorp/consul/troubleshoot => /Users/curtbushko/workspace/github.com/hashicorp/consul/troubleshoot
-)
+replace github.com/hashicorp/consul-k8s/charts => ../charts
