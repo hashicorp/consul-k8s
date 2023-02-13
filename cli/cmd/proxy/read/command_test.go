@@ -9,16 +9,18 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/envoy"
+	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/go-hclog"
 )
 
 func TestFlagParsing(t *testing.T) {
@@ -65,38 +67,48 @@ func TestReadCommandOutput(t *testing.T) {
 	// These regular expressions must be present in the output.
 	expectedHeader := fmt.Sprintf("Envoy configuration for %s in namespace default:", podName)
 	expected := map[string][]string{
-		"-clusters": {"==> Clusters \\(5\\)",
+		"-clusters": {
+			"==> Clusters \\(5\\)",
 			"Name.*FQDN.*Endpoints.*Type.*Last Updated",
 			"local_agent.*192\\.168\\.79\\.187:8502.*STATIC.*2022-05-13T04:22:39\\.553Z",
 			"local_app.*127\\.0\\.0\\.1:8080.*STATIC.*2022-05-13T04:22:39\\.655Z",
 			"client.*client\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul.*EDS",
 			"frontend.*frontend\\.default\\.dc1\\.internal\\.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00\\.consul",
-			"original-destination.*ORIGINAL_DST"},
+			"original-destination.*ORIGINAL_DST",
+		},
 
-		"-endpoints": {"==> Endpoints \\(6\\)",
+		"-endpoints": {
+			"==> Endpoints \\(6\\)",
 			"Address:Port.*Cluster.*Weight.*Status",
 			"192.168.79.187:8502.*local_agent.*1.00.*HEALTHY",
 			"127.0.0.1:8080.*local_app.*1.00.*HEALTHY",
 			"192.168.18.110:20000.*client.*1.00.*HEALTHY",
 			"192.168.52.101:20000.*client.*1.00.*HEALTHY",
 			"192.168.65.131:20000.*client.*1.00.*HEALTHY",
-			"192.168.63.120:20000.*frontend.*1.00.*HEALTHY"},
+			"192.168.63.120:20000.*frontend.*1.00.*HEALTHY",
+		},
 
-		"-listeners": {"==> Listeners \\(2\\)",
+		"-listeners": {
+			"==> Listeners \\(2\\)",
 			"Name.*Address:Port.*Direction.*Filter Chain Match.*Filters.*Last Updated",
 			"public_listener.*192\\.168\\.69\\.179:20000.*INBOUND.*Any.*\\* -> local_app/",
 			"outbound_listener.*127.0.0.1:15001.*OUTBOUND.*10\\.100\\.134\\.173/32, 240\\.0\\.0\\.3/32.*TCP: -> client",
 			"10\\.100\\.31\\.2/32, 240\\.0\\.0\\.5/32.*TCP: -> frontend",
-			"Any.*TCP: -> original-destination"},
+			"Any.*TCP: -> original-destination",
+		},
 
-		"-routes": {"==> Routes \\(1\\)",
+		"-routes": {
+			"==> Routes \\(1\\)",
 			"Name.*Destination Cluster.*Last Updated",
-			"public_listener.*local_app/"},
+			"public_listener.*local_app/",
+		},
 
-		"-secrets": {"==> Secrets \\(2\\)",
+		"-secrets": {
+			"==> Secrets \\(2\\)",
 			"Name.*Type.*Last Updated",
 			"default.*Dynamic Active",
-			"ROOTCA.*Dynamic Warming"},
+			"ROOTCA.*Dynamic Warming",
+		},
 	}
 
 	cases := map[string][]string{
@@ -122,7 +134,7 @@ func TestReadCommandOutput(t *testing.T) {
 	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
 
 	// A fetchConfig function that just returns the test Envoy config.
-	c.fetchConfig = func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
+	c.fetchConfig = func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error) {
 		return testEnvoyConfig, nil
 	}
 
@@ -230,7 +242,7 @@ func TestFilterWarnings(t *testing.T) {
 			buf := new(bytes.Buffer)
 			c := setupCommand(buf)
 			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
-			c.fetchConfig = func(context.Context, common.PortForwarder) (*EnvoyConfig, error) {
+			c.fetchConfig = func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error) {
 				return testEnvoyConfig, nil
 			}
 
@@ -294,4 +306,74 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 	cmd := setupCommand(buf)
 	c := cmd.AutocompleteArgs()
 	assert.Equal(t, complete.PredictNothing, c)
+}
+
+// testEnvoyConfig is what we expect the config at `test_config_dump.json` to be.
+
+var testEnvoyConfig = &envoy.EnvoyConfig{
+	Clusters: []envoy.Cluster{
+		{Name: "local_agent", FullyQualifiedDomainName: "local_agent", Endpoints: []string{"192.168.79.187:8502"}, Type: "STATIC", LastUpdated: "2022-05-13T04:22:39.553Z"},
+
+		{Name: "client", FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul", Endpoints: []string{"192.168.18.110:20000", "192.168.52.101:20000", "192.168.65.131:20000"}, Type: "EDS", LastUpdated: "2022-08-10T12:30:32.326Z"},
+
+		{Name: "frontend", FullyQualifiedDomainName: "frontend.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul", Endpoints: []string{"192.168.63.120:20000"}, Type: "EDS", LastUpdated: "2022-08-10T12:30:32.233Z"},
+
+		{Name: "local_app", FullyQualifiedDomainName: "local_app", Endpoints: []string{"127.0.0.1:8080"}, Type: "STATIC", LastUpdated: "2022-05-13T04:22:39.655Z"},
+
+		{Name: "original-destination", FullyQualifiedDomainName: "original-destination", Endpoints: []string{}, Type: "ORIGINAL_DST", LastUpdated: "2022-05-13T04:22:39.743Z"},
+	},
+
+	Endpoints: []envoy.Endpoint{
+		{Address: "192.168.79.187:8502", Cluster: "local_agent", Weight: 1, Status: "HEALTHY"},
+
+		{Address: "192.168.18.110:20000", Cluster: "client", Weight: 1, Status: "HEALTHY"},
+
+		{Address: "192.168.52.101:20000", Cluster: "client", Weight: 1, Status: "HEALTHY"},
+
+		{Address: "192.168.65.131:20000", Cluster: "client", Weight: 1, Status: "HEALTHY"},
+
+		{Address: "192.168.63.120:20000", Cluster: "frontend", Weight: 1, Status: "HEALTHY"},
+
+		{Address: "127.0.0.1:8080", Cluster: "local_app", Weight: 1, Status: "HEALTHY"},
+	},
+
+	Listeners: []envoy.Listener{
+		{Name: "public_listener", Address: "192.168.69.179:20000", FilterChain: []envoy.FilterChain{{Filters: []string{"HTTP: * -> local_app/"}, FilterChainMatch: "Any"}}, Direction: "INBOUND", LastUpdated: "2022-08-10T12:30:47.142Z"},
+
+		{Name: "outbound_listener", Address: "127.0.0.1:15001", FilterChain: []envoy.FilterChain{
+			{Filters: []string{"TCP: -> client"}, FilterChainMatch: "10.100.134.173/32, 240.0.0.3/32"},
+
+			{Filters: []string{"TCP: -> frontend"}, FilterChainMatch: "10.100.31.2/32, 240.0.0.5/32"},
+
+			{Filters: []string{"TCP: -> original-destination"}, FilterChainMatch: "Any"},
+		}, Direction: "OUTBOUND", LastUpdated: "2022-07-18T15:31:03.246Z"},
+	},
+
+	Routes: []envoy.Route{
+		{
+			Name: "public_listener",
+
+			DestinationCluster: "local_app/",
+
+			LastUpdated: "2022-08-10T12:30:47.141Z",
+		},
+	},
+
+	Secrets: []envoy.Secret{
+		{
+			Name: "default",
+
+			Type: "Dynamic Active",
+
+			LastUpdated: "2022-05-24T17:41:59.078Z",
+		},
+
+		{
+			Name: "ROOTCA",
+
+			Type: "Dynamic Warming",
+
+			LastUpdated: "2022-03-15T05:14:22.868Z",
+		},
+	},
 }

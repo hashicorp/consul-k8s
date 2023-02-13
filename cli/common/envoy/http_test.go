@@ -1,21 +1,38 @@
-package read
+package envoy
 
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed test_config_dump.json test_clusters.json
-var fs embed.FS
+func TestCallLoggingEndpoint(t *testing.T) {
+	t.Parallel()
+	rawLogLevels, err := os.ReadFile("testdata/fetch_debug_levels.txt")
+	require.NoError(t, err)
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(rawLogLevels)
+	}))
+
+	defer mockServer.Close()
+
+	mpf := &mockPortForwarder{
+		openBehavior: func(ctx context.Context) (string, error) {
+			return strings.Replace(mockServer.URL, "http://", "", 1), nil
+		},
+	}
+	logLevels, err := CallLoggingEndpoint(context.Background(), mpf, NewLoggerParams())
+	require.NoError(t, err)
+	require.Equal(t, testLogConfig(), logLevels)
+}
 
 const (
 	testConfigDump = "test_config_dump.json"
@@ -35,7 +52,7 @@ func TestUnmarshaling(t *testing.T) {
 }
 
 func TestJSON(t *testing.T) {
-	raw, err := fs.ReadFile(testConfigDump)
+	raw, err := os.ReadFile(fmt.Sprintf("testdata/%s", testConfigDump))
 	require.NoError(t, err)
 	expected := bytes.TrimSpace(raw)
 
@@ -49,10 +66,10 @@ func TestJSON(t *testing.T) {
 }
 
 func TestFetchConfig(t *testing.T) {
-	configDump, err := fs.ReadFile(testConfigDump)
+	configDump, err := os.ReadFile(fmt.Sprintf("testdata/%s", testConfigDump))
 	require.NoError(t, err)
 
-	clusters, err := fs.ReadFile(testClusters)
+	clusters, err := os.ReadFile(fmt.Sprintf("testdata/%s", testClusters))
 	require.NoError(t, err)
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -446,18 +463,11 @@ func TestClusterParsingEndpoints(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
-type mockPortForwarder struct {
-	openBehavior func(context.Context) (string, error)
-}
-
-func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
-func (m *mockPortForwarder) Close()                                   {}
-
 func rawEnvoyConfig(t *testing.T) []byte {
-	configDump, err := fs.ReadFile(testConfigDump)
+	configDump, err := os.ReadFile(fmt.Sprintf("testdata/%s", testConfigDump))
 	require.NoError(t, err)
 
-	clusters, err := fs.ReadFile(testClusters)
+	clusters, err := os.ReadFile(fmt.Sprintf("testdata/%s", testClusters))
 	require.NoError(t, err)
 
 	return []byte(fmt.Sprintf("{\n\"config_dump\":%s,\n\"clusters\":%s}", string(configDump), string(clusters)))
@@ -507,4 +517,19 @@ var testEnvoyConfig = &EnvoyConfig{
 			LastUpdated: "2022-03-15T05:14:22.868Z",
 		},
 	},
+}
+
+type mockPortForwarder struct {
+	openBehavior func(context.Context) (string, error)
+}
+
+func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
+func (m *mockPortForwarder) Close()                                   {}
+
+func testLogConfig() map[string]string {
+	cfg := make(map[string]string, len(envoyLoggers))
+	for k := range envoyLoggers {
+		cfg[k] = "debug"
+	}
+	return cfg
 }
