@@ -24,9 +24,9 @@ spec:
       required: false
       arguments:
         payloadPassthrough: false
-        region: us-west-2
+        arn: arn:aws:lambda:us-west-2:111111111111:function:lambda-1234
     - name: builtin/aws/lambda
       required: false
       arguments:
         payloadPassthrough: false
-        region: us-east-1
+        arn: arn:aws:lambda:us-east-1:111111111111:function:lambda-1234
