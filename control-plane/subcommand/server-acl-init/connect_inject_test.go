@@ -30,6 +30,20 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 		ctx:                ctx,
 	}
 
+	// create the auth method secret since it is always deployed by helm chart.
+	authMethodSecretName := resourcePrefix + "-auth-method"
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   authMethodSecretName,
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+		},
+		Data: map[string][]byte{},
+		// Make it not a service-account-token so the test can pass through to checking the other secrets.
+		Type: v1.SecretTypeOpaque,
+	}
+	_, err := k8s.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
 	serviceAccountName := resourcePrefix + "-auth-method"
 	secretName := resourcePrefix + "-connect-injector"
 
@@ -53,7 +67,7 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 	}
 
 	// Create a secret of non service-account-token type (we're using the opaque type).
-	secret := &v1.Secret{
+	secret = &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   secretName,
 			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
@@ -61,7 +75,7 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeOpaque,
 	}
-	_, err := k8s.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
+	_, err = k8s.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	_, err = cmd.createAuthMethodTmpl("test", true)
