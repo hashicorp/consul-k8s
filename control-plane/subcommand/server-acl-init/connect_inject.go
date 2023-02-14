@@ -96,16 +96,13 @@ func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.A
 
 	var saSecret *apiv1.Secret
 	var secretNames []string
-	if len(authMethodServiceAccount.Secrets) == 0 {
-		// In Kube 1.24+ there is no automatically generated long term JWT token for a ServiceAccount.
-		// Furthermore, there is no reference to a Secret in the ServiceAccount. Instead we have deployed
-		// a Secret in Helm which references the ServiceAccount and contains a permanent JWT token.
-		secretNames = append(secretNames, c.withPrefix("auth-method"))
-	} else {
-		// ServiceAccounts always have a SecretRef in Kubernetes < 1.24. The Secret contains the JWT token.
-		for _, secretRef := range authMethodServiceAccount.Secrets {
-			secretNames = append(secretNames, secretRef.Name)
-		}
+	// In Kube 1.24+ there is no automatically generated long term JWT token for a ServiceAccount.
+	// Furthermore, there is no reference to a Secret in the ServiceAccount. Instead we have deployed
+	// a Secret in Helm which references the ServiceAccount and contains a permanent JWT token.
+	secretNames = append(secretNames, c.withPrefix("auth-method"))
+	// ServiceAccounts always have a SecretRef in Kubernetes < 1.24. The Secret contains the JWT token.
+	for _, secretRef := range authMethodServiceAccount.Secrets {
+		secretNames = append(secretNames, secretRef.Name)
 	}
 	// Because there could be multiple secrets attached to the service account,
 	// we need pick the first one of type corev1.SecretTypeServiceAccountToken.
