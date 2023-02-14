@@ -64,6 +64,8 @@ BUG FIXES:
 IMPROVEMENTS:
 * Helm:
   * CNI: Add `connectInject.cni.namespace` stanza which allows the CNI plugin resources to be deployed in a namespace other than the namespace that Consul is installed. [[GH-1756](https://github.com/hashicorp/consul-k8s/pull/1756)]
+* Control Plane:
+  * Server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/pull/1770)]
 
 BUG FIXES:
 * Helm:
