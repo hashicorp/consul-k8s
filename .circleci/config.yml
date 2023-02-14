@@ -6,7 +6,7 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/cimg/go:1.19.2
+      - image: docker.mirror.hashicorp.services/cimg/go:1.20.1
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
@@ -35,9 +35,9 @@ commands:
       - run:
           name: Install go, gotestsum, kind, kubectl, and helm
           command: |
-            wget https://golang.org/dl/go1.19.2.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.19.2.linux-amd64.tar.gz
-            rm go1.19.2.linux-amd64.tar.gz
+            wget https://golang.org/dl/go1.20.1.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.20.1.linux-amd64.tar.gz
+            rm go1.20.1.linux-amd64.tar.gz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
 
             wget https://github.com/gotestyourself/gotestsum/releases/download/v1.8.2/gotestsum_1.8.2_linux_amd64.tar.gz
@@ -1374,19 +1374,3 @@ workflows:
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
-
-  nightly-kind-acceptance-tests-consul-compatability:
-    description: |
-      Acceptance tests which run nightly to verify the compatibility between
-      a consul-k8s binary and it's consul version pair. Tests will be conducted
-      for up to n-2 previous Consul-k8s releases.
-    triggers:
-      - schedule:
-          cron: "0 0 * * *" # Run at 12 am UTC (5 pm PST)
-          filters:
-            branches:
-              only:
-                - main
-    jobs:
-      - acceptance-kind-1-23-consul-compat-nightly-1-12
-      - acceptance-kind-1-23-consul-compat-nightly-1-13
