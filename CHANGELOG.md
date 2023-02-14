@@ -1,66 +1,5 @@
 ## UNRELEASED
 
-BREAKING CHANGES:
-* Helm:
-  * Change defaults to exclude the `openebs` namespace from sidecar injection. If you previously had pods in that namespace
-    that you wanted to be injected, you must now set `namespaceSelector` as follows:
-  
-    ```yaml
-    connectInject:
-      namespaceSelector: |
-        matchExpressions:
-        - key: "kubernetes.io/metadata.name"
-          operator: "NotIn"
-          values: ["kube-system","local-path-storage"]
-    ```
-    [[GH-1869](https://github.com/hashicorp/consul-k8s/pull/1869)]
-
-IMPROVEMENTS:
-* Helm:
-  * Kubernetes v1.26 is now supported. Minimum tested version of Kubernetes is now v1.23. [[GH-1852](https://github.com/hashicorp/consul-k8s/pull/1852)]
-  * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
-  * Add the `accessLogs` field to the `ProxyDefaults` CRD. [[GH-1816](https://github.com/hashicorp/consul-k8s/pull/1816)]
-  * Add the `envoyExtensions` field to the `ProxyDefaults` and `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
-  * Add the `balanceInboundConnections` field to the `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
-  * Add the `upstreamConfig.overrides[].peer` field to the `ServiceDefaults` CRD. [[GH-1853]](https://github.com/hashicorp/consul-k8s/pull/1853)
-* Control-Plane
-  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
-  * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
-  * Remove extraneous `gnupg` dependency from `consul-k8s-control-plane` since it is no longer needed for validating binary artifacts prior to release. [[GH-1882](https://github.com/hashicorp/consul-k8s/pull/1882)]
-
-BUG FIXES:
-* Control Plane
-   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
-
-## 1.0.3 (January 30, 2023)
-
-IMPROVEMENTS:
-* Helm:
-  * Kubernetes v1.26 is now supported. Minimum tested version of Kubernetes is now v1.23. [[GH-1852](https://github.com/hashicorp/consul-k8s/pull/1852)]
-  * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
-* Control-Plane
-  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
-  * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
-
-BUG FIXES:
-* Control Plane
-   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
-
-## 0.49.3 (January 30, 2023)
-
-IMPROVEMENTS:
-* Helm:
-  * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
-* Control-Plane
-  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1843](https://github.com/hashicorp/consul-k8s/pull/1843)]
-  * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
-
-BUG FIXES:
-* Control Plane
-   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
-
-## 1.0.2 (December 1, 2022)
-
 IMPROVEMENTS:
 * Helm:
   * CNI: Add `connectInject.cni.namespace` stanza which allows the CNI plugin resources to be deployed in a namespace other than the namespace that Consul is installed. [[GH-1756](https://github.com/hashicorp/consul-k8s/pull/1756)]
@@ -69,18 +8,6 @@ BUG FIXES:
 * Helm:
   * Use the correct autogenerated cert for the API Gateway Controller when connecting to servers versus clients. [[GH-1753](https://github.com/hashicorp/consul-k8s/pull/1753)]
   * Don't mount the CA cert when `externalServers.useSystemRoots` is `true`. [[GH-1753](https://github.com/hashicorp/consul-k8s/pull/1753)]
-
-## 0.49.2 (December 1, 2022)
-
-IMPROVEMENTS:
-* Control Plane
-   * Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.1`. [[GH-1725](https://github.com/hashicorp/consul-k8s/pull/1725)]
-* Helm
-  * Add fields `localConnectTimeoutMs` and `localRequestTimeoutMs` to the `ServiceDefaults` CRD. [[GH-1647](https://github.com/hashicorp/consul-k8s/pull/1647)]
-
-BUG FIXES:
-* Helm:
-  * Disable PodSecurityPolicies templating for `gossip-encryption-autogenerate` and `partition-init` when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
 
 ## 1.0.1 (November 21, 2022)
 
@@ -183,6 +110,7 @@ IMPROVEMENTS:
   * API Gateway: Allow controller to read MeshServices for use as a route backend. [[GH-1574](https://github.com/hashicorp/consul-k8s/pull/1574)]
   * API Gateway: Add support for using dynamic server discovery strings when running without agents. [[GH-1732](https://github.com/hashicorp/consul-k8s/pull/1732)]
 
+
 BUG FIXES:
 * CLI
   * Allow optional environment variables for use in the cloud preset to the CLI for cluster bootstrapping. [[GH-1608](https://github.com/hashicorp/consul-k8s/pull/1608)]
@@ -192,23 +120,6 @@ BUG FIXES:
   * Add `peering:read` permissions to mesh gateway token to fix peering connections through the mesh gateways. [[GH-1685](https://github.com/hashicorp/consul-k8s/pull/1685)]
 * Helm:
   * Disable PodSecurityPolicies in all templates when `global.enablePodSecurityPolicies` is `false`. [[GH-1693](https://github.com/hashicorp/consul-k8s/pull/1693)]
-
-## 0.49.1 (November 14, 2022)
-BREAKING CHANGES:
-* Peering:
-  * Rename `PeerName` to `Peer` in ExportedServices CRD. [[GH-1596](https://github.com/hashicorp/consul-k8s/pull/1596)]
-
-FEATURES:
-* Ingress Gateway
-  * Add support for MaxConnections, MaxConcurrentRequests, and MaxPendingRequests to Ingress Gateway CRD. [[GH-1691](https://github.com/hashicorp/consul-k8s/pull/1691)]
-
-IMPROVEMENTS:
-* Helm:
-  * Add `tolerations` and `nodeSelector` to Server ACL init jobs and `nodeSelector` to Webhook cert manager. [[GH-1581](https://github.com/hashicorp/consul-k8s/pull/1581)]
-  * API Gateway: Allow controller to read MeshServices for use as a route backend. [[GH-1574](https://github.com/hashicorp/consul-k8s/pull/1574)]
-  * API Gateway: Add `tolerations` to `apiGateway.managedGatewayClass` and `apiGateway.controller` [[GH-1650](https://github.com/hashicorp/consul-k8s/pull/1650)]
-  * API Gateway: Create PodSecurityPolicy for controller when `global.enablePodSecurityPolicies=true`. [[GH-1656](https://github.com/hashicorp/consul-k8s/pull/1656)]
-  * API Gateway: Create PodSecurityPolicy and allow controller to bind it to ServiceAccounts that it creates for Gateway Deployments when `global.enablePodSecurityPolicies=true`. [[GH-1672](https://github.com/hashicorp/consul-k8s/pull/1672)]
 
 ## 0.49.0 (September 29, 2022)
 

@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
@@ -66,13 +65,8 @@ func TestSyncCatalog(t *testing.T) {
 
 			service, _, err := consulClient.Catalog().Service(syncedServiceName, "", nil)
 			require.NoError(t, err)
-			require.Len(t, service, 1)
+			require.Equal(t, 1, len(service))
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
-			filter := fmt.Sprintf("ServiceID == %q", service[0].ServiceID)
-			healthChecks, _, err := consulClient.Health().Checks(syncedServiceName, &api.QueryOptions{Filter: filter})
-			require.NoError(t, err)
-			require.Len(t, healthChecks, 1)
-			require.Equal(t, api.HealthPassing, healthChecks[0].Status)
 		})
 	}
 }

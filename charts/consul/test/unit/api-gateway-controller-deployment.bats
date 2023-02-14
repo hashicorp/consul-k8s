@@ -346,11 +346,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '[.env[8].value] | any(contains("5s"))' | tee /dev/stderr)
+      yq -r '[.env[7].value] | any(contains("5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -498,30 +494,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.datacenter=dc1' \
-      --set 'global.federation.enabled=true' \
-      --set 'global.federation.primaryDatacenter=dc2' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("dc2"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "apiGateway/Deployment: primary-datacenter flag provided when federation enabled in non-primary datacenter" {
   cd `chart_dir`
   local object=$(helm template \
@@ -574,7 +546,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("dc1"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("-datacenter=dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1571,51 +1543,4 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | .mountPath' | tee /dev/stderr)
   [ "${actual}" = '"/consul/tls/ca"' ]
-}
-
-#--------------------------------------------------------------------
-# extraLabels
-
-@test "apiGateway/Deployment: no extra labels defined by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
-  [ "${actual}" = "{}" ]
-}
-
-@test "apiGateway/Deployment: extra global labels can be set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'global.extraLabels.foo=bar' \
-      . | tee /dev/stderr)
-  local actualBar=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
-  [ "${actualBar}" = "bar" ]
-  local actualTemplateBar=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
-  [ "${actualTemplateBar}" = "bar" ]
-}
-
-@test "apiGateway/Deployment: multiple global extra labels can be set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'global.extraLabels.foo=bar' \
-      --set 'global.extraLabels.baz=qux' \
-      . | tee /dev/stderr)
-  local actualFoo=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
-  local actualBaz=$(echo "${actual}" | yq -r '.metadata.labels.baz' | tee /dev/stderr)
-  [ "${actualFoo}" = "bar" ]
-  [ "${actualBaz}" = "qux" ]
-  local actualTemplateFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
-  local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
-  [ "${actualTemplateFoo}" = "bar" ]
-  [ "${actualTemplateBaz}" = "qux" ]
 }

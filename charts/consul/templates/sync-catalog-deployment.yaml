@@ -14,9 +14,6 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: sync-catalog
-    {{- if .Values.global.extraLabels }}
-      {{- toYaml .Values.global.extraLabels | nindent 4 }}
-    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -34,9 +31,6 @@ spec:
         component: sync-catalog
         {{- if .Values.syncCatalog.extraLabels }}
           {{- toYaml .Values.syncCatalog.extraLabels | nindent 8 }}
-        {{- end }}
-        {{- if .Values.global.extraLabels }}
-          {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"

@@ -63,7 +63,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.14.4"
+  image: "hashicorp/consul:1.14.0"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -236,7 +236,7 @@ global:
           {}
 
       connectInject:
-        # Configuration to the Vault Secret that Kubernetes uses on
+        # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes pod creation, deletion, and update, to get CA certificates
         # used issued from vault to send webhooks to the ConnectInject.
         caCert:
@@ -245,7 +245,7 @@ global:
           # @type: string
           secretName: null
 
-        # Configuration to the Vault Secret that Kubernetes uses on
+        # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes pod creation, deletion, and update, to get TLS certificates
         # used issued from vault to send webhooks to the ConnectInject.
         tlsCert:
@@ -300,7 +300,7 @@ global:
     # If true, the Helm chart will enable TLS for Consul
     # servers and clients and all consul-k8s-control-plane components, as well as generate certificate
     # authority (optional) and server and client certificates.
-    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
+    # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
     enabled: false
 
     # If true, turns on the auto-encrypt feature on clients and servers.
@@ -542,7 +542,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "hashicorp/consul-dataplane:1.0.1"
+  imageConsulDataplane: "hashicorp/consul-dataplane:1.0.0"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -621,19 +621,6 @@ global:
       # The key within the Kubernetes secret that holds the scada address.
       # @type: string
       secretKey: null
-
-  # Extra labels to attach to all pods, deployments, daemonsets, statefulsets, and jobs. This should be a YAML map.
-  #
-  # Example:
-  #
-  # ```yaml
-  # extraLabels:
-  #   labelKey: label-value
-  #   anotherLabelKey: another-label-value
-  # ```
-  #
-  # @type: map
-  extraLabels: {}
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -832,9 +819,9 @@ server:
   # This configures the PodDisruptionBudget (https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
   # for the server cluster.
   disruptionBudget:
-    # Enables registering a PodDisruptionBudget for the server
-    # cluster. If enabled, it only registers the budget so long as
-    # the server cluster is enabled. To disable, set to `false`.
+    # This will enable/disable registering a PodDisruptionBudget for the server
+    # cluster. If this is enabled, it will only register the budget so long as
+    # the server cluster is enabled.
     enabled: true
 
     # The maximum number of unavailable pods. By default, this will be
@@ -1924,7 +1911,7 @@ connectInject:
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
-    # If true, then all traffic redirection setup uses the consul-cni plugin.
+    # If true, then all traffic redirection setup will use the consul-cni plugin.
     # Requires connectInject.enabled to also be true.
     # @type: boolean
     enabled: false
@@ -2140,9 +2127,9 @@ connectInject:
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
   # for more details.
   #
-  # By default, we exclude kube-system since usually users won't
-  # want those pods injected and local-path-storage and openebs so that
-  # Kind (Kubernetes In Docker) and OpenEBS (https://openebs.io/) respectively can provision Pods used to create PVCs.
+  # By default, we exclude the kube-system namespace since usually users won't
+  # want those pods injected and also the local-path-storage namespace so that
+  # Kind (Kubernetes In Docker) can provision Pods used to create PVCs.
   # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
@@ -2157,7 +2144,7 @@ connectInject:
     matchExpressions:
       - key: "kubernetes.io/metadata.name"
         operator: "NotIn"
-        values: ["kube-system","local-path-storage","openebs"]
+        values: ["kube-system","local-path-storage"]
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
@@ -2318,11 +2305,11 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
-# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
+# [Mesh Gateways](/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
-  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
+  # If [mesh gateways](/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
-  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
+  # This setting is required for [Cluster Peering](/docs/connect/cluster-peering/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
@@ -2871,9 +2858,9 @@ apiGateway:
     # @type: string
     nodeSelector: null
 
-    # Toleration settings for gateway pods created with the managed gateway class. 
+    # This value defines the tolerations that will be assigned to a gateway pod.
     # This should be a multi-line string matching the
-    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    # Tolerations (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     #
     # @type: string
     tolerations: null

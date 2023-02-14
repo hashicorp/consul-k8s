@@ -29,6 +29,8 @@ server:
   replicas: 1
 connectInject:
   enabled: true
+controller:
+  enabled: true
 `
 
 	return config.ConvertToMap(values), nil

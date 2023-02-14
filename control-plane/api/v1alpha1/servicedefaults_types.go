@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
@@ -14,8 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -89,19 +88,13 @@ type ServiceDefaultsSpec struct {
 	// MaxInboundConnections is the maximum number of concurrent inbound connections to
 	// each service instance. Defaults to 0 (using consul's default) if not set.
 	MaxInboundConnections int `json:"maxInboundConnections,omitempty"`
-	// LocalConnectTimeoutMs is the number of milliseconds allowed to make connections to the local application
+	// The number of milliseconds allowed to make connections to the local application
 	// instance before timing out. Defaults to 5000.
 	LocalConnectTimeoutMs int `json:"localConnectTimeoutMs,omitempty"`
-	// LocalRequestTimeoutMs is the timeout for HTTP requests to the local application instance in milliseconds.
+	// In milliseconds, the timeout for HTTP requests to the local application instance.
 	// Applies to HTTP-based protocols only. If not specified, inherits the Envoy default for
 	// route timeouts (15s).
 	LocalRequestTimeoutMs int `json:"localRequestTimeoutMs,omitempty"`
-	// BalanceInboundConnections sets the strategy for allocating inbound connections to the service across
-	// proxy threads. The only supported value is exact_balance. By default, no connection balancing is used.
-	// Refer to the Envoy Connection Balance config for details.
-	BalanceInboundConnections string `json:"balanceInboundConnections,omitempty"`
-	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
-	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
 }
 
 type Upstreams struct {
@@ -114,14 +107,12 @@ type Upstreams struct {
 }
 
 type Upstream struct {
-	// Name is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
+	// Name is only accepted within a service-defaults config entry.
 	Name string `json:"name,omitempty"`
-	// Namespace is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
+	// Namespace is only accepted within a service-defaults config entry.
 	Namespace string `json:"namespace,omitempty"`
-	// Partition is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
+	// Partition is only accepted within a service-defaults config entry.
 	Partition string `json:"partition,omitempty"`
-	// Peer is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides config entry.
-	Peer string `json:"peer,omitempty"`
 	// EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
 	// listener.
 	// Note: This escape hatch is NOT compatible with the discovery chain and
@@ -269,21 +260,19 @@ func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
-		Kind:                      in.ConsulKind(),
-		Name:                      in.ConsulName(),
-		Protocol:                  in.Spec.Protocol,
-		MeshGateway:               in.Spec.MeshGateway.toConsul(),
-		Expose:                    in.Spec.Expose.toConsul(),
-		ExternalSNI:               in.Spec.ExternalSNI,
-		TransparentProxy:          in.Spec.TransparentProxy.toConsul(),
-		UpstreamConfig:            in.Spec.UpstreamConfig.toConsul(),
-		Destination:               in.Spec.Destination.toConsul(),
-		Meta:                      meta(datacenter),
-		MaxInboundConnections:     in.Spec.MaxInboundConnections,
-		LocalConnectTimeoutMs:     in.Spec.LocalConnectTimeoutMs,
-		LocalRequestTimeoutMs:     in.Spec.LocalRequestTimeoutMs,
-		BalanceInboundConnections: in.Spec.BalanceInboundConnections,
-		EnvoyExtensions:           in.Spec.EnvoyExtensions.toConsul(),
+		Kind:                  in.ConsulKind(),
+		Name:                  in.ConsulName(),
+		Protocol:              in.Spec.Protocol,
+		MeshGateway:           in.Spec.MeshGateway.toConsul(),
+		Expose:                in.Spec.Expose.toConsul(),
+		ExternalSNI:           in.Spec.ExternalSNI,
+		TransparentProxy:      in.Spec.TransparentProxy.toConsul(),
+		UpstreamConfig:        in.Spec.UpstreamConfig.toConsul(),
+		Destination:           in.Spec.Destination.toConsul(),
+		Meta:                  meta(datacenter),
+		MaxInboundConnections: in.Spec.MaxInboundConnections,
+		LocalConnectTimeoutMs: in.Spec.LocalConnectTimeoutMs,
+		LocalRequestTimeoutMs: in.Spec.LocalRequestTimeoutMs,
 	}
 }
 
@@ -322,13 +311,8 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 		allErrs = append(allErrs, field.Invalid(path.Child("localRequestTimeoutMs"), in.Spec.LocalRequestTimeoutMs, "LocalRequestTimeoutMs must be > 0"))
 	}
 
-	if in.Spec.BalanceInboundConnections != "" && in.Spec.BalanceInboundConnections != "exact_balance" {
-		allErrs = append(allErrs, field.Invalid(path.Child("balanceInboundConnections"), in.Spec.BalanceInboundConnections, "BalanceInboundConnections must be an empty string or exact_balance"))
-	}
-
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
-	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
@@ -377,24 +361,9 @@ func (in *Upstream) validate(path *field.Path, kind string, partitionsEnabled bo
 		if in.Name != "" {
 			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for a default upstream must be \"\""))
 		}
-		if in.Namespace != "" {
-			errs = append(errs, field.Invalid(path.Child("namespace"), in.Namespace, "upstream.namespace for a default upstream must be \"\""))
-		}
-		if in.Partition != "" {
-			errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, "upstream.partition for a default upstream must be \"\""))
-		}
-		if in.Peer != "" {
-			errs = append(errs, field.Invalid(path.Child("peer"), in.Peer, "upstream.peer for a default upstream must be \"\""))
-		}
 	} else if kind == overrideUpstream {
 		if in.Name == "" {
 			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for an override upstream cannot be \"\""))
-		}
-		if in.Namespace != "" && in.Peer != "" {
-			errs = append(errs, field.Invalid(path, in, "both namespace and peer cannot be specified."))
-		}
-		if in.Partition != "" && in.Peer != "" {
-			errs = append(errs, field.Invalid(path, in, "both partition and peer cannot be specified."))
 		}
 	}
 	if !partitionsEnabled && in.Partition != "" {
@@ -414,7 +383,6 @@ func (in *Upstream) toConsul() *capi.UpstreamConfig {
 		Name:               in.Name,
 		Namespace:          in.Namespace,
 		Partition:          in.Partition,
-		Peer:               in.Peer,
 		EnvoyListenerJSON:  in.EnvoyListenerJSON,
 		EnvoyClusterJSON:   in.EnvoyClusterJSON,
 		Protocol:           in.Protocol,

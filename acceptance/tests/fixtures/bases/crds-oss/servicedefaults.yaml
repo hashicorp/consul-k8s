@@ -25,15 +25,3 @@ spec:
       passiveHealthCheck:
         interval: 10s
         maxFailures: 2
-  balanceInboundConnections: "exact_balance"
-  envoyExtensions:
-    - name: builtin/aws/lambda
-      required: false
-      arguments:
-        payloadPassthrough: false
-        arn: arn:aws:lambda:us-west-2:111111111111:function:lambda-1234
-    - name: builtin/aws/lambda
-      required: false
-      arguments:
-        payloadPassthrough: false
-        arn: arn:aws:lambda:us-east-1:111111111111:function:lambda-1234

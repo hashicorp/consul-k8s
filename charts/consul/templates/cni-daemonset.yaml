@@ -11,9 +11,6 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: cni 
-    {{- if .Values.global.extraLabels }}
-      {{- toYaml .Values.global.extraLabels | nindent 4 }}
-    {{- end }}
 spec:
   {{- if .Values.connectInject.cni.updateStrategy }}
   updateStrategy:
@@ -32,9 +29,6 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: cni
-        {{- if .Values.global.extraLabels }}
-          {{- toYaml .Values.global.extraLabels | nindent 8 }}
-        {{- end }}
       annotations:
         consul.hashicorp.com/connect-inject: "false"
     spec:
