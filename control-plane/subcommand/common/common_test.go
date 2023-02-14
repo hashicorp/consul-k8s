@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
 	"github.com/hashicorp/consul/api"
@@ -163,36 +162,33 @@ func TestConsulLogin_TokenNotReplicated(t *testing.T) {
 
 func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	bearerTokenFile := WriteTempFile(t, "")
 	params := LoginParams{
 		BearerTokenFile: bearerTokenFile,
 	}
 	_, err := ConsulLogin(nil, params, hclog.NewNullLogger())
-	require.EqualError(err, fmt.Sprintf("no bearer token found in %q", bearerTokenFile))
+	require.EqualError(t, err, fmt.Sprintf("no bearer token found in %q", bearerTokenFile))
 }
 
 func TestConsulLogin_BearerTokenFileDoesNotExist(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 	params := LoginParams{
 		BearerTokenFile: randFileName,
 	}
 	_, err := ConsulLogin(nil, params, hclog.NewNullLogger())
-	require.Error(err)
-	require.Contains(err.Error(), "unable to read bearer token file")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to read bearer token file")
 }
 
 func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	bearerTokenFile := WriteTempFile(t, "foo")
 	client := startMockServer(t)
 	// This is a common.Logger.
 	log, err := Logger("INFO", false)
-	require.NoError(err)
+	require.NoError(t, err)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 	params := LoginParams{
 		AuthMethod:      testAuthMethod,
@@ -201,13 +197,12 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 		NumRetries:      2,
 	}
 	_, err = ConsulLogin(client, params, log)
-	require.Error(err)
-	require.Contains(err.Error(), "error writing token to file sink")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error writing token to file sink")
 }
 
 func TestWriteFileWithPerms_InvalidOutputFile(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixNano())
 	randFileName := fmt.Sprintf("/tmp/tmp/tmp/%d", rand.Int())
 	t.Cleanup(func() {
 		os.RemoveAll(randFileName)
@@ -218,7 +213,6 @@ func TestWriteFileWithPerms_InvalidOutputFile(t *testing.T) {
 
 func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixNano())
 	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
 	err := os.WriteFile(randFileName, []byte("foo"), os.FileMode(0444))
 	require.NoError(t, err)
@@ -236,7 +230,6 @@ func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 func TestWriteFileWithPerms(t *testing.T) {
 	t.Parallel()
 	payload := "foo-foo-foo-foo"
-	rand.Seed(time.Now().UnixNano())
 	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
 	t.Cleanup(func() {
 		os.RemoveAll(randFileName)
