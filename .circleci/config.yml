@@ -23,6 +23,7 @@ aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
 openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
 # This image is built from test/docker/Test.dockerfile
 consul-helm-test-image: &consul-helm-test-image docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
+consul-test-image: &consul-test-image hashicorppreview/consul-enterprise:1.15-dev
 
 ########################
 # COMMANDS
@@ -564,7 +565,8 @@ jobs:
   ###########################
   acceptance:
     environment:
-      - TEST_RESULTS: /tmp/test-results
+      - TEST_RESULTS: /tmp/test-results]
+      - CONSUL_TEST_IMAGE: *consul-test-image
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -589,7 +591,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -consul-image=$CONSUL_TEST_IMAGE
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -598,6 +600,7 @@ jobs:
   acceptance-tproxy:
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - CONSUL_TEST_IMAGE: *consul-test-image
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -622,7 +625,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -consul-image=$CONSUL_TEST_IMAGE
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -631,6 +634,7 @@ jobs:
   acceptance-tproxy-cni:
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - CONSUL_TEST_IMAGE: *consul-test-image
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
@@ -655,7 +659,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
       - run-acceptance-tests:
           failfast: true
-          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni -consul-image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-kind -kubecontext="kind-dc1" -secondary-kubecontext="kind-dc2" -enable-transparent-proxy -enable-cni -consul-image=$CONSUL_TEST_IMAGE
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -728,6 +732,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - USE_GKE_GCLOUD_AUTH_PLUGIN: true
+      - CONSUL_TEST_IMAGE: *consul-test-image
     docker:
       - image: *consul-helm-test-image
 
@@ -773,7 +778,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -797,6 +802,7 @@ jobs:
     environment:
       - TEST_RESULTS: /tmp/test-results
       - USE_GKE_GCLOUD_AUTH_PLUGIN: true
+      - CONSUL_TEST_IMAGE: *consul-test-image
     docker:
       - image: *consul-helm-test-image
 
@@ -842,7 +848,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-gke -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -865,6 +871,7 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - CONSUL_TEST_IMAGE: *consul-test-image
     docker:
       - image: *consul-helm-test-image
 
@@ -899,7 +906,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -922,6 +929,7 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - CONSUL_TEST_IMAGE: *consul-test-image
     docker:
       - image: *consul-helm-test-image
 
@@ -956,7 +964,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -use-aks -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -978,6 +986,7 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - CONSUL_TEST_IMAGE: *consul-test-image
     docker:
       - image: *consul-helm-test-image
 
@@ -1018,7 +1027,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -1041,6 +1050,7 @@ jobs:
     parallelism: 3
     environment:
       - TEST_RESULTS: /tmp/test-results
+      - CONSUL_TEST_IMAGE: *consul-test-image
     docker:
       - image: *consul-helm-test-image
 
@@ -1081,7 +1091,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-transparent-proxy -enable-cni -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -1103,6 +1113,7 @@ jobs:
   acceptance-openshift:
     environment:
       TEST_RESULTS: /tmp/test-results
+      CONSUL_TEST_IMAGE: *consul-test-image
     parallelism: 1
     docker:
       - image: *consul-helm-test-image
@@ -1135,7 +1146,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=hashicorppreview/consul-enterprise:1.15-dev-23aaa4f83845d0e2eced9ea69f731d7eedf840d1
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -consul-image=$CONSUL_TEST_IMAGE
 
       - store_test_results:
           path: /tmp/test-results
@@ -1264,15 +1275,15 @@ workflows:
       - acceptance:
           context: consul-ci
           requires:
-          - dev-upload-docker
+            - dev-upload-docker
       - acceptance-tproxy-cni:
           context: consul-ci
           requires:
-          - dev-upload-docker
+            - dev-upload-docker
       - acceptance-tproxy:
           context: consul-ci
           requires:
-          - dev-upload-docker
+            - dev-upload-docker
 
 
   nightly-cleanup:
@@ -1313,13 +1324,13 @@ workflows:
       # - acceptance-openshift
       - acceptance-gke-1-25:
           requires:
-          - dev-upload-docker
+            - dev-upload-docker
       - acceptance-gke-cni-1-25:
           requires:
-          - acceptance-gke-1-25
+            - acceptance-gke-1-25
       - acceptance-tproxy:
           requires:
-          - dev-upload-docker
+            - dev-upload-docker
 
   nightly-acceptance-tests-main:
     description: |
