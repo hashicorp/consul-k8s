@@ -293,15 +293,6 @@ spec:
             failureThreshold: 15
             periodSeconds: 2
             timeoutSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /readyz/ready
-              port: 9445
-              scheme: HTTP
-            failureThreshold: 2
-            initialDelaySeconds: 1
-            successThreshold: 1
-            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /readyz/ready

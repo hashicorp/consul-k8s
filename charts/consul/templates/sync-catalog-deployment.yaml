@@ -214,16 +214,6 @@ spec:
                 - |
                   consul-k8s-control-plane consul-logout -consul-api-timeout={{ .Values.global.consulAPITimeout }}
           {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-              scheme: HTTP
-            failureThreshold: 3
-            initialDelaySeconds: 30
-            periodSeconds: 5
-            successThreshold: 1
-            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /health/ready
