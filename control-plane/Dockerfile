@@ -13,8 +13,13 @@
 
 # go-discover builds the discover binary (which we don't currently publish
 # either).
-FROM golang:1.19.2-alpine as go-discover
+FROM golang:1.19-alpine as go-discover
 RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60c093101c9c5f6b04d5b1c80164251a761a6
+
+# go-discover builds the discover binary (which we don't currently publish
+# either).
+FROM golang:1.19-windowsservercore-1809 as go-discover-windows
+RUN go install github.com/hashicorp/go-discover/cmd/discover@49f60c093101c9c5f6b04d5b1c80164251a761a6
 
 # dev copies the binary from a local build
 # -----------------------------------
@@ -167,6 +172,58 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
+
+# -----------------------------------
+# Dockerfile target for consul-k8s with Windows binaries and base image. Used for running on
+# Windows nodes.
+#
+# This Dockerfile creates a production release image for the project. This
+# downloads the release from releases.hashicorp.com and therefore requires that
+# the release is published before building the Docker image.
+#
+# We don't rebuild the software because we want the exact checksums and
+# binary signatures to match the software and our builds aren't fully
+# reproducible currently.
+FROM mcr.microsoft.com/windows/servercore:1809
+
+ARG PRODUCT_NAME
+ARG PRODUCT_VERSION
+ARG PRODUCT_REVISION
+ARG BIN_NAME
+ARG CNI_BIN_NAME=consul-cni
+ARG VERSION
+
+# PRODUCT_NAME and PRODUCT_VERSION are the name of the software on releases.hashicorp.com
+# and the version to download. Example: PRODUCT_NAME=consul PRODUCT_VERSION=1.2.3.
+ENV BIN_NAME=$BIN_NAME
+ENV PRODUCT_VERSION=$PRODUCT_VERSION
+
+ARG PRODUCT_NAME=$BIN_NAME
+
+LABEL name=$PRODUCT_NAME \
+      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+      vendor="HashiCorp" \
+      version=$PRODUCT_VERSION \
+      release=$PRODUCT_VERSION \
+      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes."
+
+# Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
+ENV NAME=${BIN_NAME}
+ENV VERSION=${PRODUCT_VERSION}
+
+# TARGETOS and TARGETARCH are set automatically when --platform is provided.
+ARG TARGETOS
+ARG TARGETARCH
+
+COPY --from=go-discover-windows 'C:\Program Files\Go\bin\discover.exe' 'C:\Program Files\Go\bin\discover.exe'
+COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} "C:\Program Files\Go\bin\"${BIN_NAME}
+
+# Set Path
+RUN SETX /M path "%PATH%;C:\Program Files\Go\bin;"
+
+SHELL [ "bash.exe" ]
+ENTRYPOINT ["consul-k8s-control-plane.exe"]
 
 # ===================================
 # 

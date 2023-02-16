@@ -8,6 +8,7 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
+      - ishustava/windows-builds
 
 env:
   PKG_NAME: "consul-k8s"
@@ -338,4 +339,45 @@ jobs:
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}    
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
+  
+  
+
+  build-docker-windows:
+    name: Docker ${{ matrix.arch }} Windows build for DockerHub
+    needs: [ get-product-version, build ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ "amd64" ]
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
+          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+      - name: extract consul-cni zip
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+        run: |
+          cd ${ZIP_LOCATION}
+          unzip -j *.zip
+      - name: Copy LICENSE
+        run:
+          cp LICENSE ./control-plane
+      - uses: hashicorp/actions-docker-build@v1
+        with:
+          version: ${{ env.version }}
+          target: windows
+          arch: ${{ matrix.arch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane.exe
+          workdir: control-plane
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-windows
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows-${{ github.sha }}  
