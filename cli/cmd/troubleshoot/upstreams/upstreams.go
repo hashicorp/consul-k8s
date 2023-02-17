@@ -196,7 +196,7 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		return fmt.Errorf("error getting upstreams: %v", err)
 	}
 
-	c.UI.Output(fmt.Sprintf("Envoy Identifiers (explicit upstreams only) (%v)", len(envoyIDs)), terminal.WithHeaderStyle())
+	c.UI.Output(fmt.Sprintf("Upstreams (explicit upstreams only) (%v)", len(envoyIDs)), terminal.WithHeaderStyle())
 	for _, e := range envoyIDs {
 		c.UI.Output(e)
 	}
@@ -207,6 +207,13 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 		table.AddRow([]string{formatIPs(u.IPs), strconv.FormatBool(u.IsVirtual), formatClusterNames(u.ClusterNames)}, []string{})
 	}
 	c.UI.Table(table)
+
+	c.UI.Output("\nIf you cannot find the upstream address or cluster for a transparent proxy upstream:", terminal.WithInfoStyle())
+	c.UI.Output("-> Check intentions: Transparent proxy upstreams are configured based on intentions. Make sure you "+
+		"have configured intentions to allow traffic to your upstream.", terminal.WithInfoStyle())
+	c.UI.Output("-> To check that the right cluster is being dialed, run a DNS lookup "+
+		"for the upstream you are dialing. For example, run `dig backend.svc.consul` to return the IP address for the `backend` service. If the address you get from that is missing "+
+		"from the upstream IPs, it means that your proxy may be misconfigured.", terminal.WithInfoStyle())
 
 	return nil
 }
