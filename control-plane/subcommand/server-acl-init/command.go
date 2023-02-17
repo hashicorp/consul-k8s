@@ -206,7 +206,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBootstrapTokenSecretName, "bootstrap-token-secret-name", "",
 		"The name of the Vault or Kuberenetes secret for the bootstrap token.")
 	c.flags.StringVar(&c.flagBootstrapTokenSecretKey, "bootstrap-token-secret-key", "",
-		"The key within the Vault or Kuberenetes containing the bootstrap token.")
+		"The key within the Vault or Kuberenetes secret containing the bootstrap token.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
