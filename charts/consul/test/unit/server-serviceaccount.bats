@@ -89,3 +89,22 @@ load _helpers
       yq -r '.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
 }
+
+@test "server/ServiceAccount: automountServiceAccountToken enabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-serviceaccount.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.automountServiceAccountToken' | tee /dev/stderr)
+  [ "${actual}" = true ]
+}
+
+@test "server/ServiceAccount: automountServiceAccountToken when disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-serviceaccount.yaml  \
+      --set "server.serviceAccount.automountServiceAccountToken=false" \
+      . | tee /dev/stderr |
+      yq -r '.automountServiceAccountToken' | tee /dev/stderr)
+  [ "${actual}" = false ]
+}

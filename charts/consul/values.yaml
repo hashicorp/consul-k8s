@@ -770,6 +770,7 @@ server:
     #
     # @type: string
     annotations: null
+    automountServiceAccountToken: true
 
   # The resource requests (CPU, memory, etc.)
   # for each of the server agents. This should be a YAML map corresponding to a Kubernetes
