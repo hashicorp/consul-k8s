@@ -1312,6 +1312,7 @@ workflows:
               only:
                 - release/0.49.x
                 - release/1.0.x
+                - release/1.1.x
     jobs:
       - build-distro:
           OS: "linux"
