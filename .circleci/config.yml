@@ -169,7 +169,7 @@ commands:
                   echo $pkgs
                   for pkg in $pkgs
                   do
-                    if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+                    if ! gotestsum --format=testname --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
                           -enable-multi-cluster \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
@@ -181,7 +181,7 @@ commands:
                       break
                     fi
                   done
-                  gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
+                  gotestsum --format=testname --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
                   exit $exit_code
 
       - unless:
@@ -200,7 +200,7 @@ commands:
 
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
                   echo "Running $pkgs"
-                  gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
+                  gotestsum --format testname --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
                       << parameters.additional-flags >> \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -enable-multi-cluster \
@@ -281,7 +281,7 @@ jobs:
                  unzip consul_"${CONSUL_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
                  rm consul_"${CONSUL_VERSION}"_linux_amd64.zip
             PACKAGE_NAMES=$(go list ./...)
-            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+            gotestsum --format testname --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
@@ -312,7 +312,7 @@ jobs:
                  unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
                  rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
             PACKAGE_NAMES=$(go list ./...)
-            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+            gotestsum --format testname --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
@@ -401,7 +401,7 @@ jobs:
           name: Run tests
           working_directory: *cli-path
           command: |
-            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+            gotestsum --format testname --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
 
       - store_test_results:
           path: /tmp/test-results
@@ -500,7 +500,7 @@ jobs:
           name: Run tests
           working_directory: *acceptance-framework-path
           command: |
-            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+            gotestsum --format testname --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
 
       - store_test_results:
           path: /tmp/test-results
@@ -523,7 +523,7 @@ jobs:
           name: Run tests
           working_directory: *helm-gen-path
           command: |
-            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+            gotestsum --format testname --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
 
       - store_test_results:
           path: /tmp/test-results
