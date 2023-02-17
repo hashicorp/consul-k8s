@@ -62,51 +62,51 @@ jobs:
           path: ${{ steps.generate-metadata-file.outputs.filepath }}
 
   build:
-    needs: [get-go-version, get-product-version]
+    needs: [ get-go-version, get-product-version ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-        # cli 
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-        # control-plane
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-            # solaris is only built for the control plane
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-        # consul-cni
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          # cli
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          # control-plane
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          # solaris is only built for the control plane
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          # consul-cni
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
 
       fail-fast: true
 
-    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
+    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build
     steps:
       - uses: actions/checkout@v3
 
@@ -132,17 +132,17 @@ jobs:
           CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
           zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
-      - name: Upload built binaries 
+      - name: Upload built binaries
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-            
-      - name: Package rpm and deb files 
+
+      - name: Package rpm and deb files
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
         uses: hashicorp/actions-packaging-linux@v1
         with:
-          name: consul-k8s 
+          name: consul-k8s
           description: "consul-k8s provides a cli interface to first-class integrations between Consul and Kubernetes."
           arch: ${{ matrix.goarch }}
           version: ${{ needs.get-product-version.outputs.product-version }}
@@ -202,7 +202,7 @@ jobs:
             fi
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
-      - name: Upload debian packages 
+      - name: Upload debian packages
         uses: actions/upload-artifact@v3
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
         with:
@@ -211,11 +211,11 @@ jobs:
 
   build-docker:
     name: Docker ${{ matrix.arch }} default release build
-    needs: [get-product-version, build]
+    needs: [ get-product-version, build ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: ["arm", "arm64", "386", "amd64"]
+        arch: [ "arm", "arm64", "386", "amd64" ]
     env:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}
@@ -245,7 +245,7 @@ jobs:
           target: release-default
           arch: ${{ matrix.arch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
-          bin_name: consul-k8s-control-plane 
+          bin_name: consul-k8s-control-plane
           workdir: control-plane
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
@@ -255,11 +255,11 @@ jobs:
 
   build-docker-ubi-redhat-registry:
     name: Docker ${{ matrix.arch }} UBI build for RedHat Registry
-    needs: [get-product-version, build]
+    needs: [ get-product-version, build ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: ["amd64"]
+        arch: [ "amd64" ]
     env:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}
@@ -277,7 +277,7 @@ jobs:
           unzip -j *.zip
       - name: Copy LICENSE
         run:
-         cp LICENSE ./control-plane
+          cp LICENSE ./control-plane
       - uses: hashicorp/actions-docker-build@v1
         with:
           smoke_test: |
@@ -340,8 +340,6 @@ jobs:
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
-  
-  
 
   build-docker-windows:
     name: Docker ${{ matrix.arch }} Windows build for DockerHub
@@ -355,23 +353,11 @@ jobs:
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
-          path: control-plane/dist/cni/linux/${{ matrix.arch }}
-      - name: extract consul-cni zip
-        env:
-          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
-        run: |
-          cd ${ZIP_LOCATION}
-          unzip -j *.zip
-      - name: Copy LICENSE
-        run:
-          cp LICENSE ./control-plane
-      - uses: hashicorp/actions-docker-build@v1
+      - uses: ishustava/actions-docker-build@ishustava/windows-support
         with:
           version: ${{ env.version }}
           target: windows
+          os: windows
           arch: ${{ matrix.arch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane.exe
