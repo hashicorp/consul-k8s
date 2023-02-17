@@ -51,12 +51,12 @@ spec:
         {{- /* Run the Vault agent as both an init container and sidecar.
         The Vault agent sidecar is needed when server-acl-init bootstraps ACLs
         and writes the bootstrap token back to Vault.
-          * agent-prepopulate: true - Run the Vault agent init container.
+          * agent-pre-populate: true - Run the Vault agent init container.
           * agent-pre-populate-only: false - Also, run the Vault agent sidecar.
           * agent-cache-enable: true - Enable the Agent cache listener.
           * agent-cache-listener-port: 8200 - (optional) Listen on 127.0.0.1:8200.
           * agent-enable-quit: true - Enable a "quit" endpoint. server-acl-init
-            tells the Vault agent to stop (without this the Job will complete).
+            tells the Vault agent to stop (without this the Job will not complete).
         */}}
         "vault.hashicorp.com/agent-pre-populate": "true"
         "vault.hashicorp.com/agent-pre-populate-only": "false"
