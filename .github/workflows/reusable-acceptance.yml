@@ -127,7 +127,7 @@ jobs:
           do
             fullpkg="github.com/hashicorp/consul-k8s/${{ inputs.directory }}/${pkg}"
             echo "Testing package: ${fullpkg}"
-            if ! gotestsum --jsonfile=jsonfile-${pkg////-} -- ${fullpkg} -p 1 -timeout 2h -failfast \
+            if ! gotestsum --format=testname --jsonfile=jsonfile-${pkg////-} -- ${fullpkg} -p 1 -timeout 2h -failfast \
               ${{ inputs.additional-flags }} \
               -enable-enterprise \
               -enable-multi-cluster \
@@ -139,7 +139,7 @@ jobs:
               break
             fi
           done
-          gotestsum --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
+          gotestsum --format=testname --raw-command --junitfile "${{ env.TEST_RESULTS }}/gotestsum-report.xml" -- cat jsonfile*
           exit $exit_code
     
       - name: Upload tests
