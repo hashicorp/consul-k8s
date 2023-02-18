@@ -1245,7 +1245,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "\\consul\\serviceaccount-web-admin\\token",
+					Value: "/consul/serviceaccount-web-admin/token",
 				},
 			},
 		},
@@ -1335,7 +1335,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "\\consul\\serviceaccount-web-admin\\token",
+					Value: "/consul/serviceaccount-web-admin/token",
 				},
 			},
 		},

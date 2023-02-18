@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -1584,11 +1585,12 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
+			filepath.Join()
 			w := tt.Webhook
 			pod := *tt.Pod(minimal())
 			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
-			expCmd := "-addresses consul-server -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
+			expCmd := "-addresses consul-server.default.svc.cluster.local -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 				" -proxy-service-id-path=C:\\consul\\connect-inject\\proxyid " +
 				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + tt.ExpArgs
 			require.Equal(t, expCmd, strings.Join(container.Args, " "))
