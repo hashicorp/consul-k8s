@@ -932,7 +932,7 @@ load _helpers
       yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_ADDRESSES") | .value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-server.default.svc" ]
+  [ "${actual}" = "release-name-consul-server.default.svc.cluster.local" ]
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
   [ "${actual}" = "8501" ]
@@ -948,7 +948,7 @@ load _helpers
       yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_ADDRESSES") | .value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-server.default.svc" ]
+  [ "${actual}" = "release-name-consul-server.default.svc.cluster.local" ]
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
   [ "${actual}" = "8500" ]
@@ -1307,7 +1307,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.env[2].value | contains("release-name-consul-server.default.svc")' | tee /dev/stderr)
+      yq -r '.env[2].value | contains("release-name-consul-server.default.svc.cluster.local")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1364,7 +1364,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.env[2].value | contains("release-name-consul-server.default.svc")' | tee /dev/stderr)
+      yq -r '.env[2].value | contains("release-name-consul-server.default.svc.cluster.local")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
