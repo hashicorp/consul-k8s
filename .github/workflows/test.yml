@@ -180,7 +180,7 @@ jobs:
         working-directory: control-plane
         run: |
             PACKAGE_NAMES=$(go list ./...)
-            gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+            gotestsum --format=testname --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
   test-enterprise-control-plane:
     if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
@@ -228,7 +228,7 @@ jobs:
         working-directory: control-plane
         run: |
             PACKAGE_NAMES=$(go list ./...)
-            gotestsum --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+            gotestsum --format=testname --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
   build-distros:
     needs: [get-go-version, get-product-version]
