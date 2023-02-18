@@ -3,6 +3,7 @@ package upstreams
 import (
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -245,6 +246,7 @@ func formatClusterNames(names map[string]struct{}) string {
 	for k := range names {
 		out = append(out, k)
 	}
+	sort.Strings(out)
 	return strings.Join(out, ", ")
 }
 
