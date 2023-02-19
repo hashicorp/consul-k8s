@@ -169,7 +169,7 @@ commands:
                   echo $pkgs
                   for pkg in $pkgs
                   do
-                    if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+                    if ! gotestsum --format=testname --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                           << parameters.additional-flags >> \
                           -enable-multi-cluster \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
@@ -181,7 +181,7 @@ commands:
                       break
                     fi
                   done
-                  gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
+                  gotestsum --format=testname --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
                   exit $exit_code
 
       - unless:
