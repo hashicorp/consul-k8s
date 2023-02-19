@@ -29,7 +29,11 @@ ENV VERSION=${PRODUCT_VERSION}
 ARG TARGETOS
 ARG TARGETARCH
 
-#COPY --from=go-discover-windows 'C:\Program Files\Go\bin\discover.exe' 'C:\Program Files\Go\bin\discover.exe'
+RUN ["powershell", "Set-ExecutionPolicy", "Bypass", "-Scope", "Process", "-Force;"]
+RUN ["powershell", "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"]
+
+RUN choco install git.install -yf
+
 COPY "consul-k8s-control-plane.exe" "C:\consul-k8s-control-plane.exe"
 
 # Set Path
