@@ -2142,11 +2142,11 @@ rollingUpdate:
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq '[.env[11].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+      yq '[.env[12].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[11].value] | any(contains("dc2"))' | tee /dev/stderr)
+      yq '[.env[12].value] | any(contains("dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
