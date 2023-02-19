@@ -102,3 +102,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
+replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.83+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.597

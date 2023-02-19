@@ -135,5 +135,6 @@ require (
 )
 
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20221021205723-cc843c4be892
+replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.83+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.597
 
 go 1.20
