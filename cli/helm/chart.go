@@ -15,6 +15,7 @@ const (
 	chartFileName    = "Chart.yaml"
 	valuesFileName   = "values.yaml"
 	templatesDirName = "templates"
+	chartsDirName    = "charts"
 )
 
 // LoadChart will attempt to load a Helm chart from the embedded file system.
@@ -71,25 +72,12 @@ func readChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 		chartFiles = append(chartFiles, file)
 	}
 
-	// Now load everything under templates/.
-	dirs, err := chart.ReadDir(path.Join(chartDirName, templatesDirName))
+	// Now load everything under templates/ and charts/.
+	resultFiles, err := readAllChartFiles(chart, []string{templatesDirName, chartsDirName}, chartDirName)
 	if err != nil {
 		return nil, err
 	}
-
-	for _, f := range dirs {
-		if f.IsDir() {
-			// We only need to include files in the templates directory.
-			continue
-		}
-
-		file, err := readFile(chart, path.Join(chartDirName, templatesDirName, f.Name()), chartDirName)
-		if err != nil {
-			return nil, err
-		}
-		chartFiles = append(chartFiles, file)
-	}
-
+	chartFiles = append(chartFiles, resultFiles...)
 	return chartFiles, nil
 }
 

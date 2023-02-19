@@ -39,6 +39,8 @@ func TestReadChartFiles(t *testing.T) {
 		"values.yaml":            "# This is a mock Helm values.yaml file used for testing.\nkey: value",
 		"templates/_helpers.tpl": "helpers",
 		"templates/foo.yaml":     "foo: bar\n",
+		"templates/sub/app.yaml": "app: a1\n",
+		"charts/dep.txt":         "dep1",
 	}
 
 	files, err := readChartFiles(testChartFiles, directory)
