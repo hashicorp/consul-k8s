@@ -109,7 +109,7 @@ func TestInstall(t *testing.T) {
 
 				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
 				require.NoError(t, err)
-				require.Regexp(t, "upstream resources are valid", string(proxyOut))
+				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))
 			} else {
 				// With tproxy disabled and explicit upstreams we need the envoy-id of the server
@@ -117,7 +117,7 @@ func TestInstall(t *testing.T) {
 
 				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
 				require.NoError(t, err)
-				require.Regexp(t, "upstream resources are valid", string(proxyOut))
+				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))
 			}
 
