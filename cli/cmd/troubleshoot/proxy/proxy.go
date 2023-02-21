@@ -228,8 +228,8 @@ func (c *ProxyCommand) Troubleshoot() error {
 			c.UI.Output(o.Message, terminal.WithSuccessStyle())
 		} else {
 			c.UI.Output(o.Message, terminal.WithErrorStyle())
-			if o.PossibleActions != "" {
-				c.UI.Output(fmt.Sprintf("possible actions: %v", o.PossibleActions), terminal.WithInfoStyle())
+			for _, action := range o.PossibleActions {
+				c.UI.Output(fmt.Sprintf("-> %s", action), terminal.WithInfoStyle())
 			}
 		}
 	}
