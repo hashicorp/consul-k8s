@@ -64,12 +64,6 @@ spec:
         "vault.hashicorp.com/agent-cache-listener-port": "8200"
         "vault.hashicorp.com/agent-enable-quit": "true"
         "vault.hashicorp.com/agent-inject": "true"
-        {{- if .Values.global.acls.bootstrapToken.secretName }}
-        {{- with .Values.global.acls.bootstrapToken }}
-        "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
-        "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
-        {{- end }}
-        {{- end }}
         {{- if .Values.global.acls.partitionToken.secretName }}
         {{- with .Values.global.acls.partitionToken }}
         "vault.hashicorp.com/agent-inject-secret-partition-token": "{{ .secretName }}"
@@ -116,14 +110,7 @@ spec:
             path: tls.crt
       {{- end }}
       {{- end }}
-      {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.secretsBackend.vault.enabled)) }}
-      - name: bootstrap-token
-        secret:
-          secretName: {{ .Values.global.acls.bootstrapToken.secretName }}
-          items:
-          - key: {{ .Values.global.acls.bootstrapToken.secretKey }}
-            path: bootstrap-token
-      {{- else if and .Values.global.acls.replicationToken.secretName (not .Values.global.secretsBackend.vault.enabled) }}
+      {{- if and .Values.global.acls.replicationToken.secretName (not .Values.global.secretsBackend.vault.enabled) }}
       - name: acl-replication-token
         secret:
           secretName: {{ .Values.global.acls.replicationToken.secretName }}
@@ -144,6 +131,13 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        # Extract the Vault namespace from the Vault agent annotations.
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        - name: VAULT_NAMESPACE
+          value: {{ get (tpl .Values.global.secretsBackend.vault.agentAnnotations . | fromYaml) "vault.hashicorp.com/namespace" }}
+        {{- end }}
+        {{- end }}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName .Values.global.acls.bootstrapToken.secretName) }}
         volumeMounts:
@@ -154,11 +148,7 @@ spec:
           readOnly: true
         {{- end }}
         {{- end }}
-        {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.secretsBackend.vault.enabled)) }}
-        - name: bootstrap-token
-          mountPath: /consul/acl/tokens
-          readOnly: true
-        {{- else if and .Values.global.acls.replicationToken.secretName (not .Values.global.secretsBackend.vault.enabled) }}
+        {{- if and .Values.global.acls.replicationToken.secretName (not .Values.global.secretsBackend.vault.enabled) }}
         - name: acl-replication-token
           mountPath: /consul/acl/tokens
           readOnly: true
@@ -178,14 +168,13 @@ spec:
             -set-server-tokens={{ $serverEnabled }} \
             {{- if .Values.global.secretsBackend.vault.enabled }}
             -secrets-backend=vault \
+            {{- else }}
+            -secrets-backend=kubernetes \
             {{- end }}
+
             {{- if .Values.global.acls.bootstrapToken.secretName }}
-            {{- if .Values.global.secretsBackend.vault.enabled }}
             -bootstrap-token-secret-name={{ .Values.global.acls.bootstrapToken.secretName }} \
             -bootstrap-token-secret-key={{ .Values.global.acls.bootstrapToken.secretKey }} \
-            {{- else }}
-            -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
-            {{- end }}
             {{- end }}
 
             {{- if .Values.syncCatalog.enabled }}

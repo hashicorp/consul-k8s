@@ -1,7 +1,6 @@
 package serveraclinit
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,21 +13,25 @@ import (
 )
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
-// If bootstrapToken is not empty then ACLs are already bootstrapped.
-func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, bootstrapToken string, backend SecretsBackend) (string, error) {
+// If a bootstrap is found in the secrets backend, then skip ACL bootstrapping.
+// Otherwise, bootstrap ACLs and write the bootstrap token to the secrets backend.
+func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, backend SecretsBackend) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
 	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
 
-	if bootstrapToken == "" {
-		c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
+	bootstrapToken, err := backend.BootstrapToken()
+	if err != nil {
+		return "", fmt.Errorf("Unexpected error fetching bootstrap token secret: %w", err)
+	}
 
-		var err error
+	if bootstrapToken != "" {
+		c.log.Info("Found bootstrap token in secrets backend", "secret", backend.BootstrapTokenSecretName())
+	} else {
+		c.log.Info("No bootstrap token found in secrets backend, continuing to ACL bootstrapping", "secret", backend.BootstrapTokenSecretName())
 		bootstrapToken, err = c.bootstrapACLs(firstServerAddr, backend)
 		if err != nil {
 			return "", err
 		}
-	} else {
-		c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", backend.BootstrapTokenSecretName()))
 	}
 
 	// We should only create and set server tokens when servers are running within this cluster.
@@ -75,9 +78,12 @@ func (c *Command) bootstrapACLs(firstServerAddr string, backend SecretsBackend) 
 
 			// Check if already bootstrapped.
 			if strings.Contains(err.Error(), "Unexpected response code: 403") {
-				unrecoverableErr = errors.New("ACLs already bootstrapped but the ACL token was not written to a secret." +
-					" We can't proceed because the bootstrap token is lost." +
-					" You must reset ACLs.")
+				unrecoverableErr = fmt.Errorf(
+					"ACLs already bootstrapped but unable to find the bootstrap token in the secrets backend."+
+						" We can't proceed without a bootstrap token."+
+						" Store a token with `acl:write` permission in the secret %q.",
+					backend.BootstrapTokenSecretName(),
+				)
 				return nil
 			}
 

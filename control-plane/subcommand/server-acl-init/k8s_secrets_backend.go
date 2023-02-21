@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const SecretsBackendTypeKubernetes SecretsBackendType = "kubernetes"
+
 type KubernetesSecretsBackend struct {
 	ctx          context.Context
 	clientset    kubernetes.Interface

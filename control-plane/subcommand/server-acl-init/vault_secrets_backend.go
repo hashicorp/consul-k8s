@@ -6,6 +6,8 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
+const SecretsBackendTypeVault SecretsBackendType = "vault"
+
 type VaultSecretsBackend struct {
 	vaultClient *api.Client
 	secretName  string
