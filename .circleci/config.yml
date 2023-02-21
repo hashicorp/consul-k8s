@@ -565,7 +565,7 @@ jobs:
   ###########################
   acceptance:
     environment:
-      - TEST_RESULTS: /tmp/test-results]
+      - TEST_RESULTS: /tmp/test-results
       - CONSUL_TEST_IMAGE: *consul-test-image
     machine:
       image: ubuntu-2004:202010-01
