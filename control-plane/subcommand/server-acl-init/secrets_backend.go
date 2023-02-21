@@ -1,5 +1,7 @@
 package serveraclinit
 
+type SecretsBackendType string
+
 type SecretsBackend interface {
 	// BootstrapToken fetches the bootstrap token from the backend. If the
 	// token is not found or empty, implementations should return an empty
@@ -14,10 +16,3 @@ type SecretsBackend interface {
 	// BootstrapTokenSecretName returns the name of the bootstrap token secret.
 	BootstrapTokenSecretName() string
 }
-
-type SecretsBackendType string
-
-const (
-	SecretsBackendKubernetes SecretsBackendType = "kubernetes"
-	SecretsBackendVault      SecretsBackendType = "vault"
-)
