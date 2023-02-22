@@ -29,6 +29,7 @@ IMPROVEMENTS:
   * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
   * Remove extraneous `gnupg` dependency from `consul-k8s-control-plane` since it is no longer needed for validating binary artifacts prior to release. [[GH-1882](https://github.com/hashicorp/consul-k8s/pull/1882)]
   * Server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/pull/1770)]
+  * Update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/pull/1934)]
 * CLI:
   * Update minimum go version for project to 1.20 [[GH-1908](https://github.com/hashicorp/consul-k8s/pull/1908)]
   * Add `consul-k8s proxy log podname` command for displaying and modifying Envoy log levels for a given Pod. [GH-1844](https://github.com/hashicorp/consul-k8s/pull/1844), [GH-1849](https://github.com/hashicorp/consul-k8s/pull/1849), [GH-1864](https://github.com/hashicorp/consul-k8s/pull/1864)
