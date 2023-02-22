@@ -162,39 +162,45 @@ func TestValidateFlags(t *testing.T) {
 	testCases := []struct {
 		description string
 		input       []string
+		expErr      string
 	}{
 		{
 			"Should disallow non-flag arguments.",
 			[]string{"foo", "-auto-approve"},
+			"should have no non-flag arguments",
 		},
 		{
 			"Should disallow specifying both values file AND presets.",
 			[]string{"-f='f.txt'", "-preset=demo"},
+			"cannot set both -config-file and -preset",
 		},
 		{
 			"Should error on invalid presets.",
 			[]string{"-preset=foo"},
+			"'foo' is not a valid preset (valid presets: cloud, quickstart, secure)",
 		},
 		{
 			"Should error on invalid timeout.",
 			[]string{"-timeout=invalid-timeout"},
+			"unable to parse -timeout: time: invalid duration \"invalid-timeout\"",
 		},
 		{
 			"Should error on an invalid namespace. If this failed, TestValidLabel() probably did too.",
 			[]string{"-namespace=\" nsWithSpace\""},
+			"'\" nsWithSpace\"' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character",
 		},
 		{
-			"Should have errored on a non-existant file.",
+			"Should have errored on a non-existent file.",
 			[]string{"-f=\"does_not_exist.txt\""},
+			"file '\"does_not_exist.txt\"' does not exist",
 		},
 	}
 
 	for _, testCase := range testCases {
 		c := getInitializedCommand(t, nil)
 		t.Run(testCase.description, func(t *testing.T) {
-			if err := c.validateFlags(testCase.input); err == nil {
-				t.Errorf("Test case should have failed.")
-			}
+			err := c.validateFlags(testCase.input)
+			require.EqualError(t, err, testCase.expErr)
 		})
 	}
 }

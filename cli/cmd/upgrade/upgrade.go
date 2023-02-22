@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/posener/complete"
-
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
@@ -425,7 +424,7 @@ func (c *Command) validateFlags(args []string) error {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if ok := slices.Contains(preset.Presets, c.flagPreset); c.flagPreset != defaultPreset && !ok {
-		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
+		return fmt.Errorf("'%s' is not a valid preset (valid presets: %s)", c.flagPreset, strings.Join(preset.Presets, ", "))
 	}
 	if _, err := time.ParseDuration(c.flagTimeout); err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
