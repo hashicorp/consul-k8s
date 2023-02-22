@@ -589,7 +589,7 @@ func (c *Command) validateFlags(args []string) error {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if ok := slices.Contains(preset.Presets, c.flagPreset); c.flagPreset != defaultPreset && !ok {
-		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
+		return fmt.Errorf("'%s' is not a valid preset (valid presets: %s)", c.flagPreset, strings.Join(preset.Presets, ", "))
 	}
 	if !common.IsValidLabel(c.flagNamespace) {
 		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
