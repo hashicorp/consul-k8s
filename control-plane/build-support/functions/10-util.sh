@@ -684,94 +684,6 @@ function update_version_helm {
    return $?
 }
 
-function set_changelog_version {
-   # Arguments:
-   #   $1 - Path to top level Consul source
-   #   $2 - Version to put into the Changelog
-   #   $3 - Release Date
-   #
-   # Returns:
-   #   0 - success
-   #   * - error
-
-   local changelog="${1}/CHANGELOG.md"
-   local version="$2"
-   local rel_date="$3"
-
-   if ! test -f "${changelog}"
-   then
-      err "ERROR: File not found: ${changelog}"
-      return 1
-   fi
-
-   if test -z "${version}"
-   then
-      err "ERROR: Must specify a version to put into the changelog"
-      return 1
-   fi
-
-   if test -z "${rel_date}"
-   then
-      rel_date=$(date +"%B %d, %Y")
-   fi
-
-   sed_i ${SED_EXT} -e "s/## UNRELEASED/## ${version} (${rel_date})/" "${changelog}"
-   return $?
-}
-
-function unset_changelog_version {
-   # Arguments:
-   #   $1 - Path to top level Consul source
-   #
-   # Returns:
-   #   0 - success
-   #   * - error
-
-   local changelog="${1}/CHANGELOG.md"
-
-   if ! test -f "${changelog}"
-   then
-      err "ERROR: File not found: ${changelog}"
-      return 1
-   fi
-
-   sed_i ${SED_EXT} -e "1 s/^## [0-9]+\.[0-9]+\.[0-9]+ \([^)]*\)/## UNRELEASED/" "${changelog}"
-   return $?
-}
-
-function add_unreleased_to_changelog {
-   # Arguments:
-   #   $1 - Path to top level Consul source
-   #
-   # Returns:
-   #   0 - success
-   #   * - error
-
-   local changelog="${1}/CHANGELOG.md"
-
-   if ! test -f "${changelog}"
-   then
-      err "ERROR: File not found: ${changelog}"
-      return 1
-   fi
-
-   # Check if we are already in unreleased mode
-   if head -n 1 "${changelog}" | grep -q -c UNRELEASED
-   then
-      return 0
-   fi
-
-   local tfile="$(mktemp) -t "CHANGELOG.md_")"
-   (
-      echo -e "## UNRELEASED\n" > "${tfile}" &&
-      cat "${changelog}" >> "${tfile}" &&
-      cp "${tfile}" "${changelog}"
-   )
-   local ret=$?
-   rm "${tfile}"
-   return $ret
-}
-
 function set_version {
      # Arguments:
      #   $1 - Path to top level Consul source
@@ -803,21 +715,18 @@ function set_version {
      status_stage "==> Updating control-plane version/version.go with version info: ${vers} "$4""
      if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"
      then
-        unset_changelog_version "${sdir}"
         return 1
      fi
 
      status_stage "==> Updating cli version/version.go with version info: ${vers} "$4""
      if ! update_version "${sdir}/cli/version/version.go" "${vers}" "$4"
      then
-        unset_changelog_version "${sdir}"
         return 1
      fi
 
      status_stage "==> Updating Helm chart versions with version info: ${vers} "$4""
      if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4" "$5"
      then
-        unset_changelog_version "${sdir}"
         return 1
      fi
 
@@ -825,31 +734,52 @@ function set_version {
 }
 
 function set_changelog {
-     # Arguments:
-     #   $1 - Path to top level Consul source
-     #   $2 - The version of the release
-     #   $3 - The release date
-     #   $4 - The pre-release version
-     #
-     #
-     # Returns:
-     #   0 - success
-     #   * - error
-     local sdir="$1"
-     local vers="$2"
-     local rel_date="$(date +"%B %d, %Y")"
-     if test -n "$3"
-     then
-        rel_date="$3"
-     fi
+   # Arguments:
+   #   $1 - Path to top level Consul source
+   #   $2 - Version
+   #   $3 - Release Date
+   #   $4 - The last git release tag
+   #
+   #
+   # Returns:
+   #   0 - success
+   #   * - error
 
-     local changelog_vers="${vers}"
-     if test -n "$4"
-     then
-       changelog_vers="${vers}-$4"
-     fi
-     status_stage "==> Updating CHANGELOG.md with release info: ${changelog_vers} (${rel_date})"
-     set_changelog_version "${sdir}" "${changelog_vers}" "${rel_date}" || return 1
+  # Check if changelog-build is installed
+  if ! command -v changelog-build &> /dev/null; then
+     echo "Error: changelog-build is not installed. Please install it and try again."
+     exit 1
+  fi
+
+  local curdir="$1"
+  local version="$2"
+  local rel_date="$(date +"%B %d, %Y")"
+  if test -n "$3"
+  then
+    rel_date="$3"
+  fi
+  local last_release_date_git_tag=$4
+
+  if test -z "${version}"
+  then
+    err "ERROR: Must specify a version to put into the changelog"
+    return 1
+  fi
+
+  if [ -z "$LAST_RELEASE_GIT_TAG" ]; then
+    echo "Error: LAST_RELEASE_GIT_TAG not specified."
+    exit 1
+  fi
+
+cat <<EOT | cat - "${curdir}"/CHANGELOG.MD > tmp && mv tmp "${curdir}"/CHANGELOG.MD
+## ${version} (${rel_date})
+$(changelog-build -last-release ${LAST_RELEASE_GIT_TAG} \
+                 -entries-dir .changelog/ \
+                 -changelog-template .changelog/changelog.tmpl \
+                 -note-template .changelog/note.tmpl \
+                 -this-release $(git rev-parse HEAD))
+
+EOT
 }
 
 function prepare_release {
@@ -857,14 +787,16 @@ function prepare_release {
    #   $1 - Path to top level Consul source
    #   $2 - The version of the release
    #   $3 - The release date
-   #   $4 - The pre-release version
+   #   $4 - The last release git tag for this branch (eg. v1.1.0)
+   #   $5 - The pre-release version
    #
    #
    # Returns:
    #   0 - success
    #   * - error
-  echo "release version: " $1 $2 $3 $4
-  set_version "$1" "$2" "$3" "$4" "hashicorp\/consul-k8s-control-plane:"
+
+  echo "release version: " "$1" "$2" "$3" "$4"
+  set_version "$1" "$2" "$3" "$5" "hashicorp\/consul-k8s-control-plane:"
   set_changelog "$1" "$2" "$3" "$4"
 }
 
@@ -874,21 +806,14 @@ function prepare_dev {
    #   $2 - The version of the release
    #   $3 - The release date
    #   $4 - The version of the next release
-   #   $5 - The pre-release version (for setting beta in changelog)
+   #   $5 - The last release git tag for this branch (eg. v1.1.0)
    #
    # Returns:
    #   0 - success
    #   * - error
 
    echo "dev version: " $1 $4 $3 "dev"
-
-   local sdir="$1"
-
-   set_changelog "$1" "$2" "$3" "$5"
    set_version "$1" "$4" "$3" "dev" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:"
-
-   status_stage "==> Adding new UNRELEASED label in CHANGELOG.md"
-   add_unreleased_to_changelog "${sdir}" || return 1
 
    return 0
 }
