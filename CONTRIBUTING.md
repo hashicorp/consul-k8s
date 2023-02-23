@@ -6,7 +6,7 @@
     1. [Making changes to consul-k8s](#making-changes-to-consul-k8s)
     1. [Running linters locally](#running-linters-locally)
     1. [Rebasing contributions against main](#rebasing-contributions-against-main)
-1. [Creating a new CRD](#creating-a-new-crd)
+2. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
     1. [Spec Methods](#spec-methods)
     1. [Spec Tests](#spec-tests)
@@ -17,13 +17,14 @@
     1. [Updating consul-helm](#updating-consul-helm)
     1. [Testing a new CRD](#testing-a-new-crd)
     1. [Update Consul K8s acceptance tests](#update-consul-k8s-acceptance-tests)
-1. [Adding a new ACL Token](#adding-a-new-acl-token)
-1. [Testing the Helm chart](#testing-the-helm-chart)
+3. [Adding a new ACL Token](#adding-a-new-acl-token)
+4. [Testing the Helm chart](#testing-the-helm-chart)
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
-1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
-1. [Helm Reference Docs](#helm-reference-docs)
+5. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
+6. [Helm Reference Docs](#helm-reference-docs)
+7. [Adding a Changelog Entry](#adding-a-changelog-entry)
 
 ## Contributing 101
 
@@ -1214,3 +1215,43 @@ So that the documentation can look like:
 ```markdown
 - `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
 ```
+
+## Adding a Changelog Entry
+
+Any change that a Consul-K8s user might need to know about should have a changelog entry.
+
+What doesn't need a changelog entry?
+- Typos/fixes, unless they are in a public-facing API
+- Code changes we are certain no Consul-K8s users will need to know about
+
+To include a [changelog entry](../.changelog) in a PR, commit a text file
+named `.changelog/<PR#>.txt`, where `<PR#>` is the number associated with the open
+PR in GitHub. The text file should describe the changes in the following format:
+
+````
+```release-note:<change type>
+<code area>: <brief description of the improvement you made here>
+```
+````
+
+Valid values for `<change type>` include:
+- `feature`: for the addition of a new feature
+- `improvement`: for an improvement (not a bug fix) to an existing feature
+- `bug`: for a bug fix
+- `security`: for any Common Vulnerabilities and Exposures (CVE) resolutions
+- `breaking-change`: for any change that is not fully backwards-compatible
+- `deprecation`: for functionality which is now marked for removal in a future release
+
+`<code area>` is meant to categorize the functionality affected by the change.
+Some common values are:
+- `cli`: related to the command-line interface and its commands
+- `control-plane`: related to control-plane functionality
+- `helm`: related to the charts module and any files, yaml, go, etc. therein
+
+There may be cases where a `code area` doesn't make sense (i.e. addressing a Go CVE). In these 
+cases it is okay not to provide a `code area`.
+
+For more examples, look in the [`.changelog/`](../.changelog) folder for existing changelog entries.
+
+If a PR deserves multiple changelog entries, just add multiple entries separated by a newline
+in the format described above to the `.changelog/<PR#>.txt` file.
