@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -160,6 +161,24 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -prometheus-ca-path="/certs/ca/" \
   -prometheus-cert-file="/certs/server.crt" \
   -prometheus-key-file="/certs/key.pem" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+			"",
+			"",
+		},
+		{
+			"When logLevel is debug, enable logging for Envoy bootstrap config generation",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAPITimeout: 5 * time.Second,
+				LogLevel:         zapcore.DebugLevel.String(),
+			},
+			`# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -enable-config-gen-logging \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 			"",

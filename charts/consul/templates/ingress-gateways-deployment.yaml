@@ -388,6 +388,9 @@ spec:
             {{- if $root.Values.global.adminPartitions.enabled }}
             - -partition={{ $root.Values.global.adminPartitions.name }}
             {{- end }}
+            {{- if (eq $root.Values.global.logLevel "debug")}}
+            - -enable-config-gen-logging
+            {{- end }}
           livenessProbe:
             tcpSocket:
               port: 21000

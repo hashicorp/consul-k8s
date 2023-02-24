@@ -1789,6 +1789,35 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# envoy bootstrap logging
+
+@test "meshGateway/Deployment: envoy bootstrap logging is not present by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-config-gen-logging"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/Deployment: envoy bootstrap logging flag is present if global.logLevel == debug" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-config-gen-logging"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+
+#--------------------------------------------------------------------
 # get-auto-encrypt-client-ca
 
 @test "meshGateway/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {

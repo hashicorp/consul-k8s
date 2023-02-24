@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 )
@@ -70,6 +71,9 @@ type initContainerCommandData struct {
 	// EnableCNI configures this init container to skip the redirect-traffic command as traffic
 	// redirection is handled by the CNI plugin on pod creation.
 	EnableCNI bool
+
+	// EnableEnvoyBootstrapLogging enables debug log output when generating the Envoy bootstrap config.
+	EnableEnvoyBootstrapLogging bool
 
 	// TProxyExcludeInboundPorts is a list of inbound ports to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
@@ -258,6 +262,10 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		if data.PrometheusKeyFile == "" {
 			return corev1.Container{}, fmt.Errorf("Must set %q when providing prometheus TLS config", annotationPrometheusKeyFile)
 		}
+	}
+
+	if w.LogLevel == zapcore.DebugLevel.String() {
+		data.EnableEnvoyBootstrapLogging = true
 	}
 
 	// Render the command
@@ -478,6 +486,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- if .EnableEnvoyBootstrapLogging }}
+  -enable-config-gen-logging \
   {{- end }}
   {{- if .MultiPort }}
   -admin-bind=127.0.0.1:{{ .EnvoyAdminPort }} \
