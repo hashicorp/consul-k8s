@@ -1,4 +1,4 @@
-// Package common holds code that isn't tied to a particular CRD version or type.
+// Change Package common holds code that isn't tied to a particular CRD version or type.
 package common
 
 const (
