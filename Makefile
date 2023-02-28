@@ -75,6 +75,16 @@ kind-cni:
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:v1.23.6
 	make kind-cni-calico
 
+# Perform a terraform fmt check but don't change anything
+terraform-fmt-check:
+	@$(CURDIR)/control-plane/build-support/scripts/terraformfmtcheck.sh $(TERRAFORM_DIR)
+.PHONY: terraform-fmt-check
+
+# Format all terraform files according to terraform fmt
+terraform-fmt:
+	@terraform fmt -recursive
+.PHONY: terraform-fmt
+
 
 # ===========> CLI Targets
 
