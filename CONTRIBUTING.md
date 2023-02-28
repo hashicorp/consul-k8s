@@ -6,7 +6,7 @@
     1. [Making changes to consul-k8s](#making-changes-to-consul-k8s)
     1. [Running linters locally](#running-linters-locally)
     1. [Rebasing contributions against main](#rebasing-contributions-against-main)
-2. [Creating a new CRD](#creating-a-new-crd)
+1. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
     1. [Spec Methods](#spec-methods)
     1. [Spec Tests](#spec-tests)
@@ -17,14 +17,14 @@
     1. [Updating consul-helm](#updating-consul-helm)
     1. [Testing a new CRD](#testing-a-new-crd)
     1. [Update Consul K8s acceptance tests](#update-consul-k8s-acceptance-tests)
-3. [Adding a new ACL Token](#adding-a-new-acl-token)
-4. [Testing the Helm chart](#testing-the-helm-chart)
+1. [Adding a new ACL Token](#adding-a-new-acl-token)
+1. [Testing the Helm chart](#testing-the-helm-chart)
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
-5. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
-6. [Helm Reference Docs](#helm-reference-docs)
-7. [Adding a Changelog Entry](#adding-a-changelog-entry)
+1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
+1. [Helm Reference Docs](#helm-reference-docs)
+1. [Adding a Changelog Entry](#adding-a-changelog-entry)
 
 ## Contributing 101
 
