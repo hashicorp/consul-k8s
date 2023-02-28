@@ -39,7 +39,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 * Control Plane
-   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
+  * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
   * Add discover binary to control-plane image [[GH-1749](https://github.com/hashicorp/consul-k8s/pull/1749)]
 * Helm:
   * Don't pass in a CA file to the API Gateway controller when `externalServers.useSystemRoots` is `true`. [[GH-1743](https://github.com/hashicorp/consul-k8s/pull/1743)]
