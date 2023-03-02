@@ -395,7 +395,9 @@ func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T
 	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
-	require.Equal(t, time.Now().AddDate(1, 0, 0).Unix(), certificate.NotAfter.Unix())
+
+	// Add 365 days instead of 1 year to account for leap years
+	require.Equal(t, time.Now().AddDate(0, 0, 365).Unix(), certificate.NotAfter.Unix())
 }
 
 func TestRun_CreatesServerCertificatesWithProvidedHosts(t *testing.T) {
