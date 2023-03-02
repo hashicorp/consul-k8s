@@ -3,7 +3,6 @@ package installcni
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,11 +64,11 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
 	// The golden file contains the consul config.
-	expected, err := ioutil.ReadFile(goldenFile)
+	expected, err := os.ReadFile(goldenFile)
 	require.NoError(t, err)
 	// Get the name of the config file in the tempDir and read it.
 	tempDestFile := filepath.Join(tempDir, configFile)
-	actual, err := ioutil.ReadFile(tempDestFile)
+	actual, err := os.ReadFile(tempDestFile)
 	require.NoError(t, err)
 	// Filewatcher should have detected a change and appended to the config file. Make sure
 	// files match.
@@ -82,7 +81,7 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
 	// Re-read the config file so we can compare the updated config file.
-	actual, err = ioutil.ReadFile(tempDestFile)
+	actual, err = os.ReadFile(tempDestFile)
 	require.NoError(t, err)
 	// Filewatcher should have detected change, fixed and appended to the config file. Make sure
 	// files match.

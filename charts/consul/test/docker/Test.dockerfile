@@ -6,7 +6,7 @@
 # a script to configure kubectl, potentially install Helm, and run the tests
 # manually. This image only has the dependencies pre-installed.
 
-FROM cimg/go:1.18
+FROM cimg/go:1.19
 
 # change the user to root so we can install stuff
 USER root

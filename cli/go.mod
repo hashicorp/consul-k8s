@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/cli
 
-go 1.18
+go 1.19
 
 require (
 	github.com/bgentry/speakeasy v0.1.0
