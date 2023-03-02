@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/hack/helm-reference-gen
 
-go 1.18
+go 1.19
 
 require (
 	github.com/stretchr/testify v1.6.1
