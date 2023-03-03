@@ -1,10 +1,3 @@
-## UNRELEASED
-
-IMPROVEMENTS:
-* Control Plane
-  * Update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/pull/1934)]
-  * Update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/pull/1953)]
-  
 ## 1.0.4 (February 7, 2023)
 
 BREAKING CHANGES:
