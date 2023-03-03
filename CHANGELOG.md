@@ -1,9 +1,3 @@
-## UNRELEASED
-
-IMPROVEMENTS:
-* Control Plane
-  * Update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/pull/1934)]
-
 ## 0.49.4 (February 7, 2023)
 
 BREAKING CHANGES:
