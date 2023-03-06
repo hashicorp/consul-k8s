@@ -392,14 +392,20 @@ global:
     # This requires Consul >= 1.4.
     manageSystemACLs: false
 
-    # A Kubernetes or Vault secret containing the bootstrap token to use for
-    # creating policies and tokens for all Consul and consul-k8s-control-plane components.
-    # If set, we will skip ACL bootstrapping of the servers and will only
-    # initialize ACLs for the Consul clients and consul-k8s-control-plane system components.
+    # A Kubernetes or Vault secret containing the bootstrap token to use for creating policies and
+    # tokens for all Consul and consul-k8s-control-plane components. If `secretName` and `secretKey`
+    # are unset, a default secret name and secret key are used. If the secret is populated, then
+    # we will skip ACL bootstrapping of the servers and will only initialize ACLs for the Consul
+    # clients and consul-k8s-control-plane system components.
+    # If the secret is empty, then we will bootstrap ACLs on the Consul servers, and write the
+    # bootstrap token to this secret. If ACLs are already bootstrapped on the servers, then the
+    # secret must contain the bootstrap token.
     bootstrapToken:
       # The name of the Kubernetes or Vault secret that holds the bootstrap token.
+      # If unset, this defaults to `{{ global.name }}-bootstrap-acl-token`.
       secretName: null
       # The key within the Kubernetes or Vault secret that holds the bootstrap token.
+      # If unset, this defaults to `token`.
       secretKey: null
 
     # If true, an ACL token will be created that can be used in secondary

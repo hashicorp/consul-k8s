@@ -62,13 +62,6 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			Flags: []string{
-				"-bootstrap-token-file=/notexist",
-				"-addresses=localhost",
-				"-resource-prefix=prefix"},
-			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
-		},
-		{
-			Flags: []string{
 				"-addresses=localhost",
 				"-resource-prefix=prefix",
 				"-sync-consul-node-name=Speci@l_Chars",
@@ -407,7 +400,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-			tokenFile := common.WriteTempFile(t, bootToken)
 
 			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s, ns)
@@ -417,11 +409,11 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			cmd := Command{
 				UI:        ui,
 				clientset: k8s,
+				backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
 			}
 			cmdArgs := append([]string{
 				"-timeout=1m",
 				"-k8s-namespace", ns,
-				"-bootstrap-token-file", tokenFile,
 				"-addresses", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
 				"-http-port", strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
 				"-grpc-port", strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
@@ -915,7 +907,6 @@ func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
 	// Create Consul with ACLs already bootstrapped so that we can
 	// then seed it with our manually created policy.
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	tokenFile := common.WriteTempFile(t, bootToken)
 	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
 	setUpK8sServiceAccount(t, k8s, ns)
 
@@ -938,11 +929,11 @@ func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
+		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
 	}
 	cmdArgs := []string{
 		"-timeout=1s",
 		"-k8s-namespace", ns,
-		"-bootstrap-token-file", tokenFile,
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-addresses", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
@@ -1453,272 +1444,223 @@ func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 // Test if there is an old bootstrap Secret we still try to create and set
 // server tokens.
 func TestRun_AlreadyBootstrapped(t *testing.T) {
-	t.Parallel()
-	cases := map[string]bool{
-		"token saved in k8s secret": true,
-		"token provided via file":   false,
+	k8s := fake.NewSimpleClientset()
+
+	type APICall struct {
+		Method string
+		Path   string
 	}
+	var consulAPICalls []APICall
 
-	for name, tokenFromK8sSecret := range cases {
-		t.Run(name, func(t *testing.T) {
-			k8s := fake.NewSimpleClientset()
-
-			type APICall struct {
-				Method string
-				Path   string
-			}
-			var consulAPICalls []APICall
-
-			// Start the Consul server.
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Record all the API calls made.
-				consulAPICalls = append(consulAPICalls, APICall{
-					Method: r.Method,
-					Path:   r.URL.Path,
-				})
-				switch r.URL.Path {
-				case "/v1/agent/self":
-					fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
-				case "/v1/acl/tokens":
-					fmt.Fprintln(w, `[]`)
-				case "/v1/acl/token":
-					fmt.Fprintln(w, `{}`)
-				case "/v1/acl/policy":
-					fmt.Fprintln(w, `{}`)
-				case "/v1/agent/token/acl_agent_token":
-					fmt.Fprintln(w, `{}`)
-				case "/v1/acl/auth-method":
-					fmt.Fprintln(w, `{}`)
-				case "/v1/acl/role/name/release-name-consul-client-acl-role":
-					w.WriteHeader(404)
-				case "/v1/acl/role":
-					fmt.Fprintln(w, `{}`)
-				case "/v1/acl/binding-rules":
-					fmt.Fprintln(w, `[]`)
-				case "/v1/acl/binding-rule":
-					fmt.Fprintln(w, `{}`)
-				default:
-					w.WriteHeader(500)
-					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
-				}
-			}))
-			defer consulServer.Close()
-
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			port, err := strconv.Atoi(serverURL.Port())
-			require.NoError(t, err)
-			setUpK8sServiceAccount(t, k8s, ns)
-
-			cmdArgs := []string{
-				"-timeout=500ms",
-				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + ns,
-				"-addresses=" + serverURL.Hostname(),
-				"-http-port=" + serverURL.Port(),
-			}
-
-			// Create the bootstrap secret.
-			if tokenFromK8sSecret {
-				_, err = k8s.CoreV1().Secrets(ns).Create(
-					context.Background(),
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:   resourcePrefix + "-bootstrap-acl-token",
-							Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
-						},
-						Data: map[string][]byte{
-							"token": []byte("old-token"),
-						},
-					},
-					metav1.CreateOptions{})
-				require.NoError(t, err)
-			} else {
-				// Write token to a file.
-				bootTokenFile, err := os.CreateTemp("", "")
-				require.NoError(t, err)
-				defer os.RemoveAll(bootTokenFile.Name())
-
-				_, err = bootTokenFile.WriteString("old-token")
-				require.NoError(t, err)
-
-				require.NoError(t, err)
-				cmdArgs = append(cmdArgs, "-bootstrap-token-file", bootTokenFile.Name())
-			}
-
-			// Run the command.
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-				watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
-			}
-
-			responseCode := cmd.Run(cmdArgs)
-			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-
-			// Test that the Secret is the same.
-			if tokenFromK8sSecret {
-				secret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
-				require.NoError(t, err)
-				require.Contains(t, secret.Data, "token")
-				require.Equal(t, "old-token", string(secret.Data["token"]))
-			}
-
-			// Test that the expected API calls were made.
-			require.Equal(t, []APICall{
-				// We expect calls for updating the server policy, setting server tokens,
-				// and updating client policy.
-				{
-					"PUT",
-					"/v1/acl/policy",
-				},
-				{
-					"GET",
-					"/v1/acl/tokens",
-				},
-				{
-					"PUT",
-					"/v1/acl/token",
-				},
-				{
-					"PUT",
-					"/v1/agent/token/agent",
-				},
-				{
-					"PUT",
-					"/v1/agent/token/acl_agent_token",
-				},
-				{
-					"GET",
-					"/v1/agent/self",
-				},
-				{
-					"PUT",
-					"/v1/acl/auth-method",
-				},
-				{
-					"PUT",
-					"/v1/acl/policy",
-				},
-				{
-					"GET",
-					"/v1/acl/role/name/release-name-consul-client-acl-role",
-				},
-				{
-					"PUT",
-					"/v1/acl/role",
-				},
-				{
-					"GET",
-					"/v1/acl/binding-rules",
-				},
-				{
-					"PUT",
-					"/v1/acl/binding-rule",
-				},
-			}, consulAPICalls)
+	// Start the Consul server.
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record all the API calls made.
+		consulAPICalls = append(consulAPICalls, APICall{
+			Method: r.Method,
+			Path:   r.URL.Path,
 		})
+		switch r.URL.Path {
+		case "/v1/agent/self":
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/token":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/policy":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/agent/token/acl_agent_token":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/auth-method":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/role/name/release-name-consul-client-acl-role":
+			w.WriteHeader(404)
+		case "/v1/acl/role":
+			fmt.Fprintln(w, `{}`)
+		case "/v1/acl/binding-rules":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/binding-rule":
+			fmt.Fprintln(w, `{}`)
+		default:
+			w.WriteHeader(500)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+		}
+	}))
+	defer consulServer.Close()
+
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(serverURL.Port())
+	require.NoError(t, err)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	cmdArgs := []string{
+		"-timeout=500ms",
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-addresses=" + serverURL.Hostname(),
+		"-http-port=" + serverURL.Port(),
 	}
+
+	// Create the bootstrap secret.
+	_, err = k8s.CoreV1().Secrets(ns).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   resourcePrefix + "-bootstrap-acl-token",
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+			},
+			Data: map[string][]byte{
+				"token": []byte("old-token"),
+			},
+		},
+		metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Test that the Secret is the same.
+	secret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Contains(t, secret.Data, "token")
+	require.Equal(t, "old-token", string(secret.Data["token"]))
+
+	// Test that the expected API calls were made.
+	require.Equal(t, []APICall{
+		// We expect calls for updating the server policy, setting server tokens,
+		// and updating client policy.
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"GET",
+			"/v1/acl/tokens",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+		{
+			"PUT",
+			"/v1/agent/token/agent",
+		},
+		{
+			"PUT",
+			"/v1/agent/token/acl_agent_token",
+		},
+		{
+			"GET",
+			"/v1/agent/self",
+		},
+		{
+			"PUT",
+			"/v1/acl/auth-method",
+		},
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"GET",
+			"/v1/acl/role/name/release-name-consul-client-acl-role",
+		},
+		{
+			"PUT",
+			"/v1/acl/role",
+		},
+		{
+			"GET",
+			"/v1/acl/binding-rules",
+		},
+		{
+			"PUT",
+			"/v1/acl/binding-rule",
+		},
+	}, consulAPICalls)
 }
 
 // Test if there is an old bootstrap Secret and the server token exists
 // that we don't try and recreate the token.
 func TestRun_AlreadyBootstrapped_ServerTokenExists(t *testing.T) {
-	t.Parallel()
-	cases := map[string]bool{
-		"token saved in k8s secret": true,
-		"token provided via file":   false,
+	// First set everything up with ACLs bootstrapped.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace", ns,
+		"-addresses", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix", resourcePrefix,
 	}
 
-	for name, tokenInK8sSecret := range cases {
-		t.Run(name, func(t *testing.T) {
+	_, err := k8s.CoreV1().Secrets(ns).Create(context.Background(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-bootstrap-acl-token",
+		},
+		Data: map[string][]byte{
+			"token": []byte(bootToken),
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
 
-			// First set everything up with ACLs bootstrapped.
-			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s, ns)
-
-			cmdArgs := []string{
-				"-timeout=1m",
-				"-k8s-namespace", ns,
-				"-addresses", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
-				"-http-port", strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
-				"-grpc-port", strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
-				"-resource-prefix", resourcePrefix,
-			}
-
-			if tokenInK8sSecret {
-				_, err := k8s.CoreV1().Secrets(ns).Create(context.Background(), &v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: resourcePrefix + "-bootstrap-acl-token",
-					},
-					Data: map[string][]byte{
-						"token": []byte(bootToken),
-					},
-				}, metav1.CreateOptions{})
-				require.NoError(t, err)
-			} else {
-				// Write token to a file.
-				bootTokenFile, err := os.CreateTemp("", "")
-				require.NoError(t, err)
-				defer os.RemoveAll(bootTokenFile.Name())
-
-				_, err = bootTokenFile.WriteString(bootToken)
-				require.NoError(t, err)
-
-				require.NoError(t, err)
-				cmdArgs = append(cmdArgs, "-bootstrap-token-file", bootTokenFile.Name())
-			}
-
-			consulClient, err := api.NewClient(&api.Config{
-				Address: testAgent.TestServer.HTTPAddr,
-				Token:   bootToken,
-			})
-			require.NoError(t, err)
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-
-			cmd.init()
-			// Create the server policy and token _before_ we run the command.
-			agentPolicyRules, err := cmd.agentRules()
-			require.NoError(t, err)
-			policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
-				Name:        "agent-token",
-				Description: "Agent Token Policy",
-				Rules:       agentPolicyRules,
-			}, nil)
-			require.NoError(t, err)
-			_, _, err = consulClient.ACL().TokenCreate(&api.ACLToken{
-				Description: fmt.Sprintf("Server Token for %s", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0]),
-				Policies: []*api.ACLTokenPolicyLink{
-					{
-						Name: policy.Name,
-					},
-				},
-			}, nil)
-			require.NoError(t, err)
-
-			// Run the command.
-			responseCode := cmd.Run(cmdArgs)
-			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-
-			// Check that only one server token exists, i.e. it didn't create an
-			// extra token.
-			tokens, _, err := consulClient.ACL().TokenList(nil)
-			require.NoError(t, err)
-			count := 0
-			for _, token := range tokens {
-				if len(token.Policies) == 1 && token.Policies[0].Name == policy.Name {
-					count++
-				}
-			}
-			require.Equal(t, 1, count)
-		})
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testAgent.TestServer.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(t, err)
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
 	}
+
+	cmd.init()
+	// Create the server policy and token _before_ we run the command.
+	agentPolicyRules, err := cmd.agentRules()
+	require.NoError(t, err)
+	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        "agent-token",
+		Description: "Agent Token Policy",
+		Rules:       agentPolicyRules,
+	}, nil)
+	require.NoError(t, err)
+	_, _, err = consulClient.ACL().TokenCreate(&api.ACLToken{
+		Description: fmt.Sprintf("Server Token for %s", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0]),
+		Policies: []*api.ACLTokenPolicyLink{
+			{
+				Name: policy.Name,
+			},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	// Run the command.
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Check that only one server token exists, i.e. it didn't create an
+	// extra token.
+	tokens, _, err := consulClient.ACL().TokenList(nil)
+	require.NoError(t, err)
+	count := 0
+	for _, token := range tokens {
+		if len(token.Policies) == 1 && token.Policies[0].Name == policy.Name {
+			count++
+		}
+	}
+	require.Equal(t, 1, count)
 }
 
 // Test if -set-server-tokens is false (i.e. servers are disabled), we skip bootstrapping of the servers
@@ -1728,7 +1670,6 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	tokenFile := common.WriteTempFile(t, bootToken)
 
 	type APICall struct {
 		Method string
@@ -1766,6 +1707,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
 	}
 	responseCode := cmd.Run([]string{
 		"-timeout=500ms",
@@ -1773,7 +1715,6 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 		"-k8s-namespace=" + ns,
 		"-addresses=" + serverURL.Hostname(),
 		"-http-port=" + serverURL.Port(),
-		"-bootstrap-token-file=" + tokenFile,
 		"-set-server-tokens=false",
 		"-client=false", // disable client token, so there are fewer calls
 	})
