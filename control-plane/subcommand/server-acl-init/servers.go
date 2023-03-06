@@ -1,7 +1,6 @@
 package serveraclinit
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,29 +8,30 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	apiv1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
-// If bootstrapToken is not empty then ACLs are already bootstrapped.
-func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, bootstrapToken, bootTokenSecretName string) (string, error) {
+// If a bootstrap is found in the secrets backend, then skip ACL bootstrapping.
+// Otherwise, bootstrap ACLs and write the bootstrap token to the secrets backend.
+func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, backend SecretsBackend) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
 	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
 
-	if bootstrapToken == "" {
-		c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
+	bootstrapToken, err := backend.BootstrapToken()
+	if err != nil {
+		return "", fmt.Errorf("Unexpected error fetching bootstrap token secret: %w", err)
+	}
 
-		var err error
-		bootstrapToken, err = c.bootstrapACLs(firstServerAddr, bootTokenSecretName)
+	if bootstrapToken != "" {
+		c.log.Info("Found bootstrap token in secrets backend", "secret", backend.BootstrapTokenSecretName())
+	} else {
+		c.log.Info("No bootstrap token found in secrets backend, continuing to ACL bootstrapping", "secret", backend.BootstrapTokenSecretName())
+		bootstrapToken, err = c.bootstrapACLs(firstServerAddr, backend)
 		if err != nil {
 			return "", err
 		}
-	} else {
-		c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
 	}
 
 	// We should only create and set server tokens when servers are running within this cluster.
@@ -47,7 +47,7 @@ func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, bootstrapToken,
 
 // bootstrapACLs makes the ACL bootstrap API call and writes the bootstrap token
 // to a kube secret.
-func (c *Command) bootstrapACLs(firstServerAddr, bootTokenSecretName string) (string, error) {
+func (c *Command) bootstrapACLs(firstServerAddr string, backend SecretsBackend) (string, error) {
 	config := c.consulFlags.ConsulClientConfig().APIClientConfig
 	config.Address = firstServerAddr
 	// Exempting this particular use of the http client from using global.consulAPITimeout
@@ -78,9 +78,12 @@ func (c *Command) bootstrapACLs(firstServerAddr, bootTokenSecretName string) (st
 
 			// Check if already bootstrapped.
 			if strings.Contains(err.Error(), "Unexpected response code: 403") {
-				unrecoverableErr = errors.New("ACLs already bootstrapped but the ACL token was not written to a Kubernetes secret." +
-					" We can't proceed because the bootstrap token is lost." +
-					" You must reset ACLs.")
+				unrecoverableErr = fmt.Errorf(
+					"ACLs already bootstrapped but unable to find the bootstrap token in the secrets backend."+
+						" We can't proceed without a bootstrap token."+
+						" Store a token with `acl:write` permission in the secret %q.",
+					backend.BootstrapTokenSecretName(),
+				)
 				return nil
 			}
 
@@ -98,21 +101,12 @@ func (c *Command) bootstrapACLs(firstServerAddr, bootTokenSecretName string) (st
 		return "", err
 	}
 
-	// Write bootstrap token to a Kubernetes secret.
-	err = c.untilSucceeds(fmt.Sprintf("writing bootstrap Secret %q", bootTokenSecretName),
+	// Write bootstrap token to the secrets backend.
+	err = c.untilSucceeds(fmt.Sprintf("writing bootstrap Secret %q", backend.BootstrapTokenSecretName()),
 		func() error {
-			secret := &apiv1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   bootTokenSecretName,
-					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
-				},
-				Data: map[string][]byte{
-					common.ACLTokenSecretKey: []byte(bootstrapToken),
-				},
-			}
-			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, secret, metav1.CreateOptions{})
-			return err
-		})
+			return backend.WriteBootstrapToken(bootstrapToken)
+		},
+	)
 	return bootstrapToken, err
 }
 
