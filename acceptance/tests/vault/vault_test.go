@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,29 @@ const (
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
+	cases := map[string]struct {
+		autoBootstrap bool
+	}{
+		"manual ACL bootstrap": {},
+		"automatic ACL bootstrap": {
+			autoBootstrap: true,
+		},
+	}
+	for name, c := range cases {
+		c := c
+		t.Run(name, func(t *testing.T) {
+			testVault(t, c.autoBootstrap)
+		})
+	}
+}
+
+// testVault is the implementation for TestVault:
+//
+//   - testAutoBootstrap = false. Test when ACL bootstrapping has already occurred.
+//     The test pre-populates a Vault secret with the bootstrap token.
+//   - testAutoBootstrap = true. Test that server-acl-init automatically ACL bootstraps
+//     consul and writes the bootstrap token to Vault.
+func testVault(t *testing.T, testAutoBootstrap bool) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -123,16 +147,22 @@ func TestVault(t *testing.T) {
 		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 	}
 
-	// Bootstrap Token
-	bootstrapToken, err := uuid.GenerateUUID()
-	require.NoError(t, err)
 	bootstrapTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/bootstrap",
 		Key:        "token",
-		Value:      bootstrapToken,
+		Value:      "",
 		PolicyName: "bootstrap",
 	}
-	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+	if testAutoBootstrap {
+		bootstrapTokenSecret.SaveSecretAndAddUpdatePolicy(t, vaultClient)
+	} else {
+		id, err := uuid.GenerateUUID()
+		require.NoError(t, err)
+		bootstrapTokenSecret.Value = id
+		bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+	}
+
+	bootstrapToken := bootstrapTokenSecret.Value
 
 	// -------------------------
 	// Additional Auth Roles
@@ -264,6 +294,26 @@ func TestVault(t *testing.T) {
 
 	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
 	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
+
+	if testAutoBootstrap {
+		logger.Logf(t, "Validating the ACL bootstrap token was stored in Vault.")
+		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}
+		retry.RunWith(timer, t, func(r *retry.R) {
+			secret, err := vaultClient.Logical().Read("consul/data/secret/bootstrap")
+			require.NoError(r, err)
+
+			data, ok := secret.Data["data"].(map[string]interface{})
+			require.True(r, ok)
+			require.NotNil(r, data)
+
+			tok, ok := data["token"].(string)
+			require.True(r, ok)
+			require.NotEmpty(r, tok)
+
+			// Set bootstrapToken for subsequent validations.
+			bootstrapToken = tok
+		})
+	}
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
