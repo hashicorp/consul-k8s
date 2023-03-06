@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+
+* Helm:
+  * When the `global.acls.bootstrapToken` field is set and the content of the secret is empty, the bootstrap ACL token is written to that secret after bootstrapping ACLs. This applies to both the Vault and Consul secrets backends. [[GH-1920](https://github.com/hashicorp/consul-k8s/pull/1920)]
+
 ## 1.1.0 (February 27, 2023)
 
 BREAKING CHANGES:
@@ -26,7 +31,6 @@ IMPROVEMENTS:
   * Add the `envoyExtensions` field to the `ProxyDefaults` and `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
   * Add the `balanceInboundConnections` field to the `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
   * Add the `upstreamConfig.overrides[].peer` field to the `ServiceDefaults` CRD. [[GH-1853]](https://github.com/hashicorp/consul-k8s/pull/1853)
-  * When the `global.acls.bootstrapToken` field is set and the content of the secret is empty, the bootstrap ACL token is written to that secret after bootstrapping ACLs. This applies to both the Vault and Consul secrets backends. [[GH-1920](https://github.com/hashicorp/consul-k8s/pull/1920)]
 * Control-Plane
   * Update minimum go version for project to 1.20 [[GH-1908](https://github.com/hashicorp/consul-k8s/pull/1908)]
   * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
