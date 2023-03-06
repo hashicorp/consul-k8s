@@ -1,10 +1,5 @@
 ## UNRELEASED
 
-IMPROVEMENTS:
-
-* Helm:
-  * When the `global.acls.bootstrapToken` field is set and the content of the secret is empty, the bootstrap ACL token is written to that secret after bootstrapping ACLs. This applies to both the Vault and Consul secrets backends. [[GH-1920](https://github.com/hashicorp/consul-k8s/pull/1920)]
-
 ## 1.1.0 (February 27, 2023)
 
 BREAKING CHANGES:
