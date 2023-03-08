@@ -1330,11 +1330,12 @@ workflows:
       contains the same sequence of jobs.
     triggers:
       - schedule:
-          cron: "0 0 * * *" # Run at 12 am UTC (5 pm PST)
+          cron: "15 7 * * *" # Run at 12 am UTC (5 pm PST)
           filters:
             branches:
               only:
                 - release/0.49.x
+                - mw/trigger-pipeline-0-40-x
     jobs:
       - build-distro:
           OS: "linux"
