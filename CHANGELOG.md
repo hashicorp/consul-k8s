@@ -8,7 +8,7 @@ IMPROVEMENTS:
 
 * control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/issues/1770)]
 * control-plane: update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/issues/1934)]
-* control-plane: update alpine to 3.17 in the Docker image. [[GH-1953](https://github.com/hashicorp/consul-k8s/issues/1953)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/issues/1953)]
 
 ## 1.0.4 (February 7, 2023)
 
