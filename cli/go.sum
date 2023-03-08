@@ -445,6 +445,8 @@ github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyN
 github.com/hashicorp/consul/sdk v0.13.1 h1:EygWVWWMczTzXGpO93awkHFzfUka6hLYJ0qhETd+6lY=
 github.com/hashicorp/consul/troubleshoot v0.0.0-20230217154305-8dab825c3640 h1:P81kThpSzUW2oERDMrLsiZE3OuilLo3/EQhtVQW5M+8=
 github.com/hashicorp/consul/troubleshoot v0.0.0-20230217154305-8dab825c3640/go.mod h1:rskvju2tK8XvHYTAILHjO7lpV1/uViHs3Q3mg9Rkwlg=
+github.com/hashicorp/consul/troubleshoot v0.1.2 h1:c6uMTSt/qTMhK3e18nl4xW4j7JcANdQNHOEYhoXH1P8=
+github.com/hashicorp/consul/troubleshoot v0.1.2/go.mod h1:q35QOtN7K5kFLPm2SXHBDD+PzsuBekcqTZuuoOTzbWA=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
