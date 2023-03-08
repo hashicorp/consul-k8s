@@ -1,3 +1,3 @@
 ```release-note:improvement
-control-plane: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/pull/1953)]
+helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`.
 ```
