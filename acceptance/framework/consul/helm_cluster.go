@@ -142,8 +142,11 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	h.helmOptions.ExtraArgs = map[string][]string{
 		"--wait": nil,
 	}
-	err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
-	require.NoError(t, err)
+
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 15}, t, func(r *retry.R) {
+		err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+		require.NoError(r, err)
+	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -324,22 +327,25 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.
 		if h.ACLToken != "" {
 			config.Token = h.ACLToken
 		} else {
-			// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
-			// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
-			// and will try to read the replication token from the federation secret.
-			// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
-			// Instead, we provide a replication token that serves the role of the bootstrap token.
-			aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
-			if err != nil && errors.IsNotFound(err) {
-				federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
-				aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
-				require.NoError(t, err)
-				config.Token = string(aclSecret.Data["replicationToken"])
-			} else if err == nil {
-				config.Token = string(aclSecret.Data["token"])
-			} else {
-				require.NoError(t, err)
-			}
+			retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 600}, t, func(r *retry.R) {
+				// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
+				// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
+				// and will try to read the replication token from the federation secret.
+				// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
+				// Instead, we provide a replication token that serves the role of the bootstrap token.
+				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
+				if err != nil && errors.IsNotFound(err) {
+					federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
+					aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
+					require.NoError(r, err)
+					config.Token = string(aclSecret.Data["replicationToken"])
+				} else if err == nil {
+					config.Token = string(aclSecret.Data["token"])
+				} else {
+					require.NoError(r, err)
+				}
+			})
+
 		}
 	}
 
@@ -524,21 +530,24 @@ func defaultValues() map[string]string {
 }
 
 func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
-	_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
-			},
-			StringData: map[string]string{
-				secretKey: secret,
-			},
-			Type: corev1.SecretTypeOpaque,
-		}, metav1.CreateOptions{})
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
-	}
+
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 15}, t, func(r *retry.R) {
+		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: secretName,
+				},
+				StringData: map[string]string{
+					secretKey: secret,
+				},
+				Type: corev1.SecretTypeOpaque,
+			}, metav1.CreateOptions{})
+			require.NoError(r, err)
+		} else {
+			require.NoError(r, err)
+		}
+	})
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
