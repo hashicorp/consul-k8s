@@ -1295,7 +1295,7 @@ workflows:
       contains the same sequence of jobs.
     triggers:
       - schedule:
-          cron: "48 21 * * *" # Run at 12 am UTC (5 pm PST)
+          cron: "47 4 * * *" # Run at 12 am UTC (5 pm PST)
           filters:
             branches:
               only:
