@@ -1,4 +1,31 @@
-## UNRELEASED
+## 1.0.5 (March 9, 2023)
+
+SECURITY:
+
+* upgrade to use Go 1.19.6. This resolves vulnerabilities CVE-2022-41724 in crypto/tls and CVE-2022-41723 in net/http. [[GH-1976](https://github.com/hashicorp/consul-k8s/issues/1976)]
+
+IMPROVEMENTS:
+
+* control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/issues/1770)]
+* control-plane: update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/issues/1934)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/issues/1953)]
+
+## 0.49.5 (March 9, 2023)
+
+SECURITY:
+
+* upgrade to use Go 1.19.6. This resolves vulnerabilities CVE-2022-41724 in crypto/tls and CVE-2022-41723 in net/http. [[GH-1975](https://github.com/hashicorp/consul-k8s/issues/1975)]
+
+IMPROVEMENTS:
+
+* cli: update minimum go version for project to 1.19. [[GH-1975](https://github.com/hashicorp/consul-k8s/issues/1975)]
+* control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/issues/1770)]
+* control-plane: update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/issues/1934)]
+* control-plane: update minimum go version for project to 1.19. [[GH-1975](https://github.com/hashicorp/consul-k8s/issues/1975)]
+
+BUG FIXES:
+
+* control-plane: fix issue where consul-connect-injector acl token was unintentionally being deleted and not recreated when a container was restarted due to a livenessProbe failure. [[GH-1914](https://github.com/hashicorp/consul-k8s/issues/1914)]
 
 ## 1.1.0 (February 27, 2023)
 
