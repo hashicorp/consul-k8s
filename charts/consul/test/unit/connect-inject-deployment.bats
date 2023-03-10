@@ -1282,7 +1282,7 @@ EOF
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-init-container-cpu-limit=50m"))' | tee /dev/stderr)
+    yq 'any(contains("-init-container-cpu-limit=500m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
