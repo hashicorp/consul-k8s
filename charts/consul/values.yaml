@@ -2330,7 +2330,7 @@ connectInject:
         cpu: "50m"
       limits:
         memory: "150Mi"
-        cpu: "250m"
+        cpu: "500m"
 
 # [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
