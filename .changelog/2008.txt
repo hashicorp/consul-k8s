@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Increase cpu limits from `50m` to `500m` cores for `consul-connect-inject-init` container to speed up registration times when onboarding services onto the mesh.
+```
