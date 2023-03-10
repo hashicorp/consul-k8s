@@ -2337,7 +2337,7 @@ connectInject:
         cpu: "50m"
       limits:
         memory: "150Mi"
-        cpu: "250m"
+        cpu: "500m"
 
 # Controller handles config entry custom resources.
 # Requires consul >= 1.8.4.
