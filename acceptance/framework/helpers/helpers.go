@@ -35,7 +35,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 	// Check if there's an existing cluster and fail if there is one.
 	// We may need to retry since this is the first command run once the Kube
 	// cluster is created and sometimes the API server returns errors.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 15}, t, func(r *retry.R) {
 		var err error
 		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
 		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
