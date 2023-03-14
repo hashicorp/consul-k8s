@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix issue where specifying an external server SNI name while using client nodes resulted in a TLS verification error.
+```
