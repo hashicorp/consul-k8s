@@ -2,16 +2,6 @@
 
 load _helpers
 
-testOnly() {
-  if [ "$BATS_TEST_DESCRIPTION" != "$1" ]; then
-    skip
-  fi
-}
-
-setup() {
-  testOnly "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME will not be set for when clients are used"
-}
-
 @test "apiGateway/Deployment: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
