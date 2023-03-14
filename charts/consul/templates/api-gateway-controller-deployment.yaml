@@ -112,7 +112,7 @@ spec:
           {{- end }}
         - name: CONSUL_HTTP_SSL
           value: "{{ .Values.global.tls.enabled }}"
-        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+        {{- if and (not .Values.client.enabled) .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
         - name: CONSUL_TLS_SERVER_NAME
           value: {{ .Values.externalServers.tlsServerName }}
         {{- end }}
