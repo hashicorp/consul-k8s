@@ -2130,15 +2130,22 @@ connectInject:
     # @type: string
     annotations: null
 
-  # The resource settings for connect inject pods.
-  # @recurse: false
+  # The resource settings for connect inject pods. The defaults, are optimized for getting started worklows on developer deployments. The settings should be tweaked for production deployments. 
   # @type: map
   resources:
     requests:
+      # Recommended production default: 500Mi
+      # @type: string
       memory: "50Mi"
+      # Recommended production default: 250m
+      # @type: string
       cpu: "50m"
     limits:
+      # Recommended production default: 500Mi
+      # @type: string
       memory: "50Mi"
+      # Recommended production default: 250m
+      # @type: string
       cpu: "50m"
 
   # Sets the failurePolicy for the mutating webhook. By default this will cause pods not part of the consul installation to fail scheduling while the webhook
@@ -2306,31 +2313,40 @@ connectInject:
     # @type: map
     resources:
       requests:
-        # Recommended default: 100Mi
+        # Recommended production default: 100Mi
         # @type: string
         memory: null
-        # Recommended default: 100m
+        # Recommended production default: 100m
         # @type: string
         cpu: null
       limits:
-        # Recommended default: 100Mi
+        # Recommended production default: 100Mi
         # @type: string
         memory: null
-        # Recommended default: 100m
+        # Recommended production default: 100m
         # @type: string
         cpu: null
 
-  # The resource settings for the Connect injected init container.
-  # @recurse: false
+  # The resource settings for the Connect injected init container. If null, the resources
+  # won't be set for the initContainer. The defaults are optimized for developer instances of 
+  # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times. 
   # @type: map
   initContainer:
     resources:
       requests:
+        # Recommended production default: 150Mi
+        # @type: string
         memory: "25Mi"
+        # Recommended production default: 250m
+        # @type: string
         cpu: "50m"
       limits:
+        # Recommended production default: 150Mi
+        # @type: string
         memory: "150Mi"
-        cpu: "50m"
+        # Recommended production default: 500m
+        # @type: string
+        cpu: null
 
 # [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
