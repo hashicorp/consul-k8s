@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Parses golang code looking for github.com/hashicorp/consul/api.NewClient()
 // being used in non-test code. If it finds this, it will error.
 // The purpose of this lint is that we actually want to use our internal

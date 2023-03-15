@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 {{- if (and .Values.global.openshift.enabled (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled))) }}
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
