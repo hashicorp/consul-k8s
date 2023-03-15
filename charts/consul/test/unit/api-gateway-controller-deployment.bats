@@ -1418,6 +1418,24 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME will not be set for when clients are used" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.httpsPort=8501' \
+      --set 'externalServers.tlsServerName=hashi' \
+      --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select (.name == "api-gateway-controller") | .env[] | select(.name == "CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
 #--------------------------------------------------------------------
 # Admin Partitions
 
