@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Set default `limits.cpu` resource setting to `null` for `consul-connect-inject-init` container to speed up registration times when onboarding services onto the mesh during the init container lifecycle. 
+```
