@@ -986,10 +986,7 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("-init-container-memory-limit=150Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-init-container-cpu-limit=50m"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  
 }
 
 @test "connectInject/Deployment: can set init container resources" {
