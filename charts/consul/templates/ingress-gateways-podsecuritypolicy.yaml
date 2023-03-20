@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 {{- if (and .Values.global.enablePodSecurityPolicies .Values.ingressGateways.enabled) }}
 {{- $root := . }}
 {{- range .Values.ingressGateways.gateways }}

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Script to copy generated CRD yaml into chart directory and modify it to match
 // the expected chart format (e.g. formatted YAML).
 package main

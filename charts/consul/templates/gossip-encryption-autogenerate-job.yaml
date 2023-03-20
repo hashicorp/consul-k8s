@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 {{- if .Values.global.gossipEncryption.autoGenerate }}
 {{- if (or .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
   {{ fail "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." }}

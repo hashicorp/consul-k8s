@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Package v1alpha1 contains API Schema definitions for the consul.hashicorp.com v1alpha1 API group
 // +kubebuilder:object:generate=true
 // +groupName=consul.hashicorp.com
