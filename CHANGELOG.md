@@ -1,3 +1,13 @@
+## 1.0.6 (March 20, 2023)
+
+IMPROVEMENTS:
+
+* helm: Set default `limits.cpu` resource setting to `null` for `consul-connect-inject-init` container to speed up registration times when onboarding services onto the mesh during the init container lifecycle. [[GH-2008](https://github.com/hashicorp/consul-k8s/issues/2008)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where specifying an external server SNI name while using client nodes resulted in a TLS verification error. [[GH-2013](https://github.com/hashicorp/consul-k8s/issues/2013)]
+
 ## 1.0.5 (March 9, 2023)
 
 SECURITY:
