@@ -2565,8 +2565,7 @@ meshGateway:
 # for a specific gateway.
 # Requirements: consul >= 1.8.0
 ingressGateways:
-  # Enable ingress gateway deployment. Requires `connectInject.enabled=true`
-  # and `client.enabled=true`.
+  # Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
 
   # Defaults sets default values for all gateway fields. With the exception
@@ -2732,8 +2731,7 @@ ingressGateways:
 # for a specific gateway.
 # Requirements: consul >= 1.8.0
 terminatingGateways:
-  # Enable terminating gateway deployment. Requires `connectInject.enabled=true`
-  # and `client.enabled=true`.
+  # Enable terminating gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
 
   # Defaults sets default values for all gateway fields. With the exception
