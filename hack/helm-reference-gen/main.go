@@ -159,11 +159,14 @@ func GenerateDocs(yamlStr string) (string, error) {
 		return "", err
 	}
 
-	enterpriseSubst := strings.ReplaceAll(strings.Join(children, "\n\n"), "[Enterprise Only]", "<EnterpriseAlert inline />")
+	docsStr := strings.Join(children, "\n\n")
+	docsStr = strings.ReplaceAll(docsStr, "[Enterprise Only]", "<EnterpriseAlert inline />")
+	// Remove https://developer.hashicorp.com prefix from links because docs linting requires it.
+	docsStr = strings.ReplaceAll(docsStr, "https://developer.hashicorp.com/", "/")
 
 	// Add table of contents.
 	toc := generateTOC(node)
-	return toc + "\n\n" + enterpriseSubst + "\n", nil
+	return toc + "\n\n" + docsStr + "\n", nil
 }
 
 // Parse parses yamlStr into a tree of DocNode's.
