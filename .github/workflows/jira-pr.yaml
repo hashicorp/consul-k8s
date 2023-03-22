@@ -1,3 +1,5 @@
+# Copyright (c) HashiCorp, Inc.
+
 on:
   pull_request_target:
     types: [opened, closed, reopened]
