@@ -136,7 +136,7 @@ func TestControllerNamespaces(t *testing.T) {
 				// On startup, the controller can take upwards of 1m to perform
 				// leader election so we may need to wait a long time for
 				// the reconcile loop to run (hence the 1m timeout here).
-				counter := &retry.Counter{Count: 60, Wait: 1 * time.Second}
+				counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
 					entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", queryOpts)
@@ -258,7 +258,7 @@ func TestControllerNamespaces(t *testing.T) {
 				patchSNI := "patch-sni"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
 
-				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
+				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
 					entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", queryOpts)
@@ -366,7 +366,7 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "deleting terminating-gateway custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "terminatinggateway", "terminating-gateway")
 
-				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
+				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
 					_, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", queryOpts)

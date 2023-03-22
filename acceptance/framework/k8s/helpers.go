@@ -43,10 +43,10 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 	logger.Logf(t, "Waiting for pods with label %q to be ready.", podLabelSelector)
 
-	// Wait up to 11m.
+	// Wait up to 20m.
 	// On Azure, volume provisioning can sometimes take close to 5 min,
 	// so we need to give a bit more time for pods to become healthy.
-	counter := &retry.Counter{Count: 11 * 60, Wait: 1 * time.Second}
+	counter := &retry.Counter{Count: 20 * 60, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
@@ -113,7 +113,7 @@ func ServiceHost(t *testing.T, cfg *config.TestConfig, ctx environment.TestConte
 		var host string
 		// It can take some time for the load balancers to be ready and have an IP/Hostname.
 		// Wait for 5 minutes before failing.
-		retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 600}, t, func(r *retry.R) {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
 			svc, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
 			require.NoError(t, err)
 			require.NotEmpty(r, svc.Status.LoadBalancer.Ingress)

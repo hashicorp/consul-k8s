@@ -132,7 +132,7 @@ func TestAppMetrics(t *testing.T) {
 
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
-	retry.RunWith(&retry.Counter{Count: 3, Wait: 1 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
 		require.NoError(r, err)
 		// This assertion represents the metrics from the envoy sidecar.

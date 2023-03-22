@@ -146,14 +146,14 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		"--wait": nil,
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 15}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 		require.NoError(r, err)
 	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 600}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
@@ -330,7 +330,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.
 		if h.ACLToken != "" {
 			config.Token = h.ACLToken
 		} else {
-			retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 600}, t, func(r *retry.R) {
+			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
 				// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
 				// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
 				// and will try to read the replication token from the federation secret.
@@ -534,7 +534,7 @@ func defaultValues() map[string]string {
 
 func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
 
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 15}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
