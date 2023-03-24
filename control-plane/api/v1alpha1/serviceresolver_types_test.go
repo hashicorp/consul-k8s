@@ -70,17 +70,26 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							ServiceSubset: "failover_subset1",
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+							Policy: &FailoverPolicy{
+								Mode: "default",
+							},
 						},
 						"failover2": {
 							Service:       "failover2",
 							ServiceSubset: "failover_subset2",
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+							Policy: &FailoverPolicy{
+								Mode: "",
+							},
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							},
+							Policy: &FailoverPolicy{
+								Mode: "order-by-locality",
 							},
 						},
 					},
@@ -137,17 +146,26 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						ServiceSubset: "failover_subset1",
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode: "default",
+						},
 					},
 					"failover2": {
 						Service:       "failover2",
 						ServiceSubset: "failover_subset2",
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode: "",
+						},
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+						},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode: "order-by-locality",
 						},
 					},
 				},
@@ -253,17 +271,26 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							ServiceSubset: "failover_subset1",
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+							Policy: &FailoverPolicy{
+								Mode: "default",
+							},
 						},
 						"failover2": {
 							Service:       "failover2",
 							ServiceSubset: "failover_subset2",
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+							Policy: &FailoverPolicy{
+								Mode: "",
+							},
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							},
+							Policy: &FailoverPolicy{
+								Mode: "order-by-locality",
 							},
 						},
 					},
@@ -320,17 +347,26 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						ServiceSubset: "failover_subset1",
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode: "default",
+						},
 					},
 					"failover2": {
 						Service:       "failover2",
 						ServiceSubset: "failover_subset2",
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode: "",
+						},
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+						},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode: "order-by-locality",
 						},
 					},
 				},

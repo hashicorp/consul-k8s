@@ -82,6 +82,8 @@ type ProxyDefaultsSpec struct {
 	AccessLogs *AccessLogs `json:"accessLogs,omitempty"`
 	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
 	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
+	// FailoverPolicy specifies the exact mechanism used for failover.
+	FailoverPolicy *FailoverPolicy `json:"failoverPolicy,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -174,6 +176,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
 		AccessLogs:       in.Spec.AccessLogs.toConsul(),
 		EnvoyExtensions:  in.Spec.EnvoyExtensions.toConsul(),
+		FailoverPolicy:   in.Spec.FailoverPolicy.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -209,6 +212,7 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 	}
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
+	allErrs = append(allErrs, in.Spec.FailoverPolicy.validate(path.Child("failoverPolicy"))...)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
