@@ -131,6 +131,8 @@ type ServiceResolverFailover struct {
 	Datacenters []string `json:"datacenters,omitempty"`
 	// Targets specifies a fixed list of failover targets to try during failover.
 	Targets []ServiceResolverFailoverTarget `json:"targets,omitempty"`
+	// Policy specifies the exact mechanism used for failover.
+	Policy *FailoverPolicy `json:"policy,omitempty"`
 }
 
 type ServiceResolverFailoverTarget struct {
@@ -398,6 +400,9 @@ func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
 		Namespace:     in.Namespace,
 		Datacenters:   in.Datacenters,
 		Targets:       targets,
+		Policy:		   &capi.ServiceResolverFailoverPolicy {
+			Mode: in.Policy.Mode,
+		},
 	}
 }
 
@@ -507,7 +512,7 @@ func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) fiel
 }
 
 func (in *ServiceResolverFailover) isEmpty() bool {
-	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0
+	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0 && in.Policy == nil
 }
 
 func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
@@ -515,7 +520,7 @@ func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
 		// NOTE: We're passing "{}" here as our value because we know that the
 		// error is we have an empty object.
 		return field.Invalid(path, "{}",
-			"service, serviceSubset, namespace, datacenters, and targets cannot all be empty at once")
+			"service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once")
 	}
 	return nil
 }
