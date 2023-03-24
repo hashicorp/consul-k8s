@@ -93,6 +93,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 							Required:  true,
 						},
 					},
+					FailoverPolicy: &FailoverPolicy{
+						Mode: "default",
+					},
 				},
 			},
 			Theirs: &capi.ProxyConfigEntry{
@@ -150,6 +153,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						},
 						Required: true,
 					},
+				},
+				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
+					Mode: "default",
 				},
 			},
 			Matches: true,
@@ -303,6 +309,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 							Required:  true,
 						},
 					},
+					FailoverPolicy: &FailoverPolicy{
+						Mode: "default",
+					},
 				},
 			},
 			Exp: &capi.ProxyConfigEntry{
@@ -361,6 +370,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						},
 						Required: true,
 					},
+				},
+				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
+					Mode: "default",
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,

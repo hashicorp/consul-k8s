@@ -139,6 +139,14 @@ spec:
                       type: object
                     type: array
                 type: object
+              failoverPolicy: 
+                description: FailoverPolicy specifies the exact mechanism used for failover.
+                properties:
+                  mode:
+                    description: Mode specifies the type of failover that will be performed. 
+                      Valid values are "default", "" (equivalent to "default") and "order-by-locality".
+                    type: string
+                type: object
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
                   for this service.
