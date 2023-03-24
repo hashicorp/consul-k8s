@@ -79,6 +79,14 @@ spec:
                         service from to form the failover group of instances. If empty
                         the current namespace is used.
                       type: string
+                    policy:
+                      description: FailoverPolicy specifies the exact mechanism used for failover.
+                      properties:
+                        mode:
+                          description: Mode specifies the type of failover that will be performed. 
+                            Valid values are "default", "" (equivalent to "default") and "order-by-locality".
+                          type: string
+                      type: object
                     service:
                       description: Service is the service to resolve instead of the
                         default as the failover group of instances during failover.

@@ -245,6 +245,35 @@ func (in EnvoyExtension) validate(path *field.Path) *field.Error {
 	return nil
 }
 
+// FailoverPolicy specifies the exact mechanism used for failover.
+type FailoverPolicy struct {
+	// Mode specifies the type of failover that will be performed. Valid values are
+	// "default", "" (equivalent to "default") and "order-by-locality".
+	Mode string `json:",omitempty"`
+}
+
+func (in *FailoverPolicy) toConsul() *capi.ServiceResolverFailoverPolicy {
+	if in == nil {
+		return nil
+	}
+
+	return &capi.ServiceResolverFailoverPolicy{
+		Mode: in.Mode,
+	}
+}
+
+func (in *FailoverPolicy) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in == nil {
+		return nil
+	}
+	modes := []string{"default", "order-by-locality"}
+	if !sliceContains(modes, in.Mode) {
+		errs = append(errs, field.Invalid(path.Child("mode"), in.Mode, notInSliceMessage(modes)))
+	}
+	return errs
+}
+
 func notInSliceMessage(slice []string) string {
 	return fmt.Sprintf(`must be one of "%s"`, strings.Join(slice, `", "`))
 }
