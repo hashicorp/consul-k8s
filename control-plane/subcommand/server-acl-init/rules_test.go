@@ -143,6 +143,7 @@ func TestAPIGatewayControllerRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool
+		Partition        string
 		Expected         string
 	}{
 		{
@@ -165,6 +166,7 @@ acl = "write"
 operator = "write"
 acl = "write"
 namespace_prefix "" {
+  policy = "write"
   service_prefix "" {
     policy = "write"
     intentions = "write"
@@ -174,13 +176,36 @@ namespace_prefix "" {
   }
 }`,
 		},
+		{
+			Name:             "Namespaces are enabled, partitions enabled",
+			EnableNamespaces: true,
+			Partition:        "Default",
+			Expected: `
+partition "Default" {
+  mesh = "write"
+  acl = "write"
+  operator = "write"
+namespace_prefix "" {
+  policy = "write"
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}
+}`,
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
 				flagEnableNamespaces: tt.EnableNamespaces,
-				consulFlags:          &flags.ConsulFlags{},
+				consulFlags: &flags.ConsulFlags{
+					Partition: tt.Partition,
+				},
 			}
 
 			meshGatewayRules, err := cmd.apiGatewayControllerRules()
