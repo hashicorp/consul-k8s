@@ -146,14 +146,16 @@ func (c *Command) apiGatewayControllerRules() (string, error) {
 	apiGatewayRulesTpl := `{{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
   mesh = "write"
-  operator = "write"
   acl = "write"
+  operator = "write"
 {{- else }}
 operator = "write"
 acl = "write"
 {{- end }}
+
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
+  policy = "write"
 {{- end }}
   service_prefix "" {
     policy = "write"
@@ -168,7 +170,7 @@ namespace_prefix "" {
 {{- if .EnablePartitions }}
 }
 {{- end }}
-  `
+`
 
 	return c.renderRules(apiGatewayRulesTpl)
 }
