@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 {{- if and .Values.global.enablePodSecurityPolicies .Values.meshGateway.enabled }}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
