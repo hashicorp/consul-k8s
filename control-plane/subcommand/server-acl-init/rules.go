@@ -147,7 +147,6 @@ func (c *Command) apiGatewayControllerRules() (string, error) {
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
-  operator = "write"
 {{- else }}
 operator = "write"
 acl = "write"
