@@ -187,7 +187,6 @@ namespace_prefix "" {
 partition "Default" {
   mesh = "write"
   acl = "write"
-  operator = "write"
 namespace_prefix "" {
   policy = "write"
   service_prefix "" {
