@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 {{- if .Values.ingressGateways.enabled }}
 {{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}

@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (and .Values.global.adminPartitions.enabled (not $serverEnabled) (ne .Values.global.adminPartitions.name "default")) }}
 {{- template "consul.reservedNamesFailer" (list .Values.global.adminPartitions.name "global.adminPartitions.name") }}
