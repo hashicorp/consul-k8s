@@ -94,7 +94,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						},
 					},
 					FailoverPolicy: &FailoverPolicy{
-						Mode: "default",
+						Mode: "sequential",
 					},
 				},
 			},
@@ -155,7 +155,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					},
 				},
 				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
-					Mode: "default",
+					Mode: "sequential",
 				},
 			},
 			Matches: true,
@@ -310,7 +310,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						},
 					},
 					FailoverPolicy: &FailoverPolicy{
-						Mode: "default",
+						Mode: "sequential",
 					},
 				},
 			},
@@ -372,7 +372,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					},
 				},
 				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
-					Mode: "default",
+					Mode: "sequential",
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,

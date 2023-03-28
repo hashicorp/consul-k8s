@@ -400,7 +400,7 @@ func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
 		Namespace:     in.Namespace,
 		Datacenters:   in.Datacenters,
 		Targets:       targets,
-		Policy:		   &capi.ServiceResolverFailoverPolicy {
+		Policy: &capi.ServiceResolverFailoverPolicy{
 			Mode: in.Policy.Mode,
 		},
 	}
