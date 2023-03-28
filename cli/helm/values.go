@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package helm
 
 // HACK this is a temporary hard-coded struct. We should actually generate this from our `values.yaml` file.
