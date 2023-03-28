@@ -71,7 +71,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 							Policy: &FailoverPolicy{
-								Mode: "default",
+								Mode: "sequential",
 							},
 						},
 						"failover2": {
@@ -147,7 +147,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "default",
+							Mode: "sequential",
 						},
 					},
 					"failover2": {
@@ -272,7 +272,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 							Policy: &FailoverPolicy{
-								Mode: "default",
+								Mode: "sequential",
 							},
 						},
 						"failover2": {
@@ -348,7 +348,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "default",
+							Mode: "sequential",
 						},
 					},
 					"failover2": {

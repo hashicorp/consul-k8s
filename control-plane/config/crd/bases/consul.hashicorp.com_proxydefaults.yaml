@@ -144,7 +144,7 @@ spec:
                 properties:
                   mode:
                     description: Mode specifies the type of failover that will be performed. 
-                      Valid values are "default", "" (equivalent to "default") and "order-by-locality".
+                      Valid values are "sequential", "" (equivalent to "sequential") and "order-by-locality".
                     type: string
                 type: object
               meshGateway:

@@ -267,7 +267,7 @@ func (in *FailoverPolicy) validate(path *field.Path) field.ErrorList {
 	if in == nil {
 		return nil
 	}
-	modes := []string{"default", "order-by-locality"}
+	modes := []string{"sequential", "order-by-locality"}
 	if !sliceContains(modes, in.Mode) {
 		errs = append(errs, field.Invalid(path.Child("mode"), in.Mode, notInSliceMessage(modes)))
 	}
