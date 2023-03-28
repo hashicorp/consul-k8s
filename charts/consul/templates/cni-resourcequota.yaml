@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 {{- if .Values.connectInject.cni.enabled }}
 apiVersion: v1
 kind: ResourceQuota

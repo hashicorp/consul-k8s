@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 {{- if and .Values.global.peering.enabled (not .Values.connectInject.enabled) }}{{ fail "setting global.peering.enabled to true requires connectInject.enabled to be true" }}{{ end }}
 {{- if and .Values.global.peering.enabled (not .Values.global.tls.enabled) }}{{ fail "setting global.peering.enabled to true requires global.tls.enabled to be true" }}{{ end }}
 {{- if and .Values.global.peering.enabled (not .Values.meshGateway.enabled) }}{{ fail "setting global.peering.enabled to true requires meshGateway.enabled to be true" }}{{ end }}
