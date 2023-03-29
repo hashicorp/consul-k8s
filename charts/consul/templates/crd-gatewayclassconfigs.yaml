@@ -1,0 +1,238 @@
+{{- if .Values.connectInject.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: gatewayclassconfigs.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: GatewayClassConfig
+    listKind: GatewayClassConfigList
+    plural: gatewayclassconfigs
+    singular: gatewayclassconfig
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: GatewayClassConfig describes the configuration of a consul-api-gateway
+          GatewayClass.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of GatewayClassConfig.
+            properties:
+              connectionManagement:
+                description: Configuration information for managing connections in
+                  Envoy
+                properties:
+                  maxConnections:
+                    description: The maximum number of connections allowed for the
+                      Gateway proxy. If not set, the default for the proxy implementation
+                      will be used.
+                    format: int32
+                    type: integer
+                type: object
+              consul:
+                description: Configuration information about connecting to Consul.
+                properties:
+                  address:
+                    description: The address of the consul server to communicate with
+                      in the gateway pod. If not specified, the pod will attempt to
+                      use a local agent on the host on which it is running.
+                    type: string
+                  authentication:
+                    description: Consul authentication information
+                    properties:
+                      account:
+                        description: The name of an existing Kubernetes ServiceAccount
+                          to authenticate as. Ignored if managed is true.
+                        type: string
+                      managed:
+                        description: Whether deployments should be run with "managed"
+                          Kubernetes ServiceAccounts created by the gateway controller.
+                        type: boolean
+                      method:
+                        description: The Consul auth method used for initial authentication
+                          by consul-api-gateway.
+                        type: string
+                      namespace:
+                        description: The Consul namespace to use for authentication.
+                        type: string
+                      podSecurityPolicy:
+                        description: The name of an existing Kubernetes PodSecurityPolicy
+                          to bind to the managed ServiceAccount if managed is true.
+                        type: string
+                    type: object
+                  partition:
+                    description: The Consul admin partition in which the gateway is
+                      registered. https://developer.hashicorp.com/consul/tutorials/enterprise/consul-admin-partitions
+                    type: string
+                  ports:
+                    description: The information about Consul's ports
+                    properties:
+                      grpc:
+                        description: The grpc port for Consul's xDS server.
+                        type: integer
+                      http:
+                        description: The port for Consul's HTTP server.
+                        type: integer
+                    type: object
+                  scheme:
+                    description: The scheme to use for connecting to Consul.
+                    enum:
+                    - http
+                    - https
+                    type: string
+                  serverName:
+                    description: The server name presented by the server's TLS certificate.
+                      This is useful when attempting to talk to a Consul server over
+                      TLS while referencing it via ip address.
+                    type: string
+                type: object
+              copyAnnotations:
+                description: Annotation Information to copy to services or deployments
+                properties:
+                  service:
+                    description: List of annotations to copy to the gateway service.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              deployment:
+                description: Configuration information about how many instances to
+                  deploy
+                properties:
+                  defaultInstances:
+                    default: 1
+                    description: Number of gateway instances that should be deployed
+                      by default
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  maxInstances:
+                    default: 8
+                    description: Max allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  minInstances:
+                    default: 1
+                    description: Minimum allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                type: object
+              image:
+                description: Configuration information about the images to use
+                properties:
+                  consulAPIGateway:
+                    description: The image to use for consul-api-gateway.
+                    type: string
+                  envoy:
+                    description: The image to use for Envoy.
+                    type: string
+                type: object
+              logLevel:
+                description: Logging levels
+                enum:
+                - trace
+                - debug
+                - info
+                - warning
+                - error
+                type: string
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: 'NodeSelector is a selector which must be true for the
+                  pod to fit on a node. Selector which must match a node''s labels
+                  for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
+                type: object
+              serviceType:
+                description: Service Type string describes ingress methods for a service
+                enum:
+                - ClusterIP
+                - NodePort
+                - LoadBalancer
+                type: string
+              tolerations:
+                description: 'Tolerations allow the scheduler to schedule nodes with
+                  matching taints More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/'
+                items:
+                  description: The pod this Toleration is attached to tolerates any
+                    taint that matches the triple <key,value,effect> using the matching
+                    operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty
+                        means match all taint effects. When specified, allowed values
+                        are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to. Empty means match all taint keys. If the key is empty,
+                        operator must be Exists; this combination means to match all
+                        values and all keys.
+                      type: string
+                    operator:
+                      description: Operator represents a key's relationship to the
+                        value. Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod
+                        can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time
+                        the toleration (which must be of effect NoExecute, otherwise
+                        this field is ignored) tolerates the taint. By default, it
+                        is not set, which means tolerate the taint forever (do not
+                        evict). Zero and negative values will be treated as 0 (evict
+                        immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to. If the operator is Exists, the value should be empty,
+                        otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+              useHostPorts:
+                description: If this is set, then the Envoy container ports are mapped
+                  to host ports.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}
