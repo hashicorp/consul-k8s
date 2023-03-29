@@ -34,7 +34,7 @@ func (r *ServiceSplitterController) Logger(name types.NamespacedName) logr.Logge
 	return r.Log.WithValues("request", name)
 }
 
-func (r *ServiceSplitterController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (r *ServiceSplitterController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 
