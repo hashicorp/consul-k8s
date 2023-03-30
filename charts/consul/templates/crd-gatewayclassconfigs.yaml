@@ -25,8 +25,8 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: GatewayClassConfig describes the configuration of a consul-api-gateway
-          GatewayClass.
+        description: GatewayClassConfig describes the configuration of a GatewayClass
+          for Consul API Gateway.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -182,7 +182,7 @@ spec:
                 type: string
               tolerations:
                 description: 'Tolerations allow the scheduler to schedule nodes with
-                  matching taints More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/'
+                  matching taints. More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/'
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching
