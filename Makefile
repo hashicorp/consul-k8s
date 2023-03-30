@@ -64,7 +64,7 @@ cni-plugin-lint:
 	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
-	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
+	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
 # Helper target for doing local cni acceptance testing
 kind-cni:
