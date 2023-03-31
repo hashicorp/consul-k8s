@@ -1,3 +1,15 @@
+## 1.1.1 (March 31, 2023)
+
+IMPROVEMENTS:
+
+* helm: Set default `limits.cpu` resource setting to `null` for `consul-connect-inject-init` container to speed up registration times when onboarding services onto the mesh during the init container lifecycle. [[GH-2008](https://github.com/hashicorp/consul-k8s/issues/2008)]
+* helm: When the `global.acls.bootstrapToken` field is set and the content of the secret is empty, the bootstrap ACL token is written to that secret after bootstrapping ACLs. This applies to both the Vault and Consul secrets backends. [[GH-1920](https://github.com/hashicorp/consul-k8s/issues/1920)]
+
+BUG FIXES:
+
+* api-gateway: fix ACL issue where when adminPartitions and ACLs are enabled, API Gateway Controller is unable to create a new namespace in Consul [[GH-2029](https://github.com/hashicorp/consul-k8s/issues/2029)]
+* api-gateway: fix issue where specifying an external server SNI name while using client nodes resulted in a TLS verification error. [[GH-2013](https://github.com/hashicorp/consul-k8s/issues/2013)]
+
 ## 1.1.0 (February 27, 2023)
 
 BREAKING CHANGES:
