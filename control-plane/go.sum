@@ -359,6 +359,10 @@ github.com/hashicorp/consul/api v1.10.1-0.20230317144806-eaa39f4ef59a h1:eXpcnIZ
 github.com/hashicorp/consul/api v1.10.1-0.20230317144806-eaa39f4ef59a/go.mod h1:f8zVJwBcLdr1IQnfdfszjUM0xzp31Zl3bpws3pL9uFM=
 github.com/hashicorp/consul/api v1.10.1-0.20230324190300-a168d0e667ac h1:jl7+FYcrlMS/m9SLCz4Ehm2qh/vueJstPEXkIjQj6ug=
 github.com/hashicorp/consul/api v1.10.1-0.20230324190300-a168d0e667ac/go.mod h1:f8zVJwBcLdr1IQnfdfszjUM0xzp31Zl3bpws3pL9uFM=
+github.com/hashicorp/consul/api v1.10.1-0.20230329135459-3e69ff1cd299 h1:JAevohOFaTL9XDpzYwN/2mkGPBm2QxTNcN41lys13Yc=
+github.com/hashicorp/consul/api v1.10.1-0.20230329135459-3e69ff1cd299/go.mod h1:f8zVJwBcLdr1IQnfdfszjUM0xzp31Zl3bpws3pL9uFM=
+github.com/hashicorp/consul/api v1.10.1-0.20230331190547-fc64a702f43c h1:MfDuWW38RozPodXT2aGc5jakoYo9EjgYpZl+vR3//Wg=
+github.com/hashicorp/consul/api v1.10.1-0.20230331190547-fc64a702f43c/go.mod h1:f8zVJwBcLdr1IQnfdfszjUM0xzp31Zl3bpws3pL9uFM=
 github.com/hashicorp/consul/api v1.20.0 h1:9IHTjNVSZ7MIwjlW3N3a7iGiykCMDpxZu8jsxFJh0yc=
 github.com/hashicorp/consul/api v1.20.0/go.mod h1:nR64eD44KQ59Of/ECwt2vUmIK2DKsDzAwTmwmLl8Wpo=
 github.com/hashicorp/consul/proto-public v0.1.0 h1:O0LSmCqydZi363hsqc6n2v5sMz3usQMXZF6ziK3SzXU=

@@ -150,6 +150,12 @@ spec:
                     description: Mode specifies the type of failover that will be performed. 
                       Valid values are "sequential", "" (equivalent to "sequential") and "order-by-locality".
                     type: string
+                  regions: 
+                    description: The ordered list of the regions of the failover targets.
+                      Valid values can be "us-west-1", "us-west-2", and so on. 
+                    items:
+                      type: string
+                    type: array
                 type: object
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
