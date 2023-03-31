@@ -401,7 +401,8 @@ func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
 		Datacenters:   in.Datacenters,
 		Targets:       targets,
 		Policy: &capi.ServiceResolverFailoverPolicy{
-			Mode: in.Policy.Mode,
+			Mode:    in.Policy.Mode,
+			Regions: in.Policy.Regions,
 		},
 	}
 }
