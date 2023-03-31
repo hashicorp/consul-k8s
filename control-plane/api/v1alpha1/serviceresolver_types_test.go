@@ -71,7 +71,8 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 							Policy: &FailoverPolicy{
-								Mode: "sequential",
+								Mode:    "sequential",
+								Regions: []string{"us-west-2"},
 							},
 						},
 						"failover2": {
@@ -80,7 +81,8 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 							Policy: &FailoverPolicy{
-								Mode: "",
+								Mode:    "",
+								Regions: []string{"us-west-1"},
 							},
 						},
 						"failover3": {
@@ -89,7 +91,8 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
 							},
 							Policy: &FailoverPolicy{
-								Mode: "order-by-locality",
+								Mode:    "order-by-locality",
+								Regions: []string{"us-east-1"},
 							},
 						},
 					},
@@ -147,7 +150,8 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "sequential",
+							Mode:    "sequential",
+							Regions: []string{"us-west-2"},
 						},
 					},
 					"failover2": {
@@ -156,7 +160,8 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "",
+							Mode:    "",
+							Regions: []string{"us-west-1"},
 						},
 					},
 					"failover3": {
@@ -165,7 +170,8 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
 						},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "order-by-locality",
+							Mode:    "order-by-locality",
+							Regions: []string{"us-east-1"},
 						},
 					},
 				},
@@ -272,7 +278,8 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 							Policy: &FailoverPolicy{
-								Mode: "sequential",
+								Mode:    "sequential",
+								Regions: []string{"us-west-2"},
 							},
 						},
 						"failover2": {
@@ -281,7 +288,8 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 							Policy: &FailoverPolicy{
-								Mode: "",
+								Mode:    "",
+								Regions: []string{"us-west-1"},
 							},
 						},
 						"failover3": {
@@ -290,7 +298,8 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
 							},
 							Policy: &FailoverPolicy{
-								Mode: "order-by-locality",
+								Mode:    "order-by-locality",
+								Regions: []string{"us-east-1"},
 							},
 						},
 					},
@@ -348,7 +357,8 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "sequential",
+							Mode:    "sequential",
+							Regions: []string{"us-west-2"},
 						},
 					},
 					"failover2": {
@@ -357,7 +367,8 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "",
+							Mode:    "",
+							Regions: []string{"us-west-1"},
 						},
 					},
 					"failover3": {
@@ -366,7 +377,8 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
 						},
 						Policy: &capi.ServiceResolverFailoverPolicy{
-							Mode: "order-by-locality",
+							Mode:    "order-by-locality",
+							Regions: []string{"us-east-1"},
 						},
 					},
 				},
