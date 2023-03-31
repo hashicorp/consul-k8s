@@ -249,7 +249,8 @@ func (in EnvoyExtension) validate(path *field.Path) *field.Error {
 type FailoverPolicy struct {
 	// Mode specifies the type of failover that will be performed. Valid values are
 	// "default", "" (equivalent to "default") and "order-by-locality".
-	Mode string `json:",omitempty"`
+	Mode    string   `json:",omitempty"`
+	Regions []string `json:",omitempty"`
 }
 
 func (in *FailoverPolicy) toConsul() *capi.ServiceResolverFailoverPolicy {
@@ -258,7 +259,8 @@ func (in *FailoverPolicy) toConsul() *capi.ServiceResolverFailoverPolicy {
 	}
 
 	return &capi.ServiceResolverFailoverPolicy{
-		Mode: in.Mode,
+		Mode:    in.Mode,
+		Regions: in.Regions,
 	}
 }
 
