@@ -50,43 +50,8 @@ func TestGatewayClassConfigDeepCopy(t *testing.T) {
 }
 
 func TestGatewayClassConfig_RoleFor(t *testing.T) {
-	t.Run("unmanaged auth", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{Managed: false},
-				},
-			},
-		}
-
-		assert.Nil(t, gcc.RoleFor(&gwv1beta1.Gateway{}))
-	})
-
-	t.Run("managed auth with no podSecurityPolicy", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{
-						Managed:           true,
-						PodSecurityPolicy: "",
-					},
-				},
-			},
-		}
-		assert.Nil(t, gcc.RoleFor(&gwv1beta1.Gateway{}))
-	})
-
 	t.Run("managed auth with podSecurityPolicy", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{
-						Managed:           true,
-						PodSecurityPolicy: "myPodSecurityPolicy",
-					},
-				},
-			},
-		}
+		gcc := &GatewayClassConfig{}
 
 		gw := &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Name: t.Name(), Namespace: t.Name()}}
 
@@ -99,48 +64,14 @@ func TestGatewayClassConfig_RoleFor(t *testing.T) {
 		require.Len(t, role.Rules, 1)
 		assert.ElementsMatch(t, []string{"policy"}, role.Rules[0].APIGroups)
 		assert.ElementsMatch(t, []string{"podsecuritypolicies"}, role.Rules[0].Resources)
-		assert.ElementsMatch(t, []string{"myPodSecurityPolicy"}, role.Rules[0].ResourceNames)
 		assert.ElementsMatch(t, []string{"use"}, role.Rules[0].Verbs)
 	})
 }
 
 func TestGatewayClassConfig_RoleBindingFor(t *testing.T) {
-	t.Run("unmanaged auth", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{Managed: false},
-				},
-			},
-		}
-
-		assert.Nil(t, gcc.ServiceAccountFor(&gwv1beta1.Gateway{}))
-	})
-
-	t.Run("managed auth with no podSecurityPolicy", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{
-						Managed:           true,
-						PodSecurityPolicy: "",
-					},
-				},
-			},
-		}
-		assert.Nil(t, gcc.RoleFor(&gwv1beta1.Gateway{}))
-	})
-
 	t.Run("managed auth with podSecurityPolicy", func(t *testing.T) {
 		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{
-						Managed:           true,
-						PodSecurityPolicy: "myPodSecurityPolicy",
-					},
-				},
-			},
+			Spec: GatewayClassConfigSpec{},
 		}
 
 		gw := &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Name: t.Name(), Namespace: t.Name()}}
@@ -163,26 +94,8 @@ func TestGatewayClassConfig_RoleBindingFor(t *testing.T) {
 }
 
 func TestGatewayClassConfig_ServiceAccountFor(t *testing.T) {
-	t.Run("unmanaged auth", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{Managed: false},
-				},
-			},
-		}
-
-		assert.Nil(t, gcc.ServiceAccountFor(&gwv1beta1.Gateway{}))
-	})
-
 	t.Run("managed auth", func(t *testing.T) {
-		gcc := &GatewayClassConfig{
-			Spec: GatewayClassConfigSpec{
-				ConsulSpec: ConsulSpec{
-					AuthSpec: AuthSpec{Managed: true},
-				},
-			},
-		}
+		gcc := &GatewayClassConfig{}
 
 		gw := &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Name: t.Name(), Namespace: t.Name()}}
 
