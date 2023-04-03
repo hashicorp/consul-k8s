@@ -26,7 +26,7 @@ aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
 openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
 # This image is built from test/docker/Test.dockerfile
 consul-helm-test-image: &consul-helm-test-image docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
-consul-test-image: &consul-test-image hashicorppreview/consul-enterprise:1.15-dev
+consul-test-image: &consul-test-image hashicorppreview/consul-enterprise:1.16-dev
 
 ########################
 # COMMANDS
