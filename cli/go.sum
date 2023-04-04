@@ -181,8 +181,8 @@ github.com/docker/cli v20.10.17+incompatible h1:eO2KS7ZFeov5UJeaDmIs1NFEDRf32Paq
 github.com/docker/cli v20.10.17+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/distribution v2.8.1+incompatible h1:Q50tZOPR6T/hjNsyc9g8/syEs6bk8XXApsHjKukMl68=
 github.com/docker/distribution v2.8.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
-github.com/docker/docker v20.10.17+incompatible h1:JYCuMrWaVNophQTOrMMoSwudOVEfcegoZZrleKc1xwE=
-github.com/docker/docker v20.10.17+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v20.10.24+incompatible h1:Ugvxm7a8+Gz6vqQYQQ2W7GYq5EUPaAiuPgIfVyI3dYE=
+github.com/docker/docker v20.10.24+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.6.4 h1:axCks+yV+2MR3/kZhAmy07yC56WZ2Pwu/fKWtKuZB0o=
 github.com/docker/docker-credential-helpers v0.6.4/go.mod h1:ofX3UI0Gz1TteYBjtgs07O36Pyasyp66D2uKT7H8W1c=
 github.com/docker/go-connections v0.4.0 h1:El9xVISelRB7BuFusrZozjnkIM5YnzCViNKohAFqRJQ=
@@ -443,8 +443,6 @@ github.com/hashicorp/consul/envoyextensions v0.1.2 h1:PvPqJ/td3UpOeIKQl5ycFPUy46
 github.com/hashicorp/consul/envoyextensions v0.1.2/go.mod h1:N94DQQkgITiA40zuTQ/UdPOLAAWobgHfVT5u7wxE/aU=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/consul/sdk v0.13.1 h1:EygWVWWMczTzXGpO93awkHFzfUka6hLYJ0qhETd+6lY=
-github.com/hashicorp/consul/troubleshoot v0.0.0-20230217154305-8dab825c3640 h1:P81kThpSzUW2oERDMrLsiZE3OuilLo3/EQhtVQW5M+8=
-github.com/hashicorp/consul/troubleshoot v0.0.0-20230217154305-8dab825c3640/go.mod h1:rskvju2tK8XvHYTAILHjO7lpV1/uViHs3Q3mg9Rkwlg=
 github.com/hashicorp/consul/troubleshoot v0.1.2 h1:c6uMTSt/qTMhK3e18nl4xW4j7JcANdQNHOEYhoXH1P8=
 github.com/hashicorp/consul/troubleshoot v0.1.2/go.mod h1:q35QOtN7K5kFLPm2SXHBDD+PzsuBekcqTZuuoOTzbWA=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
