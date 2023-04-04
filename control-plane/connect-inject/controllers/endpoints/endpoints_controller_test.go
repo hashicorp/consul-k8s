@@ -3442,7 +3442,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					// Read the token from Consul.
 					token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
 					if deregisteredServices.Contains(sID) {
-						require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+						require.EqualError(t, err, "Unexpected response code: 403 (token does not exist: ACL not found)")
 					} else {
 						require.NoError(t, err, "token should exist for service instance: "+sID)
 						require.NotNil(t, token)
@@ -4040,7 +4040,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 
 			if tt.enableACLs {
 				_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-				require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+				require.EqualError(t, err, "Unexpected response code: 403 (token does not exist: ACL not found)")
 			}
 		})
 	}
