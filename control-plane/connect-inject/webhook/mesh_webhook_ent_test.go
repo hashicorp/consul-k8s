@@ -52,7 +52,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'default' from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -74,7 +74,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'default' from k8s 'non-default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -96,7 +96,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'dest' from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -118,7 +118,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'dest' from k8s 'non-default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -140,7 +140,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -163,7 +163,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring from k8s 'dest'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -186,7 +186,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring with prefix from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -210,7 +210,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring with prefix from k8s 'dest'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -298,7 +298,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'default' from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -321,7 +321,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'default' from k8s 'non-default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -344,7 +344,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'dest' from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -367,7 +367,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'dest' from k8s 'non-default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -390,7 +390,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -414,7 +414,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring from k8s 'dest'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -438,7 +438,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring with prefix from k8s 'default'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -463,7 +463,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring with prefix from k8s 'dest'",
 			Webhook: MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -603,7 +603,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 			require.NoError(t, err)
 
 			webhook := MeshWebhook{
-				Log:                        logrtest.TestLogger{T: t},
+				Log:                        logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,

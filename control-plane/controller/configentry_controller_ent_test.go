@@ -204,7 +204,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 
 				r := in.GetController(
 					fakeClient,
-					logrtest.TestLogger{T: t},
+					logrtest.NewTestLogger(t),
 					s,
 					&controller.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
@@ -466,7 +466,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 
 				r := in.GetControllerFunc(
 					fakeClient,
-					logrtest.TestLogger{T: t},
+					logrtest.NewTestLogger(t),
 					s,
 					&controller.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
@@ -715,7 +715,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 
 				r := in.GetControllerFunc(
 					fakeClient,
-					logrtest.TestLogger{T: t},
+					logrtest.NewTestLogger(t),
 					s,
 					&controller.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
