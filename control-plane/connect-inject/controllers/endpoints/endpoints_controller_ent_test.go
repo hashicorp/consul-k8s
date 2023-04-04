@@ -1564,7 +1564,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						// Read the token from Consul.
 						token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
 						if deregisteredServices.Contains(serviceID) {
-							require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+							require.EqualError(t, err, "Unexpected response code: 403 (token not found in namespace kube: ACL not found)")
 						} else {
 							require.NoError(t, err, "token should exist for service instance: "+serviceID)
 							require.NotNil(t, token)
