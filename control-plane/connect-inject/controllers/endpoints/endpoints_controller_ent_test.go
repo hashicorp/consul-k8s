@@ -1566,7 +1566,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						if deregisteredServices.Contains(serviceID) {
 							require.EqualError(t, err, 
 								fmt.Sprintf("Unexpected response code: 403 (token not found in namespace %s: ACL not found)", 
-								ts.SourceKubeNS))
+								ts.ExpConsulNS))
 						} else {
 							require.NoError(t, err, "token should exist for service instance: "+serviceID)
 							require.NotNil(t, token)
