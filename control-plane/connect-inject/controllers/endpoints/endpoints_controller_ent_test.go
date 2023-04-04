@@ -1824,7 +1824,9 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.EqualError(t, err, "Unexpected response code: 403 (token does not exist: ACL not found)")
+					require.EqualError(t, err, 
+						fmt.Sprintf("Unexpected response code: 403 (token not found in namespace %s: ACL not found)",
+						ts.ExpConsulNS))
 				}
 			})
 		}
@@ -2109,7 +2111,8 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.EqualError(t, err, "Unexpected response code: 403 (token does not exist: ACL not found)")
+					require.EqualError(t, err, 
+						"Unexpected response code: 403 (token not found in namespace default: ACL not found)")
 				}
 			})
 		}
