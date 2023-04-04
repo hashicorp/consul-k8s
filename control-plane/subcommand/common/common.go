@@ -166,9 +166,9 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 	// with that token. This is because clients talk to servers in the stale consistency mode
 	// to decrease the load on the servers (see https://www.consul.io/docs/architecture/consensus#stale).
 	// In that case, it's possible that the token isn't replicated
-	// to that server instance yet. The client will then get an "ACL not found" error
+	// to that server instance yet. The client will then get an "token does not exist: ACL not found" error
 	// and subsequently cache this not found response. Then on any API call with the token,
-	// we will keep hitting the same "ACL not found" error
+	// we will keep hitting the same "token does not exist: ACL not found" error
 	// until the cache entry expires (determined by the `acl_token_ttl` which defaults to 30 seconds).
 	// This is not great because it will delay app start up time by 30 seconds in most cases
 	// (if you are running 3 servers, then the probability of ending up on a follower is close to 2/3).
@@ -182,7 +182,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 	// for this call and the next call to reach different servers and those servers to have different
 	// states from each other.
 	// For example, this call can reach a leader and succeed, while the next call can go to a follower
-	// that is still behind the leader and get an "ACL not found" error.
+	// that is still behind the leader and get an "token does not exist: ACL not found" error.
 	// However, this is a pretty unlikely case because
 	// clients have sticky connections to a server, and those connections get rebalanced only every 2-3min.
 	// And so, this workaround should work in a vast majority of cases.
