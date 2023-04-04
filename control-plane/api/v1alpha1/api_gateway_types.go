@@ -178,7 +178,7 @@ func compareSecrets(a, b *corev1.Secret) bool {
 
 // MergeService merges a gateway service a onto b and returns b, overriding all of
 // the fields that we'd normally set for a service deployment. It does not attempt
-// to change the service type
+// to change the service type.
 func MergeService(a, b *corev1.Service) *corev1.Service {
 	if !compareServices(a, b) {
 		b.Annotations = a.Annotations
@@ -213,7 +213,7 @@ func compareServices(a, b *corev1.Service) bool {
 
 // MergeDeployment merges a gateway deployment a onto b and returns b, overriding all of
 // the fields that we'd normally set for a service deployment. It does not attempt
-// to change the service type
+// to change the service type.
 func MergeDeployment(a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
 		b.Spec.Template = a.Spec.Template
@@ -246,11 +246,7 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 		}
 	}
 
-	if *b.Spec.Replicas != *a.Spec.Replicas {
-		return false
-	}
-
-	return true
+	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
 // labelsForGateway formats the correct configuration labels for a Gateway resource.
