@@ -29,9 +29,9 @@ type Command struct {
 
 	isTest bool
 
-	flagCAFile            string // CA File for CA for Consul server
-	flagCASecret          string // CA Secret for Consul server
-	flagCASecretNamespace string // CA Secret namespace for Consul server
+	flagServerCAFile            string // CA File for CA for Consul server
+	flagServerCASecret          string // CA Secret for Consul server
+	flagServerCASecretNamespace string // CA Secret namespace for Consul server
 
 	flagConsulAddress string // Consul server address
 
@@ -67,9 +67,9 @@ func New(ctx context.Context, ui cli.Ui, logOutput io.Writer) *Command {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.flags.StringVar(&c.flagCAFile, "ca-file", "", "Path to CA for Consul server.")
-	c.flags.StringVar(&c.flagCASecret, "ca-secret", "", "CA Secret for Consul server.")
-	c.flags.StringVar(&c.flagCASecretNamespace, "ca-secret-namespace", "default", "CA Secret namespace for Consul server.")
+	c.flags.StringVar(&c.flagServerCAFile, "ca-file", "", "Path to CA for Consul server.")
+	c.flags.StringVar(&c.flagServerCASecret, "ca-secret", "", "CA Secret for Consul server.")
+	c.flags.StringVar(&c.flagServerCASecretNamespace, "ca-secret-namespace", "default", "CA Secret namespace for Consul server.")
 	c.flags.StringVar(&c.flagConsulAddress, "consul-address", "", "Consul Address.")
 	c.flags.StringVar(&c.flagPrimaryDatacenter, "primary-datacenter", "", "Name of the primary Consul datacenter")
 	c.flags.StringVar(&c.flagSDSServerHost, "sds-server-host", defaultSDSServerHost, "SDS Server Host.")
@@ -95,8 +95,6 @@ func (c *Command) init() {
 			"Enable or disable JSON output format for logging.")
 	}
 
-	c.k8s = &flags.K8SFlags{}
-	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
 

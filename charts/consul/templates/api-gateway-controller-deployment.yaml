@@ -59,7 +59,7 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-api-gateway-controller
       containers:
       - name: api-gateway-controller
-        image: {{ default .Values.apiGateway.image .Values.global.imageK8S }} # TODO Melisa check this out
+        image: {{ default .Values.global.imageK8S .Values.apiGateway.image}}
         ports:
         - containerPort: 9090
           name: sds
@@ -137,9 +137,9 @@ spec:
         - |
         {{- if not .Values.apiGateway.image}}
           consul-k8s-control-plane api-gateway \
-        {{ else }}
+        {{- else}}
           consul-api-gateway server \
-        {{- end }}
+        {{- end}}
             -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
             -k8s-namespace {{ .Release.Namespace }} \
             {{- if .Values.global.enableConsulNamespaces }}
