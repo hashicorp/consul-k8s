@@ -1,0 +1,45 @@
+global:
+  imageK8S: melisaghashicorp/consul-k8s-controller-dev:m1
+  name: consul
+  datacenter: dc2
+  tls:
+    enabled: true
+    caCert:
+      secretName: consul-federation
+      secretKey: caCert
+    caKey:
+      secretName: consul-federation
+      secretKey: caKey
+  federation:
+    enabled: true
+    primaryDatacenter: dc1
+    k8sAuthMethodHost: "https://34.66.255.241"
+  acls:
+    k8sAuthMethodHost:
+    manageSystemACLs: true
+    replicationToken:
+      secretName: consul-acl-replication-acl-token
+      secretKey: token
+server:
+  replicas: 1
+  extraVolumes:
+    - type: secret
+      name: consul-federation
+      items:
+        - key: serverConfigJSON
+          path: config.json
+      load: true
+connectInject:
+  enabled: true
+controller:
+  enabled: true
+meshGateway:
+  enabled: true
+  replicas: 1
+apiGateway:
+  enabled: true
+  image: hashicorp/consul-api-gateway:0.5.1
+  logLevel: debug
+  managedGatewayClass:
+    enabled: true
+    serviceType: LoadBalancer
