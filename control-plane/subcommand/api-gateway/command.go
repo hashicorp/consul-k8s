@@ -6,28 +6,21 @@ package apigateway
 import (
 	"context"
 	"flag"
-	"io"
-	"sync"
-	"time"
-
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/mitchellh/cli"
+	"io"
+	"sync"
 )
 
 const (
-	defaultGRPCPort      = 8502
 	defaultSDSServerHost = "consul-api-gateway-controller.default.svc.cluster.local"
 	defaultSDSServerPort = 9090
-	// The amount of time to wait for the first cert write
-	defaultCertWaitTime = 1 * time.Minute
 )
 
 type Command struct {
 	UI    cli.Ui
 	flags *flag.FlagSet
-
-	isTest bool
 
 	flagServerCAFile            string // CA File for CA for Consul server
 	flagServerCASecret          string // CA Secret for Consul server
@@ -59,7 +52,7 @@ type Command struct {
 	ctx    context.Context
 }
 
-// New returns a new server command
+// New returns a new API Gateway command.
 func New(ctx context.Context, ui cli.Ui, logOutput io.Writer) *Command {
 	return &Command{UI: ui, output: logOutput, ctx: ctx}
 }
