@@ -2945,7 +2945,7 @@ apiGateway:
       # ```yaml
       # service:
       #   annotations: |
-      #   - external-dns.alpha.kubernetes.io/hostname
+      #     - external-dns.alpha.kubernetes.io/hostname
       # ```
       #
       # @type: string
