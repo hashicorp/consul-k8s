@@ -79,6 +79,20 @@ spec:
                         service from to form the failover group of instances. If empty
                         the current namespace is used.
                       type: string
+                    policy:
+                      description: FailoverPolicy specifies the exact mechanism used for failover.
+                      properties:
+                        mode:
+                          description: Mode specifies the type of failover that will be performed. 
+                            Valid values are "sequential", "" (equivalent to "sequential") and "order-by-locality".
+                          type: string
+                        regions: 
+                          description: The ordered list of the regions of the failover targets.
+                            Valid values can be "us-west-1", "us-west-2", and so on.
+                          items:
+                            type: string
+                          type: array
+                      type: object
                     service:
                       description: Service is the service to resolve instead of the
                         default as the failover group of instances during failover.
