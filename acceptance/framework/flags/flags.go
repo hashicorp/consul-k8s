@@ -40,6 +40,8 @@ type TestFlags struct {
 	flagConsulVersion    string
 	flagEnvoyImage       string
 
+	flagVaultVersion string
+
 	flagNoCleanupOnFailure bool
 
 	flagDebugDirectory string
@@ -72,6 +74,7 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
+	flag.StringVar(&t.flagVaultVersion, "vault-version", "", "The vault version used for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -142,6 +145,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 	// if the Version is empty consulVersion will be nil
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
+	vaultVersion, _ := version.NewVersion(t.flagVaultVersion)
 
 	return &config.TestConfig{
 		Kubeconfig:    t.flagKubeconfig,
@@ -171,6 +175,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		ConsulK8SImage:   t.flagConsulK8sImage,
 		ConsulVersion:    consulVersion,
 		EnvoyImage:       t.flagEnvoyImage,
+		VaultVersion:     vaultVersion,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
