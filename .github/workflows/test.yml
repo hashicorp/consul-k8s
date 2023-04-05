@@ -8,8 +8,8 @@ env:
   TEST_RESULTS: /tmp/test-results # path to where test results are saved
   GOTESTSUM_VERSION: 1.8.2 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
   # We use docker images to copy the consul binary for unit tests.
-  CONSUL_OSS_DOCKER_IMAGE: hashicorppreview/consul:1.14-dev # Consul's OSS version to use in tests
-  CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.14-dev # Consul's enterprise version to use in tests
+  CONSUL_OSS_DOCKER_IMAGE: hashicorppreview/consul:1.16-dev # Consul's OSS version to use in tests
+  CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.16-dev # Consul's enterprise version to use in tests
 
 jobs:
   terraform-fmt-check:

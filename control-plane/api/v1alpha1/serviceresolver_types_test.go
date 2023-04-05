@@ -70,17 +70,29 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							ServiceSubset: "failover_subset1",
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+							Policy: &FailoverPolicy{
+								Mode:    "sequential",
+								Regions: []string{"us-west-2"},
+							},
 						},
 						"failover2": {
 							Service:       "failover2",
 							ServiceSubset: "failover_subset2",
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+							Policy: &FailoverPolicy{
+								Mode:    "",
+								Regions: []string{"us-west-1"},
+							},
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							},
+							Policy: &FailoverPolicy{
+								Mode:    "order-by-locality",
+								Regions: []string{"us-east-1"},
 							},
 						},
 					},
@@ -137,17 +149,29 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						ServiceSubset: "failover_subset1",
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode:    "sequential",
+							Regions: []string{"us-west-2"},
+						},
 					},
 					"failover2": {
 						Service:       "failover2",
 						ServiceSubset: "failover_subset2",
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode:    "",
+							Regions: []string{"us-west-1"},
+						},
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+						},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode:    "order-by-locality",
+							Regions: []string{"us-east-1"},
 						},
 					},
 				},
@@ -253,17 +277,29 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							ServiceSubset: "failover_subset1",
 							Namespace:     "failover_namespace1",
 							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+							Policy: &FailoverPolicy{
+								Mode:    "sequential",
+								Regions: []string{"us-west-2"},
+							},
 						},
 						"failover2": {
 							Service:       "failover2",
 							ServiceSubset: "failover_subset2",
 							Namespace:     "failover_namespace2",
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+							Policy: &FailoverPolicy{
+								Mode:    "",
+								Regions: []string{"us-west-1"},
+							},
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							},
+							Policy: &FailoverPolicy{
+								Mode:    "order-by-locality",
+								Regions: []string{"us-east-1"},
 							},
 						},
 					},
@@ -320,17 +356,29 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						ServiceSubset: "failover_subset1",
 						Namespace:     "failover_namespace1",
 						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode:    "sequential",
+							Regions: []string{"us-west-2"},
+						},
 					},
 					"failover2": {
 						Service:       "failover2",
 						ServiceSubset: "failover_subset2",
 						Namespace:     "failover_namespace2",
 						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode:    "",
+							Regions: []string{"us-west-1"},
+						},
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+						},
+						Policy: &capi.ServiceResolverFailoverPolicy{
+							Mode:    "order-by-locality",
+							Regions: []string{"us-east-1"},
 						},
 					},
 				},
@@ -598,8 +646,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, and targets cannot all be empty at once",
-				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, and targets cannot all be empty at once",
+				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
 			},
 		},
 		"hashPolicy.field invalid": {
