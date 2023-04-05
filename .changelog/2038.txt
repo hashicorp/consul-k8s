@@ -1,0 +1,3 @@
+```release-note:feature
+apiGateway: Adds API Gateway command to CLI
+```
