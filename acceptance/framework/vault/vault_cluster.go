@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	releaseLabel = "app.kubernetes.io/instance="
-	//defaultVaultHelmChartVersion = "v0.21.0"
-	defaultVaultHelmChartVersion = vaultVersion
+	releaseLabel                 = "app.kubernetes.io/instance="
+	defaultVaultHelmChartVersion = "v0.21.0"
+	//defaultVaultHelmChartVersion = vaultVersion
 )
 
 // VaultCluster represents a vault installation.
@@ -60,13 +60,20 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
+	if cfg.VaultServerVersion != nil {
+		values["server.image.tag"] = cfg.VaultServerVersion.String()
+	}
+	vaultHelmChartVersion := defaultVaultHelmChartVersion
 
+	if cfg.VaultHelmChartVersion != "" {
+		vaultHelmChartVersion = cfg.VaultHelmChartVersion
+	}
 	helpers.MergeMaps(values, helmValues)
 	vaultHelmOpts := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: kopts,
 		Logger:         logger,
-		Version:        defaultVaultHelmChartVersion,
+		Version:        vaultHelmChartVersion,
 	}
 
 	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")
