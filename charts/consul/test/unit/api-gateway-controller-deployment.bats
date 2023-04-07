@@ -9,14 +9,26 @@ load _helpers
       .
 }
 
-@test "apiGateway/Deployment: fails if no image is set" {
+@test "apiGateway/Deployment: uses default image of the global control-plane if no image is set" {
   cd `chart_dir`
-  run helm template \
+  local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "apiGateway.image must be set to enable api gateway" ]]
+      --set 'global.imageK8S=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+}
+
+@test "apiGateway/Deployment: uses image of consul-api-gateway when specified" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=hashicorp/consul-api-gateway' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+  [ "${actual}" = "hashicorp/consul-api-gateway" ]
 }
 
 @test "apiGateway/Deployment: disable with apiGateway.enabled" {

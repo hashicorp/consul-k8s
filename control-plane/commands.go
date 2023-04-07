@@ -7,6 +7,7 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
+	cmdAPIGateway "github.com/hashicorp/consul-k8s/control-plane/subcommand/api-gateway"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
@@ -34,6 +35,10 @@ func init() {
 	Commands = map[string]cli.CommandFactory{
 		"acl-init": func() (cli.Command, error) {
 			return &cmdACLInit.Command{UI: ui}, nil
+		},
+
+		"api-gateway": func() (cli.Command, error) {
+			return &cmdAPIGateway.Command{UI: ui}, nil
 		},
 
 		"connect-init": func() (cli.Command, error) {
