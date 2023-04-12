@@ -1,0 +1,10 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: SamenessGroups
+metadata:
+  name: samenessgroups-sample
+spec:
+  defaultForFailover: true
+  includeLocal: true
+  members:
+    - peer: dc1
+      partition: default

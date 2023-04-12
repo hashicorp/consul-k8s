@@ -14,6 +14,7 @@ const (
 	ExportedServices   string = "exportedservices"
 	IngressGateway     string = "ingressgateway"
 	TerminatingGateway string = "terminatinggateway"
+	SamenessGroups     string = "samenessgroups"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"

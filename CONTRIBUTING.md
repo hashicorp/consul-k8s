@@ -167,7 +167,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```bash
     operator-sdk create api --group consul --version v1alpha1 --kind IngressGateway --controller --namespaced=true --make=false --resource=true
     ```
-1. Re-order the file so it looks like:
+1. Re-order the generated ingressgateway_types.go file, so it looks like:
     ```go
     func init() {
     	SchemeBuilder.Register(&IngressGateway{}, &IngressGatewayList{})
@@ -320,8 +320,6 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ### Controller
 1. Delete the file `control-plane/controllers/suite_test.go`. We don't write suite tests, just unit tests.
-1. Move `control-plane/controllers/ingressgateway_controller.go` to `control-plane/controller` directory.
-1. Delete the `control-plane/controllers` directory.
 1. Rename `Reconciler` to `Controller`, e.g. `IngressGatewayReconciler` => `IngressGatewayController`
 1. Use the existing controller files as a guide and make this file match.
 1. Add your controller as a case in the tests in `configentry_controller_test.go`:

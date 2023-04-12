@@ -5,16 +5,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: terminatinggateways.consul.hashicorp.com
+  name: samenessgroups.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
-    kind: TerminatingGateway
-    listKind: TerminatingGatewayList
-    plural: terminatinggateways
+    kind: SamenessGroups
+    listKind: SamenessGroupsList
+    plural: samenessgroups
     shortNames:
-    - terminating-gateway
-    singular: terminatinggateway
+    - sameness-groups
+    singular: samenessgroups
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -33,8 +33,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: TerminatingGateway is the Schema for the terminatinggateways
-          API
+        description: SamenessGroups is the Schema for the samenessgroups API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -49,39 +48,21 @@ spec:
           metadata:
             type: object
           spec:
-            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway.
+            description: SamenessGroupsSpec defines the desired state of SamenessGroups
             properties:
-              services:
-                description: Services is a list of service names represented by the
-                  terminating gateway.
+              defaultForFailover:
+                description: DefaultForFailover is
+                type: boolean
+              includeLocal:
+                description: IncludeLocal
+                type: boolean
+              members:
+                description: Members
                 items:
-                  description: A LinkedService is a service represented by a terminating
-                    gateway.
                   properties:
-                    caFile:
-                      description: CAFile is the optional path to a CA certificate
-                        to use for TLS connections from the gateway to the linked
-                        service.
+                    partition:
                       type: string
-                    certFile:
-                      description: CertFile is the optional path to a client certificate
-                        to use for TLS connections from the gateway to the linked
-                        service.
-                      type: string
-                    keyFile:
-                      description: KeyFile is the optional path to a private key to
-                        use for TLS connections from the gateway to the linked service.
-                      type: string
-                    name:
-                      description: Name is the name of the service, as defined in
-                        Consul's catalog.
-                      type: string
-                    namespace:
-                      description: The namespace the service is registered in.
-                      type: string
-                    sni:
-                      description: SNI is the optional name to specify during the
-                        TLS handshake with a linked service.
+                    peer:
                       type: string
                   type: object
                 type: array

@@ -3,7 +3,7 @@
 
 //go:build enterprise
 
-package controller_test
+package controllers_test
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -88,7 +88,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind        string
 			ConsulNamespace   string
 			KubeResource      common.ConfigEntryResource
-			GetController     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler
+			GetController     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler
 			AssertValidConfig func(entry capi.ConfigEntry) bool
 		}{
 			"namespaced": {
@@ -102,8 +102,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						Protocol: "http",
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceDefaultsController{
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ServiceDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -132,8 +132,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						},
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ProxyDefaultsController{
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ProxyDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -170,8 +170,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						},
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceIntentionsController{
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ServiceIntentionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -206,7 +206,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.TestLogger{T: t},
 					s,
-					&controller.ConfigEntryController{
+					&controllers.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
@@ -299,7 +299,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind            string
 			ConsulNamespace       string
 			KubeResource          common.ConfigEntryResource
-			GetControllerFunc     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler
+			GetControllerFunc     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler
 			AssertValidConfigFunc func(entry capi.ConfigEntry) bool
 			WriteConfigEntryFunc  func(consulClient *capi.Client, namespace string) error
 			UpdateResourceFunc    func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error
@@ -310,15 +310,15 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "foo",
 						Namespace:  c.SourceKubeNS,
-						Finalizers: []string{controller.FinalizerName},
+						Finalizers: []string{controllers.FinalizerName},
 					},
 					Spec: v1alpha1.ServiceDefaultsSpec{
 						Protocol: "http",
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ServiceDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -352,7 +352,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       common.Global,
 						Namespace:  c.SourceKubeNS,
-						Finalizers: []string{controller.FinalizerName},
+						Finalizers: []string{controllers.FinalizerName},
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
 						MeshGateway: v1alpha1.MeshGateway{
@@ -361,8 +361,8 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ProxyDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ProxyDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -398,7 +398,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "test",
 						Namespace:  c.SourceKubeNS,
-						Finalizers: []string{controller.FinalizerName},
+						Finalizers: []string{controllers.FinalizerName},
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
 						Destination: v1alpha1.IntentionDestination{
@@ -415,8 +415,8 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceIntentionsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ServiceIntentionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -468,7 +468,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.TestLogger{T: t},
 					s,
-					&controller.ConfigEntryController{
+					&controllers.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
@@ -577,7 +577,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind           string
 			ConsulNamespace      string
 			KubeResource         common.ConfigEntryResource
-			GetControllerFunc    func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler
+			GetControllerFunc    func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler
 			WriteConfigEntryFunc func(consulClient *capi.Client, namespace string) error
 		}{
 			"namespaced": {
@@ -588,7 +588,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "foo",
 						Namespace:         c.SourceKubeNS,
-						Finalizers:        []string{controller.FinalizerName},
+						Finalizers:        []string{controllers.FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ServiceDefaultsSpec{
@@ -596,8 +596,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ServiceDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -621,7 +621,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              common.Global,
 						Namespace:         c.SourceKubeNS,
-						Finalizers:        []string{controller.FinalizerName},
+						Finalizers:        []string{controllers.FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
@@ -631,8 +631,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ProxyDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ProxyDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -658,7 +658,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "foo",
 						Namespace:         c.SourceKubeNS,
-						Finalizers:        []string{controller.FinalizerName},
+						Finalizers:        []string{controllers.FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
@@ -676,8 +676,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceIntentionsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controllers.ConfigEntryController) reconcile.Reconciler {
+					return &controllers.ServiceIntentionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -717,7 +717,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.TestLogger{T: t},
 					s,
-					&controller.ConfigEntryController{
+					&controllers.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,

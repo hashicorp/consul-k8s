@@ -3,7 +3,7 @@
 
 //go:build enterprise
 
-package controller_test
+package controllers_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -103,11 +103,11 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
 
-			controller := &controller.ExportedServicesController{
+			controller := &controllers.ExportedServicesController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
-				ConfigEntryController: &controller.ConfigEntryController{
+				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					EnableConsulNamespaces:     true,
@@ -195,7 +195,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "default",
 					Namespace:  c.SourceKubeNS,
-					Finalizers: []string{controller.FinalizerName},
+					Finalizers: []string{controllers.FinalizerName},
 				},
 				Spec: v1alpha1.ExportedServicesSpec{
 					Services: []v1alpha1.ExportedService{
@@ -218,11 +218,11 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 			consulClient := testClient.APIClient
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
 
-			controller := &controller.ExportedServicesController{
+			controller := &controllers.ExportedServicesController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
-				ConfigEntryController: &controller.ConfigEntryController{
+				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					EnableConsulNamespaces:     true,
@@ -332,7 +332,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "default",
 					Namespace:         c.SourceKubeNS,
-					Finalizers:        []string{controller.FinalizerName},
+					Finalizers:        []string{controllers.FinalizerName},
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 				},
 				Spec: v1alpha1.ExportedServicesSpec{
@@ -356,11 +356,11 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
 
-			controller := &controller.ExportedServicesController{
+			controller := &controllers.ExportedServicesController{
 				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
-				ConfigEntryController: &controller.ConfigEntryController{
+				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					EnableConsulNamespaces:     true,

@@ -1,0 +1,24 @@
+# permissions for end users to edit samenessgroups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: samenessgroups-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - samenessgroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - samenessgroups/status
+  verbs:
+  - get
