@@ -11,8 +11,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  CONSUL_OSS_DOCKER_IMAGE: hashicorppreview/consul:1.16-dev # Consul's OSS version to use in tests
-  CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.16-dev # Consul's enterprise version to use in tests
+  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.15-dev # Consul's enterprise version to use in tests
   BRANCH: "release/1.1.x"
   CONTEXT: "weekly"
 
@@ -28,4 +27,4 @@ jobs:
         repo: hashicorp/consul-k8s-workflows
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}","consul-oss-docker-image":"${{ env.CONSUL_OSS_DOCKER_IMAGE}}", "consul-ent-docker-image":"${{ env.CONSUL_ENT_DOCKER_IMAGE }}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'
