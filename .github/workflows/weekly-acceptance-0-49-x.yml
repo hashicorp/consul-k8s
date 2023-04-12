@@ -1,4 +1,6 @@
 # Dispatch to the consul-k8s-workflows with a weekly cron
+#
+# A separate file is needed for each release because the cron schedules are different for each release.
 name: weekly-acceptance-0-49-x
 on:
   schedule:
