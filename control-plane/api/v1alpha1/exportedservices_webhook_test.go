@@ -180,7 +180,7 @@ func TestValidateExportedServices(t *testing.T) {
 
 			validator := &ExportedServicesWebhook{
 				Client:     client,
-				Logger:     logrtest.TestLogger{T: t},
+				Logger:     logrtest.NewTestLogger(t),
 				decoder:    decoder,
 				ConsulMeta: c.consulMeta,
 			}
