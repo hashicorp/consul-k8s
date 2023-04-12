@@ -70,7 +70,7 @@ func ZapLogger(level string, jsonLogging bool) (logr.Logger, error) {
 		level = "debug"
 	}
 	if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
-		return nil, fmt.Errorf("unknown log level %q: %s", level, err.Error())
+		return logr.Logger{}, fmt.Errorf("unknown log level %q: %s", level, err.Error())
 	}
 	if jsonLogging {
 		return zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder()), nil

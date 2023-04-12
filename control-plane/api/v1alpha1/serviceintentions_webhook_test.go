@@ -253,7 +253,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.NewTestLogger(t),
 				decoder: decoder,
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
@@ -442,7 +442,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.NewTestLogger(t),
 				decoder: decoder,
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
@@ -602,7 +602,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 
 				validator := &ServiceIntentionsWebhook{
 					Client:  client,
-					Logger:  logrtest.TestLogger{T: t},
+					Logger:  logrtest.NewTestLogger(t),
 					decoder: decoder,
 					ConsulMeta: common.ConsulMeta{
 						NamespacesEnabled: namespacesEnabled,
