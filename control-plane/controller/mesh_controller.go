@@ -34,7 +34,7 @@ func (r *MeshController) Logger(name types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("request", name)
 }
 
-func (r *MeshController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (r *MeshController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 

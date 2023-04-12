@@ -34,7 +34,7 @@ func (r *ExportedServicesController) Logger(name types.NamespacedName) logr.Logg
 	return r.Log.WithValues("request", name)
 }
 
-func (r *ExportedServicesController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (r *ExportedServicesController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 
