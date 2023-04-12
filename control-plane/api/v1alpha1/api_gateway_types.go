@@ -10,10 +10,6 @@ import (
 
 const (
 	GatewayClassConfigKind = "GatewayClassConfig"
-	managedLabel           = "api-gateway.consul.hashicorp.com/managed"
-	nameLabel              = "api-gateway.consul.hashicorp.com/name"
-	namespaceLabel         = "api-gateway.consul.hashicorp.com/namespace"
-	createdAtLabel         = "api-gateway.consul.hashicorp.com/created"
 )
 
 // +genclient
