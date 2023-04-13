@@ -44,8 +44,10 @@ func TestSamenessGroups_ToConsul(t *testing.T) {
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
 						{
-							Peer:      "dc1",
-							Partition: "default",
+							Peer: "peer2",
+						},
+						{
+							Partition: "p2",
 						},
 					},
 				},
@@ -61,8 +63,10 @@ func TestSamenessGroups_ToConsul(t *testing.T) {
 				IncludeLocal:       true,
 				Members: []capi.SamenessGroupMember{
 					{
-						Peer:      "dc1",
-						Partition: "default",
+						Peer: "peer2",
+					},
+					{
+						Partition: "p2",
 					},
 				},
 			},
@@ -111,17 +115,17 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
 						{
-							Peer:      "dc1",
-							Partition: "default",
+							Peer: "peer2",
+						},
+						{
+							Partition: "p2",
 						},
 					},
 				},
 			},
 			&capi.SamenessGroupConfigEntry{
-				Kind:        capi.SamenessGroup,
-				Name:        "my-test-sameness-group",
-				CreateIndex: 1,
-				ModifyIndex: 2,
+				Kind: capi.SamenessGroup,
+				Name: "my-test-sameness-group",
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -130,8 +134,10 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 				IncludeLocal:       true,
 				Members: []capi.SamenessGroupMember{
 					{
-						Peer:      "dc1",
-						Partition: "default",
+						Peer: "peer2",
+					},
+					{
+						Partition: "p2",
 					},
 				},
 			},
@@ -162,8 +168,12 @@ func TestSamenessGroups_Validate(t *testing.T) {
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
 						{
-							Peer:      "dc1",
-							Partition: "default",
+							Peer:      "peer2",
+							Partition: "",
+						},
+						{
+							Peer:      "",
+							Partition: "p2",
 						},
 					},
 				},
@@ -171,13 +181,65 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			partitionsEnabled: true,
 			expectedErrMsg:    "",
 		},
+		"invalid - with peer and partition both": {
+			input: &SamenessGroups{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-sameness-group",
+				},
+				Spec: SamenessGroupsSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []SamenessGroupMember{
+						{
+							Peer:      "peer2",
+							Partition: "p2",
+						},
+					},
+				},
+			},
+			partitionsEnabled: true,
+			expectedErrMsg:    "sameness group members cannot specify both partition and peer in the same entry",
+		},
+		"invalid - no name": {
+			input: &SamenessGroups{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: SamenessGroupsSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []SamenessGroupMember{
+						{
+							Peer: "peer2",
+						},
+						{
+							Partition: "p2",
+						},
+					},
+				},
+			},
+			partitionsEnabled: true,
+			expectedErrMsg:    "sameness groups must have a name defined",
+		},
+		"invalid - empty members": {
+			input: &SamenessGroups{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-sameness-group",
+				},
+				Spec: SamenessGroupsSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members:            []SamenessGroupMember{},
+				},
+			},
+			partitionsEnabled: true,
+			expectedErrMsg:    "sameness groups must have at least one member",
+		},
 	}
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := testCase.input.Validate(common.ConsulMeta{})
 			if testCase.expectedErrMsg != "" {
-				require.EqualError(t, err, testCase.expectedErrMsg)
+				require.ErrorContains(t, err, testCase.expectedErrMsg)
 			} else {
 				require.NoError(t, err)
 			}

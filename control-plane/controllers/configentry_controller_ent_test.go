@@ -34,7 +34,7 @@ import (
 // we're only testing with the ServiceDefaults and ProxyDefaults controllers which
 // will exercise all the namespaces code for config entries that are namespaced and those that
 // exist in the global namespace.
-// We also test Enterprise only features like SamenessGroups
+// We also test Enterprise only features like SamenessGroups.
 
 func TestConfigEntryController_createsConfigEntry(t *testing.T) {
 	t.Parallel()

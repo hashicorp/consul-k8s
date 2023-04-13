@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -169,7 +170,24 @@ func (in *SamenessGroups) Validate(consulMeta common.ConsulMeta) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
-	allErrs = append(allErrs, SamenessGroupMembers(in.Spec.Members).validate(path.Child("envoyExtensions"))...)
+	asJSON, _ := json.Marshal(in)
+	if in == nil {
+		allErrs = append(allErrs, field.Invalid(path, string(asJSON), "config entry is nil"))
+	}
+	if in.Name == "" {
+		allErrs = append(allErrs, field.Invalid(path.Child("name"), in.Name, "sameness groups must have a name defined"))
+	}
+
+	if len(in.Spec.Members) == 0 {
+		asJSON, _ := json.Marshal(in.Spec.Members)
+		allErrs = append(allErrs, field.Invalid(path.Child("members"), string(asJSON), "sameness groups must have at least one member"))
+	}
+
+	for i, m := range in.Spec.Members {
+		if err := m.validate(path.Child("members").Index(i)); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
@@ -202,23 +220,22 @@ func (in SamenessGroupMembers) toConsul() []capi.SamenessGroupMember {
 	return outMembers
 }
 
-func (in SamenessGroupMembers) validate(path *field.Path) field.ErrorList {
-	if len(in) == 0 {
-		return nil
-	}
+func (in *SamenessGroupMember) validate(path *field.Path) *field.Error {
+	asJSON, _ := json.Marshal(in)
 
-	var errs field.ErrorList
-	for i, e := range in {
-		if err := e.validate(path.Child("envoyExtension").Index(i)); err != nil {
-			errs = append(errs, err)
-		}
+	if in == nil {
+		return field.Invalid(path, string(asJSON), "sameness group member is nil")
 	}
-
-	return errs
+	if in.isEmpty() {
+		return field.Invalid(path, string(asJSON), "sameness group members must specify either partition or peer")
+	}
+	// We do not allow referencing peer connections in other partitions.
+	if in.Peer != "" && in.Partition != "" {
+		return field.Invalid(path, string(asJSON), "sameness group members cannot specify both partition and peer in the same entry")
+	}
+	return nil
 }
 
-func (in SamenessGroupMember) validate(path *field.Path) *field.Error {
-
-	//TODO
-	return nil
+func (in *SamenessGroupMember) isEmpty() bool {
+	return in.Peer == "" && in.Partition == ""
 }
