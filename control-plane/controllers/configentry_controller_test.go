@@ -431,45 +431,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "sni", resource.Services[0].SNI)
 			},
 		},
-		{
-			kubeKind:   "SamenessGroups",
-			consulKind: capi.SamenessGroup,
-			configEntryResource: &v1alpha1.SamenessGroups{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: kubeNS,
-				},
-				Spec: v1alpha1.SamenessGroupsSpec{
-					DefaultForFailover: true,
-					IncludeLocal:       true,
-					Members: []v1alpha1.SamenessGroupMember{
-						{
-							Peer:      "dc1",
-							Partition: "default",
-						},
-					},
-				},
-			},
-			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
-				return &SamenessGroupsController{
-					Client: client,
-					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
-						ConsulClientConfig:  cfg,
-						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
-					},
-				}
-			},
-			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				resource, ok := consulEntry.(*capi.SamenessGroupConfigEntry)
-				require.True(t, ok, "cast error")
-				require.Equal(t, true, resource.DefaultForFailover)
-				require.Equal(t, true, resource.IncludeLocal)
-				require.Equal(t, "dc1", resource.Members[0].Peer)
-				require.Equal(t, "default", resource.Members[0].Partition)
-			},
-		},
 	}
 
 	for _, c := range cases {
@@ -947,49 +908,6 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "new-sni", resource.Services[0].SNI)
 			},
 		},
-		{
-			kubeKind:   "SamenessGroups",
-			consulKind: capi.SamenessGroup,
-			configEntryResource: &v1alpha1.SamenessGroups{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: kubeNS,
-				},
-				Spec: v1alpha1.SamenessGroupsSpec{
-					DefaultForFailover: true,
-					IncludeLocal:       true,
-					Members: []v1alpha1.SamenessGroupMember{
-						{
-							Peer:      "dc1",
-							Partition: "default",
-						},
-					},
-				},
-			},
-			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
-				return &SamenessGroupsController{
-					Client: client,
-					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
-						ConsulClientConfig:  cfg,
-						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
-					},
-				}
-			},
-			updateF: func(resource common.ConfigEntryResource) {
-				sg := resource.(*v1alpha1.SamenessGroups)
-				sg.Spec.IncludeLocal = false
-			},
-			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				resource, ok := consulEntry.(*capi.SamenessGroupConfigEntry)
-				require.True(t, ok, "cast error")
-				require.Equal(t, true, resource.DefaultForFailover)
-				require.Equal(t, false, resource.IncludeLocal)
-				require.Equal(t, "dc1", resource.Members[0].Peer)
-				require.Equal(t, "default", resource.Members[0].Partition)
-			},
-		},
 	}
 
 	for _, c := range cases {
@@ -1381,39 +1299,6 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
-						ConsulClientConfig:  cfg,
-						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
-					},
-				}
-			},
-		},
-		{
-			kubeKind:   "SamenessGroups",
-			consulKind: capi.SamenessGroup,
-			configEntryResourceWithDeletion: &v1alpha1.SamenessGroups{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "foo",
-					Namespace:         kubeNS,
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-					Finalizers:        []string{FinalizerName},
-				},
-				Spec: v1alpha1.SamenessGroupsSpec{
-					DefaultForFailover: true,
-					IncludeLocal:       true,
-					Members: []v1alpha1.SamenessGroupMember{
-						{
-							Peer:      "dc1",
-							Partition: "default",
-						},
-					},
-				},
-			},
-			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
-				return &SamenessGroupsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
