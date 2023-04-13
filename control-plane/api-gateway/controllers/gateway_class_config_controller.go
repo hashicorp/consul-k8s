@@ -41,7 +41,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if !gcc.ObjectMeta.DeletionTimestamp.IsZero() {
-		// we have a deletion, ensure we're not in use
+		// We have a deletion, ensure we're not in use.
 		used, err := r.GatewayClassConfigInUse(ctx, gcc)
 		if err != nil {
 			r.Log.Error(err, "failed to check if the gateway class config is still in use")
@@ -49,10 +49,10 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		if used {
 			r.Log.Info("gateway class config still in use")
-			// requeue as to not block the reconciliation loop
+			// Requeue as to not block the reconciliation loop.
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
-		// gcc is no longer in use
+		// gcc is no longer in use.
 		if _, err := r.RemoveFinalizer(ctx, gcc, gatewayClassConfigFinalizer); err != nil {
 			r.Log.Error(err, "error removing gateway class config finalizer")
 			return ctrl.Result{}, err
@@ -84,7 +84,7 @@ func (r *Controller) EnsureFinalizer(ctx context.Context, object client.Object, 
 
 // RemoveFinalizer ensures that the given finalizer is removed from the passed object
 // it returns a boolean saying whether a finalizer was removed, and any
-// potential errors
+// potential errors.
 func (r *Controller) RemoveFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
 	finalizers := []string{}
 	found := false
