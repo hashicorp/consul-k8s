@@ -5,7 +5,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"testing"
 
@@ -18,14 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-)
-
-var (
-	errExpected     = errors.New("expected")
-	classConfigName = types.NamespacedName{
-		Name:      "config",
-		Namespace: "default",
-	}
 )
 
 func TestGatewayClassConfigSetup(t *testing.T) {
