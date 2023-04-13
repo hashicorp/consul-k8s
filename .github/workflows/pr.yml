@@ -5,7 +5,6 @@ on:
   push:
     # Sequence of patterns matched against refs/heads
     branches:
-      - 'curtbushko/gha-tests'
       # Push events on main branch
       - main
       # Push events to branches matching refs/heads/release/**
