@@ -36,7 +36,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			r.Log.Info("gateway class not found")
 			return ctrl.Result{}, nil
 		}
-		r.Log.Error(err, "failed to get gateway class config") // TODO: Melisa is there a way to test this
+		r.Log.Error(err, "failed to get gateway class config")
 		return ctrl.Result{}, err
 	}
 
@@ -60,7 +60,6 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	r.Log.Info("Ensuring Finalizer")
 	if _, err := r.EnsureFinalizer(ctx, gcc, gatewayClassConfigFinalizer); err != nil {
 		r.Log.Error(err, "error adding gateway class config finalizer")
 		return ctrl.Result{}, err
@@ -73,7 +72,6 @@ func (r *Controller) EnsureFinalizer(ctx context.Context, object client.Object, 
 	finalizers := object.GetFinalizers()
 	for _, f := range finalizers {
 		if f == finalizer {
-			r.Log.Info("Finalizer already exists")
 			return false, nil
 		}
 	}
