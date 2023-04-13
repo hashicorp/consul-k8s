@@ -615,7 +615,7 @@ func TestRun_Gateways_Errors(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
-				"-consul-api-timeout", "5s",
+				"-consul-api-timeout", "10s",
 				"-consul-node-name", nodeName,
 			}
 
@@ -729,7 +729,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", randFileName,
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
