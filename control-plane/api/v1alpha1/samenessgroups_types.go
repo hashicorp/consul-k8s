@@ -42,14 +42,14 @@ type SamenessGroups struct {
 
 //+kubebuilder:object:root=true
 
-// SamenessGroupsList contains a list of SamenessGroups
+// SamenessGroupsList contains a list of SamenessGroups.
 type SamenessGroupsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []SamenessGroups `json:"items"`
 }
 
-// SamenessGroupsSpec defines the desired state of SamenessGroups
+// SamenessGroupsSpec defines the desired state of SamenessGroups.
 type SamenessGroupsSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

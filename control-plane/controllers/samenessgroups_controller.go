@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// SamenessGroupsController reconciles a SamenessGroups object
+// SamenessGroupsController reconciles a SamenessGroups object.
 type SamenessGroupsController struct {
 	client.Client
 	Log                   logr.Logger
