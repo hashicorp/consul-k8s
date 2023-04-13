@@ -58,8 +58,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 		{
 			name: "GatewayClassConfig Does Not Exist",
 			k8sObjects: func() []runtime.Object {
-				gatewayClassConfig := v1alpha1.GatewayClassConfig{}
-				return []runtime.Object{&gatewayClassConfig}
+				return []runtime.Object{}
 			},
 			expErr: "",
 			reque:  false,
@@ -78,14 +77,41 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 			expErr: "",
 			reque:  false,
 		},
+		{
+			name: "Try to remove in-use GatewayClassConfig",
+			k8sObjects: func() []runtime.Object {
+				gatewayClassConfig := v1alpha1.GatewayClassConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "consul-api-gateway",
+						DeletionTimestamp: &deletionTimestamp,
+					},
+				}
+				gatewayClass := gwv1beta1.GatewayClass{
+					TypeMeta: metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "consul-api-gateway-class",
+					},
+					Spec: gwv1beta1.GatewayClassSpec{
+						ParametersRef: &gwv1beta1.ParametersReference{
+							Group:     gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:      v1alpha1.GatewayClassConfigKind,
+							Name:      gatewayClassConfig.ObjectMeta.Name,
+							Namespace: nil,
+						},
+					},
+					Status: gwv1beta1.GatewayClassStatus{},
+				}
+				return []runtime.Object{&gatewayClassConfig, &gatewayClass}
+			},
+			expErr: "",
+			reque:  true,
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			s := runtime.NewScheme()
-			gatewayClass := gwv1beta1.GatewayClass{}
-			gatewayClassList := gwv1beta1.GatewayClassList{}
-			k8sObjects := append(tt.k8sObjects(), &gatewayClass, &gatewayClassList)
-			s.AddKnownTypes(v1alpha1.GroupVersion, k8sObjects...)
+			k8sSchemaObjects := append(tt.k8sObjects(), &gwv1beta1.GatewayClass{}, &gwv1beta1.GatewayClassList{}, &v1alpha1.GatewayClassConfig{})
+			s.AddKnownTypes(v1alpha1.GroupVersion, k8sSchemaObjects...)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.k8sObjects()...).Build()
 
 			// Create the gateway class config controller.

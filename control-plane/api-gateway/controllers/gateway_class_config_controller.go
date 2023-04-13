@@ -117,9 +117,9 @@ func gatewayClassUsesConfig(gc gwv1beta1.GatewayClass, gcc *v1alpha1.GatewayClas
 
 // GatewayClassConfigInUse determines whether any GatewayClass in the cluster
 // references the provided GatewayClassConfig.
-func (g *Controller) GatewayClassConfigInUse(ctx context.Context, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
+func (r *Controller) GatewayClassConfigInUse(ctx context.Context, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
 	list := &gwv1beta1.GatewayClassList{}
-	if err := g.List(ctx, list); err != nil {
+	if err := r.List(ctx, list); err != nil {
 		return false, err
 	}
 
