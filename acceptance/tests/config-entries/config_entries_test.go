@@ -96,7 +96,7 @@ func TestController(t *testing.T) {
 				// On startup, the controller can take upwards of 1m to perform
 				// leader election so we may need to wait a long time for
 				// the reconcile loop to run (hence the 1m timeout here).
-				counter := &retry.Counter{Count: 60, Wait: 1 * time.Second}
+				counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
 					entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)

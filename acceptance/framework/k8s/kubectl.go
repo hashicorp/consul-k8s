@@ -56,7 +56,7 @@ func RunKubectlAndGetOutputWithLoggerE(t *testing.T, options *k8s.KubectlOptions
 	}
 
 	counter := &retry.Counter{
-		Count: 3,
+		Count: 10,
 		Wait:  1 * time.Second,
 	}
 	var output string
