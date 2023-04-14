@@ -1,0 +1,31 @@
+# Dispatch to the consul-k8s-workflows when a PR is created and on merges to main/release*
+name: merge
+on:
+  push:
+    # Sequence of patterns matched against refs/heads
+    branches:
+      # Push events on main branch
+      - main
+      # Push events to branches matching refs/heads/release/**
+      - "release/**"
+
+# these should be the only settings that you will ever need to change
+env:
+  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.16-dev # Consul's enterprise version to use in tests. We use this consul image on release branches too
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  CONTEXT: "merge"
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@v1.2.2
+      name: test
+      with:
+        workflow: test.yml
+        repo: hashicorp/consul-k8s-workflows
+        ref: main
+        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'
