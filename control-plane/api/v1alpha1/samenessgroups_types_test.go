@@ -233,6 +233,46 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			partitionsEnabled: true,
 			expectedErrMsg:    "sameness groups must have at least one member",
 		},
+		"invalid - not unique members": {
+			input: &SamenessGroups{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-sameness-group",
+				},
+				Spec: SamenessGroupsSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []SamenessGroupMember{
+						{
+							Peer: "peer2",
+						},
+						{
+							Peer: "peer2",
+						},
+					},
+				},
+			},
+			partitionsEnabled: true,
+			expectedErrMsg:    "sameness group members must be unique",
+		},
+		"invalid - not in default namespace": {
+			input: &SamenessGroups{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-sameness-group",
+					Namespace: "non-default",
+				},
+				Spec: SamenessGroupsSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []SamenessGroupMember{
+						{
+							Peer: "peer2",
+						},
+					},
+				},
+			},
+			partitionsEnabled: true,
+			expectedErrMsg:    "sameness groups must reside in the default namespace",
+		},
 	}
 
 	for name, testCase := range cases {

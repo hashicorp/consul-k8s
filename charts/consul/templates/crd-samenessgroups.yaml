@@ -58,13 +58,13 @@ spec:
             description: SamenessGroupsSpec defines the desired state of SamenessGroups.
             properties:
               defaultForFailover:
-                description: DefaultForFailover is
+                description: 'DefaultForFailover indicates that upstream requests to members of the given sameness group will implicitly failover between members of this sameness group.'
                 type: boolean
               includeLocal:
-                description: IncludeLocal
+                description: 'IncludeLocal is used to include the local partition as the first member of the sameness group.'
                 type: boolean
               members:
-                description: Members
+                description: 'Members are the partitions and peers that are part of the sameness group.'
                 items:
                   properties:
                     partition:

@@ -51,14 +51,14 @@ type SamenessGroupsList struct {
 
 // SamenessGroupsSpec defines the desired state of SamenessGroups.
 type SamenessGroupsSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// DefaultForFailover is
+	// DefaultForFailover indicates that upstream requests to members of the given sameness group will implicitly failover between members of this sameness group.
+	// When DefaultForFailover is true, the local partition must be a member of the sameness group or IncludeLocal must be set to true.
 	DefaultForFailover bool `json:"defaultForFailover,omitempty"`
-	// IncludeLocal
+	// IncludeLocal is used to include the local partition as the first member of the sameness group.
+	// The local partition can only be a member of a single sameness group.
 	IncludeLocal bool `json:"includeLocal,omitempty"`
-	// Members
+	// Members are the partitions and peers that are part of the sameness group.
+	// If a member of a sameness group does not exist, it will be ignored.
 	Members []SamenessGroupMember `json:"members,omitempty"`
 }
 
@@ -170,12 +170,18 @@ func (in *SamenessGroups) Validate(consulMeta common.ConsulMeta) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
-	asJSON, _ := json.Marshal(in)
 	if in == nil {
-		allErrs = append(allErrs, field.Invalid(path, string(asJSON), "config entry is nil"))
+		return nil
 	}
 	if in.Name == "" {
 		allErrs = append(allErrs, field.Invalid(path.Child("name"), in.Name, "sameness groups must have a name defined"))
+	}
+
+	partition := consulMeta.Partition
+	includesLocal := in.Spec.IncludeLocal
+
+	if in.ObjectMeta.Namespace != "default" && in.ObjectMeta.Namespace != "" {
+		allErrs = append(allErrs, field.Invalid(path.Child("name"), consulMeta.DestinationNamespace, "sameness groups must reside in the default namespace"))
 	}
 
 	if len(in.Spec.Members) == 0 {
@@ -183,10 +189,24 @@ func (in *SamenessGroups) Validate(consulMeta common.ConsulMeta) error {
 		allErrs = append(allErrs, field.Invalid(path.Child("members"), string(asJSON), "sameness groups must have at least one member"))
 	}
 
+	seenMembers := make(map[SamenessGroupMember]struct{})
 	for i, m := range in.Spec.Members {
+		if partition == m.Partition {
+			includesLocal = true
+		}
 		if err := m.validate(path.Child("members").Index(i)); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		if _, ok := seenMembers[m]; ok {
+			asJSON, _ := json.Marshal(m)
+			allErrs = append(allErrs, field.Invalid(path.Child("members").Index(i), string(asJSON), "sameness group members must be unique"))
+		}
+		seenMembers[m] = struct{}{}
+
+	}
+
+	if !includesLocal {
+		allErrs = append(allErrs, field.Invalid(path.Child("members"), in.Spec.IncludeLocal, "the local partition must be a member of sameness groups"))
 	}
 
 	if len(allErrs) > 0 {
