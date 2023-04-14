@@ -5,7 +5,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.16-dev # Consul's enterprise version to use in tests. We use this consul image on release branches too
+  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.13-dev # Consul's enterprise version to use in tests
   BRANCH: ${{ github.head_ref || github.ref_name }}
   CONTEXT: "pr"
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
