@@ -21,7 +21,7 @@ import (
 )
 
 func TestGatewayClassConfigSetup(t *testing.T) {
-	require.Error(t, (&Controller{}).SetupWithManager(nil))
+	require.Error(t, (&GatewayClassConfigController{}).SetupWithManager(nil))
 }
 
 func TestGatewayClassConfigReconcile(t *testing.T) {
@@ -100,7 +100,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.k8sObjects()...).Build()
 
 			// Create the gateway class config controller.
-			gcc := &Controller{
+			gcc := &GatewayClassConfigController{
 				Client: fakeClient,
 				Log:    logrtest.NewTestLogger(t),
 			}

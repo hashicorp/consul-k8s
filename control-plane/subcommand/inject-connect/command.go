@@ -448,11 +448,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err = (&controllers.Controller{
+	if err = (&controllers.GatewayClassConfigController{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", controllers.Controller{})
+		setupLog.Error(err, "unable to create controller", "controller", controllers.GatewayClassConfigController{})
 		return 1
 	}
 

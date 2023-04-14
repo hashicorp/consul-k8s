@@ -19,16 +19,19 @@ const (
 	gatewayClassConfigFinalizer = "gateway-class-exists-finalizer.consul.hashicorp.com"
 )
 
-type Controller struct {
+// The GatewayClassConfigController manages the state of GatewayClassConfigs
+type GatewayClassConfigController struct {
 	client.Client
 
 	Log logr.Logger
 }
 
-// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
-// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
-func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconcile the Gateway Class Config Controller", "name", req.Name, "namespace", req.Namespace)
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
+func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Log.Info("Reconciling the Gateway Class Config GatewayClassConfigController", "name", req.Name, "namespace", req.Namespace)
 
 	gcc := &v1alpha1.GatewayClassConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, gcc); err != nil {
@@ -68,7 +71,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
-func (r *Controller) EnsureFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
+func (r *GatewayClassConfigController) EnsureFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
 	finalizers := object.GetFinalizers()
 	for _, f := range finalizers {
 		if f == finalizer {
@@ -85,7 +88,7 @@ func (r *Controller) EnsureFinalizer(ctx context.Context, object client.Object, 
 // RemoveFinalizer ensures that the given finalizer is removed from the passed object
 // it returns a boolean saying whether a finalizer was removed, and any
 // potential errors.
-func (r *Controller) RemoveFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
+func (r *GatewayClassConfigController) RemoveFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
 	finalizers := []string{}
 	found := false
 	for _, f := range object.GetFinalizers() {
@@ -117,7 +120,7 @@ func gatewayClassUsesConfig(gc gwv1beta1.GatewayClass, gcc *v1alpha1.GatewayClas
 
 // GatewayClassConfigInUse determines whether any GatewayClass in the cluster
 // references the provided GatewayClassConfig.
-func (r *Controller) GatewayClassConfigInUse(ctx context.Context, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
+func (r *GatewayClassConfigController) GatewayClassConfigInUse(ctx context.Context, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
 	list := &gwv1beta1.GatewayClassList{}
 	if err := r.List(ctx, list); err != nil {
 		return false, err
@@ -132,7 +135,7 @@ func (r *Controller) GatewayClassConfigInUse(ctx context.Context, gcc *v1alpha1.
 	return false, nil
 }
 
-func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
+func (r *GatewayClassConfigController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.GatewayClassConfig{}).
 		Complete(r)
