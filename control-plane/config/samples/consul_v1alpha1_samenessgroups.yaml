@@ -6,5 +6,5 @@ spec:
   defaultForFailover: true
   includeLocal: true
   members:
-    - peer: dc1
-      partition: default
+    - peer: peer2
+    - partition: p2

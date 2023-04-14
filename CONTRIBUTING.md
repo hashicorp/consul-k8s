@@ -393,13 +393,13 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 
 ### Updating Helm chart
-1. Update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
+1. Update `charts/consul/templates/connect-inject-mutatingwebhookconfiguration` with the webhook for this resource
    using the updated `control-plane/config/webhook/manifests.v1beta1.yaml` and replacing `clientConfig.service.name/namespace`
    with the templated strings shown below to match the other webhooks.:
     ```yaml
     - clientConfig:
         service:
-          name: {{ template "consul.fullname" . }}-controller-webhook
+          name: {{ template "consul.fullname" . }}-connect-injector
           namespace: {{ .Release.Namespace }}
           path: /mutate-v1alpha1-ingressgateway
       failurePolicy: Fail
@@ -419,7 +419,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
             - ingressgateways
       sideEffects: None
     ```
-1. Update `charts/consul/templates/controller-clusterrole.yaml` to allow the controller to
+1. Update `charts/consul/templates/connect-inject-clusterrole.yaml` to allow the controller to
    manage your resource type.
 
 ### Testing A New CRD
