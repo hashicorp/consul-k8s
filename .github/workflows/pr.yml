@@ -5,6 +5,7 @@ on:
   push:
     # Sequence of patterns matched against refs/heads
     branches:
+      - 'curtbushko/update-status-on-prs'
       # Push events on main branch
       - main
       # Push events to branches matching refs/heads/release/**
@@ -15,6 +16,7 @@ env:
   CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.16-dev # Consul's enterprise version to use in tests. We use this consul image on release branches too
   BRANCH: ${{ github.head_ref || github.ref_name }} 
   CONTEXT: "${{ github.actor }}"
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   test:
@@ -28,4 +30,4 @@ jobs:
         repo: hashicorp/consul-k8s-workflows
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'
