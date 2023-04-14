@@ -140,6 +140,8 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 }
 
 func (c *Command) init() {
@@ -465,6 +467,17 @@ func (c *Command) Run(args []string) int {
 		DestinationNamespace: c.flagConsulDestinationNamespace,
 		Mirroring:            c.flagEnableK8SNSMirroring,
 		Prefix:               c.flagK8SNSMirroringPrefix,
+	}
+
+	gatewayClassReconciler := &controllers.GatewayClassReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("GatewayClass"),
+	}
+
+	err = gatewayClassReconciler.SetupWithManager(mgr)
+	if err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
+		return 1
 	}
 
 	configEntryReconciler := &controller.ConfigEntryController{
