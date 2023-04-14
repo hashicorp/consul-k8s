@@ -45,7 +45,7 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 
 	if !gcc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// We have a deletion, ensure we're not in use.
-		used, err := r.GatewayClassConfigInUse(ctx, gcc)
+		used, err := gatewayClassConfigInUse(ctx, r.Client, gcc)
 		if err != nil {
 			r.Log.Error(err, "failed to check if the gateway class config is still in use")
 			return ctrl.Result{}, err
@@ -56,14 +56,14 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 		// gcc is no longer in use.
-		if _, err := r.RemoveFinalizer(ctx, gcc, gatewayClassConfigFinalizer); err != nil {
+		if _, err := removeFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
 			r.Log.Error(err, "error removing gateway class config finalizer")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
-	if _, err := r.EnsureFinalizer(ctx, gcc, gatewayClassConfigFinalizer); err != nil {
+	if _, err := ensureFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
 		r.Log.Error(err, "error adding gateway class config finalizer")
 		return ctrl.Result{}, err
 	}
@@ -71,7 +71,11 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *GatewayClassConfigController) EnsureFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
+// EnsureFinalizer ensures that the given finalizer is added to the passed
+// object if it does not already exist on the object
+// it returns a boolean saying whether a finalizer was added, and any
+// potential errors.
+func ensureFinalizer(ctx context.Context, k8sClient client.Client, object client.Object, finalizer string) (bool, error) {
 	finalizers := object.GetFinalizers()
 	for _, f := range finalizers {
 		if f == finalizer {
@@ -79,7 +83,7 @@ func (r *GatewayClassConfigController) EnsureFinalizer(ctx context.Context, obje
 		}
 	}
 	object.SetFinalizers(append(finalizers, finalizer))
-	if err := r.Update(ctx, object); err != nil {
+	if err := k8sClient.Update(ctx, object); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -88,7 +92,7 @@ func (r *GatewayClassConfigController) EnsureFinalizer(ctx context.Context, obje
 // RemoveFinalizer ensures that the given finalizer is removed from the passed object
 // it returns a boolean saying whether a finalizer was removed, and any
 // potential errors.
-func (r *GatewayClassConfigController) RemoveFinalizer(ctx context.Context, object client.Object, finalizer string) (bool, error) {
+func removeFinalizer(ctx context.Context, k8sClient client.Client, object client.Object, finalizer string) (bool, error) {
 	finalizers := []string{}
 	found := false
 	for _, f := range object.GetFinalizers() {
@@ -100,7 +104,7 @@ func (r *GatewayClassConfigController) RemoveFinalizer(ctx context.Context, obje
 	}
 	if found {
 		object.SetFinalizers(finalizers)
-		if err := r.Update(ctx, object); err != nil {
+		if err := k8sClient.Update(ctx, object); err != nil {
 			return false, err
 		}
 	}
@@ -111,18 +115,18 @@ func (r *GatewayClassConfigController) RemoveFinalizer(ctx context.Context, obje
 // given GatewayClassConfig. Since these resources are scoped to the cluster,
 // namespace is not considered.
 func gatewayClassUsesConfig(gc gwv1beta1.GatewayClass, gcc *v1alpha1.GatewayClassConfig) bool {
-	paramaterRef := gc.Spec.ParametersRef
-	return paramaterRef != nil &&
-		string(paramaterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
-		paramaterRef.Kind == v1alpha1.GatewayClassConfigKind &&
-		paramaterRef.Name == gcc.Name
+	parameterRef := gc.Spec.ParametersRef
+	return parameterRef != nil &&
+		string(parameterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
+		parameterRef.Kind == v1alpha1.GatewayClassConfigKind &&
+		parameterRef.Name == gcc.Name
 }
 
 // GatewayClassConfigInUse determines whether any GatewayClass in the cluster
 // references the provided GatewayClassConfig.
-func (r *GatewayClassConfigController) GatewayClassConfigInUse(ctx context.Context, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
+func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
 	list := &gwv1beta1.GatewayClassList{}
-	if err := r.List(ctx, list); err != nil {
+	if err := k8sClient.List(ctx, list); err != nil {
 		return false, err
 	}
 
