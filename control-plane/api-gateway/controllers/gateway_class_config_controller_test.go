@@ -7,6 +7,7 @@ import (
 	"context"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"testing"
+	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -29,9 +30,9 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 	cases := []struct {
 		name       string
 		k8sObjects func() []runtime.Object
-		nodeMeta   map[string]string
 		expErr     string
 		reque      bool
+		requeAfter time.Duration
 	}{
 		{
 			name: "Happy Path",
@@ -43,16 +44,12 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 				}
 				return []runtime.Object{&gatewayClassConfig}
 			},
-			expErr: "",
-			reque:  false,
 		},
 		{
 			name: "GatewayClassConfig Does Not Exist",
 			k8sObjects: func() []runtime.Object {
 				return []runtime.Object{}
 			},
-			expErr: "",
-			reque:  false,
 		},
 		{
 			name: "Remove not-in-use GatewayClassConfig",
@@ -65,8 +62,6 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 				}
 				return []runtime.Object{&gatewayClassConfig}
 			},
-			expErr: "",
-			reque:  false,
 		},
 		{
 			name: "Try to remove in-use GatewayClassConfig",
@@ -94,8 +89,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 				}
 				return []runtime.Object{&gatewayClassConfig, &gatewayClass}
 			},
-			expErr: "",
-			reque:  true,
+			requeAfter: time.Second * 10,
 		},
 	}
 	for _, tt := range cases {
