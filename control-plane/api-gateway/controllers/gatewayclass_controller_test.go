@@ -126,7 +126,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			k8sObjects: []runtime.Object{
 				&gwv1beta1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
+						Namespace: "default",
 						Name:      "test-gateway",
 					},
 					Spec: gwv1beta1.GatewaySpec{

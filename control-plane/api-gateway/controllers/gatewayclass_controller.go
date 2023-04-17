@@ -12,7 +12,7 @@ import (
 
 const (
 	GatewayClassFinalizer      = "gateway-exists-finalizer.networking.x-k8s.io"
-	GatewayClassControllerName = "consul"
+	GatewayClassControllerName = "hashicorp.com/consul-api-gateway-controller"
 )
 
 // GatewayClassReconciler reconciles a GatewayClass object.

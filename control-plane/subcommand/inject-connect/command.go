@@ -469,13 +469,11 @@ func (c *Command) Run(args []string) int {
 		Prefix:               c.flagK8SNSMirroringPrefix,
 	}
 
-	gatewayClassReconciler := &controllers.GatewayClassReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("GatewayClass"),
-	}
-
-	err = gatewayClassReconciler.SetupWithManager(mgr)
-	if err != nil {
+	if err := (&controllers.GatewayClassReconciler{
+		ControllerName: controllers.GatewayClassControllerName,
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
+	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
 		return 1
 	}
