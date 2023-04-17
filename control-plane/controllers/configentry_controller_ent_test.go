@@ -36,7 +36,7 @@ import (
 // exist in the global namespace.
 // We also test Enterprise only features like SamenessGroups.
 
-func TestConfigEntryController_createsConfigEntry(t *testing.T) {
+func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 	t.Parallel()
 	kubeNS := "default"
 
@@ -135,7 +135,7 @@ func TestConfigEntryController_createsConfigEntry(t *testing.T) {
 	}
 }
 
-func TestConfigEntryController_updatesConfigEntry(t *testing.T) {
+func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 	t.Parallel()
 	kubeNS := "default"
 
@@ -252,7 +252,7 @@ func TestConfigEntryController_updatesConfigEntry(t *testing.T) {
 	}
 }
 
-func TestConfigEntryController_deletesConfigEntry(t *testing.T) {
+func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 	t.Parallel()
 	kubeNS := "default"
 

@@ -63,6 +63,8 @@ type SamenessGroupsSpec struct {
 }
 
 type SamenessGroupMember struct {
+	// The partitions and peers that are part of the sameness group.
+	// A sameness group member cannot define both peer and partition at the same time.
 	Partition string `json:"partition,omitempty"`
 	Peer      string `json:"peer,omitempty"`
 }

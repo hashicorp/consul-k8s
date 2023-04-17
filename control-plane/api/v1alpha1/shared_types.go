@@ -249,7 +249,9 @@ func (in EnvoyExtension) validate(path *field.Path) *field.Error {
 type FailoverPolicy struct {
 	// Mode specifies the type of failover that will be performed. Valid values are
 	// "sequential", "" (equivalent to "sequential") and "order-by-locality".
-	Mode    string   `json:"mode,omitempty"`
+	Mode string `json:"mode,omitempty"`
+	// Regions is the ordered list of the regions of the failover targets.
+	// Valid values can be "us-west-1", "us-west-2", and so on.
 	Regions []string `json:"regions,omitempty"`
 }
 
