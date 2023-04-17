@@ -10,7 +10,10 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-const gatewayClassFinalizer = "gateway-exists-finalizer.networking.x-k8s.io"
+const (
+	GatewayClassFinalizer      = "gateway-exists-finalizer.networking.x-k8s.io"
+	GatewayClassControllerName = "consul"
+)
 
 // GatewayClassReconciler reconciles a GatewayClass object.
 // The GatewayClass is responsible for defining the behavior of API gateways
@@ -24,6 +27,8 @@ type GatewayClassReconciler struct {
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/finalizers,verbs=update
+
+// Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
 
@@ -31,7 +36,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	err := r.Client.Get(ctx, req.NamespacedName, gc)
 	if err != nil {
-		log.Error(err, "unable to get GatewayClass", "error", err)
+		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -40,7 +45,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if !gc.DeletionTimestamp.IsZero() {
+	if !gc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// We have a deletion request. Ensure we are not in use.
 		used, err := r.isGatewayClassInUse(ctx, gc)
 		if err != nil {
@@ -53,7 +58,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 		// Remove our finalizer.
-		if _, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer); err != nil {
+		if _, err := RemoveFinalizer(ctx, r.Client, gc, GatewayClassFinalizer); err != nil {
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
 		}
@@ -61,7 +66,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// We are creating or updating the GatewayClass.
-	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
+	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, GatewayClassFinalizer)
 	if err != nil {
 		log.Error(err, "unable to add finalizer")
 		return ctrl.Result{}, err
