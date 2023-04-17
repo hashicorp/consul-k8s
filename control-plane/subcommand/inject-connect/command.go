@@ -140,8 +140,6 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
-
-	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 }
 
 func (c *Command) init() {
