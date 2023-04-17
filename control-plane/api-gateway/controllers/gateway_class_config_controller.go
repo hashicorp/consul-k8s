@@ -31,7 +31,7 @@ type GatewayClassConfigController struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconciling the Gateway Class Config GatewayClassConfigController", "name", req.Name, "namespace", req.Namespace)
+	r.Log.Info("Reconciling the Gateway Class Config GatewayClassConfigController", "name", req.Name)
 
 	gcc := &v1alpha1.GatewayClassConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, gcc); err != nil {

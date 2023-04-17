@@ -6,7 +6,6 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
@@ -14,7 +13,7 @@ const (
 )
 
 func init() {
-	SchemeBuilder.Register(&GatewayClassConfig{}, &GatewayClassConfigList{}, &gwv1beta1.GatewayClass{}, &gwv1beta1.GatewayClassList{})
+	SchemeBuilder.Register(&GatewayClassConfig{}, &GatewayClassConfigList{})
 }
 
 // +genclient

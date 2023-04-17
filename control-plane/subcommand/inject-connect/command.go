@@ -39,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -137,6 +138,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

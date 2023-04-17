@@ -28,14 +28,14 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 	t.Parallel()
 	deletionTimestamp := meta.Now()
 	cases := []struct {
-		name       string
-		k8sObjects func() []runtime.Object
-		expErr     string
-		reque      bool
-		requeAfter time.Duration
+		name         string
+		k8sObjects   func() []runtime.Object
+		expErr       string
+		requeue      bool
+		requeueAfter time.Duration
 	}{
 		{
-			name: "Happy Path",
+			name: "Successfully reconcile without any changes",
 			k8sObjects: func() []runtime.Object {
 				gatewayClassConfig := v1alpha1.GatewayClassConfig{
 					ObjectMeta: metav1.ObjectMeta{
@@ -89,7 +89,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 				}
 				return []runtime.Object{&gatewayClassConfig, &gatewayClass}
 			},
-			requeAfter: time.Second * 10,
+			requeueAfter: time.Second * 10,
 		},
 	}
 	for _, tt := range cases {
@@ -116,7 +116,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			require.Equal(t, tt.reque, resp.Requeue)
+			require.Equal(t, tt.requeue, resp.Requeue)
 		})
 	}
 }
