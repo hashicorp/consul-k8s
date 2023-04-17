@@ -8,6 +8,10 @@ gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consu
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
 	@cd hack/copy-crds-to-chart; go run ./...
 
+generate-external-crds: ## Generate CRDs for externally defined CRDs and copy them to charts/consul. Usage: make generate-external-crds
+	@cd ./charts/consul/crds/; \
+		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
+
 bats-tests: ## Run Helm chart bats tests.
 	 bats --jobs 4 charts/consul/test/unit
 
@@ -123,6 +127,7 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
+	make generate-example-crds
 	make add-copyright-header
 
 get-controller-gen: ## Download controller-gen program needed for operator SDK.
@@ -181,7 +186,7 @@ endif
 # ===========> Makefile config
 
 .DEFAULT_GOAL := help
-.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
+.PHONY: gen-helm-docs copy-crds-to-chart generate-external-crds bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
 SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
