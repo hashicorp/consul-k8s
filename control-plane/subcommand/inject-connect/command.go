@@ -556,13 +556,13 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)
 		return 1
 	}
-	if err = (&controllers.SamenessGroupsController{
+	if err = (&controllers.SamenessGroupController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.SamenessGroups),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.SamenessGroup),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.SamenessGroups)
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.SamenessGroup)
 		return 1
 	}
 
@@ -715,10 +715,10 @@ func (c *Command) Run(args []string) int {
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
 			ConsulMeta: consulMeta,
 		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroups",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.SamenessGroupsWebhook{
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroup",
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.SamenessGroupWebhook{
 			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroups),
+			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
 			ConsulMeta: consulMeta,
 		}})
 

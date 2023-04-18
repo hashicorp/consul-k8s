@@ -49,14 +49,14 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 		compare             func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
-			kubeKind:   "SamenessGroups",
+			kubeKind:   "SamenessGroup",
 			consulKind: capi.SamenessGroup,
-			configEntryResource: &v1alpha1.SamenessGroups{
+			configEntryResource: &v1alpha1.SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.SamenessGroupsSpec{
+				Spec: v1alpha1.SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []v1alpha1.SamenessGroupMember{
@@ -68,7 +68,7 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 				},
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
-				return &SamenessGroupsController{
+				return &SamenessGroupController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -149,14 +149,14 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 		compare             func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
-			kubeKind:   "SamenessGroups",
+			kubeKind:   "SamenessGroup",
 			consulKind: capi.SamenessGroup,
-			configEntryResource: &v1alpha1.SamenessGroups{
+			configEntryResource: &v1alpha1.SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
 				},
-				Spec: v1alpha1.SamenessGroupsSpec{
+				Spec: v1alpha1.SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []v1alpha1.SamenessGroupMember{
@@ -168,7 +168,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 				},
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
-				return &SamenessGroupsController{
+				return &SamenessGroupController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -179,7 +179,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.ConfigEntryResource) {
-				sg := resource.(*v1alpha1.SamenessGroups)
+				sg := resource.(*v1alpha1.SamenessGroup)
 				sg.Spec.IncludeLocal = false
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -264,16 +264,16 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 		reconciler                      func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 	}{
 		{
-			kubeKind:   "SamenessGroups",
+			kubeKind:   "SamenessGroup",
 			consulKind: capi.SamenessGroup,
-			configEntryResourceWithDeletion: &v1alpha1.SamenessGroups{
+			configEntryResourceWithDeletion: &v1alpha1.SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v1alpha1.SamenessGroupsSpec{
+				Spec: v1alpha1.SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []v1alpha1.SamenessGroupMember{
@@ -285,7 +285,7 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 				},
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
-				return &SamenessGroupsController{
+				return &SamenessGroupController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{

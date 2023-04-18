@@ -15,42 +15,42 @@ import (
 )
 
 const (
-	SamenessGroupsKubeKind string = "samenessgroups"
+	SamenessGroupKubeKind string = "samenessgroup"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 func init() {
-	SchemeBuilder.Register(&SamenessGroups{}, &SamenessGroupsList{})
+	SchemeBuilder.Register(&SamenessGroup{}, &SamenessGroupList{})
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// SamenessGroups is the Schema for the samenessgroups API
+// SamenessGroup is the Schema for the samenessgroups API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
-// +kubebuilder:resource:shortName="sameness-groups"
-type SamenessGroups struct {
+// +kubebuilder:resource:shortName="sameness-group"
+type SamenessGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              SamenessGroupsSpec `json:"spec,omitempty"`
+	Spec              SamenessGroupSpec `json:"spec,omitempty"`
 	Status            `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// SamenessGroupsList contains a list of SamenessGroups.
-type SamenessGroupsList struct {
+// SamenessGroupList contains a list of SamenessGroup.
+type SamenessGroupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SamenessGroups `json:"items"`
+	Items           []SamenessGroup `json:"items"`
 }
 
-// SamenessGroupsSpec defines the desired state of SamenessGroups.
-type SamenessGroupsSpec struct {
+// SamenessGroupSpec defines the desired state of SamenessGroup.
+type SamenessGroupSpec struct {
 	// DefaultForFailover indicates that upstream requests to members of the given sameness group will implicitly failover between members of this sameness group.
 	// When DefaultForFailover is true, the local partition must be a member of the sameness group or IncludeLocal must be set to true.
 	DefaultForFailover bool `json:"defaultForFailover,omitempty"`
@@ -69,15 +69,15 @@ type SamenessGroupMember struct {
 	Peer      string `json:"peer,omitempty"`
 }
 
-func (in *SamenessGroups) GetObjectMeta() metav1.ObjectMeta {
+func (in *SamenessGroup) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
 
-func (in *SamenessGroups) AddFinalizer(name string) {
+func (in *SamenessGroup) AddFinalizer(name string) {
 	in.ObjectMeta.Finalizers = append(in.Finalizers(), name)
 }
 
-func (in *SamenessGroups) RemoveFinalizer(name string) {
+func (in *SamenessGroup) RemoveFinalizer(name string) {
 	var newFinalizers []string
 	for _, oldF := range in.Finalizers() {
 		if oldF != name {
@@ -87,35 +87,35 @@ func (in *SamenessGroups) RemoveFinalizer(name string) {
 	in.ObjectMeta.Finalizers = newFinalizers
 }
 
-func (in *SamenessGroups) Finalizers() []string {
+func (in *SamenessGroup) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *SamenessGroups) ConsulKind() string {
+func (in *SamenessGroup) ConsulKind() string {
 	return capi.SamenessGroup
 }
 
-func (in *SamenessGroups) ConsulGlobalResource() bool {
+func (in *SamenessGroup) ConsulGlobalResource() bool {
 	return false
 }
 
-func (in *SamenessGroups) ConsulMirroringNS() string {
+func (in *SamenessGroup) ConsulMirroringNS() string {
 	return common.DefaultConsulNamespace
 }
 
-func (in *SamenessGroups) KubeKind() string {
-	return SamenessGroupsKubeKind
+func (in *SamenessGroup) KubeKind() string {
+	return SamenessGroupKubeKind
 }
 
-func (in *SamenessGroups) ConsulName() string {
+func (in *SamenessGroup) ConsulName() string {
 	return in.ObjectMeta.Name
 }
 
-func (in *SamenessGroups) KubernetesName() string {
+func (in *SamenessGroup) KubernetesName() string {
 	return in.ObjectMeta.Name
 }
 
-func (in *SamenessGroups) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
+func (in *SamenessGroup) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
 	in.Status.Conditions = Conditions{
 		{
 			Type:               ConditionSynced,
@@ -127,11 +127,11 @@ func (in *SamenessGroups) SetSyncedCondition(status corev1.ConditionStatus, reas
 	}
 }
 
-func (in *SamenessGroups) SetLastSyncedTime(time *metav1.Time) {
+func (in *SamenessGroup) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 
-func (in *SamenessGroups) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
+func (in *SamenessGroup) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
 	if cond == nil {
 		return corev1.ConditionUnknown, "", ""
@@ -139,7 +139,7 @@ func (in *SamenessGroups) SyncedCondition() (status corev1.ConditionStatus, reas
 	return cond.Status, cond.Reason, cond.Message
 }
 
-func (in *SamenessGroups) SyncedConditionStatus() corev1.ConditionStatus {
+func (in *SamenessGroup) SyncedConditionStatus() corev1.ConditionStatus {
 	cond := in.Status.GetCondition(ConditionSynced)
 	if cond == nil {
 		return corev1.ConditionUnknown
@@ -147,8 +147,7 @@ func (in *SamenessGroups) SyncedConditionStatus() corev1.ConditionStatus {
 	return cond.Status
 }
 
-func (in *SamenessGroups) ToConsul(datacenter string) api.ConfigEntry {
-	//consulConfig := in.convertConfig()
+func (in *SamenessGroup) ToConsul(datacenter string) api.ConfigEntry {
 	return &capi.SamenessGroupConfigEntry{
 		Kind:               in.ConsulKind(),
 		Name:               in.ConsulName(),
@@ -159,7 +158,7 @@ func (in *SamenessGroups) ToConsul(datacenter string) api.ConfigEntry {
 	}
 }
 
-func (in *SamenessGroups) MatchesConsul(candidate api.ConfigEntry) bool {
+func (in *SamenessGroup) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.SamenessGroupConfigEntry)
 	if !ok {
 		return false
@@ -168,7 +167,7 @@ func (in *SamenessGroups) MatchesConsul(candidate api.ConfigEntry) bool {
 		cmp.Comparer(transparentProxyConfigComparer))
 }
 
-func (in *SamenessGroups) Validate(consulMeta common.ConsulMeta) error {
+func (in *SamenessGroup) Validate(consulMeta common.ConsulMeta) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -213,7 +212,7 @@ func (in *SamenessGroups) Validate(consulMeta common.ConsulMeta) error {
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: SamenessGroupsKubeKind},
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: SamenessGroupKubeKind},
 			in.KubernetesName(), allErrs)
 	}
 
@@ -221,7 +220,7 @@ func (in *SamenessGroups) Validate(consulMeta common.ConsulMeta) error {
 }
 
 // DefaultNamespaceFields has no behaviour here as sameness-groups have no namespace specific fields.
-func (in *SamenessGroups) DefaultNamespaceFields(_ common.ConsulMeta) {
+func (in *SamenessGroup) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 type SamenessGroupMembers []SamenessGroupMember

@@ -8,16 +8,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: samenessgroups.consul.hashicorp.com
+  name: samenessgroup.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
-    kind: SamenessGroups
-    listKind: SamenessGroupsList
+    kind: SamenessGroup
+    listKind: SamenessGroupList
     plural: samenessgroups
     shortNames:
-    - sameness-groups
-    singular: samenessgroups
+    - sameness-group
+    singular: samenessgroup
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -36,7 +36,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SamenessGroups is the Schema for the samenessgroups API
+        description: SamenessGroup is the Schema for the samenessgroups API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -51,7 +51,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: SamenessGroupsSpec defines the desired state of SamenessGroups.
+            description: SamenessGroupSpec defines the desired state of SamenessGroup.
             properties:
               defaultForFailover:
                 description: 'DefaultForFailover indicates that upstream requests to members of the given sameness group will implicitly failover between members of this sameness group.'

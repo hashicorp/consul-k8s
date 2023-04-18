@@ -15,15 +15,15 @@ import (
 
 func TestSamenessGroups_ToConsul(t *testing.T) {
 	cases := map[string]struct {
-		input    *SamenessGroups
+		input    *SamenessGroup
 		expected *capi.SamenessGroupConfigEntry
 	}{
 		"empty fields": {
-			&SamenessGroups{
+			&SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: SamenessGroupsSpec{},
+				Spec: SamenessGroupSpec{},
 			},
 			&capi.SamenessGroupConfigEntry{
 				Name: "foo",
@@ -35,11 +35,11 @@ func TestSamenessGroups_ToConsul(t *testing.T) {
 			},
 		},
 		"every field set": {
-			&SamenessGroups{
+			&SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -82,16 +82,16 @@ func TestSamenessGroups_ToConsul(t *testing.T) {
 
 func TestSamenessGroups_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		internal *SamenessGroups
+		internal *SamenessGroup
 		consul   capi.ConfigEntry
 		matches  bool
 	}{
 		"empty fields matches": {
-			&SamenessGroups{
+			&SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-test-sameness-group",
 				},
-				Spec: SamenessGroupsSpec{},
+				Spec: SamenessGroupSpec{},
 			},
 			&capi.SamenessGroupConfigEntry{
 				Kind:        capi.SamenessGroup,
@@ -106,11 +106,11 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 			true,
 		},
 		"all fields populated matches": {
-			&SamenessGroups{
+			&SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-test-sameness-group",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -154,16 +154,16 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 
 func TestSamenessGroups_Validate(t *testing.T) {
 	cases := map[string]struct {
-		input             *SamenessGroups
+		input             *SamenessGroup
 		partitionsEnabled bool
 		expectedErrMsg    string
 	}{
 		"valid": {
-			input: &SamenessGroups{
+			input: &SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-sameness-group",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -182,11 +182,11 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			expectedErrMsg:    "",
 		},
 		"invalid - with peer and partition both": {
-			input: &SamenessGroups{
+			input: &SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-sameness-group",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -201,9 +201,9 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			expectedErrMsg:    "sameness group members cannot specify both partition and peer in the same entry",
 		},
 		"invalid - no name": {
-			input: &SamenessGroups{
+			input: &SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -220,11 +220,11 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			expectedErrMsg:    "sameness groups must have a name defined",
 		},
 		"invalid - empty members": {
-			input: &SamenessGroups{
+			input: &SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-sameness-group",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members:            []SamenessGroupMember{},
@@ -234,11 +234,11 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			expectedErrMsg:    "sameness groups must have at least one member",
 		},
 		"invalid - not unique members": {
-			input: &SamenessGroups{
+			input: &SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-sameness-group",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -255,12 +255,12 @@ func TestSamenessGroups_Validate(t *testing.T) {
 			expectedErrMsg:    "sameness group members must be unique",
 		},
 		"invalid - not in default namespace": {
-			input: &SamenessGroups{
+			input: &SamenessGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-sameness-group",
 					Namespace: "non-default",
 				},
-				Spec: SamenessGroupsSpec{
+				Spec: SamenessGroupSpec{
 					DefaultForFailover: true,
 					IncludeLocal:       true,
 					Members: []SamenessGroupMember{
@@ -291,20 +291,20 @@ func TestSamenessGroups_GetObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name: "name",
 	}
-	samenessGroups := &SamenessGroups{
+	samenessGroups := &SamenessGroup{
 		ObjectMeta: meta,
 	}
 	require.Equal(t, meta, samenessGroups.GetObjectMeta())
 }
 
 func TestSamenessGroups_AddFinalizer(t *testing.T) {
-	samenessGroups := &SamenessGroups{}
+	samenessGroups := &SamenessGroup{}
 	samenessGroups.AddFinalizer("finalizer")
 	require.Equal(t, []string{"finalizer"}, samenessGroups.ObjectMeta.Finalizers)
 }
 
 func TestSamenessGroups_RemoveFinalizer(t *testing.T) {
-	samenessGroups := &SamenessGroups{
+	samenessGroups := &SamenessGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
@@ -314,11 +314,11 @@ func TestSamenessGroups_RemoveFinalizer(t *testing.T) {
 }
 
 func TestSamenessGroups_ConsulKind(t *testing.T) {
-	require.Equal(t, capi.SamenessGroup, (&SamenessGroups{}).ConsulKind())
+	require.Equal(t, capi.SamenessGroup, (&SamenessGroup{}).ConsulKind())
 }
 
 func TestSamenessGroups_ConsulGlobalResource(t *testing.T) {
-	require.False(t, (&SamenessGroups{}).ConsulGlobalResource())
+	require.False(t, (&SamenessGroup{}).ConsulGlobalResource())
 }
 
 func TestSamenessGroups_ConsulMirroringNS(t *testing.T) {
@@ -326,19 +326,19 @@ func TestSamenessGroups_ConsulMirroringNS(t *testing.T) {
 }
 
 func TestSamenessGroups_KubeKind(t *testing.T) {
-	require.Equal(t, "samenessgroups", (&SamenessGroups{}).KubeKind())
+	require.Equal(t, "samenessgroups", (&SamenessGroup{}).KubeKind())
 }
 
 func TestSamenessGroups_ConsulName(t *testing.T) {
-	require.Equal(t, "foo", (&SamenessGroups{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+	require.Equal(t, "foo", (&SamenessGroup{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
 }
 
 func TestSamenessGroups_KubernetesName(t *testing.T) {
-	require.Equal(t, "foo", (&SamenessGroups{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+	require.Equal(t, "foo", (&SamenessGroup{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
 }
 
 func TestSamenessGroups_SetSyncedCondition(t *testing.T) {
-	samenessGroups := &SamenessGroups{}
+	samenessGroups := &SamenessGroup{}
 	samenessGroups.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
 	require.Equal(t, corev1.ConditionTrue, samenessGroups.Status.Conditions[0].Status)
@@ -349,7 +349,7 @@ func TestSamenessGroups_SetSyncedCondition(t *testing.T) {
 }
 
 func TestSamenessGroups_SetLastSyncedTime(t *testing.T) {
-	samenessGroups := &SamenessGroups{}
+	samenessGroups := &SamenessGroup{}
 	syncedTime := metav1.NewTime(time.Now())
 	samenessGroups.SetLastSyncedTime(&syncedTime)
 
@@ -364,7 +364,7 @@ func TestSamenessGroups_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			samenessGroups := &SamenessGroups{
+			samenessGroups := &SamenessGroup{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -379,11 +379,11 @@ func TestSamenessGroups_GetSyncedConditionStatus(t *testing.T) {
 }
 
 func TestSamenessGroups_SyncedConditionStatusWhenStatusNil(t *testing.T) {
-	require.Equal(t, corev1.ConditionUnknown, (&SamenessGroups{}).SyncedConditionStatus())
+	require.Equal(t, corev1.ConditionUnknown, (&SamenessGroup{}).SyncedConditionStatus())
 }
 
 func TestSamenessGroups_SyncedConditionWhenStatusNil(t *testing.T) {
-	status, reason, message := (&SamenessGroups{}).SyncedCondition()
+	status, reason, message := (&SamenessGroup{}).SyncedCondition()
 	require.Equal(t, corev1.ConditionUnknown, status)
 	require.Equal(t, "", reason)
 	require.Equal(t, "", message)

@@ -298,9 +298,9 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-samenessgroups
+      path: /mutate-v1alpha1-samenessgroup
   failurePolicy: Fail
-  name: mutate-samenessgroups.consul.hashicorp.com
+  name: mutate-samenessgroup.consul.hashicorp.com
   rules:
     - apiGroups:
         - consul.hashicorp.com

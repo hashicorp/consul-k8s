@@ -12,8 +12,8 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// SamenessGroupsController reconciles a SamenessGroups object.
-type SamenessGroupsController struct {
+// SamenessGroupController reconciles a SamenessGroups object.
+type SamenessGroupController struct {
 	client.Client
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
@@ -23,19 +23,19 @@ type SamenessGroupsController struct {
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=samenessgroups,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=samenessgroups/status,verbs=get;update;patch
 
-func (r *SamenessGroupsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.SamenessGroups{})
+func (r *SamenessGroupController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.SamenessGroup{})
 }
 
-func (r *SamenessGroupsController) Logger(name types.NamespacedName) logr.Logger {
+func (r *SamenessGroupController) Logger(name types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("request", name)
 }
 
-func (r *SamenessGroupsController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (r *SamenessGroupController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *SamenessGroupsController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.SamenessGroups{}, r)
+func (r *SamenessGroupController) SetupWithManager(mgr ctrl.Manager) error {
+	return setupWithManager(mgr, &consulv1alpha1.SamenessGroup{}, r)
 }
