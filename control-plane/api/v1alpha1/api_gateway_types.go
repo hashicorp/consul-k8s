@@ -12,6 +12,10 @@ const (
 	GatewayClassConfigKind = "GatewayClassConfig"
 )
 
+func init() {
+	SchemeBuilder.Register(&GatewayClassConfig{}, &GatewayClassConfigList{})
+}
+
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster

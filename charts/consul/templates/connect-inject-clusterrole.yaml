@@ -24,6 +24,7 @@ rules:
   - serviceintentions
   - ingressgateways
   - terminatinggateways
+  - gatewayclassconfigs
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers

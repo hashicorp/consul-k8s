@@ -36,6 +36,7 @@ require (
 	k8s.io/klog/v2 v2.80.1
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 	sigs.k8s.io/controller-runtime v0.14.6
+	sigs.k8s.io/gateway-api v0.6.2
 )
 
 require (

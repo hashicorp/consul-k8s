@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -136,6 +138,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -444,6 +447,14 @@ func (c *Command) Run(args []string) int {
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
+		return 1
+	}
+
+	if err = (&controllers.GatewayClassConfigController{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", controllers.GatewayClassConfigController{})
 		return 1
 	}
 
