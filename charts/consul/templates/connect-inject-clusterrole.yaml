@@ -24,6 +24,7 @@ rules:
   - serviceintentions
   - ingressgateways
   - terminatinggateways
+  - samenessgroups
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
@@ -49,6 +50,7 @@ rules:
   - serviceintentions/status
   - ingressgateways/status
   - terminatinggateways/status
+  - samenessgroups/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
   - peeringdialers/status
