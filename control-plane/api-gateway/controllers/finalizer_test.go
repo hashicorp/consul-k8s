@@ -11,6 +11,8 @@ import (
 )
 
 func TestEnsureFinalizer(t *testing.T) {
+	t.Parallel()
+
 	finalizer := "test-finalizer"
 
 	cases := map[string]struct {
@@ -44,6 +46,8 @@ func TestEnsureFinalizer(t *testing.T) {
 }
 
 func TestRemoveFinalizer(t *testing.T) {
+	t.Parallel()
+
 	finalizer := "test-finalizer"
 
 	cases := map[string]struct {
