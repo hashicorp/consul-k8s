@@ -1,9 +1,6 @@
 {{- if .Values.apiGateway.enabled }}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for api gateway" }}{{ end }}
-{{- if not .Values.apiGateway.image}}
-  # apiGateway.image is not set, so you must be trying to run beta API Gateway in Consul
-  # if this is not what you want, set the apiGateway.image value
-{{ end }}
+{{- if not .Values.apiGateway.image}}{{ fail "apiGateway.image must be set to enable api gateway" }}{{ end }}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
@@ -59,7 +56,7 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-api-gateway-controller
       containers:
       - name: api-gateway-controller
-        image: {{ default .Values.global.imageK8S .Values.apiGateway.image}}
+        image: {{ .Values.apiGateway.image }}
         ports:
         - containerPort: 9090
           name: sds
@@ -135,11 +132,7 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-        {{- if not .Values.apiGateway.image}}
-          consul-k8s-control-plane api-gateway \
-        {{- else}}
           consul-api-gateway server \
-        {{- end}}
             -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
             -k8s-namespace {{ .Release.Namespace }} \
             {{- if .Values.global.enableConsulNamespaces }}
