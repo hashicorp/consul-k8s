@@ -1219,7 +1219,7 @@ So that the documentation can look like:
 
 ## Managing External CRD Dependencies
 
-Some of the features of Consul on Kubernetes make use of custom resource definitions (CRDs) that we don't directly
+Some of the features of Consul on Kubernetes make use of CustomResourceDefinitions (CRDs) that we don't directly
 manage. One such example is the Gateway API CRDs which we use to configure API Gateways, but are managed by SIG
 Networking.
 
