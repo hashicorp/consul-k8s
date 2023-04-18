@@ -2,10 +2,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"net"
-	"strings"
-	"time"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -16,6 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"net"
+	"strings"
 )
 
 const (
@@ -181,11 +179,11 @@ type PassiveHealthCheck struct {
 	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
 	// The maximum % of an upstream cluster that can be ejected due to outlier detection.
 	// Defaults to 10% but will eject at least one host regardless of the value.
-	MaxEjectionPercent *uint32 `json:",omitempty" alias:"maxEjectionPercent"`
+	MaxEjectionPercent *uint32 `json:"maxEjectionPercent,omitempty"`
 	// The base time that a host is ejected for. The real time is equal to the base time
 	// multiplied by the number of times the host has been ejected and is capped by
 	// max_ejection_time (Default 300s). Defaults to 30000ms or 30s.
-	BaseEjectionTime *time.Duration `json:",omitempty" alias:"baseEjectionTime"`
+	BaseEjectionTime *metav1.Duration `json:"baseEjectionTime,omitempty"`
 }
 
 type ServiceDefaultsDestination struct {
@@ -435,7 +433,7 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 		MaxFailures:             in.MaxFailures,
 		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
 		MaxEjectionPercent:      in.MaxEjectionPercent,
-		BaseEjectionTime:        in.BaseEjectionTime,
+		BaseEjectionTime:        &in.BaseEjectionTime.Duration,
 	}
 }
 
