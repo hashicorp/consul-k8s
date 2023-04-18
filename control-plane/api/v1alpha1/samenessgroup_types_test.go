@@ -326,7 +326,7 @@ func TestSamenessGroups_ConsulMirroringNS(t *testing.T) {
 }
 
 func TestSamenessGroups_KubeKind(t *testing.T) {
-	require.Equal(t, "samenessgroups", (&SamenessGroup{}).KubeKind())
+	require.Equal(t, "samenessgroup", (&SamenessGroup{}).KubeKind())
 }
 
 func TestSamenessGroups_ConsulName(t *testing.T) {
