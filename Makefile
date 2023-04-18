@@ -127,7 +127,7 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
-	make generate-example-crds
+	make generate-external-crds
 	make add-copyright-header
 
 get-controller-gen: ## Download controller-gen program needed for operator SDK.
