@@ -100,7 +100,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
-            - name: CONSUL_HTTP_TOKEN
+            - name: CONSUL_ACL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
