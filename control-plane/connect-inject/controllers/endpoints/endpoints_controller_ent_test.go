@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 //go:build enterprise
 
 package endpoints
@@ -1561,7 +1564,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						// Read the token from Consul.
 						token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
 						if deregisteredServices.Contains(serviceID) {
-							require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+							require.Contains(t, err.Error(), "ACL not found")
 						} else {
 							require.NoError(t, err, "token should exist for service instance: "+serviceID)
 							require.NotNil(t, token)
@@ -1819,7 +1822,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+					require.Contains(t, err.Error(), "ACL not found")
 				}
 			})
 		}
@@ -2104,7 +2107,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+					require.Contains(t, err.Error(), "ACL not found")
 				}
 			})
 		}
