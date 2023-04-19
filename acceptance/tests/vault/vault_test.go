@@ -34,7 +34,7 @@ const (
 
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
-func TestVault_123(t *testing.T) {
+func TestVault(t *testing.T) {
 	cases := map[string]struct {
 		autoBootstrap bool
 	}{
