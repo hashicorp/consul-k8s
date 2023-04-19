@@ -8,6 +8,13 @@ import (
 	consulAPI "github.com/hashicorp/consul/api"
 )
 
+const (
+	metaKeyManagedBy       = "managed-by"
+	metaValueManagedBy     = "consul-k8s-gateway-controller"
+	metaKeyKubeNS          = "k8s-namespace"
+	metaKeyKubeServiceName = "k8s-service-name"
+)
+
 func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntry {
 	listeners := make([]consulAPI.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
 	conditions := make([]consulAPI.Condition, 0, len(k8sGW.Status.Conditions))
@@ -80,9 +87,13 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 	}
 
 	return consulAPI.APIGatewayConfigEntry{
-		Kind:      k8sGW.Kind,
-		Name:      k8sGW.Name,
-		Meta:      map[string]string{}, // TODO: what should go in here?
+		Kind: k8sGW.Kind,
+		Name: k8sGW.Name,
+		Meta: map[string]string{
+			metaKeyManagedBy:       metaValueManagedBy,
+			metaKeyKubeNS:          k8sGW.GetObjectMeta().GetNamespace(),
+			metaKeyKubeServiceName: k8sGW.GetObjectMeta().GetName(),
+		},
 		Listeners: listeners,
 		Status: consulAPI.ConfigEntryStatus{
 			Conditions: conditions,
@@ -92,114 +103,6 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 		Partition:   "",
 		Namespace:   "",
 	}
-
-	// _ = gwv1beta1.Gateway{
-	// 	TypeMeta: metav1.TypeMeta{
-	// 		Kind:       "",
-	// 		APIVersion: "",
-	// 	},
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name:                       "",
-	// 		GenerateName:               "",
-	// 		Namespace:                  "",
-	// 		SelfLink:                   "",
-	// 		UID:                        "",
-	// 		ResourceVersion:            "",
-	// 		Generation:                 0,
-	// 		CreationTimestamp:          metav1.Time{},
-	// 		DeletionTimestamp:          &metav1.Time{},
-	// 		DeletionGracePeriodSeconds: new(int64),
-	// 		Labels:                     map[string]string{},
-	// 		Annotations:                map[string]string{},
-	// 		OwnerReferences: []metav1.OwnerReference{
-	// 			{
-	// 				APIVersion:         "",
-	// 				Kind:               "",
-	// 				Name:               "",
-	// 				UID:                "",
-	// 				Controller:         new(bool),
-	// 				BlockOwnerDeletion: new(bool),
-	// 			},
-	// 		},
-	// 		Finalizers: []string{},
-	// 		ManagedFields: []metav1.ManagedFieldsEntry{
-	// 			{
-	// 				Manager:     "",
-	// 				Operation:   "",
-	// 				APIVersion:  "",
-	// 				Time:        &metav1.Time{},
-	// 				FieldsType:  "",
-	// 				FieldsV1:    &metav1.FieldsV1{},
-	// 				Subresource: "",
-	// 			},
-	// 		},
-	// 	},
-	// 	Spec: gwv1beta1.GatewaySpec{
-	// 		GatewayClassName: "",
-	// 		Listeners: []gwv1beta1.Listener{
-	// 			{
-	// 				Name:     "",
-	// 				Hostname: new(gwv1beta1.Hostname),
-	// 				Port:     0,
-	// 				Protocol: "",
-	// 				TLS: &gwv1beta1.GatewayTLSConfig{
-	// 					Mode: new(gwv1beta1.TLSModeType),
-	// 					CertificateRefs: []gwv1beta1.SecretObjectReference{
-	// 						{
-	// 							Group:     &"",
-	// 							Kind:      &"",
-	// 							Name:      "",
-	// 							Namespace: &"",
-	// 						},
-	// 					},
-	// 					Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{},
-	// 				},
-	// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{},
-	// 			},
-	// 		},
-	// 		Addresses: []gwv1beta1.GatewayAddress{},
-	// 	},
-	// 	Status: gwv1beta1.GatewayStatus{
-	// 		Addresses: []gwv1beta1.GatewayAddress{
-	// 			{
-	// 				Type:  &"",
-	// 				Value: "",
-	// 			},
-	// 		},
-	// 		Conditions: []metav1.Condition{
-	// 			{
-	// 				Type:               "",
-	// 				Status:             "",
-	// 				ObservedGeneration: 0,
-	// 				LastTransitionTime: metav1.Time{},
-	// 				Reason:             "",
-	// 				Message:            "",
-	// 			},
-	// 		},
-	// 		Listeners: []gwv1beta1.ListenerStatus{
-	// 			{
-	// 				Name: "",
-	// 				SupportedKinds: []gwv1beta1.RouteGroupKind{
-	// 					{
-	// 						Group: &"",
-	// 						Kind:  "",
-	// 					},
-	// 				},
-	// 				AttachedRoutes: 0,
-	// 				Conditions: []metav1.Condition{
-	// 					{
-	// 						Type:               "",
-	// 						Status:             "",
-	// 						ObservedGeneration: 0,
-	// 						LastTransitionTime: metav1.Time{},
-	// 						Reason:             "",
-	// 						Message:            "",
-	// 					},
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// }
 }
 
 func ptrTo[T any](v T) *T {
