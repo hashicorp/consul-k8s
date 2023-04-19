@@ -18,7 +18,7 @@ func TestEnsureFinalizer(t *testing.T) {
 	cases := map[string]struct {
 		initialFinalizers []string
 		finalizerToAdd    string
-		shouldUpdate      bool
+		expectedDidUpdate bool
 	}{
 		"should update":     {[]string{}, finalizer, true},
 		"should not update": {[]string{finalizer}, finalizer, false},
@@ -40,7 +40,7 @@ func TestEnsureFinalizer(t *testing.T) {
 			didUpdate, err := EnsureFinalizer(context.Background(), client, testObj, tc.finalizerToAdd)
 
 			require.NoError(t, err)
-			require.Equal(t, tc.shouldUpdate, didUpdate)
+			require.Equal(t, tc.expectedDidUpdate, didUpdate)
 		})
 	}
 }
@@ -53,7 +53,7 @@ func TestRemoveFinalizer(t *testing.T) {
 	cases := map[string]struct {
 		initialFinalizers []string
 		finalizerToRemove string
-		shouldUpdate      bool
+		expectedDidUpdate bool
 	}{
 		"should update":     {[]string{finalizer}, finalizer, true},
 		"should not update": {[]string{}, finalizer, false},
@@ -75,7 +75,7 @@ func TestRemoveFinalizer(t *testing.T) {
 			didUpdate, err := RemoveFinalizer(context.Background(), client, testObj, tc.finalizerToRemove)
 
 			require.NoError(t, err)
-			require.Equal(t, tc.shouldUpdate, didUpdate)
+			require.Equal(t, tc.expectedDidUpdate, didUpdate)
 		})
 	}
 }
