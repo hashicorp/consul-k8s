@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -49,9 +48,8 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 		if used {
-			// Requeue after 10 seconds to check again.
 			log.Info("GatewayClass is in use, cannot delete")
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			return ctrl.Result{}, nil
 		}
 		// Remove our finalizer.
 		if _, err := RemoveFinalizer(ctx, r.Client, gc, GatewayClassFinalizer); err != nil {
