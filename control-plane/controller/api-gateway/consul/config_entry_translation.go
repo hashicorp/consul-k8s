@@ -1,10 +1,9 @@
 package consul
 
 import (
-	"time"
-
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul/api"
 	consulAPI "github.com/hashicorp/consul/api"
 )
 
@@ -37,9 +36,6 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 			Protocol: string(listener.Protocol),
 			TLS: consulAPI.APIGatewayTLSConfiguration{
 				Certificates: certificates,
-				MaxVersion:   "",
-				MinVersion:   "",
-				CipherSuites: []string{},
 			},
 		}
 
@@ -55,13 +51,11 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 			Reason:  condition.Reason,
 			Message: condition.Message,
 			Resource: &consulAPI.ResourceReference{
-				Kind:        k8sGW.Kind,
-				Name:        k8sGW.Name,
-				SectionName: "",
-				Partition:   "",
-				Namespace:   k8sGW.Namespace,
+				Kind:      consulAPI.APIGateway,
+				Name:      k8sGW.Name,
+				Namespace: k8sGW.Namespace,
 			},
-			LastTransitionTime: &time.Time{},
+			LastTransitionTime: &condition.LastTransitionTime.Time,
 		}
 		conditions = append(conditions, c)
 	}
@@ -77,17 +71,16 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 					Kind:        consulAPI.APIGateway,
 					Name:        k8sGW.Name,
 					SectionName: string(listener.Name),
-					Partition:   "",
 					Namespace:   k8sGW.Namespace,
 				},
-				LastTransitionTime: ptrTo(time.Now().UTC()),
+				LastTransitionTime: &condition.LastTransitionTime.Time,
 			}
 			conditions = append(conditions, listenerCondition)
 		}
 	}
 
 	return consulAPI.APIGatewayConfigEntry{
-		Kind: k8sGW.Kind,
+		Kind: api.APIGateway,
 		Name: k8sGW.Name,
 		Meta: map[string]string{
 			metaKeyManagedBy:       metaValueManagedBy,
@@ -98,10 +91,7 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 		Status: consulAPI.ConfigEntryStatus{
 			Conditions: conditions,
 		},
-		CreateIndex: 0,
-		ModifyIndex: 0,
-		Partition:   "",
-		Namespace:   "",
+		Namespace: k8sGW.GetObjectMeta().GetNamespace(),
 	}
 }
 
