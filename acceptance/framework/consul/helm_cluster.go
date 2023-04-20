@@ -460,9 +460,10 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		deletePolicy := metav1.DeletePropagationForeground
+		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
+		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
+		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 	})
 }
 
@@ -511,8 +512,9 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
+		deletePolicy := metav1.DeletePropagationForeground
+		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
+		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 	})
 }
 
@@ -553,6 +555,7 @@ func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.Test
 	})
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+		deletePolicy := metav1.DeletePropagationForeground
+		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 	})
 }

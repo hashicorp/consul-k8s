@@ -112,8 +112,9 @@ func TestVault_Partitions(t *testing.T) {
 			require.NoError(t, err)
 		}
 		t.Cleanup(func() {
-			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
+			deletePolicy := metav1.DeletePropagationForeground
+			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
+			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server
@@ -374,7 +375,8 @@ func TestVault_Partitions(t *testing.T) {
 	_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
+		deletePolicy := metav1.DeletePropagationForeground
+		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 	})
 
 	// Create client cluster.

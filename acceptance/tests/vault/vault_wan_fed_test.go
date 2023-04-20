@@ -121,8 +121,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 			require.NoError(t, err)
 		}
 		t.Cleanup(func() {
-			secondaryCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			secondaryCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
+			deletePolicy := metav1.DeletePropagationForeground
+			secondaryCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
+			secondaryCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server
@@ -338,7 +339,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	_, err = secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
+		deletePolicy := metav1.DeletePropagationForeground
+		secondaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 	})
 
 	primaryConsulHelmValues := map[string]string{

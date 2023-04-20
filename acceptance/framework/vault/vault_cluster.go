@@ -413,7 +413,8 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	v.logger.Logf(t, "saving Vault root token to %q Kubernetes secret", rootTokenSecret)
 
 	helpers.Cleanup(t, v.noCleanupOnFailure, func() {
-		_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{})
+		deletePolicy := metav1.DeletePropagationForeground
+		_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{PropagationPolicy: &deletePolicy})
 	})
 	_, err := v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
