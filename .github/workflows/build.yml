@@ -21,7 +21,7 @@ jobs:
     outputs:
       go-version: ${{ steps.get-go-version.outputs.go-version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Determine Go version
         id: get-go-version
         # We use .go-version as our source of truth for current Go
@@ -35,7 +35,7 @@ jobs:
     outputs:
       product-version: ${{ steps.get-product-version.outputs.product-version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: get product version
         id: get-product-version
         run: |
@@ -49,7 +49,7 @@ jobs:
       filepath: ${{ steps.generate-metadata-file.outputs.filepath }}
     steps:
       - name: "Checkout directory"
-        uses: actions/checkout@v3
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Generate metadata file
         id: generate-metadata-file
         uses: hashicorp/actions-generate-metadata@v1
@@ -57,7 +57,7 @@ jobs:
           version: ${{ needs.get-product-version.outputs.product-version }}
           product: ${{ env.PKG_NAME }}
           repositoryOwner: "hashicorp"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: metadata.json
           path: ${{ steps.generate-metadata-file.outputs.filepath }}
@@ -109,10 +109,10 @@ jobs:
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
 
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
         with:
           go-version: ${{ matrix.go }}
 
@@ -134,7 +134,7 @@ jobs:
           zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
       - name: Upload built binaries 
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
@@ -162,7 +162,7 @@ jobs:
 
       - name: Test rpm package
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@v3 # TSCCR: no entry for repository "addnab/docker-run-action"
         with:
           image: registry.access.redhat.com/ubi8/ubi:latest
           options: -v ${{ github.workspace }}:/work
@@ -179,7 +179,7 @@ jobs:
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
       - name: Upload rpm package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
         with:
           name: ${{ env.RPM_PACKAGE }}
@@ -187,7 +187,7 @@ jobs:
 
       - name: Test debian package
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@v3 # TSCCR: no entry for repository "addnab/docker-run-action"
         with:
           image: ubuntu:latest
           options: -v ${{ github.workspace }}:/work
@@ -204,7 +204,7 @@ jobs:
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
       - name: Upload debian packages 
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
         with:
           name: ${{ env.DEB_PACKAGE }}
@@ -221,8 +221,8 @@ jobs:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
           path: control-plane/dist/cni/linux/${{ matrix.arch }}
@@ -265,8 +265,8 @@ jobs:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
           path: control-plane/dist/cni/linux/${{ matrix.arch }}
@@ -307,8 +307,8 @@ jobs:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
           path: control-plane/dist/cni/linux/${{ matrix.arch }}
