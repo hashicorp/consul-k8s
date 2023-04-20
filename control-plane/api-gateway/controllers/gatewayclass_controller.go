@@ -54,10 +54,9 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		_, err := RemoveFinalizer(ctx, r.Client, gc, GatewayClassFinalizer)
 		if err != nil {
 			log.Error(err, "unable to remove finalizer")
-			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
 	}
 
 	if !gc.ObjectMeta.DeletionTimestamp.IsZero() {
