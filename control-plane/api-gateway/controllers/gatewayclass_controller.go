@@ -19,10 +19,10 @@ import (
 )
 
 const (
-	GatewayClassFinalizer      = "gateway-exists-finalizer.consul.hashicorp.com"
 	GatewayClassControllerName = "hashicorp.com/consul-api-gateway-controller"
 
-	InvalidParameters = "InvalidParameters"
+	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
+	invalidParameters     = "InvalidParameters"
 
 	gatewayClassConfigFieldIndex = "__gatewayclassconfig"
 	gatewayClassFieldIndex       = "__gatewayclass"
@@ -51,7 +51,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if string(gc.Spec.ControllerName) != r.ControllerName {
 		// This GatewayClass is not for this controller.
-		_, err := RemoveFinalizer(ctx, r.Client, gc, GatewayClassFinalizer)
+		_, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
 		if err != nil {
 			log.Error(err, "unable to remove finalizer")
 		}
@@ -71,7 +71,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 		// Remove our finalizer.
-		if _, err := RemoveFinalizer(ctx, r.Client, gc, GatewayClassFinalizer); err != nil {
+		if _, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer); err != nil {
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
 		}
@@ -79,7 +79,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// We are creating or updating the GatewayClass.
-	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, GatewayClassFinalizer)
+	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
 	if err != nil {
 		log.Error(err, "unable to add finalizer")
 		return ctrl.Result{}, err
@@ -93,7 +93,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	pr := gc.Spec.ParametersRef
 	if pr != nil {
 		if pr.Kind != v1alpha1.GatewayClassConfigKind {
-			_, err := r.ensureStatus(ctx, gc, InvalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", pr.Kind))
+			_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", pr.Kind))
 			if err != nil {
 				log.Error(err, "unable to update status")
 			}
@@ -102,7 +102,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		err := r.Client.Get(ctx, types.NamespacedName{Name: pr.Name}, &v1alpha1.GatewayClassConfig{})
 		if k8serrors.IsNotFound(err) {
-			_, err := r.ensureStatus(ctx, gc, InvalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", pr.Name))
+			_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", pr.Name))
 			if err != nil {
 				log.Error(err, "unable to update status")
 			}
