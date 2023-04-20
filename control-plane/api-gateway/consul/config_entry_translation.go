@@ -1,8 +1,12 @@
 package consul
 
 import (
+	"os"
+	"strings"
+
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	consulAPI "github.com/hashicorp/consul/api"
 )
@@ -12,20 +16,44 @@ const (
 	metaValueManagedBy     = "consul-k8s-gateway-controller"
 	metaKeyKubeNS          = "k8s-namespace"
 	metaKeyKubeServiceName = "k8s-service-name"
+
+	AnnotationGateway = "consul.hashicorp.com/gateway"
 )
 
-func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntry {
+type consulIdentifier struct {
+	name      string
+	namespace string
+	partition string
+}
+
+type NamespaceName struct {
+	Namespace string
+	Name      string
+}
+
+type Translator struct {
+	EnableConsulNamespaces bool
+	ConsulDestNamespace    string
+	EnableK8sMirroring     bool
+	MirroringPrefix        string
+}
+
+func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[NamespaceName]consulIdentifier) consulAPI.APIGatewayConfigEntry {
 	listeners := make([]consulAPI.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
-	conditions := make([]consulAPI.Condition, 0, len(k8sGW.Status.Conditions))
+	consulPartition := os.Getenv("CONSUL_PARTITION")
 	for _, listener := range k8sGW.Spec.Listeners {
 		certificates := make([]consulAPI.ResourceReference, 0, len(listener.TLS.CertificateRefs))
 		for _, certificate := range listener.TLS.CertificateRefs {
+			certRef, ok := certs[NamespaceName{Name: string(certificate.Name), Namespace: string(*certificate.Namespace)}]
+			if !ok {
+				// drop the ref from the created gateway
+				continue
+			}
 			c := consulAPI.ResourceReference{
-				Kind:        consulAPI.InlineCertificate,
-				Name:        string(certificate.Name),
-				SectionName: "",
-				Partition:   "",
-				Namespace:   string(*certificate.Namespace),
+				Kind:      consulAPI.InlineCertificate,
+				Name:      certRef.name,
+				Partition: certRef.partition,
+				Namespace: certRef.namespace,
 			}
 			certificates = append(certificates, c)
 		}
@@ -41,57 +69,23 @@ func GatewayToAPIGateway(k8sGW gwv1beta1.Gateway) consulAPI.APIGatewayConfigEntr
 
 		listeners = append(listeners, l)
 	}
+	gwName := k8sGW.Name
 
-	for _, condition := range k8sGW.Status.Conditions {
-		// TODO: John Maguire - convert status/reason/type to use a mapping of values defined
-		// in consul to convert from the k8s status/type/reason into consul status/types/reason
-		c := consulAPI.Condition{
-			Type:    condition.Type,
-			Status:  string(condition.Status),
-			Reason:  condition.Reason,
-			Message: condition.Message,
-			Resource: &consulAPI.ResourceReference{
-				Kind:      consulAPI.APIGateway,
-				Name:      k8sGW.Name,
-				Namespace: k8sGW.Namespace,
-			},
-			LastTransitionTime: &condition.LastTransitionTime.Time,
-		}
-		conditions = append(conditions, c)
-	}
-
-	for _, listener := range k8sGW.Status.Listeners {
-		for _, condition := range listener.Conditions {
-			listenerCondition := consulAPI.Condition{
-				Type:    condition.Type,
-				Status:  string(condition.Status),
-				Reason:  condition.Reason,
-				Message: condition.Message,
-				Resource: &consulAPI.ResourceReference{
-					Kind:        consulAPI.APIGateway,
-					Name:        k8sGW.Name,
-					SectionName: string(listener.Name),
-					Namespace:   k8sGW.Namespace,
-				},
-				LastTransitionTime: &condition.LastTransitionTime.Time,
-			}
-			conditions = append(conditions, listenerCondition)
-		}
+	if gwNameFromAnnotation, ok := k8sGW.Annotations[AnnotationGateway]; ok && gwNameFromAnnotation != "" && !strings.Contains(gwNameFromAnnotation, ",") {
+		gwName = gwNameFromAnnotation
 	}
 
 	return consulAPI.APIGatewayConfigEntry{
 		Kind: api.APIGateway,
-		Name: k8sGW.Name,
+		Name: gwName,
 		Meta: map[string]string{
 			metaKeyManagedBy:       metaValueManagedBy,
 			metaKeyKubeNS:          k8sGW.GetObjectMeta().GetNamespace(),
 			metaKeyKubeServiceName: k8sGW.GetObjectMeta().GetName(),
 		},
 		Listeners: listeners,
-		Status: consulAPI.ConfigEntryStatus{
-			Conditions: conditions,
-		},
-		Namespace: k8sGW.GetObjectMeta().GetNamespace(),
+		Partition: consulPartition,
+		Namespace: namespaces.ConsulNamespace(k8sGW.GetObjectMeta().GetNamespace(), t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix),
 	}
 }
 
