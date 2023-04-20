@@ -23,9 +23,6 @@ const (
 
 	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
 	invalidParameters     = "InvalidParameters"
-
-	gatewayClassConfigFieldIndex = "__gatewayclassconfig"
-	gatewayClassFieldIndex       = "__gatewayclass"
 )
 
 // GatewayClassReconciler reconciles a GatewayClass object.
@@ -118,71 +115,19 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *GatewayClassReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &gwv1beta1.GatewayClass{}, gatewayClassConfigFieldIndex, func(o client.Object) []string {
-		gc := o.(*gwv1beta1.GatewayClass)
-
-		pr := gc.Spec.ParametersRef
-		if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {
-			return []string{pr.Name}
-		}
-
-		return []string{}
-	}); err != nil {
-		return err
-	}
-
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &gwv1beta1.Gateway{}, gatewayClassFieldIndex, func(o client.Object) []string {
-		g := o.(*gwv1beta1.Gateway)
-		return []string{string(g.Spec.GatewayClassName)}
-	}); err != nil {
-		return err
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.GatewayClass{}).
 		// Watch for changes to GatewayClassConfig objects.
-		Watches(source.NewKindWithCache(&v1alpha1.GatewayClassConfig{}, mgr.GetCache()), handler.EnqueueRequestsFromMapFunc(
-			func(o client.Object) []reconcile.Request {
-				requests := []reconcile.Request{}
-
-				var gcList gwv1beta1.GatewayClassList
-				err := r.Client.List(ctx, &gcList, &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector(gatewayClassConfigFieldIndex, o.GetName()),
-				})
-				if err != nil {
-					r.Log.Error(err, "unable to list gateway classes")
-				}
-
-				for _, gc := range gcList.Items {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name: gc.Name,
-						},
-					})
-				}
-
-				return requests
-			})).
-		// Watch for changes to Gateways that reference this GatewayClass.
-		Watches(source.NewKindWithCache(&gwv1beta1.Gateway{}, mgr.GetCache()), handler.EnqueueRequestsFromMapFunc(
-			func(o client.Object) []reconcile.Request {
-				g := o.(*gwv1beta1.Gateway)
-				return []reconcile.Request{
-					{
-						NamespacedName: types.NamespacedName{
-							Name: string(g.Spec.GatewayClassName),
-						},
-					},
-				}
-			})).
+		Watches(source.NewKindWithCache(&v1alpha1.GatewayClassConfig{}, mgr.GetCache()), r.gatewayClassConfigFieldIndexEventHandler(ctx)).
+		// Watch for changes to Gateway objects that reference this GatewayClass.
+		Watches(source.NewKindWithCache(&gwv1beta1.Gateway{}, mgr.GetCache()), r.gatewayFieldIndexEventHandler(ctx)).
 		Complete(r)
 }
 
 func (r *GatewayClassReconciler) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.GatewayClass) (bool, error) {
 	list := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(gatewayClassFieldIndex, gc.Name),
+		FieldSelector: fields.OneTermEqualSelector(GatewayClassFieldIndex, gc.Name),
 	}); err != nil {
 		return false, err
 	}
@@ -210,4 +155,41 @@ func (r *GatewayClassReconciler) ensureStatus(ctx context.Context, gc *gwv1beta1
 		}
 	}
 	return false, nil
+}
+
+func (r *GatewayClassReconciler) gatewayClassConfigFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+		requests := []reconcile.Request{}
+
+		var gcList gwv1beta1.GatewayClassList
+		err := r.Client.List(ctx, &gcList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(GatewayClassConfigFieldIndex, o.GetName()),
+		})
+		if err != nil {
+			r.Log.Error(err, "unable to list gateway classes")
+		}
+
+		for _, gc := range gcList.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: gc.Name,
+				},
+			})
+		}
+
+		return requests
+	})
+}
+
+func (r *GatewayClassReconciler) gatewayFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+		g := o.(*gwv1beta1.Gateway)
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name: string(g.Spec.GatewayClassName),
+				},
+			},
+		}
+	})
 }

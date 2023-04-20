@@ -450,21 +450,18 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// API Gateway Controllers
+	if err := controllers.RegisterFieldIndexes(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to register field indexes")
+		return 1
+	}
+
 	if err = (&controllers.GatewayClassConfigController{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", controllers.GatewayClassConfigController{})
 		return 1
-	}
-
-	consulMeta := apicommon.ConsulMeta{
-		PartitionsEnabled:    c.flagEnablePartitions,
-		Partition:            c.consul.Partition,
-		NamespacesEnabled:    c.flagEnableNamespaces,
-		DestinationNamespace: c.flagConsulDestinationNamespace,
-		Mirroring:            c.flagEnableK8SNSMirroring,
-		Prefix:               c.flagK8SNSMirroringPrefix,
 	}
 
 	if err := (&controllers.GatewayClassReconciler{
@@ -663,6 +660,15 @@ func (c *Command) Run(args []string) int {
 			LogLevel:                     c.flagLogLevel,
 			LogJSON:                      c.flagLogJSON,
 		}})
+
+	consulMeta := apicommon.ConsulMeta{
+		PartitionsEnabled:    c.flagEnablePartitions,
+		Partition:            c.consul.Partition,
+		NamespacesEnabled:    c.flagEnableNamespaces,
+		DestinationNamespace: c.flagConsulDestinationNamespace,
+		Mirroring:            c.flagEnableK8SNSMirroring,
+		Prefix:               c.flagK8SNSMirroringPrefix,
+	}
 
 	// Note: The path here should be identical to the one on the kubebuilder
 	// annotation in each webhook file.
