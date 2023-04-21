@@ -484,6 +484,31 @@ func TestExportedServices_Validate(t *testing.T) {
 				`exporting to all peers (wildcard) is not supported`,
 			},
 		},
+		"exporting to all sameness groups (wildcard) is not supported": {
+			input: &ExportedServices{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.DefaultConsulPartition,
+				},
+				Spec: ExportedServicesSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service-frontend",
+							Namespace: "frontend",
+							Consumers: []ServiceConsumer{
+								{
+									SamenessGroup: "*",
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceEnabled:  true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`exporting to all sameness groups (wildcard) is not supported`,
+			},
+		},
 		"multiple errors": {
 			input: &ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{

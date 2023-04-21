@@ -260,6 +260,9 @@ func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMe
 	if in.Peer == WildcardSpecifier {
 		return field.Invalid(path.Child("peer"), "", "exporting to all peers (wildcard) is not supported")
 	}
+	if in.SamenessGroup == WildcardSpecifier {
+		return field.Invalid(path.Child("samenessgroup"), "", "exporting to all sameness groups (wildcard) is not supported")
+	}
 	return nil
 }
 
