@@ -86,29 +86,8 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// Check that the parametersRef is valid.
-	pr := gc.Spec.ParametersRef
-	if pr != nil {
-		if pr.Kind != v1alpha1.GatewayClassConfigKind {
-			_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", pr.Kind))
-			if err != nil {
-				log.Error(err, "unable to update status")
-			}
-			return ctrl.Result{}, err
-		}
-
-		err := r.Client.Get(ctx, types.NamespacedName{Name: pr.Name}, &v1alpha1.GatewayClassConfig{})
-		if k8serrors.IsNotFound(err) {
-			_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", pr.Name))
-			if err != nil {
-				log.Error(err, "unable to update status")
-			}
-			return ctrl.Result{}, err
-		}
-		if err != nil {
-			log.Error(err, "unable to fetch GatewayClassConfig")
-			return ctrl.Result{}, err
-		}
+	if err := r.validateParametersRef(ctx, gc, log); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -133,6 +112,35 @@ func (r *GatewayClassReconciler) isGatewayClassInUse(ctx context.Context, gc *gw
 	}
 
 	return len(list.Items) != 0, nil
+}
+
+func (r *GatewayClassReconciler) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) error {
+	parametersRef := gc.Spec.ParametersRef
+	if parametersRef == nil {
+		return nil
+	}
+
+	if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
+		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind))
+		if err != nil {
+			log.Error(err, "unable to update status")
+		}
+		return err
+	}
+
+	err := r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
+	if k8serrors.IsNotFound(err) {
+		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name))
+		if err != nil {
+			log.Error(err, "unable to update status")
+		}
+		return err
+	}
+	if err != nil {
+		log.Error(err, "unable to fetch GatewayClassConfig")
+		return err
+	}
+	return nil
 }
 
 func (r *GatewayClassReconciler) ensureStatus(ctx context.Context, gc *gwv1beta1.GatewayClass, key, status string) (didUpdate bool, err error) {
@@ -161,6 +169,7 @@ func (r *GatewayClassReconciler) gatewayClassConfigFieldIndexEventHandler(ctx co
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
 		requests := []reconcile.Request{}
 
+		// Get all GatewayClass objects from the field index.
 		var gcList gwv1beta1.GatewayClassList
 		err := r.Client.List(ctx, &gcList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(GatewayClassConfigFieldIndex, o.GetName()),
@@ -169,6 +178,7 @@ func (r *GatewayClassReconciler) gatewayClassConfigFieldIndexEventHandler(ctx co
 			r.Log.Error(err, "unable to list gateway classes")
 		}
 
+		// Create a reconcile request for each GatewayClass.
 		for _, gc := range gcList.Items {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
