@@ -25,17 +25,17 @@ const (
 	invalidParameters     = "InvalidParameters"
 )
 
-// GatewayClassReconciler reconciles a GatewayClass object.
+// GatewayClassController reconciles a GatewayClass object.
 // The GatewayClass is responsible for defining the behavior of API gateways
 // which reference the given class.
-type GatewayClassReconciler struct {
+type GatewayClassController struct {
 	ControllerName string
 	Log            logr.Logger
 	client.Client
 }
 
 // Reconcile handles the reconciliation loop for GatewayClass objects.
-func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
 
 	gc := &gwv1beta1.GatewayClass{}
@@ -93,7 +93,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *GatewayClassReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *GatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.GatewayClass{}).
 		// Watch for changes to GatewayClassConfig objects.
@@ -103,7 +103,7 @@ func (r *GatewayClassReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		Complete(r)
 }
 
-func (r *GatewayClassReconciler) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.GatewayClass) (bool, error) {
+func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.GatewayClass) (bool, error) {
 	list := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(GatewayClassFieldIndex, gc.Name),
@@ -114,7 +114,7 @@ func (r *GatewayClassReconciler) isGatewayClassInUse(ctx context.Context, gc *gw
 	return len(list.Items) != 0, nil
 }
 
-func (r *GatewayClassReconciler) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) error {
+func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) error {
 	parametersRef := gc.Spec.ParametersRef
 	if parametersRef == nil {
 		return nil
@@ -143,7 +143,7 @@ func (r *GatewayClassReconciler) validateParametersRef(ctx context.Context, gc *
 	return nil
 }
 
-func (r *GatewayClassReconciler) ensureStatus(ctx context.Context, gc *gwv1beta1.GatewayClass, key, status, reason string) (didUpdate bool, err error) {
+func (r *GatewayClassController) ensureStatus(ctx context.Context, gc *gwv1beta1.GatewayClass, key, status, reason string) (didUpdate bool, err error) {
 	conditionStatus := metav1.ConditionStatus(status)
 
 	for _, condition := range gc.Status.Conditions {
@@ -165,7 +165,7 @@ func (r *GatewayClassReconciler) ensureStatus(ctx context.Context, gc *gwv1beta1
 	return false, nil
 }
 
-func (r *GatewayClassReconciler) gatewayClassConfigFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
+func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
 		requests := []reconcile.Request{}
 
@@ -191,7 +191,7 @@ func (r *GatewayClassReconciler) gatewayClassConfigFieldIndexEventHandler(ctx co
 	})
 }
 
-func (r *GatewayClassReconciler) gatewayFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
+func (r *GatewayClassController) gatewayFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
 		g := o.(*gwv1beta1.Gateway)
 		return []reconcile.Request{
