@@ -22,7 +22,14 @@ const (
 	GatewayClassControllerName = "hashicorp.com/consul-api-gateway-controller"
 
 	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
-	invalidParameters     = "InvalidParameters"
+
+	// GatewayClass status fields.
+	invalidParameters = "InvalidParameters"
+	accepted          = "Accepted"
+
+	// GatewayClass status condition reasons.
+	configurationAccepted = "ConfigurationAccepted"
+	configurationInvalid  = "ConfigurationInvalid"
 )
 
 // GatewayClassController reconciles a GatewayClass object.
@@ -31,6 +38,7 @@ const (
 type GatewayClassController struct {
 	ControllerName string
 	Log            logr.Logger
+
 	client.Client
 }
 
@@ -90,9 +98,18 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
+	// Update the status to Accepted=True.
+	didUpdate, err = r.ensureCondition(ctx, gc, metav1.Condition{
+		Type:    accepted,
+		Status:  metav1.ConditionTrue,
+		Reason:  configurationAccepted,
+		Message: "Configuration accepted",
+	})
+
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager registers the controller with the given manager.
 func (r *GatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.GatewayClass{}).
@@ -103,6 +120,7 @@ func (r *GatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.
 		Complete(r)
 }
 
+// isGatewayClassInUse returns true if the given GatewayClass is referenced by any Gateway objects.
 func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.GatewayClass) (bool, error) {
 	list := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
@@ -114,6 +132,8 @@ func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gw
 	return len(list.Items) != 0, nil
 }
 
+// validateParametersRef validates the ParametersRef field of the given GatewayClass
+// if it is set, ensuring that the referenced object is a GatewayClassConfig that exists.
 func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) error {
 	parametersRef := gc.Spec.ParametersRef
 	if parametersRef == nil {
@@ -121,7 +141,12 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 	}
 
 	if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
-		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind), "IncorrectGatewayKind")
+		_, err := r.ensureCondition(ctx, gc, metav1.Condition{
+			Type:    invalidParameters,
+			Status:  metav1.ConditionTrue,
+			Reason:  configurationInvalid,
+			Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind),
+		})
 		if err != nil {
 			log.Error(err, "unable to update status")
 		}
@@ -130,7 +155,12 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 
 	err := r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
 	if k8serrors.IsNotFound(err) {
-		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name), "GatewayClassConfigNotFound")
+		_, err := r.ensureCondition(ctx, gc, metav1.Condition{
+			Type:    invalidParameters,
+			Status:  metav1.ConditionTrue,
+			Reason:  configurationInvalid,
+			Message: fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name),
+		})
 		if err != nil {
 			log.Error(err, "unable to update status")
 		}
@@ -140,36 +170,40 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 		log.Error(err, "unable to fetch GatewayClassConfig")
 		return err
 	}
+
 	return nil
 }
 
-func (r *GatewayClassController) ensureStatus(ctx context.Context, gc *gwv1beta1.GatewayClass, key, status, reason string) (didUpdate bool, err error) {
-	conditionStatus := metav1.ConditionStatus(status)
-
-	for _, condition := range gc.Status.Conditions {
-		if condition.Type == key {
-			if condition.Status != conditionStatus || condition.Reason != reason {
-				// We need to update the status and/or reason.
-				condition.Status = conditionStatus
-				condition.Reason = reason
-				condition.LastTransitionTime = metav1.Now()
-			}
-
-			if err := r.Client.Status().Update(ctx, gc); err != nil {
-				return false, err
-			}
-
-			return true, nil
+// ensureCondition ensures that the given condition is set on the GatewayClass.
+func (r *GatewayClassController) ensureCondition(ctx context.Context, gc *gwv1beta1.GatewayClass, condition metav1.Condition) (didUpdate bool, err error) {
+	for _, c := range gc.Status.Conditions {
+		if condition.Type != c.Type {
+			continue
 		}
+
+		if condition != c {
+			c.LastTransitionTime = metav1.Now()
+			c = condition
+		}
+
+		if err := r.Client.Status().Update(ctx, gc); err != nil {
+			return false, err
+		}
+
+		return true, nil
 	}
+
 	return false, nil
 }
 
+// gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
+// reconcile.Requests for GatewayClass objects that reference the Gateway
+// object that triggered the event.
 func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
 		requests := []reconcile.Request{}
 
-		// Get all GatewayClass objects from the field index.
+		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
 		var gcList gwv1beta1.GatewayClassList
 		err := r.Client.List(ctx, &gcList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(GatewayClassConfigFieldIndex, o.GetName()),
@@ -191,9 +225,16 @@ func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx co
 	})
 }
 
+// gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
+// reconcile.Requests for GatewayClass objects that reference the Gateway
+// object that triggered the event.
 func (r *GatewayClassController) gatewayFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+		// Get the Gateway object that triggered the event.
 		g := o.(*gwv1beta1.Gateway)
+
+		// Return a slice with the single reconcile.Request for the GatewayClass
+		// that the Gateway references.
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
