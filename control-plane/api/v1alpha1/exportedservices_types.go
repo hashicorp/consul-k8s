@@ -249,7 +249,7 @@ func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMe
 		return field.Invalid(path, *in, "Service consumer must define at most one of Peer, Partition, or SamenessGroup")
 	}
 	if count == 0 {
-		return field.Invalid(path, *in, "Service consumer must define at least one of Peer, Partition, or SamenessGroup")
+		return field.Invalid(path, *in, "service consumer must define at least one of Peer, Partition, or SamenessGroup")
 	}
 	if !consulMeta.PartitionsEnabled && in.Partition != "" {
 		return field.Invalid(path.Child("partition"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")
