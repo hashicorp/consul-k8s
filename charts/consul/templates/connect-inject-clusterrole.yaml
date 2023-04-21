@@ -121,6 +121,7 @@ rules:
   - gateway.networking.k8s.io
   resources:
   - gatewayclasses
+  - gateways
   verbs:
   - create
   - delete
