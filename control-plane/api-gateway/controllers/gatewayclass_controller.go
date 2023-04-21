@@ -121,7 +121,7 @@ func (r *GatewayClassReconciler) validateParametersRef(ctx context.Context, gc *
 	}
 
 	if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
-		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind))
+		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind), "IncorrectGatewayKind")
 		if err != nil {
 			log.Error(err, "unable to update status")
 		}
@@ -130,7 +130,7 @@ func (r *GatewayClassReconciler) validateParametersRef(ctx context.Context, gc *
 
 	err := r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
 	if k8serrors.IsNotFound(err) {
-		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name))
+		_, err := r.ensureStatus(ctx, gc, invalidParameters, fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name), "GatewayClassConfigNotFound")
 		if err != nil {
 			log.Error(err, "unable to update status")
 		}
@@ -143,17 +143,17 @@ func (r *GatewayClassReconciler) validateParametersRef(ctx context.Context, gc *
 	return nil
 }
 
-func (r *GatewayClassReconciler) ensureStatus(ctx context.Context, gc *gwv1beta1.GatewayClass, key, status string) (didUpdate bool, err error) {
+func (r *GatewayClassReconciler) ensureStatus(ctx context.Context, gc *gwv1beta1.GatewayClass, key, status, reason string) (didUpdate bool, err error) {
 	conditionStatus := metav1.ConditionStatus(status)
 
 	for _, condition := range gc.Status.Conditions {
 		if condition.Type == key {
-			if condition.Status == conditionStatus {
-				// We already have the correct status.
-				return false, nil
+			if condition.Status != conditionStatus || condition.Reason != reason {
+				// We need to update the status and/or reason.
+				condition.Status = conditionStatus
+				condition.Reason = reason
+				condition.LastTransitionTime = metav1.Now()
 			}
-			condition.Status = conditionStatus
-			condition.LastTransitionTime = metav1.Now()
 
 			if err := r.Client.Status().Update(ctx, gc); err != nil {
 				return false, err
