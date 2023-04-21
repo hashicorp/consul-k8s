@@ -138,7 +138,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-v1alpha1-samenessgroup
+      path: /mutate-v1alpha1-samenessgroups
   failurePolicy: Fail
   name: mutate-samenessgroup.consul.hashicorp.com
   rules:
