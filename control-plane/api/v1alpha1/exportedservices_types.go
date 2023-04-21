@@ -246,7 +246,7 @@ func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMe
 		count++
 	}
 	if count > 1 {
-		return field.Invalid(path, *in, "Service consumer must define at most one of Peer, Partition, or SamenessGroup")
+		return field.Invalid(path, *in, "service consumer must define at most one of Peer, Partition, or SamenessGroup")
 	}
 	if count == 0 {
 		return field.Invalid(path, *in, "service consumer must define at least one of Peer, Partition, or SamenessGroup")

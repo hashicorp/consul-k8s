@@ -358,7 +358,7 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`Service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`service consumer must define at most one of Peer, Partition, or SamenessGroup`,
 			},
 		},
 		"none of peer, partition, or sameness group defined": {
@@ -381,7 +381,7 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`Service consumer must define at least one of Peer, Partition, or SamenessGroup`,
+				`service consumer must define at least one of Peer, Partition, or SamenessGroup`,
 			},
 		},
 		"partition provided when partitions are disabled": {
@@ -537,9 +537,9 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer", SamenessGroup:""}: Service consumer must define at most one of Peer, Partition, or SamenessGroup`,
-				`spec.services[0].consumers[1]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:"", SamenessGroup:""}: Service consumer must define at least one of Peer, Partition, or SamenessGroup`,
-				`spec.services[0].consumers[2]: Invalid value: v1alpha1.ServiceConsumer{Partition:"partition2", Peer:"", SamenessGroup:"sg2"}: Service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer", SamenessGroup:""}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[1]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:"", SamenessGroup:""}: service consumer must define at least one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[2]: Invalid value: v1alpha1.ServiceConsumer{Partition:"partition2", Peer:"", SamenessGroup:"sg2"}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
 			},
 		},
 	}
