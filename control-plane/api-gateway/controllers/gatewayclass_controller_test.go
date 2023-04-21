@@ -6,6 +6,7 @@ import (
 	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,7 +46,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Namespace: namespace,
 					Name:      name,
 					Finalizers: []string{
-						GatewayClassFinalizer,
+						gatewayClassFinalizer,
 					},
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
@@ -55,7 +56,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 
 			expectedResult:     ctrl.Result{},
 			expectedError:      nil,
-			expectedFinalizers: []string{GatewayClassFinalizer},
+			expectedFinalizers: []string{gatewayClassFinalizer},
 		},
 		"successful reconcile that adds finalizer": {
 			gatewayClass: &gwv1beta1.GatewayClass{
@@ -70,7 +71,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			},
 			expectedResult:     ctrl.Result{Requeue: true},
 			expectedError:      nil,
-			expectedFinalizers: []string{GatewayClassFinalizer},
+			expectedFinalizers: []string{gatewayClassFinalizer},
 		},
 		"attempt to reconcile a GatewayClass with a different controller name": {
 			gatewayClass: &gwv1beta1.GatewayClass{
@@ -97,7 +98,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Namespace: namespace,
 					Name:      name,
 					Finalizers: []string{
-						GatewayClassFinalizer,
+						gatewayClassFinalizer,
 					},
 					DeletionTimestamp: &deletionTimestamp,
 				},
@@ -115,7 +116,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Namespace: namespace,
 					Name:      name,
 					Finalizers: []string{
-						GatewayClassFinalizer,
+						gatewayClassFinalizer,
 					},
 					DeletionTimestamp: &deletionTimestamp,
 				},
@@ -136,7 +137,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			},
 			expectedResult:     ctrl.Result{RequeueAfter: 10 * time.Second},
 			expectedError:      nil,
-			expectedFinalizers: []string{GatewayClassFinalizer},
+			expectedFinalizers: []string{gatewayClassFinalizer},
 		},
 	}
 
@@ -144,15 +145,16 @@ func TestGatewayClassReconciler(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			objs := tc.k8sObjects
 			if tc.gatewayClass != nil {
 				objs = append(objs, tc.gatewayClass)
 			}
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
+			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
 
-			r := &GatewayClassReconciler{
+			r := &GatewayClassController{
 				Client:         fakeClient,
 				ControllerName: GatewayClassControllerName,
 				Log:            logrtest.NewTestLogger(t),

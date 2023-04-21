@@ -10,8 +10,14 @@ import (
 )
 
 const (
-	GatewayClassConfigFieldIndex = "__gatewayclassconfig"
-	GatewayClassFieldIndex       = "__gatewayclass"
+	// Naming convention: TARGET_REFERENCE
+	GatewayClass_GatewayClassConfigIndex = "__gatewayclass_referencing_gatewayclassconfig"
+	Gateway_GatewayClassIndex            = "__gateway_referencing_gatewayclass"
+	HTTPRoute_GatewayIndex               = "__httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex               = "__httproute_referencing_service"
+	TCPRoute_GatewayIndex                = "__tcproute_referencing_gateway"
+	TCPRoute_ServiceIndex                = "__tcproute_referencing_service"
+	Secret_GatewayIndex                  = "__secret_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -34,20 +40,19 @@ type index struct {
 
 var indexes = []index{
 	{
-		name:        GatewayClassConfigFieldIndex,
-		target:      &v1alpha1.GatewayClassConfig{},
-		indexerFunc: gatewayClassConfigIndexerFunc,
+		name:        GatewayClass_GatewayClassConfigIndex,
+		target:      &gwv1beta1.GatewayClass{},
+		indexerFunc: gatewayClassConfigForGatewayClass,
 	},
 	{
-		name:        GatewayClassFieldIndex,
-		target:      &gwv1beta1.GatewayClass{},
-		indexerFunc: gatewayClassIndexerFunc,
+		name:        Gateway_GatewayClassIndex,
+		target:      &gwv1beta1.Gateway{},
+		indexerFunc: gatewayClassForGateway,
 	},
 }
 
-// gatewayClassConfigIndexerFunc creates an index of every GatewayClass
-// that references the GatewayClassConfig.
-func gatewayClassConfigIndexerFunc(o client.Object) []string {
+// gatewayClassConfigForGatewayClass creates an index of every GatewayClassConfig referenced by a GatewayClass.
+func gatewayClassConfigForGatewayClass(o client.Object) []string {
 	gc := o.(*gwv1beta1.GatewayClass)
 
 	pr := gc.Spec.ParametersRef
@@ -58,8 +63,8 @@ func gatewayClassConfigIndexerFunc(o client.Object) []string {
 	return []string{}
 }
 
-// gatewayClassIndexerFunc creates an index of every GatewayClass
-func gatewayClassIndexerFunc(o client.Object) []string {
+// gatewayClassForGateway creates an index of every GatewayClass referenced by a Gateway.
+func gatewayClassForGateway(o client.Object) []string {
 	g := o.(*gwv1beta1.Gateway)
 	return []string{string(g.Spec.GatewayClassName)}
 }
