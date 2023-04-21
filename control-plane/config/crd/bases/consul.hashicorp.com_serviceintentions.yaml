@@ -98,8 +98,7 @@ spec:
                       description: Partition is the Admin Partition for the Name parameter.
                       type: string
                     peer:
-                      description: '[Experimental] Peer is the peer name for the Name
-                        parameter.'
+                      description: Peer is the peer name for the Name parameter.
                       type: string
                     permissions:
                       description: Permissions is the list of all additional L7 attributes

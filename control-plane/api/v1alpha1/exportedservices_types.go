@@ -72,7 +72,7 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
-	// [Experimental] Peer is the name of the peer to export the service to.
+	// Peer is the name of the peer to export the service to.
 	Peer string `json:"peer,omitempty"`
 	// SamenessGroup is the name of the sameness group to export the service to.
 	SamenessGroup string `json:"samenessGroup,omitempty"`
