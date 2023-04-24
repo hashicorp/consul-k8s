@@ -211,8 +211,8 @@ func (r *GatewayClassController) ensureCondition(ctx context.Context, gc *gwv1be
 
 }
 
-// gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
-// reconcile.Requests for GatewayClass objects that reference the Gateway
+// gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
+// reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
 // object that triggered the event.
 func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
@@ -241,8 +241,8 @@ func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx co
 }
 
 // gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
-// reconcile.Requests for GatewayClass objects that reference the Gateway
-// object that triggered the event.
+// reconcile.Requests for GatewayClass objects from Gateways which reference the GatewayClass
+// when those Gateways are updated.
 func (r *GatewayClassController) gatewayFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
 		// Get the Gateway object that triggered the event.
@@ -261,7 +261,6 @@ func (r *GatewayClassController) gatewayFieldIndexEventHandler(ctx context.Conte
 }
 
 func equalConditions(a, b metav1.Condition) bool {
-
 	return a.Type == b.Type &&
 		a.Status == b.Status &&
 		a.Reason == b.Reason &&
