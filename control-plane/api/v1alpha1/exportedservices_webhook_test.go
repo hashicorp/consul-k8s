@@ -123,7 +123,7 @@ func TestValidateExportedServices(t *testing.T) {
 				Partition:         "",
 			},
 			expAllow:      false,
-			expErrMessage: "exportedservices.consul.hashicorp.com \"default\" is invalid: spec.services[0].consumers[0].partitions: Invalid value: \"other\": Consul Admin Partitions need to be enabled to specify partition.",
+			expErrMessage: "exportedservices.consul.hashicorp.com \"default\" is invalid: spec.services[0].consumers[0].partition: Invalid value: \"other\": Consul Admin Partitions need to be enabled to specify partition.",
 		},
 		"no services": {
 			existingResources: []runtime.Object{},
