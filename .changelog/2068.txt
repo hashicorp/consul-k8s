@@ -1,0 +1,3 @@
+```release-note:bug
+sync-catalog: fix issue where the sync-catalog ACL token were set with an incorrect ENV VAR.
+```
