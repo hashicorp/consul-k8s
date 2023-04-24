@@ -19,7 +19,7 @@ const (
 	gatewayClassConfigFinalizer = "gateway-class-exists-finalizer.consul.hashicorp.com"
 )
 
-// The GatewayClassConfigController manages the state of GatewayClassConfigs
+// The GatewayClassConfigController manages the state of GatewayClassConfigs.
 type GatewayClassConfigController struct {
 	client.Client
 

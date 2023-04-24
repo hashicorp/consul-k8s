@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// Naming convention: TARGET_REFERENCE
+	// Naming convention: TARGET_REFERENCE.
 	GatewayClass_GatewayClassConfigIndex = "__gatewayclass_referencing_gatewayclassconfig"
 	Gateway_GatewayClassIndex            = "__gateway_referencing_gatewayclass"
 	HTTPRoute_GatewayIndex               = "__httproute_referencing_gateway"

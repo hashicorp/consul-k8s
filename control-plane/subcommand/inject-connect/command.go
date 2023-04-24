@@ -464,7 +464,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err := (&controllers.GatewayClassReconciler{
+	if err := (&controllers.GatewayClassController{
 		ControllerName: controllers.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),

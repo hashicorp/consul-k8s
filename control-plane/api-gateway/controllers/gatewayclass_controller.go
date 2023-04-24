@@ -106,7 +106,7 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		Message: "Configuration accepted",
 	})
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager registers the controller with the given manager.
