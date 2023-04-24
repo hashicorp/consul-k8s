@@ -153,8 +153,9 @@ spec:
                       "sequential") and "order-by-locality".
                     type: string
                   regions:
-                    description: The ordered list of the regions of the failover targets.
-                      Valid values can be "us-west-1", "us-west-2", and so on.
+                    description: Regions is the ordered list of the regions of the
+                      failover targets. Valid values can be "us-west-1", "us-west-2",
+                      and so on.
                     items:
                       type: string
                     type: array
