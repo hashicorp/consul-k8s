@@ -135,7 +135,34 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Type:    invalidParameters,
 					Status:  metav1.ConditionTrue,
 					Reason:  configurationInvalid,
-					Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", "some-nonesense"),
+					Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", "some-nonsense"),
+				},
+			},
+		},
+		"attempt to reconcile a GatewayClass with a GatewayClassConfig that does not exist": {
+			gatewayClass: &gwv1beta1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  namespace,
+					Name:       name,
+					Finalizers: []string{gatewayClassFinalizer},
+				},
+				Spec: gwv1beta1.GatewayClassSpec{
+					ControllerName: GatewayClassControllerName,
+					ParametersRef: &gwv1beta1.ParametersReference{
+						Kind: v1alpha1.GatewayClassConfigKind,
+						Name: "does-not-exist",
+					},
+				},
+			},
+			expectedResult:     ctrl.Result{},
+			expectedError:      nil,
+			expectedFinalizers: []string{gatewayClassFinalizer},
+			expectedConditions: []metav1.Condition{
+				{
+					Type:    invalidParameters,
+					Status:  metav1.ConditionTrue,
+					Reason:  configurationInvalid,
+					Message: fmt.Sprintf("GatewayClassConfig not found %q.", "does-not-exist"),
 				},
 			},
 		},
