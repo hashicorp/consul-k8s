@@ -2,12 +2,13 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"testing"
-	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,24 +40,32 @@ func TestGatewayClassReconciler(t *testing.T) {
 		expectedResult     ctrl.Result
 		expectedError      error
 		expectedFinalizers []string
+		expectedIsDeleted  bool
+		expectedConditions []metav1.Condition
 	}{
 		"successful reconcile with no change": {
 			gatewayClass: &gwv1beta1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: namespace,
-					Name:      name,
-					Finalizers: []string{
-						gatewayClassFinalizer,
-					},
+					Namespace:  namespace,
+					Name:       name,
+					Finalizers: []string{gatewayClassFinalizer},
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
 					ControllerName: GatewayClassControllerName,
 				},
 			},
-
 			expectedResult:     ctrl.Result{},
 			expectedError:      nil,
 			expectedFinalizers: []string{gatewayClassFinalizer},
+			expectedIsDeleted:  false,
+			expectedConditions: []metav1.Condition{
+				{
+					Type:    accepted,
+					Status:  metav1.ConditionTrue,
+					Reason:  configurationAccepted,
+					Message: "Configuration accepted",
+				},
+			},
 		},
 		"successful reconcile that adds finalizer": {
 			gatewayClass: &gwv1beta1.GatewayClass{
@@ -69,9 +78,10 @@ func TestGatewayClassReconciler(t *testing.T) {
 					ControllerName: GatewayClassControllerName,
 				},
 			},
-			expectedResult:     ctrl.Result{Requeue: true},
+			expectedResult:     ctrl.Result{},
 			expectedError:      nil,
 			expectedFinalizers: []string{gatewayClassFinalizer},
+			expectedConditions: []metav1.Condition{},
 		},
 		"attempt to reconcile a GatewayClass with a different controller name": {
 			gatewayClass: &gwv1beta1.GatewayClass{
@@ -84,13 +94,56 @@ func TestGatewayClassReconciler(t *testing.T) {
 					ControllerName: "foo",
 				},
 			},
-			expectedResult: ctrl.Result{},
-			expectedError:  nil,
+			expectedResult:     ctrl.Result{},
+			expectedError:      nil,
+			expectedConditions: []metav1.Condition{},
+		},
+		"attempt to reconcile a GatewayClass with a different controller name removing our finalizer": {
+			gatewayClass: &gwv1beta1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  namespace,
+					Name:       name,
+					Finalizers: []string{gatewayClassFinalizer},
+				},
+				Spec: gwv1beta1.GatewayClassSpec{
+					ControllerName: "foo",
+				},
+			},
+			expectedResult:     ctrl.Result{},
+			expectedError:      nil,
+			expectedConditions: []metav1.Condition{},
+		},
+		"attempt to reconcile a GatewayClass with an incorrect parametersRef type": {
+			gatewayClass: &gwv1beta1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  namespace,
+					Name:       name,
+					Finalizers: []string{gatewayClassFinalizer},
+				},
+				Spec: gwv1beta1.GatewayClassSpec{
+					ControllerName: GatewayClassControllerName,
+					ParametersRef: &gwv1beta1.ParametersReference{
+						Kind: "some-nonsense",
+					},
+				},
+			},
+			expectedResult:     ctrl.Result{},
+			expectedError:      nil,
+			expectedFinalizers: []string{gatewayClassFinalizer},
+			expectedConditions: []metav1.Condition{
+				{
+					Type:    invalidParameters,
+					Status:  metav1.ConditionTrue,
+					Reason:  configurationInvalid,
+					Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", "some-nonesense"),
+				},
+			},
 		},
 		"attempt to reconcile a non-existent object": {
-			k8sObjects:     []runtime.Object{},
-			expectedResult: ctrl.Result{},
-			expectedError:  nil,
+			k8sObjects:         []runtime.Object{},
+			expectedResult:     ctrl.Result{},
+			expectedError:      nil,
+			expectedConditions: []metav1.Condition{},
 		},
 		"attempt to remove a GatewayClass that is not in use": {
 			gatewayClass: &gwv1beta1.GatewayClass{
@@ -109,6 +162,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedResult:     ctrl.Result{},
 			expectedError:      nil,
 			expectedFinalizers: []string{},
+			expectedIsDeleted:  true,
 		},
 		"attempt to remove a GatewayClass that is in use": {
 			gatewayClass: &gwv1beta1.GatewayClass{
@@ -135,10 +189,11 @@ func TestGatewayClassReconciler(t *testing.T) {
 					},
 				},
 			},
-			expectedResult:     ctrl.Result{RequeueAfter: 10 * time.Second},
+			expectedResult:     ctrl.Result{},
 			expectedError:      nil,
 			expectedFinalizers: []string{gatewayClassFinalizer},
 		},
+		// */
 	}
 
 	for name, tc := range cases {
@@ -164,14 +219,21 @@ func TestGatewayClassReconciler(t *testing.T) {
 			require.Equal(t, tc.expectedResult, result)
 			require.Equal(t, tc.expectedError, err)
 
-			if tc.gatewayClass != nil {
-				gc := &gwv1beta1.GatewayClass{}
-				err := r.Client.Get(context.Background(), req.NamespacedName, gc)
-				require.NoError(t, client.IgnoreNotFound(err))
+			// Check the GatewayClass after reconciliation.
+			gc := &gwv1beta1.GatewayClass{}
+			err = r.Client.Get(context.Background(), req.NamespacedName, gc)
 
-				if err == nil { // This skips the "not found case".
-					require.Equal(t, tc.expectedFinalizers, gc.ObjectMeta.Finalizers)
-				}
+			if tc.gatewayClass == nil || tc.expectedIsDeleted {
+				// There shouldn't be a GatewayClass to check.
+				require.True(t, apierrors.IsNotFound(err))
+				return
+			}
+
+			require.NoError(t, client.IgnoreNotFound(err))
+			require.Equal(t, tc.expectedFinalizers, gc.ObjectMeta.Finalizers)
+			require.Equal(t, len(tc.expectedConditions), len(gc.Status.Conditions), "expected %+v, got %+v", tc.expectedConditions, gc.Status.Conditions)
+			for i, expectedCondition := range tc.expectedConditions {
+				require.True(t, equalConditions(expectedCondition, gc.Status.Conditions[i]), "expected %+v, got %+v", expectedCondition, gc.Status.Conditions[i])
 			}
 		})
 	}

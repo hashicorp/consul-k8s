@@ -94,12 +94,12 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.validateParametersRef(ctx, gc, log); err != nil {
+	if didUpdate, err := r.validateParametersRef(ctx, gc, log); didUpdate || err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Update the status to Accepted=True.
-	didUpdate, err = r.ensureCondition(ctx, gc, metav1.Condition{
+	_, err = r.ensureCondition(ctx, gc, metav1.Condition{
 		Type:    accepted,
 		Status:  metav1.ConditionTrue,
 		Reason:  configurationAccepted,
@@ -124,7 +124,7 @@ func (r *GatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.
 func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.GatewayClass) (bool, error) {
 	list := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(GatewayClassFieldIndex, gc.Name),
+		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gc.Name),
 	}); err != nil {
 		return false, err
 	}
@@ -134,14 +134,14 @@ func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gw
 
 // validateParametersRef validates the ParametersRef field of the given GatewayClass
 // if it is set, ensuring that the referenced object is a GatewayClassConfig that exists.
-func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) error {
+func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) (didUpdate bool, err error) {
 	parametersRef := gc.Spec.ParametersRef
 	if parametersRef == nil {
-		return nil
+		return false, nil
 	}
 
 	if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
-		_, err := r.ensureCondition(ctx, gc, metav1.Condition{
+		didUpdate, err := r.ensureCondition(ctx, gc, metav1.Condition{
 			Type:    invalidParameters,
 			Status:  metav1.ConditionTrue,
 			Reason:  configurationInvalid,
@@ -150,12 +150,12 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 		if err != nil {
 			log.Error(err, "unable to update status")
 		}
-		return err
+		return didUpdate, err
 	}
 
-	err := r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
+	err = r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
 	if k8serrors.IsNotFound(err) {
-		_, err := r.ensureCondition(ctx, gc, metav1.Condition{
+		didUpdate, err := r.ensureCondition(ctx, gc, metav1.Condition{
 			Type:    invalidParameters,
 			Status:  metav1.ConditionTrue,
 			Reason:  configurationInvalid,
@@ -164,27 +164,33 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 		if err != nil {
 			log.Error(err, "unable to update status")
 		}
-		return err
+		return didUpdate, err
 	}
 	if err != nil {
 		log.Error(err, "unable to fetch GatewayClassConfig")
-		return err
 	}
-
-	return nil
+	return false, err
 }
 
 // ensureCondition ensures that the given condition is set on the GatewayClass.
 func (r *GatewayClassController) ensureCondition(ctx context.Context, gc *gwv1beta1.GatewayClass, condition metav1.Condition) (didUpdate bool, err error) {
-	for _, c := range gc.Status.Conditions {
-		if condition.Type != c.Type {
-			continue
+
+	// Update a condition the GatewayClass already has.
+	existsAt := -1
+	for i, c := range gc.Status.Conditions {
+		if condition.Type == c.Type {
+			existsAt = i
+		}
+	}
+	if 0 <= existsAt {
+		// Don't update if there is no change.
+		if equalConditions(condition, gc.Status.Conditions[existsAt]) {
+			return false, nil
 		}
 
-		if condition != c {
-			c.LastTransitionTime = metav1.Now()
-			c = condition
-		}
+		// Update and set the time of the update.
+		gc.Status.Conditions[existsAt] = condition
+		gc.Status.Conditions[existsAt].LastTransitionTime = metav1.Now()
 
 		if err := r.Client.Status().Update(ctx, gc); err != nil {
 			return false, err
@@ -193,7 +199,16 @@ func (r *GatewayClassController) ensureCondition(ctx context.Context, gc *gwv1be
 		return true, nil
 	}
 
-	return false, nil
+	// Add a new condition to the GatewayClass.
+	gc.Status.Conditions = append(gc.Status.Conditions, condition)
+	gc.Status.Conditions[len(gc.Status.Conditions)-1].LastTransitionTime = metav1.Now()
+
+	if err := r.Client.Status().Update(ctx, gc); err != nil {
+		return false, err
+	}
+
+	return true, nil
+
 }
 
 // gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
@@ -206,7 +221,7 @@ func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx co
 		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
 		var gcList gwv1beta1.GatewayClassList
 		err := r.Client.List(ctx, &gcList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(GatewayClassConfigFieldIndex, o.GetName()),
+			FieldSelector: fields.OneTermEqualSelector(GatewayClass_GatewayClassConfigIndex, o.GetName()),
 		})
 		if err != nil {
 			r.Log.Error(err, "unable to list gateway classes")
@@ -243,4 +258,12 @@ func (r *GatewayClassController) gatewayFieldIndexEventHandler(ctx context.Conte
 			},
 		}
 	})
+}
+
+func equalConditions(a, b metav1.Condition) bool {
+
+	return a.Type == b.Type &&
+		a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message
 }
