@@ -62,10 +62,14 @@ spec:
           name: sds
           protocol: TCP
         env:
-        {{- if or (not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled)) .Values.client.enabled }}
+        {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
+          {{- if and (not .Values.client.enabled) .Values.global.secretsBackend.vault.enabled }}
+          value: /vault/secrets/serverca.crt
+          {{- else }}
           value: /consul/tls/ca/tls.crt
+          {{- end }}
         {{- end }}
         {{- end }}
         - name: HOST_IP
