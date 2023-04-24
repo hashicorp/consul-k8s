@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -26,11 +27,6 @@ type consulIdentifier struct {
 	partition string
 }
 
-type NamespaceName struct {
-	Namespace string
-	Name      string
-}
-
 type Translator struct {
 	EnableConsulNamespaces bool
 	ConsulDestNamespace    string
@@ -38,14 +34,15 @@ type Translator struct {
 	MirroringPrefix        string
 }
 
-func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[NamespaceName]consulIdentifier) consulAPI.APIGatewayConfigEntry {
+func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]consulIdentifier) consulAPI.APIGatewayConfigEntry {
 	listeners := make([]consulAPI.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
 	consulPartition := os.Getenv("CONSUL_PARTITION")
 	for _, listener := range k8sGW.Spec.Listeners {
 		certificates := make([]consulAPI.ResourceReference, 0, len(listener.TLS.CertificateRefs))
 		for _, certificate := range listener.TLS.CertificateRefs {
-			certRef, ok := certs[NamespaceName{Name: string(certificate.Name), Namespace: string(*certificate.Namespace)}]
+			certRef, ok := certs[types.NamespacedName{Name: string(certificate.Name), Namespace: string(*certificate.Namespace)}]
 			if !ok {
+				// we don't have a ref for this certificate in consul
 				// drop the ref from the created gateway
 				continue
 			}
