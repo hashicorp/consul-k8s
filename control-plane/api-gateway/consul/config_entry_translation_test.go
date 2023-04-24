@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/hashicorp/consul/api"
+	capi "github.com/hashicorp/consul/api"
 )
 
 func TestGatewayToAPIGateway(t *testing.T) {
@@ -172,24 +172,24 @@ func TestGatewayToAPIGateway(t *testing.T) {
 				},
 			}
 
-			expectedConfigEntry := api.APIGatewayConfigEntry{
-				Kind: api.APIGateway,
+			expectedConfigEntry := capi.APIGatewayConfigEntry{
+				Kind: capi.APIGateway,
 				Name: tc.expectedGWName,
 				Meta: map[string]string{
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          k8sNamespace,
 					metaKeyKubeServiceName: k8sObjectName,
 				},
-				Listeners: []api.APIGatewayListener{
+				Listeners: []capi.APIGatewayListener{
 					{
 						Name:     listenerOneName,
 						Hostname: listenerOneHostname,
 						Port:     listenerOnePort,
 						Protocol: listenerOneProtocol,
-						TLS: api.APIGatewayTLSConfiguration{
-							Certificates: []api.ResourceReference{
+						TLS: capi.APIGatewayTLSConfiguration{
+							Certificates: []capi.ResourceReference{
 								{
-									Kind:      api.InlineCertificate,
+									Kind:      capi.InlineCertificate,
 									Name:      listenerOneCertName,
 									Namespace: listenerOneCertConsulNamespace,
 								},
@@ -201,10 +201,10 @@ func TestGatewayToAPIGateway(t *testing.T) {
 						Hostname: listenerTwoHostname,
 						Port:     listenerTwoPort,
 						Protocol: listenerTwoProtocol,
-						TLS: api.APIGatewayTLSConfiguration{
-							Certificates: []api.ResourceReference{
+						TLS: capi.APIGatewayTLSConfiguration{
+							Certificates: []capi.ResourceReference{
 								{
-									Kind:      api.InlineCertificate,
+									Kind:      capi.InlineCertificate,
 									Name:      listenerTwoCertName,
 									Namespace: listenerTwoCertConsulNamespace,
 								},
@@ -212,7 +212,7 @@ func TestGatewayToAPIGateway(t *testing.T) {
 						},
 					},
 				},
-				Status:    api.ConfigEntryStatus{},
+				Status:    capi.ConfigEntryStatus{},
 				Namespace: k8sNamespace,
 			}
 			translator := Translator{
