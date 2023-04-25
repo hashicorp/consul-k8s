@@ -74,6 +74,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								Mode:    "sequential",
 								Regions: []string{"us-west-2"},
 							},
+							SamenessGroup: "sg2",
 						},
 						"failover2": {
 							Service:       "failover2",
@@ -84,6 +85,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								Mode:    "",
 								Regions: []string{"us-west-1"},
 							},
+							SamenessGroup: "sg3",
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
@@ -153,6 +155,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Mode:    "sequential",
 							Regions: []string{"us-west-2"},
 						},
+						SamenessGroup: "sg2",
 					},
 					"failover2": {
 						Service:       "failover2",
@@ -163,6 +166,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Mode:    "",
 							Regions: []string{"us-west-1"},
 						},
+						SamenessGroup: "sg3",
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
@@ -281,6 +285,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								Mode:    "sequential",
 								Regions: []string{"us-west-2"},
 							},
+							SamenessGroup: "sg2",
 						},
 						"failover2": {
 							Service:       "failover2",
@@ -291,6 +296,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								Mode:    "",
 								Regions: []string{"us-west-1"},
 							},
+							SamenessGroup: "sg3",
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
@@ -360,6 +366,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Mode:    "sequential",
 							Regions: []string{"us-west-2"},
 						},
+						SamenessGroup: "sg2",
 					},
 					"failover2": {
 						Service:       "failover2",
@@ -370,6 +377,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Mode:    "",
 							Regions: []string{"us-west-1"},
 						},
+						SamenessGroup: "sg3",
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
@@ -543,15 +551,14 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: ServiceResolverSpec{
-					Redirect: &ServiceResolverRedirect{
-						Service:   "bar",
-						Namespace: "namespace-a",
-					},
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Service:   "baz",
 							Namespace: "namespace-b",
 						},
+					},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {Filter: "Service.Meta.version == v1"},
 					},
 				},
 			},
@@ -568,10 +575,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Redirect: &ServiceResolverRedirect{
 						Service: "bar",
 					},
-					Failover: map[string]ServiceResolverFailover{
-						"failA": {
-							Service: "baz",
-						},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {Filter: "Service.Meta.version == v1"},
 					},
 				},
 			},
@@ -585,16 +590,14 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: ServiceResolverSpec{
-					Redirect: &ServiceResolverRedirect{
-						Service:   "bar",
-						Namespace: "namespace-a",
-						Partition: "other",
-					},
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Service:   "baz",
 							Namespace: "namespace-b",
 						},
+					},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {Filter: "Service.Meta.version == v1"},
 					},
 				},
 			},
@@ -611,11 +614,6 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Redirect: &ServiceResolverRedirect{
 						Service: "bar",
 					},
-					Failover: map[string]ServiceResolverFailover{
-						"failA": {
-							Service: "baz",
-						},
-					},
 				},
 			},
 			namespacesEnabled: false,
@@ -629,13 +627,13 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Service:       "",
 							ServiceSubset: "",
 							Namespace:     "",
 							Datacenters:   nil,
 						},
-						"failB": {
+						"v2": {
 							Service:       "",
 							ServiceSubset: "",
 							Namespace:     "",
@@ -646,9 +644,32 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
-				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+				"spec.failover[v1]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+				"spec.failover[v2]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+				"spec.failover[v1]: Invalid value: \"v1\": failover does not have a valid subset",
 			},
+		},
+		"service resolver redirect and failover cannot both be set": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
+						Namespace: "namespace-a",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service:   "baz",
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs:   []string{"service resolver redirect and failover cannot both be set"},
 		},
 		"hashPolicy.field invalid": {
 			input: &ServiceResolver{
@@ -723,11 +744,19 @@ func TestServiceResolver_Validate(t *testing.T) {
 							},
 						},
 					},
+					Subsets: map[string]ServiceResolverSubset{
+						"": {
+							Filter: "random string",
+						},
+					},
 				},
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+				`spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+				`subset defined with empty name`,
+				`subset name must begin or end with lower case alphanumeric characters, and contain lower case alphanumeric characters or '-' in between`,
+				`filter for subset is not a valid expression`,
 			},
 		},
 		"hashPolicy nothing set is valid": {
@@ -778,6 +807,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
 						Namespace: "namespace-a",
 					},
 				},
@@ -794,6 +824,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
 						Namespace: "namespace-a",
 						Partition: "other",
 					},
@@ -812,14 +843,19 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Namespace: "namespace-a",
+						},
+					},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {
+							Filter: "Service.Meta.version == v1",
 						},
 					},
 				},
 			},
 			expectedErrMsgs: []string{
-				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.failover[v1].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
 			},
 			namespacesEnabled: false,
 		},
@@ -843,6 +879,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 			expectedErrMsgs: []string{
 				"spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
 				"spec.failover[failB].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+				"failover does not have a valid subset",
 			},
 		},
 	}
@@ -857,6 +894,48 @@ func TestServiceResolver_Validate(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestServiceResolverRedirect_ToConsul(t *testing.T) {
+	cases := map[string]struct {
+		Ours *ServiceResolverRedirect
+		Exp  *capi.ServiceResolverRedirect
+	}{
+		"nil": {
+			Ours: nil,
+			Exp:  nil,
+		},
+		"empty fields": {
+			Ours: &ServiceResolverRedirect{},
+			Exp:  &capi.ServiceResolverRedirect{},
+		},
+		"every field set": {
+			Ours: &ServiceResolverRedirect{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				Namespace:     "ns1",
+				Datacenter:    "dc1",
+				Partition:     "default",
+				Peer:          "peer1",
+				SamenessGroup: "sg1",
+			},
+			Exp: &capi.ServiceResolverRedirect{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				Namespace:     "ns1",
+				Datacenter:    "dc1",
+				Partition:     "default",
+				Peer:          "peer1",
+				SamenessGroup: "sg1",
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := c.Ours.toConsul()
+			require.Equal(t, c.Exp, actual)
 		})
 	}
 }

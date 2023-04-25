@@ -5,16 +5,19 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"regexp"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-bexpr"
 )
 
 const ServiceResolverKubeKind string = "serviceresolver"
@@ -97,6 +100,8 @@ type ServiceResolverRedirect struct {
 	// Peer is the name of the cluster peer to resolve the service from instead
 	// of the current one.
 	Peer string `json:"peer,omitempty"`
+	// SamenessGroup is the name of the sameness group to resolve the service from instead of the current one.
+	SamenessGroup string `json:"samenessGroup,omitempty"`
 }
 
 type ServiceResolverSubsetMap map[string]ServiceResolverSubset
@@ -133,6 +138,8 @@ type ServiceResolverFailover struct {
 	Targets []ServiceResolverFailoverTarget `json:"targets,omitempty"`
 	// Policy specifies the exact mechanism used for failover.
 	Policy *FailoverPolicy `json:"policy,omitempty"`
+	// SamenessGroup is the name of the sameness group to try during failover.
+	SamenessGroup string `json:"samenessGroup,omitempty"`
 }
 
 type ServiceResolverFailoverTarget struct {
@@ -322,14 +329,46 @@ func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
-	for k, v := range in.Spec.Failover {
-		if err := v.validate(path.Child("failover").Key(k)); err != nil {
-			errs = append(errs, err)
+	for subset, f := range in.Spec.Failover {
+		errs = append(errs, f.validate(path.Child("failover").Key(subset), subset, consulMeta)...)
+		if subset != "*" && !in.Spec.Subsets.hasSubset(subset) {
+			errs = append(errs, field.Invalid(path.Child("failover").Key(subset), subset, "failover does not have a valid subset"))
+		}
+
+		if f.ServiceSubset != "" &&
+			(f.Service == "" || f.Service == in.Name) {
+			if !in.Spec.Subsets.hasSubset(f.ServiceSubset) {
+				errs = append(errs, field.Invalid(path, f.ServiceSubset,
+					"failover.serviceSubset is not a valid subset of this service resolver"))
+			}
+		}
+
+		for i, target := range f.Targets {
+			if target.ServiceSubset != "" && (target.Service == "" || target.Service == in.Name) {
+				if !in.Spec.Subsets.hasSubset(target.ServiceSubset) {
+					errs = append(errs, field.Invalid(path.Child("targets").Index(i), "", "serviceSubset is not a valid subset of this service this service resolver"))
+				}
+			}
+		}
+
+	}
+	if len(in.Spec.Failover) > 0 && in.Spec.Redirect != nil {
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON), "service resolver redirect and failover cannot both be set"))
+	}
+
+	if in.Spec.Redirect != nil &&
+		in.Spec.Redirect.ServiceSubset != "" &&
+		(in.Spec.Redirect.Service == "" || in.Spec.Redirect.Service == in.Name) {
+		if !in.Spec.Subsets.hasSubset(in.Spec.Redirect.ServiceSubset) {
+			errs = append(errs, field.Invalid(path, in.Spec.Redirect.ServiceSubset,
+				"redirect.serviceSubset is not a valid subset of this service resolver"))
 		}
 	}
 
+	errs = append(errs, in.Spec.Redirect.validate(path.Child("redirect"), consulMeta)...)
+	errs = append(errs, in.Spec.Subsets.validate(path.Child("subsets"))...)
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
-
 	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
@@ -356,6 +395,39 @@ func (in ServiceResolverSubsetMap) toConsul() map[string]capi.ServiceResolverSub
 	return m
 }
 
+func (in ServiceResolverSubsetMap) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if len(in) == 0 {
+		return nil
+	}
+	validServiceSubset := regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+	for name, subset := range in {
+		indexPath := path.Key(name)
+
+		if name == "" {
+			errs = append(errs, field.Invalid(indexPath, name, "subset defined with empty name"))
+		}
+		if !validServiceSubset.MatchString(name) {
+			errs = append(errs, field.Invalid(indexPath, name, "subset name must begin or end with lower case alphanumeric characters, and contain lower case alphanumeric characters or '-' in between"))
+		}
+		if subset.Filter != "" {
+			if _, err := bexpr.CreateEvaluator(subset.Filter, nil); err != nil {
+				errs = append(errs, field.Invalid(indexPath.Child("filter"), subset.Filter, "filter for subset is not a valid expression"))
+			}
+		}
+	}
+	return errs
+}
+
+func (in ServiceResolverSubsetMap) hasSubset(subset string) bool {
+	if len(in) > 0 {
+		_, ok := in[subset]
+		return ok
+	}
+	return false
+}
+
 func (in ServiceResolverSubset) toConsul() capi.ServiceResolverSubset {
 	return capi.ServiceResolverSubset{
 		Filter:      in.Filter,
@@ -374,7 +446,74 @@ func (in *ServiceResolverRedirect) toConsul() *capi.ServiceResolverRedirect {
 		Datacenter:    in.Datacenter,
 		Partition:     in.Partition,
 		Peer:          in.Peer,
+		SamenessGroup: in.SamenessGroup,
 	}
+}
+
+func (in *ServiceResolverRedirect) validate(path *field.Path, consulMeta common.ConsulMeta) field.ErrorList {
+	var errs field.ErrorList
+	if in == nil {
+		return nil
+	}
+
+	asJSON, _ := json.Marshal(in)
+	if in.isEmpty() {
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"service resolver redirect cannot be empty"))
+	}
+
+	if consulMeta.Partition != "default" && in.Datacenter != "" {
+		errs = append(errs, field.Invalid(path.Child("datacenter"), in.Datacenter,
+			"cross-datacenter redirect is only supported in the default partition"))
+	}
+	if consulMeta.Partition != in.Partition && in.Datacenter != "" {
+		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition,
+			"cross-datacenter and cross-partition redirect is not supported"))
+	}
+
+	switch {
+	case in.SamenessGroup != "" && in.ServiceSubset != "":
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"redirect.samenessGroup cannot be set with redirect.serviceSubset"))
+	case in.SamenessGroup != "" && in.Partition != "":
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"redirect.partition cannot be set with redirect.samenessGroup"))
+	case in.SamenessGroup != "" && in.Datacenter != "":
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"redirect.samenessGroup cannot be set with redirect.datacenter"))
+	case in.Peer != "" && in.ServiceSubset != "":
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"redirect.peer cannot be set with redirect.serviceSubset"))
+	case in.Peer != "" && in.Partition != "":
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"redirect.partition cannot be set with redirect.peer"))
+	case in.Peer != "" && in.Datacenter != "":
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"redirect.peer cannot be set with redirect.datacenter"))
+	case in.Service == "":
+		if in.ServiceSubset != "" {
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"redirect.serviceSubset defined without redirect.service"))
+		}
+		if in.Namespace != "" {
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"redirect.namespace defined without redirect.service"))
+		}
+		if in.Partition != "" {
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"redirect.partition defined without redirect.service"))
+		}
+		if in.Peer != "" {
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"redirect.peer defined without redirect.service"))
+		}
+	}
+
+	return errs
+}
+
+func (in *ServiceResolverRedirect) isEmpty() bool {
+	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && in.Partition == "" && in.Datacenter == "" && in.Peer == "" && in.SamenessGroup == ""
 }
 
 func (in ServiceResolverFailoverMap) toConsul() map[string]capi.ServiceResolverFailover {
@@ -404,6 +543,7 @@ func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
 			Mode:    in.Policy.Mode,
 			Regions: in.Policy.Regions,
 		},
+		SamenessGroup: in.SamenessGroup,
 	}
 }
 
@@ -513,17 +653,80 @@ func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) fiel
 }
 
 func (in *ServiceResolverFailover) isEmpty() bool {
-	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0 && in.Policy == nil
+	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0 && in.Policy == nil && in.SamenessGroup == ""
 }
 
-func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
+func (in *ServiceResolverFailover) validate(path *field.Path, subset string, consulMeta common.ConsulMeta) field.ErrorList {
+	var errs field.ErrorList
 	if in.isEmpty() {
 		// NOTE: We're passing "{}" here as our value because we know that the
 		// error is we have an empty object.
-		return field.Invalid(path, "{}",
-			"service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once")
+		errs = append(errs, field.Invalid(path, "{}",
+			"service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once"))
 	}
-	return nil
+
+	if consulMeta.Partition != "default" && len(in.Datacenters) != 0 {
+		errs = append(errs, field.Invalid(path.Child("datacenters"), in.Datacenters,
+			"cross-datacenter failover is only supported in the default partition"))
+	}
+
+	errs = append(errs, in.Policy.validate(path.Child("policy"))...)
+
+	asJSON, _ := json.Marshal(in)
+	if in.SamenessGroup != "" {
+		switch {
+		case len(in.Datacenters) > 0:
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"samenessGroup cannot be set with datacenters"))
+		case in.ServiceSubset != "":
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"samenessGroup cannot be set with serviceSubset"))
+		case len(in.Targets) > 0:
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"samenessGroup cannot be set with targets"))
+		}
+	}
+
+	if len(in.Datacenters) != 0 && len(in.Targets) != 0 {
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"targets cannot be set with datacenters"))
+	}
+
+	if in.ServiceSubset != "" && len(in.Targets) != 0 {
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"targets cannot be set with serviceSubset"))
+	}
+
+	if in.Service != "" && len(in.Targets) != 0 {
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"targets cannot be set with service"))
+	}
+
+	for i, target := range in.Targets {
+		asJSON, _ := json.Marshal(target)
+		switch {
+		case target.Peer != "" && target.ServiceSubset != "":
+			errs = append(errs, field.Invalid(path.Child("targets").Index(i), string(asJSON),
+				"peer cannot be set with serviceSubset"))
+		case target.Peer != "" && target.Partition != "":
+			errs = append(errs, field.Invalid(path.Child("targets").Index(i), string(asJSON),
+				"partition cannot be set with peer"))
+		case target.Peer != "" && target.Datacenter != "":
+			errs = append(errs, field.Invalid(path.Child("targets").Index(i), string(asJSON),
+				"peer cannot be set with datacenter"))
+		case target.Partition != "" && target.Datacenter != "":
+			errs = append(errs, field.Invalid(path.Child("targets").Index(i), string(asJSON),
+				"partition cannot be set with datacenter"))
+		}
+	}
+
+	for i, dc := range in.Datacenters {
+		if dc == "" {
+			errs = append(errs, field.Invalid(path.Child("datacenters").Index(i), "", "found empty datacenter"))
+		}
+	}
+
+	return errs
 }
 
 func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
