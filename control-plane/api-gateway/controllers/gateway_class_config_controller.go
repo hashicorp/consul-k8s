@@ -8,18 +8,19 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 const (
 	gatewayClassConfigFinalizer = "gateway-class-exists-finalizer.consul.hashicorp.com"
 )
 
-// The GatewayClassConfigController manages the state of GatewayClassConfigs
+// The GatewayClassConfigController manages the state of GatewayClassConfigs.
 type GatewayClassConfigController struct {
 	client.Client
 
