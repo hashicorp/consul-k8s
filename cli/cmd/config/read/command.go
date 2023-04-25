@@ -162,7 +162,6 @@ func (c *ReadCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLog
 	if err != nil {
 		c.UI.Output("%+v", err, terminal.WithErrorStyle())
 	} else {
-		// c.UI.Output(string(valuesYaml), terminal.WithInfoStyle())
 		c.UI.Output(string(valuesYaml))
 	}
 
