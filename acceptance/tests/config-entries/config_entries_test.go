@@ -111,6 +111,7 @@ func TestController(t *testing.T) {
 					svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
 					require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
 					require.Equal(r, "bar", svcResolverEntry.Redirect.Service)
+					require.Equal(r, "sg2", svcResolverEntry.Redirect.SamenessGroup)
 
 					// proxy-defaults
 					entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
