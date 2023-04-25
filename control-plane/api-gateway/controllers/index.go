@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -67,4 +69,17 @@ func gatewayClassConfigForGatewayClass(o client.Object) []string {
 func gatewayClassForGateway(o client.Object) []string {
 	g := o.(*gwv1beta1.Gateway)
 	return []string{string(g.Spec.GatewayClassName)}
+}
+
+// gatewayForTCPRoute creates an index of every Gateway referenced by a TCPRoute.
+func gatewayForTCPRoute(o client.Object) []types.NamespacedName {
+	g := o.(*gwv1alpha2.TCPRoute)
+	parents := make([]types.NamespacedName, 0, len(g.Spec.ParentRefs))
+	for _, p := range g.Spec.ParentRefs {
+		parents = append(parents, types.NamespacedName{
+			Namespace: string(*p.Namespace), // TODO: Melisa handle panic
+			Name:      string(p.Name),
+		})
+	}
+	return parents
 }
