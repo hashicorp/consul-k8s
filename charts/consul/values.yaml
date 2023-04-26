@@ -550,6 +550,9 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
+    # If true, envoy instances will forward metrics to the consul-telemetry-collector
+    enableTelemetryCollector: true
+
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
@@ -3082,3 +3085,18 @@ prometheus:
 # is only useful when running helm template.
 tests:
   enabled: true
+
+telemetryCollector:
+  enabled: false
+  image: "clly/ctc2:latest"
+  # resources: {}
+  replicas: 1
+  # customExporterConfig: {}
+  cloud:
+    clientId:
+      secretName: null
+      secretKey: null
+    clientSecret:
+      secretName: null
+      secretKey: null
+
