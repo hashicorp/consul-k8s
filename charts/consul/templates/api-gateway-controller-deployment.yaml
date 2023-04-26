@@ -65,6 +65,9 @@ spec:
         {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
+          {{- /* When Vault is being used as a secrets backend, auto-encrypt must be enabled. Since clients use a separate
+          root CA from servers when auto-encrypt is enabled, and our controller communicates with the agent when clients are
+          enabled, we only use the Vault server CA if clients are disabled and our controller will be communicating w/ the server. */}}
           {{- if and (not .Values.client.enabled) .Values.global.secretsBackend.vault.enabled }}
           value: /vault/secrets/serverca.crt
           {{- else }}
