@@ -90,7 +90,7 @@ func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types
 		},
 		Listeners: listeners,
 		Partition: consulPartition,
-		Namespace: namespaces.ConsulNamespace(k8sGW.GetObjectMeta().GetNamespace(), t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix),
+		Namespace: t.getConsulNamespace(k8sGW.GetObjectMeta().GetNamespace()),
 	}
 }
 
@@ -112,7 +112,8 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 			metaKeyKubeServiceName: k8sHTTPRoute.GetObjectMeta().GetName(),
 		},
 		Partition: consulPartition,
-		Namespace: namespaces.ConsulNamespace(k8sHTTPRoute.GetObjectMeta().GetNamespace(), t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix),
+
+		Namespace: t.getConsulNamespace(k8sHTTPRoute.GetObjectMeta().GetNamespace()),
 	}
 
 	// translate hostnames
@@ -126,7 +127,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 	consulHTTPRoute.Parents = translateHTTPRouteParentRefs(k8sHTTPRoute.Spec.CommonRouteSpec.ParentRefs, parentRefs)
 
 	// translate rules
-	consulHTTPRoute.Rules = translateHTTPRouteRules(k8sHTTPRoute.Spec.Rules)
+	consulHTTPRoute.Rules = t.translateHTTPRouteRules(k8sHTTPRoute.Spec.Rules)
 
 	return consulHTTPRoute
 }
@@ -151,7 +152,7 @@ func translateHTTPRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, par
 	return parents
 }
 
-func translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRouteRule {
+func (t Translator) translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRouteRule {
 	rules := make([]capi.HTTPRouteRule, 0, len(k8sRules))
 	for _, k8sRule := range k8sRules {
 		rule := capi.HTTPRouteRule{}
@@ -162,7 +163,7 @@ func translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRout
 		rule.Filters = translateHTTPFilters(k8sRule.Filters)
 
 		// translate services
-		rule.Services = translateHTTPServices(k8sRule.BackendRefs)
+		rule.Services = t.translateHTTPServices(k8sRule.BackendRefs)
 
 		rules = append(rules, rule)
 	}
@@ -263,7 +264,7 @@ func translateHTTPFilters(k8sFilters []gwv1beta1.HTTPRouteFilter) capi.HTTPFilte
 }
 
 // translate the backendrefs into services.
-func translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackendRef) []capi.HTTPService {
+func (t Translator) translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackendRef) []capi.HTTPService {
 	services := make([]capi.HTTPService, 0, len(k8sBackendRefs))
 
 	for _, k8sRef := range k8sBackendRefs {
@@ -271,13 +272,16 @@ func translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackendRef) []capi.HTT
 			Name:      string(k8sRef.Name),
 			Weight:    int(*k8sRef.Weight),
 			Filters:   translateHTTPFilters(k8sRef.Filters),
-			Partition: "", // how do we get these for a service??
-			Namespace: "",
+			Namespace: t.getConsulNamespace(string(*k8sRef.Namespace)),
 		}
 		services = append(services, service)
 	}
 
 	return services
+}
+
+func (t Translator) getConsulNamespace(k8sNS string) string {
+	return namespaces.ConsulNamespace(k8sNS, t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix)
 }
 
 func ptrTo[T any](v T) *T {
