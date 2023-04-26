@@ -90,7 +90,7 @@ func (r *GatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			source.NewKindWithCache(&gwv1alpha2.TCPRoute{}, mgr.GetCache()), r.tcpRouteFieldIndexEventHandler(ctx),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1alpha2.HTTPRoute{}, mgr.GetCache()), r.tcpRouteFieldIndexEventHandler(ctx),
+			source.NewKindWithCache(&gwv1beta1.HTTPRoute{}, mgr.GetCache()), r.httpRouteFieldIndexEventHandler(ctx),
 		).
 		//Watches(
 		//	&source.Kind{Type: &corev1.Pod{}},
@@ -107,6 +107,25 @@ func (r *GatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		//).
 		// TODO: Watches for consul resources.
 		Complete(r)
+}
+
+// gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
+// reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
+// object that triggered the event.
+func (r *GatewayController) httpRouteFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
+		var gList gwv1beta1.GatewayList
+
+		err := r.Client.List(ctx, &gList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, o.GetName()),
+		})
+		if err != nil {
+			r.Log.Error(err, "unable to list gateways")
+		}
+
+		return makeListOfRequestsToReconcile(gList)
+	})
 }
 
 // gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
