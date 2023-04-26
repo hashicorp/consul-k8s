@@ -45,6 +45,7 @@ type GatewayClassController struct {
 // Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
+	log.Info("Reconciling GatewayClass", req.NamespacedName)
 
 	gc := &gwv1beta1.GatewayClass{}
 
@@ -94,17 +95,31 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if didUpdate, err := r.validateParametersRef(ctx, gc, log); didUpdate || err != nil {
+	didUpdate, err = r.validateParametersRef(ctx, gc, log)
+	if didUpdate {
+		if err := r.Client.Update(ctx, gc); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, err
+	}
+	if err != nil {
+		log.Error(err, "unable to validate ParametersRef")
 		return ctrl.Result{}, err
 	}
 
 	// Update the status to Accepted=True.
-	_, err = r.ensureCondition(ctx, gc, metav1.Condition{
+	didUpdate = r.setCondition(gc, metav1.Condition{
 		Type:    accepted,
 		Status:  metav1.ConditionTrue,
 		Reason:  configurationAccepted,
 		Message: "Configuration accepted",
 	})
+	if didUpdate {
+		err := r.Client.Update(ctx, gc)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, err
 }
@@ -141,29 +156,23 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 	}
 
 	if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
-		didUpdate, err := r.ensureCondition(ctx, gc, metav1.Condition{
+		didUpdate = r.setCondition(gc, metav1.Condition{
 			Type:    invalidParameters,
 			Status:  metav1.ConditionTrue,
 			Reason:  configurationInvalid,
 			Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind),
 		})
-		if err != nil {
-			log.Error(err, "unable to update status")
-		}
-		return didUpdate, err
+		return didUpdate, nil
 	}
 
 	err = r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
 	if k8serrors.IsNotFound(err) {
-		didUpdate, err := r.ensureCondition(ctx, gc, metav1.Condition{
+		didUpdate := r.setCondition(gc, metav1.Condition{
 			Type:    invalidParameters,
 			Status:  metav1.ConditionTrue,
 			Reason:  configurationInvalid,
 			Message: fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name),
 		})
-		if err != nil {
-			log.Error(err, "unable to update status")
-		}
 		return didUpdate, err
 	}
 	if err != nil {
@@ -172,43 +181,30 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 	return false, err
 }
 
-// ensureCondition ensures that the given condition is set on the GatewayClass.
-func (r *GatewayClassController) ensureCondition(ctx context.Context, gc *gwv1beta1.GatewayClass, condition metav1.Condition) (didUpdate bool, err error) {
+// setCondition sets the given condition on the given GatewayClass.
+func (r *GatewayClassController) setCondition(gc *gwv1beta1.GatewayClass, condition metav1.Condition) (didUpdate bool) {
+	condition.LastTransitionTime = metav1.Now()
 
-	// Update a condition the GatewayClass already has.
-	existsAt := -1
+	// Set the condition if it already exists.
 	for i, c := range gc.Status.Conditions {
-		if condition.Type == c.Type {
-			existsAt = i
+		if c.Type == condition.Type {
+			// The condition already exists and is up to date.
+			if equalConditions(condition, c) {
+				return false
+			}
+
+			condition.ObservedGeneration = c.ObservedGeneration + 1
+			gc.Status.Conditions[i] = condition
+
+			return true
 		}
 	}
-	if 0 <= existsAt {
-		// Don't update if there is no change.
-		if equalConditions(condition, gc.Status.Conditions[existsAt]) {
-			return false, nil
-		}
 
-		// Update and set the time of the update.
-		gc.Status.Conditions[existsAt] = condition
-		gc.Status.Conditions[existsAt].LastTransitionTime = metav1.Now()
-
-		if err := r.Client.Status().Update(ctx, gc); err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}
-
-	// Add a new condition to the GatewayClass.
+	// Append the condition if it does not exist.
+	condition.ObservedGeneration = 1
 	gc.Status.Conditions = append(gc.Status.Conditions, condition)
-	gc.Status.Conditions[len(gc.Status.Conditions)-1].LastTransitionTime = metav1.Now()
 
-	if err := r.Client.Status().Update(ctx, gc); err != nil {
-		return false, err
-	}
-
-	return true, nil
-
+	return true
 }
 
 // gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue

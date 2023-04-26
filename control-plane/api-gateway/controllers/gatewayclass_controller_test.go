@@ -9,8 +9,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -155,7 +157,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 				},
 			},
 			expectedResult:     ctrl.Result{},
-			expectedError:      nil,
+			expectedError:      k8serrors.NewNotFound(schema.GroupResource{Group: v1alpha1.GroupVersion.Group, Resource: "gatewayclassconfigs"}, "does-not-exist"),
 			expectedFinalizers: []string{gatewayClassFinalizer},
 			expectedConditions: []metav1.Condition{
 				{
