@@ -40,15 +40,18 @@ type GatewayClassController struct {
 
 // Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
-	log.Info("Reconciling GatewayClass", req.NamespacedName)
+	log := r.Log.WithValues("gatewayClass", req.NamespacedName.Name)
+	log.Info("Reconciling GatewayClass")
 
 	gc := &gwv1beta1.GatewayClass{}
 
 	err := r.Client.Get(ctx, req.NamespacedName, gc)
 	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		log.Error(err, "unable to get GatewayClass")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 
 	if string(gc.Spec.ControllerName) != r.ControllerName {
@@ -93,7 +96,7 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 
 	didUpdate, err = r.validateParametersRef(ctx, gc, log)
 	if didUpdate {
-		if err := r.Client.Update(ctx, gc); err != nil {
+		if err := r.Client.Status().Update(ctx, gc); err != nil {
 			log.Error(err, "unable to update GatewayClass")
 			return ctrl.Result{}, err
 		}
