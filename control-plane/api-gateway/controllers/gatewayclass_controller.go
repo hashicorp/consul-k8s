@@ -184,6 +184,7 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 // setCondition sets the given condition on the given GatewayClass.
 func (r *GatewayClassController) setCondition(gc *gwv1beta1.GatewayClass, condition metav1.Condition) (didUpdate bool) {
 	condition.LastTransitionTime = metav1.Now()
+	condition.ObservedGeneration = gc.GetGeneration()
 
 	// Set the condition if it already exists.
 	for i, c := range gc.Status.Conditions {
@@ -193,7 +194,6 @@ func (r *GatewayClassController) setCondition(gc *gwv1beta1.GatewayClass, condit
 				return false
 			}
 
-			condition.ObservedGeneration = c.ObservedGeneration + 1
 			gc.Status.Conditions[i] = condition
 
 			return true
@@ -201,7 +201,6 @@ func (r *GatewayClassController) setCondition(gc *gwv1beta1.GatewayClass, condit
 	}
 
 	// Append the condition if it does not exist.
-	condition.ObservedGeneration = 1
 	gc.Status.Conditions = append(gc.Status.Conditions, condition)
 
 	return true
@@ -260,5 +259,6 @@ func equalConditions(a, b metav1.Condition) bool {
 	return a.Type == b.Type &&
 		a.Status == b.Status &&
 		a.Reason == b.Reason &&
-		a.Message == b.Message
+		a.Message == b.Message &&
+		a.ObservedGeneration == b.ObservedGeneration
 }
