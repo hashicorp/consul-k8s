@@ -2,12 +2,11 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/types"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
+	"fmt"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -27,7 +26,9 @@ const (
 // They allow us to quickly find objects based on a field value.
 func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
 	for _, index := range indexes {
+		fmt.Println("############Index: ", index)
 		if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, index.name, index.indexerFunc); err != nil {
+			fmt.Println("RRRrrrrrrrrrrrrrrrrrrrrrrrRegistering Index ERror")
 			return err
 		}
 	}
@@ -51,6 +52,16 @@ var indexes = []index{
 		target:      &gwv1beta1.Gateway{},
 		indexerFunc: gatewayClassForGateway,
 	},
+	{
+		name:        HTTPRoute_GatewayIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: gatewayForHTTPRoute,
+	},
+	{
+		name:        TCPRoute_GatewayIndex,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: gatewayForTCPRoute,
+	},
 }
 
 // gatewayClassConfigForGatewayClass creates an index of every GatewayClassConfig referenced by a GatewayClass.
@@ -71,15 +82,22 @@ func gatewayClassForGateway(o client.Object) []string {
 	return []string{string(g.Spec.GatewayClassName)}
 }
 
-// gatewayForTCPRoute creates an index of every Gateway referenced by a TCPRoute.
-func gatewayForTCPRoute(o client.Object) []types.NamespacedName {
-	g := o.(*gwv1alpha2.TCPRoute)
-	parents := make([]types.NamespacedName, 0, len(g.Spec.ParentRefs))
+// gatewayForHTTPRoute creates an index of every Gateway referenced by an HTTPRoute.
+func gatewayForHTTPRoute(o client.Object) []string {
+	g := o.(*gwv1beta1.HTTPRoute)
+	parents := make([]string, 0, len(g.Spec.ParentRefs))
 	for _, p := range g.Spec.ParentRefs {
-		parents = append(parents, types.NamespacedName{
-			Namespace: string(*p.Namespace), // TODO: Melisa handle panic
-			Name:      string(p.Name),
-		})
+		parents = append(parents, string(p.Name))
+	}
+	return parents
+}
+
+// gatewayForTCPRoute creates an index of every Gateway referenced by a TCPRoute.
+func gatewayForTCPRoute(o client.Object) []string {
+	g := o.(*gwv1alpha2.TCPRoute)
+	parents := make([]string, 0, len(g.Spec.ParentRefs))
+	for _, p := range g.Spec.ParentRefs {
+		parents = append(parents, string(p.Name))
 	}
 	return parents
 }
