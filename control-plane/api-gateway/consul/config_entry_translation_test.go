@@ -4,16 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/google/go-cmp/cmp"
-
 	capi "github.com/hashicorp/consul/api"
 )
 
-func TestGatewayToAPIGateway(t *testing.T) {
+func TestTranslator_GatewayToAPIGateway(t *testing.T) {
 	k8sObjectName := "my-k8s-gw"
 	k8sNamespace := "my-k8s-namespace"
 
@@ -236,7 +235,902 @@ func TestGatewayToAPIGateway(t *testing.T) {
 			actualConfigEntry := translator.GatewayToAPIGateway(input, certs)
 
 			if diff := cmp.Diff(expectedConfigEntry, actualConfigEntry); diff != "" {
-				t.Errorf("GatewayToAPIGateway() mismatch (-want +got):\n%s", diff)
+				t.Errorf("Translator.GatewayToAPIGateway() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
+	type args struct {
+		k8sHTTPRoute gwv1beta1.HTTPRoute
+		parentRefs   map[types.NamespacedName]consulIdentifier
+	}
+	tests := map[string]struct {
+		args args
+		want capi.HTTPRouteConfigEntry
+	}{
+		"base test": {
+			args: args{
+				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "k8s-http-route",
+						Namespace:   "k8s-ns",
+						Annotations: map[string]string{},
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("k8s-gw-ns")),
+									Name:        gwv1beta1.ObjectName("api-gw"),
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-1")),
+								},
+							},
+						},
+						Hostnames: []gwv1beta1.Hostname{
+							"host-name.example.com",
+							"consul.io",
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Matches: []gwv1beta1.HTTPRouteMatch{
+									{
+										Path: &gwv1beta1.HTTPPathMatch{
+											Type:  ptrTo(gwv1beta1.PathMatchPathPrefix),
+											Value: ptrTo("/v1"),
+										},
+										Headers: []gwv1beta1.HTTPHeaderMatch{
+											{
+												Type:  ptrTo(gwv1beta1.HeaderMatchExact),
+												Name:  "my header match",
+												Value: "the value",
+											},
+										},
+										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+											{
+												Type:  ptrTo(gwv1beta1.QueryParamMatchExact),
+												Name:  "search",
+												Value: "term",
+											},
+										},
+										Method: ptrTo(gwv1beta1.HTTPMethodGet),
+									},
+								},
+								Filters: []gwv1beta1.HTTPRouteFilter{
+									{
+										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+											Set: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "Magic",
+													Value: "v2",
+												},
+												{
+													Name:  "Another One",
+													Value: "dj khaled",
+												},
+											},
+											Add: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "add it on",
+													Value: "the value",
+												},
+											},
+											Remove: []string{"time to go"},
+										},
+										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+											Path: &gwv1beta1.HTTPPathModifier{
+												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												ReplacePrefixMatch: ptrTo("v1"),
+											},
+										},
+									},
+								},
+								BackendRefs: []gwv1beta1.HTTPBackendRef{
+									{
+										BackendRef: gwv1beta1.BackendRef{
+											BackendObjectReference: gwv1beta1.BackendObjectReference{
+												Name:      "service one",
+												Namespace: ptrTo(gwv1beta1.Namespace("some ns")),
+											},
+											Weight: ptrTo(int32(45)),
+										},
+										Filters: []gwv1beta1.HTTPRouteFilter{
+											{
+												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+													Set: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - Magic",
+															Value: "svc - v2",
+														},
+														{
+															Name:  "svc - Another One",
+															Value: "svc - dj khaled",
+														},
+													},
+													Add: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - add it on",
+															Value: "svc - the value",
+														},
+													},
+													Remove: []string{"svc - time to go"},
+												},
+												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+													Path: &gwv1beta1.HTTPPathModifier{
+														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														ReplacePrefixMatch: ptrTo("path"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				parentRefs: map[types.NamespacedName]consulIdentifier{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				},
+			},
+			want: capi.HTTPRouteConfigEntry{
+				Kind: capi.HTTPRoute,
+				Name: "k8s-http-route",
+				Parents: []capi.ResourceReference{
+					{
+						Kind:        capi.APIGateway,
+						Name:        "api-gw",
+						SectionName: "listener-1",
+						Partition:   "part-1",
+						Namespace:   "ns",
+					},
+				},
+				Rules: []capi.HTTPRouteRule{
+					{
+						Filters: capi.HTTPFilters{
+							Headers: []capi.HTTPHeaderFilter{
+								{
+									Add: map[string]string{
+										"add it on": "the value",
+									},
+									Remove: []string{"time to go"},
+									Set: map[string]string{
+										"Magic":       "v2",
+										"Another One": "dj khaled",
+									},
+								},
+							},
+							URLRewrite: &capi.URLRewrite{Path: "v1"},
+						},
+						Matches: []capi.HTTPMatch{
+							{
+								Headers: []capi.HTTPHeaderMatch{
+									{
+										Match: capi.HTTPHeaderMatchExact,
+										Name:  "my header match",
+										Value: "the value",
+									},
+								},
+								Method: capi.HTTPMatchMethodGet,
+								Path: capi.HTTPPathMatch{
+									Match: capi.HTTPPathMatchPrefix,
+									Value: "/v1",
+								},
+								Query: []capi.HTTPQueryMatch{
+									{
+										Match: capi.HTTPQueryMatchExact,
+										Name:  "search",
+										Value: "term",
+									},
+								},
+							},
+						},
+						Services: []capi.HTTPService{
+							{
+								Name:   "service one",
+								Weight: 45,
+								Filters: capi.HTTPFilters{
+									Headers: []capi.HTTPHeaderFilter{
+										{
+											Add: map[string]string{
+												"svc - add it on": "svc - the value",
+											},
+											Remove: []string{"svc - time to go"},
+											Set: map[string]string{
+												"svc - Magic":       "svc - v2",
+												"svc - Another One": "svc - dj khaled",
+											},
+										},
+									},
+									URLRewrite: &capi.URLRewrite{
+										Path: "path",
+									},
+								},
+								Partition: "",
+								Namespace: "",
+							},
+						},
+					},
+				},
+				Hostnames: []string{
+					"host-name.example.com",
+					"consul.io",
+				},
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "k8s-http-route",
+				},
+				Namespace: "k8s-ns",
+			},
+		},
+		"with httproute name override": {
+			args: args{
+				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "k8s-http-route",
+						Namespace: "k8s-ns",
+						Annotations: map[string]string{
+							AnnotationHTTPRoute: "overrrrride",
+						},
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("k8s-gw-ns")),
+									Name:        gwv1beta1.ObjectName("api-gw"),
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-1")),
+								},
+							},
+						},
+						Hostnames: []gwv1beta1.Hostname{
+							"host-name.example.com",
+							"consul.io",
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Matches: []gwv1beta1.HTTPRouteMatch{
+									{
+										Path: &gwv1beta1.HTTPPathMatch{
+											Type:  ptrTo(gwv1beta1.PathMatchPathPrefix),
+											Value: ptrTo("/v1"),
+										},
+										Headers: []gwv1beta1.HTTPHeaderMatch{
+											{
+												Type:  ptrTo(gwv1beta1.HeaderMatchExact),
+												Name:  "my header match",
+												Value: "the value",
+											},
+										},
+										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+											{
+												Type:  ptrTo(gwv1beta1.QueryParamMatchExact),
+												Name:  "search",
+												Value: "term",
+											},
+										},
+										Method: ptrTo(gwv1beta1.HTTPMethodGet),
+									},
+								},
+								Filters: []gwv1beta1.HTTPRouteFilter{
+									{
+										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+											Set: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "Magic",
+													Value: "v2",
+												},
+												{
+													Name:  "Another One",
+													Value: "dj khaled",
+												},
+											},
+											Add: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "add it on",
+													Value: "the value",
+												},
+											},
+											Remove: []string{"time to go"},
+										},
+										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+											Path: &gwv1beta1.HTTPPathModifier{
+												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												ReplacePrefixMatch: ptrTo("v1"),
+											},
+										},
+									},
+								},
+								BackendRefs: []gwv1beta1.HTTPBackendRef{
+									{
+										BackendRef: gwv1beta1.BackendRef{
+											BackendObjectReference: gwv1beta1.BackendObjectReference{
+												Name:      "service one",
+												Namespace: ptrTo(gwv1beta1.Namespace("some ns")),
+											},
+											Weight: ptrTo(int32(45)),
+										},
+										Filters: []gwv1beta1.HTTPRouteFilter{
+											{
+												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+													Set: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - Magic",
+															Value: "svc - v2",
+														},
+														{
+															Name:  "svc - Another One",
+															Value: "svc - dj khaled",
+														},
+													},
+													Add: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - add it on",
+															Value: "svc - the value",
+														},
+													},
+													Remove: []string{"svc - time to go"},
+												},
+												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+													Path: &gwv1beta1.HTTPPathModifier{
+														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														ReplacePrefixMatch: ptrTo("path"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				parentRefs: map[types.NamespacedName]consulIdentifier{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				},
+			},
+			want: capi.HTTPRouteConfigEntry{
+				Kind: capi.HTTPRoute,
+				Name: "overrrrride",
+				Parents: []capi.ResourceReference{
+					{
+						Kind:        capi.APIGateway,
+						Name:        "api-gw",
+						SectionName: "listener-1",
+						Partition:   "part-1",
+						Namespace:   "ns",
+					},
+				},
+				Rules: []capi.HTTPRouteRule{
+					{
+						Filters: capi.HTTPFilters{
+							Headers: []capi.HTTPHeaderFilter{
+								{
+									Add: map[string]string{
+										"add it on": "the value",
+									},
+									Remove: []string{"time to go"},
+									Set: map[string]string{
+										"Magic":       "v2",
+										"Another One": "dj khaled",
+									},
+								},
+							},
+							URLRewrite: &capi.URLRewrite{Path: "v1"},
+						},
+						Matches: []capi.HTTPMatch{
+							{
+								Headers: []capi.HTTPHeaderMatch{
+									{
+										Match: capi.HTTPHeaderMatchExact,
+										Name:  "my header match",
+										Value: "the value",
+									},
+								},
+								Method: capi.HTTPMatchMethodGet,
+								Path: capi.HTTPPathMatch{
+									Match: capi.HTTPPathMatchPrefix,
+									Value: "/v1",
+								},
+								Query: []capi.HTTPQueryMatch{
+									{
+										Match: capi.HTTPQueryMatchExact,
+										Name:  "search",
+										Value: "term",
+									},
+								},
+							},
+						},
+						Services: []capi.HTTPService{
+							{
+								Name:   "service one",
+								Weight: 45,
+								Filters: capi.HTTPFilters{
+									Headers: []capi.HTTPHeaderFilter{
+										{
+											Add: map[string]string{
+												"svc - add it on": "svc - the value",
+											},
+											Remove: []string{"svc - time to go"},
+											Set: map[string]string{
+												"svc - Magic":       "svc - v2",
+												"svc - Another One": "svc - dj khaled",
+											},
+										},
+									},
+									URLRewrite: &capi.URLRewrite{
+										Path: "path",
+									},
+								},
+								Partition: "",
+								Namespace: "",
+							},
+						},
+					},
+				},
+				Hostnames: []string{
+					"host-name.example.com",
+					"consul.io",
+				},
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "k8s-http-route",
+				},
+				Namespace: "k8s-ns",
+			},
+		},
+		"dropping path rewrites that are not prefix match": {
+			args: args{
+				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "k8s-http-route",
+						Namespace: "k8s-ns",
+						Annotations: map[string]string{
+							AnnotationHTTPRoute: "overrrrride",
+						},
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("k8s-gw-ns")),
+									Name:        gwv1beta1.ObjectName("api-gw"),
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-1")),
+								},
+							},
+						},
+						Hostnames: []gwv1beta1.Hostname{
+							"host-name.example.com",
+							"consul.io",
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Matches: []gwv1beta1.HTTPRouteMatch{
+									{
+										Path: &gwv1beta1.HTTPPathMatch{
+											Type:  ptrTo(gwv1beta1.PathMatchPathPrefix),
+											Value: ptrTo("/v1"),
+										},
+										Headers: []gwv1beta1.HTTPHeaderMatch{
+											{
+												Type:  ptrTo(gwv1beta1.HeaderMatchExact),
+												Name:  "my header match",
+												Value: "the value",
+											},
+										},
+										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+											{
+												Type:  ptrTo(gwv1beta1.QueryParamMatchExact),
+												Name:  "search",
+												Value: "term",
+											},
+										},
+										Method: ptrTo(gwv1beta1.HTTPMethodGet),
+									},
+								},
+								Filters: []gwv1beta1.HTTPRouteFilter{
+									{
+										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+											Set: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "Magic",
+													Value: "v2",
+												},
+												{
+													Name:  "Another One",
+													Value: "dj khaled",
+												},
+											},
+											Add: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "add it on",
+													Value: "the value",
+												},
+											},
+											Remove: []string{"time to go"},
+										},
+										// THIS IS THE CHANGE
+										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+											Path: &gwv1beta1.HTTPPathModifier{
+												Type:            gwv1beta1.FullPathHTTPPathModifier,
+												ReplaceFullPath: ptrTo("v1"),
+											},
+										},
+									},
+								},
+								BackendRefs: []gwv1beta1.HTTPBackendRef{
+									{
+										BackendRef: gwv1beta1.BackendRef{
+											BackendObjectReference: gwv1beta1.BackendObjectReference{
+												Name:      "service one",
+												Namespace: ptrTo(gwv1beta1.Namespace("some ns")),
+											},
+											Weight: ptrTo(int32(45)),
+										},
+										Filters: []gwv1beta1.HTTPRouteFilter{
+											{
+												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+													Set: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - Magic",
+															Value: "svc - v2",
+														},
+														{
+															Name:  "svc - Another One",
+															Value: "svc - dj khaled",
+														},
+													},
+													Add: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - add it on",
+															Value: "svc - the value",
+														},
+													},
+													Remove: []string{"svc - time to go"},
+												},
+												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+													Path: &gwv1beta1.HTTPPathModifier{
+														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														ReplacePrefixMatch: ptrTo("path"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				parentRefs: map[types.NamespacedName]consulIdentifier{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				},
+			},
+			want: capi.HTTPRouteConfigEntry{
+				Kind: capi.HTTPRoute,
+				Name: "overrrrride",
+				Parents: []capi.ResourceReference{
+					{
+						Kind:        capi.APIGateway,
+						Name:        "api-gw",
+						SectionName: "listener-1",
+						Partition:   "part-1",
+						Namespace:   "ns",
+					},
+				},
+				Rules: []capi.HTTPRouteRule{
+					{
+						Filters: capi.HTTPFilters{
+							Headers: []capi.HTTPHeaderFilter{
+								{
+									Add: map[string]string{
+										"add it on": "the value",
+									},
+									Remove: []string{"time to go"},
+									Set: map[string]string{
+										"Magic":       "v2",
+										"Another One": "dj khaled",
+									},
+								},
+							},
+						},
+						Matches: []capi.HTTPMatch{
+							{
+								Headers: []capi.HTTPHeaderMatch{
+									{
+										Match: capi.HTTPHeaderMatchExact,
+										Name:  "my header match",
+										Value: "the value",
+									},
+								},
+								Method: capi.HTTPMatchMethodGet,
+								Path: capi.HTTPPathMatch{
+									Match: capi.HTTPPathMatchPrefix,
+									Value: "/v1",
+								},
+								Query: []capi.HTTPQueryMatch{
+									{
+										Match: capi.HTTPQueryMatchExact,
+										Name:  "search",
+										Value: "term",
+									},
+								},
+							},
+						},
+						Services: []capi.HTTPService{
+							{
+								Name:   "service one",
+								Weight: 45,
+								Filters: capi.HTTPFilters{
+									Headers: []capi.HTTPHeaderFilter{
+										{
+											Add: map[string]string{
+												"svc - add it on": "svc - the value",
+											},
+											Remove: []string{"svc - time to go"},
+											Set: map[string]string{
+												"svc - Magic":       "svc - v2",
+												"svc - Another One": "svc - dj khaled",
+											},
+										},
+									},
+									URLRewrite: &capi.URLRewrite{
+										Path: "path",
+									},
+								},
+								Partition: "",
+								Namespace: "",
+							},
+						},
+					},
+				},
+				Hostnames: []string{
+					"host-name.example.com",
+					"consul.io",
+				},
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "k8s-http-route",
+				},
+				Namespace: "k8s-ns",
+			},
+		},
+
+		"parent ref that is not registered with consul is dropped": {
+			args: args{
+				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "k8s-http-route",
+						Namespace:   "k8s-ns",
+						Annotations: map[string]string{},
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("k8s-gw-ns")),
+									Name:        gwv1beta1.ObjectName("api-gw"),
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-1")),
+								},
+
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("k8s-gw-ns")),
+									Name:        gwv1beta1.ObjectName("consul don't know about me"),
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-1")),
+								},
+							},
+						},
+						Hostnames: []gwv1beta1.Hostname{
+							"host-name.example.com",
+							"consul.io",
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Matches: []gwv1beta1.HTTPRouteMatch{
+									{
+										Path: &gwv1beta1.HTTPPathMatch{
+											Type:  ptrTo(gwv1beta1.PathMatchPathPrefix),
+											Value: ptrTo("/v1"),
+										},
+										Headers: []gwv1beta1.HTTPHeaderMatch{
+											{
+												Type:  ptrTo(gwv1beta1.HeaderMatchExact),
+												Name:  "my header match",
+												Value: "the value",
+											},
+										},
+										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+											{
+												Type:  ptrTo(gwv1beta1.QueryParamMatchExact),
+												Name:  "search",
+												Value: "term",
+											},
+										},
+										Method: ptrTo(gwv1beta1.HTTPMethodGet),
+									},
+								},
+								Filters: []gwv1beta1.HTTPRouteFilter{
+									{
+										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+											Set: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "Magic",
+													Value: "v2",
+												},
+												{
+													Name:  "Another One",
+													Value: "dj khaled",
+												},
+											},
+											Add: []gwv1beta1.HTTPHeader{
+												{
+													Name:  "add it on",
+													Value: "the value",
+												},
+											},
+											Remove: []string{"time to go"},
+										},
+										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+											Path: &gwv1beta1.HTTPPathModifier{
+												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												ReplacePrefixMatch: ptrTo("v1"),
+											},
+										},
+									},
+								},
+								BackendRefs: []gwv1beta1.HTTPBackendRef{
+									{
+										BackendRef: gwv1beta1.BackendRef{
+											BackendObjectReference: gwv1beta1.BackendObjectReference{
+												Name:      "service one",
+												Namespace: ptrTo(gwv1beta1.Namespace("some ns")),
+											},
+											Weight: ptrTo(int32(45)),
+										},
+										Filters: []gwv1beta1.HTTPRouteFilter{
+											{
+												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
+													Set: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - Magic",
+															Value: "svc - v2",
+														},
+														{
+															Name:  "svc - Another One",
+															Value: "svc - dj khaled",
+														},
+													},
+													Add: []gwv1beta1.HTTPHeader{
+														{
+															Name:  "svc - add it on",
+															Value: "svc - the value",
+														},
+													},
+													Remove: []string{"svc - time to go"},
+												},
+												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
+													Path: &gwv1beta1.HTTPPathModifier{
+														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														ReplacePrefixMatch: ptrTo("path"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				parentRefs: map[types.NamespacedName]consulIdentifier{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				},
+			},
+			want: capi.HTTPRouteConfigEntry{
+				Kind: capi.HTTPRoute,
+				Name: "k8s-http-route",
+				Parents: []capi.ResourceReference{
+					{
+						Kind:        capi.APIGateway,
+						Name:        "api-gw",
+						SectionName: "listener-1",
+						Partition:   "part-1",
+						Namespace:   "ns",
+					},
+				},
+				Rules: []capi.HTTPRouteRule{
+					{
+						Filters: capi.HTTPFilters{
+							Headers: []capi.HTTPHeaderFilter{
+								{
+									Add: map[string]string{
+										"add it on": "the value",
+									},
+									Remove: []string{"time to go"},
+									Set: map[string]string{
+										"Magic":       "v2",
+										"Another One": "dj khaled",
+									},
+								},
+							},
+							URLRewrite: &capi.URLRewrite{Path: "v1"},
+						},
+						Matches: []capi.HTTPMatch{
+							{
+								Headers: []capi.HTTPHeaderMatch{
+									{
+										Match: capi.HTTPHeaderMatchExact,
+										Name:  "my header match",
+										Value: "the value",
+									},
+								},
+								Method: capi.HTTPMatchMethodGet,
+								Path: capi.HTTPPathMatch{
+									Match: capi.HTTPPathMatchPrefix,
+									Value: "/v1",
+								},
+								Query: []capi.HTTPQueryMatch{
+									{
+										Match: capi.HTTPQueryMatchExact,
+										Name:  "search",
+										Value: "term",
+									},
+								},
+							},
+						},
+						Services: []capi.HTTPService{
+							{
+								Name:   "service one",
+								Weight: 45,
+								Filters: capi.HTTPFilters{
+									Headers: []capi.HTTPHeaderFilter{
+										{
+											Add: map[string]string{
+												"svc - add it on": "svc - the value",
+											},
+											Remove: []string{"svc - time to go"},
+											Set: map[string]string{
+												"svc - Magic":       "svc - v2",
+												"svc - Another One": "svc - dj khaled",
+											},
+										},
+									},
+									URLRewrite: &capi.URLRewrite{
+										Path: "path",
+									},
+								},
+								Partition: "",
+								Namespace: "",
+							},
+						},
+					},
+				},
+				Hostnames: []string{
+					"host-name.example.com",
+					"consul.io",
+				},
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "k8s-http-route",
+				},
+				Namespace: "k8s-ns",
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tr := Translator{
+				EnableConsulNamespaces: true,
+				EnableK8sMirroring:     true,
+			}
+			got := tr.HTTPRouteToHTTPRoute(tc.args.k8sHTTPRoute, tc.args.parentRefs)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Translator.HTTPRouteToHTTPRoute() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
