@@ -9,10 +9,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,8 +62,8 @@ func TestGatewayClassReconciler(t *testing.T) {
 				{
 					Type:    accepted,
 					Status:  metav1.ConditionTrue,
-					Reason:  configurationAccepted,
-					Message: "Configuration accepted",
+					Reason:  accepted,
+					Message: "GatewayClass Accepted",
 				},
 			},
 		},
@@ -134,9 +132,9 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedFinalizers: []string{gatewayClassFinalizer},
 			expectedConditions: []metav1.Condition{
 				{
-					Type:    invalidParameters,
-					Status:  metav1.ConditionTrue,
-					Reason:  configurationInvalid,
+					Type:    accepted,
+					Status:  metav1.ConditionFalse,
+					Reason:  invalidParameters,
 					Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", "some-nonsense"),
 				},
 			},
@@ -157,13 +155,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 				},
 			},
 			expectedResult:     ctrl.Result{},
-			expectedError:      k8serrors.NewNotFound(schema.GroupResource{Group: v1alpha1.GroupVersion.Group, Resource: "gatewayclassconfigs"}, "does-not-exist"),
+			expectedError:      nil,
 			expectedFinalizers: []string{gatewayClassFinalizer},
 			expectedConditions: []metav1.Condition{
 				{
-					Type:    invalidParameters,
-					Status:  metav1.ConditionTrue,
-					Reason:  configurationInvalid,
+					Type:    accepted,
+					Status:  metav1.ConditionFalse,
+					Reason:  invalidParameters,
 					Message: fmt.Sprintf("GatewayClassConfig not found %q.", "does-not-exist"),
 				},
 			},

@@ -24,12 +24,8 @@ const (
 	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
 
 	// GatewayClass status fields.
-	invalidParameters = "InvalidParameters"
 	accepted          = "Accepted"
-
-	// GatewayClass status condition reasons.
-	configurationAccepted = "ConfigurationAccepted"
-	configurationInvalid  = "ConfigurationInvalid"
+	invalidParameters = "InvalidParameters"
 )
 
 // GatewayClassController reconciles a GatewayClass object.
@@ -98,27 +94,13 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	didUpdate, err = r.validateParametersRef(ctx, gc, log)
 	if didUpdate {
 		if err := r.Client.Update(ctx, gc); err != nil {
+			log.Error(err, "unable to update GatewayClass")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 	if err != nil {
 		log.Error(err, "unable to validate ParametersRef")
-		return ctrl.Result{}, err
-	}
-
-	// Update the status to Accepted=True.
-	didUpdate = r.setCondition(gc, metav1.Condition{
-		Type:    accepted,
-		Status:  metav1.ConditionTrue,
-		Reason:  configurationAccepted,
-		Message: "Configuration accepted",
-	})
-	if didUpdate {
-		err := r.Client.Update(ctx, gc)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
 	}
 
 	return ctrl.Result{}, err
@@ -151,34 +133,40 @@ func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gw
 // if it is set, ensuring that the referenced object is a GatewayClassConfig that exists.
 func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) (didUpdate bool, err error) {
 	parametersRef := gc.Spec.ParametersRef
-	if parametersRef == nil {
-		return false, nil
+	if parametersRef != nil {
+		if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
+			didUpdate = r.setCondition(gc, metav1.Condition{
+				Type:    accepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  invalidParameters,
+				Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind),
+			})
+			return didUpdate, nil
+		}
+
+		err = r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
+		if k8serrors.IsNotFound(err) {
+			didUpdate := r.setCondition(gc, metav1.Condition{
+				Type:    accepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  invalidParameters,
+				Message: fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name),
+			})
+			return didUpdate, nil
+		}
+		if err != nil {
+			log.Error(err, "unable to fetch GatewayClassConfig")
+		}
 	}
 
-	if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
-		didUpdate = r.setCondition(gc, metav1.Condition{
-			Type:    invalidParameters,
-			Status:  metav1.ConditionTrue,
-			Reason:  configurationInvalid,
-			Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind),
-		})
-		return didUpdate, nil
-	}
+	didUpdate = r.setCondition(gc, metav1.Condition{
+		Type:    accepted,
+		Status:  metav1.ConditionTrue,
+		Reason:  accepted,
+		Message: "GatewayClass Accepted",
+	})
 
-	err = r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
-	if k8serrors.IsNotFound(err) {
-		didUpdate := r.setCondition(gc, metav1.Condition{
-			Type:    invalidParameters,
-			Status:  metav1.ConditionTrue,
-			Reason:  configurationInvalid,
-			Message: fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name),
-		})
-		return didUpdate, err
-	}
-	if err != nil {
-		log.Error(err, "unable to fetch GatewayClassConfig")
-	}
-	return false, err
+	return didUpdate, err
 }
 
 // setCondition sets the given condition on the given GatewayClass.
