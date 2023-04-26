@@ -1,0 +1,19 @@
+{{/*{{- if .Values.telemetryCollector.enabled }}*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: consul-telemetry-collector
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    release: {{ .Release.Name }}
+    component: consul-telemetry-collector
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9356
+      targetPort: 9356
+  selector:
+    app: consul
+    component: consul-telemetry-collector
+{{/*{{- end }}*/}}

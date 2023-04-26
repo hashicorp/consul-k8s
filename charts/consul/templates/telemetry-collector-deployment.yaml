@@ -1,0 +1,110 @@
+{{- if .Values.telemetryCollector.enabled }}
+{{/*{{- if not .Values.telemetryCollector.image}}{{ fail "telemetryCollector.image must be set to enable consul-telemetry-collector" }}{{ end }}*/}}
+{{/*{{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}*/}}
+{{/*{{ template "consul.validateRequiredCloudSecretsExist" . }}*/}}
+{{/*{{ template "consul.validateCloudSecretKeys" . }}*/}}
+{{/*{{ template "consul.validateTelemetryCollectorCloud" . }}*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" . }}-telemetry-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: consul-telemetry-collector
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.telemetryCollector.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: consul-telemetry-collector
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: consul-telemetry-collector
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ template "consul.fullname" . }}-telemetry-collector
+      containers:
+      - name: consul-telemetry-collector
+        image: {{ .Values.telemetryCollector.image }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+          {{- if .Values.global.cloud.enabled }}
+            # These are mounted as secrets so that the telemetry-collector can use them when cloud is enabled.
+            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
+            #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
+            # - HCP_RESOURCE_ID is created for use in the
+            #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
+            {{- if .Values.telemetryCollector.clientId }}
+            - name: HCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryCollector.clientId.secretName }}
+                  key: {{ .Values.telemetryCollector.clientId.secretKey }}
+            {{- end }}
+            {{- if .Values.telemetryCollector.clientSecret }}
+            - name: HCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryCollector.clientSecret.secretName }}
+                  key: {{ .Values.telemetryCollector.clientSecret.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.resourceId.secretName }}
+                  key: {{ .Values.global.cloud.resourceId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.authUrl.secretName }}
+            - name: HCP_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.authUrl.secretName }}
+                  key: {{ .Values.global.cloud.authUrl.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.apiHost.secretName }}
+            - name: HCP_API_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.apiHost.secretName }}
+                  key: {{ .Values.global.cloud.apiHost.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.scadaAddress.secretName }}
+            - name: HCP_SCADA_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.scadaAddress.secretName }}
+                  key: {{ .Values.global.cloud.scadaAddress.secretKey }}
+            {{- end}}
+            {{- end }}
+
+        command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-telemetry-collector agent
+        volumeMounts:
+        {{- if .Values.telemetryCollector.resources }}
+        resources:
+          {{- toYaml .Values.telemetryCollector.resources | nindent 12 }}
+        {{- end }}
+{{- end }}
