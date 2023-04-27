@@ -319,10 +319,14 @@ func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs 
 	consulRoute.Services = make([]capi.TCPService, 0)
 	for _, rule := range k8sRoute.Spec.Rules {
 		for _, k8sref := range rule.BackendRefs {
+			k8srefNS := ""
+			if k8sref.Namespace != nil {
+				k8srefNS = string(*k8sref.Namespace)
+			}
 			tcpService := capi.TCPService{
 				Name:      string(k8sref.Name),
 				Partition: consulPartition,
-				Namespace: t.getConsulNamespace(string(*k8sref.Namespace)),
+				Namespace: t.getConsulNamespace(k8srefNS),
 			}
 			consulRoute.Services = append(consulRoute.Services, tcpService)
 		}
