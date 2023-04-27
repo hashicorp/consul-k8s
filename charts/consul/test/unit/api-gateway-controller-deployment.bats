@@ -1522,6 +1522,23 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: CONSUL_CACERT has correct path with Vault as secrets backend and client disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'server.enabled=true' \
+      --set 'client.enabled=false' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      . | tee /dev/stderr|
+      yq '.spec.template.spec.containers[0].env[0].value == "/vault/secrets/serverca.crt"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "apiGateway/Deployment: CONSUL_CACERT is not set when using tls and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
