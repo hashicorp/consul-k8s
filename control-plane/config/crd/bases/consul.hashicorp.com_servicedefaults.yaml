@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -251,15 +254,15 @@ spec:
                             type: string
                         type: object
                       name:
-                        description: Name is only accepted within a service-defaults
+                        description: Name is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
                           config entry.
                         type: string
                       namespace:
-                        description: Namespace is only accepted within a service-defaults
+                        description: Namespace is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
                           config entry.
                         type: string
                       partition:
-                        description: Partition is only accepted within a service-defaults
+                        description: Partition is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
                           config entry.
                         type: string
                       passiveHealthCheck:
@@ -296,6 +299,10 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      peer:
+                        description: Peer is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
+                          config entry.
+                        type: string
                       protocol:
                         description: Protocol describes the upstream's service protocol.
                           Valid values are "tcp", "http" and "grpc". Anything else
@@ -362,15 +369,15 @@ spec:
                               type: string
                           type: object
                         name:
-                          description: Name is only accepted within a service-defaults
+                          description: Name is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
                             config entry.
                           type: string
                         namespace:
-                          description: Namespace is only accepted within a service-defaults
+                          description: Namespace is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
                             config entry.
                           type: string
                         partition:
-                          description: Partition is only accepted within a service-defaults
+                          description: Partition is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
                             config entry.
                           type: string
                         passiveHealthCheck:
@@ -409,6 +416,10 @@ spec:
                               format: int32
                               type: integer
                           type: object
+                        peer:
+                          description: Peer is only accepted within service ServiceDefaultsSpec.UpstreamConfig.Overrides
+                            config entry.
+                          type: string
                         protocol:
                           description: Protocol describes the upstream's service protocol.
                             Valid values are "tcp", "http" and "grpc". Anything else

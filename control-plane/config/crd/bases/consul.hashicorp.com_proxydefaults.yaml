@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -134,6 +137,23 @@ spec:
                             Valid values are "http" and "http2", defaults to "http".
                           type: string
                       type: object
+                    type: array
+                type: object
+              failoverPolicy:
+                description: FailoverPolicy specifies the exact mechanism used for
+                  failover.
+                properties:
+                  mode:
+                    description: Mode specifies the type of failover that will be
+                      performed. Valid values are "sequential", "" (equivalent to
+                      "sequential") and "order-by-locality".
+                    type: string
+                  regions:
+                    description: Regions is the ordered list of the regions of the
+                      failover targets. Valid values can be "us-west-1", "us-west-2",
+                      and so on.
+                    items:
+                      type: string
                     type: array
                 type: object
               meshGateway:

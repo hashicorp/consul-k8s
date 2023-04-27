@@ -1,5 +1,8 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 provider "azurerm" {
-  version = "2.90.0"
+  version = "3.40.0"
   features {}
 }
 
@@ -40,12 +43,13 @@ resource "azurerm_virtual_network_peering" "default" {
 }
 
 resource "azurerm_kubernetes_cluster" "default" {
-  count               = var.cluster_count
-  name                = "consul-k8s-${random_id.suffix[count.index].dec}"
-  location            = azurerm_resource_group.default[count.index].location
-  resource_group_name = azurerm_resource_group.default[count.index].name
-  dns_prefix          = "consul-k8s-${random_id.suffix[count.index].dec}"
-  kubernetes_version  = "1.22.11"
+  count                             = var.cluster_count
+  name                              = "consul-k8s-${random_id.suffix[count.index].dec}"
+  location                          = azurerm_resource_group.default[count.index].location
+  resource_group_name               = azurerm_resource_group.default[count.index].name
+  dns_prefix                        = "consul-k8s-${random_id.suffix[count.index].dec}"
+  kubernetes_version                = "1.24.6"
+  role_based_access_control_enabled = true
 
   // We're setting the network plugin and other network properties explicitly
   // here even though they are the same as defaults to ensure that none of these CIDRs
@@ -67,7 +71,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   default_node_pool {
     name            = "default"
     node_count      = 3
-    vm_size         = "Standard_D2_v2"
+    vm_size         = "Standard_D3_v2"
     os_disk_size_gb = 30
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
   }
@@ -75,10 +79,6 @@ resource "azurerm_kubernetes_cluster" "default" {
   service_principal {
     client_id     = var.client_id
     client_secret = var.client_secret
-  }
-
-  role_based_access_control {
-    enabled = true
   }
 
   tags = var.tags

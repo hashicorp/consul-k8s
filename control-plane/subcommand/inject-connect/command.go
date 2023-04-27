@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package connectinject
 
 import (
@@ -18,7 +21,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -35,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
-	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -454,7 +456,7 @@ func (c *Command) Run(args []string) int {
 		Prefix:               c.flagK8SNSMirroringPrefix,
 	}
 
-	configEntryReconciler := &controller.ConfigEntryController{
+	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClientConfig:         c.consul.ConsulClientConfig(),
 		ConsulServerConnMgr:        watcher,
 		DatacenterName:             c.consul.Datacenter,
@@ -464,7 +466,7 @@ func (c *Command) Run(args []string) int {
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
 	}
-	if err = (&controller.ServiceDefaultsController{
+	if err = (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceDefaults),
@@ -473,7 +475,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceDefaults)
 		return 1
 	}
-	if err = (&controller.ServiceResolverController{
+	if err = (&controllers.ServiceResolverController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceResolver),
@@ -482,7 +484,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceResolver)
 		return 1
 	}
-	if err = (&controller.ProxyDefaultsController{
+	if err = (&controllers.ProxyDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ProxyDefaults),
@@ -491,7 +493,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ProxyDefaults)
 		return 1
 	}
-	if err = (&controller.MeshController{
+	if err = (&controllers.MeshController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.Mesh),
@@ -500,7 +502,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Mesh)
 		return 1
 	}
-	if err = (&controller.ExportedServicesController{
+	if err = (&controllers.ExportedServicesController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ExportedServices),
@@ -509,7 +511,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ExportedServices)
 		return 1
 	}
-	if err = (&controller.ServiceRouterController{
+	if err = (&controllers.ServiceRouterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceRouter),
@@ -518,7 +520,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceRouter)
 		return 1
 	}
-	if err = (&controller.ServiceSplitterController{
+	if err = (&controllers.ServiceSplitterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceSplitter),
@@ -527,7 +529,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceSplitter)
 		return 1
 	}
-	if err = (&controller.ServiceIntentionsController{
+	if err = (&controllers.ServiceIntentionsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceIntentions),
@@ -536,7 +538,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceIntentions)
 		return 1
 	}
-	if err = (&controller.IngressGatewayController{
+	if err = (&controllers.IngressGatewayController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.IngressGateway),
@@ -545,13 +547,22 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.IngressGateway)
 		return 1
 	}
-	if err = (&controller.TerminatingGatewayController{
+	if err = (&controllers.TerminatingGatewayController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.TerminatingGateway),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)
+		return 1
+	}
+	if err = (&controllers.SamenessGroupController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.SamenessGroup),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.SamenessGroup)
 		return 1
 	}
 
@@ -645,63 +656,69 @@ func (c *Command) Run(args []string) int {
 	// Note: The path here should be identical to the one on the kubebuilder
 	// annotation in each webhook file.
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.MeshWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.MeshWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceSplitter),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceIntentions),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
 			ConsulMeta: consulMeta,
 		}})
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
-		&ctrlwebhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
+			ConsulMeta: consulMeta,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroup",
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.SamenessGroupWebhook{
+			Client:     mgr.GetClient(),
+			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
 			ConsulMeta: consulMeta,
 		}})
 

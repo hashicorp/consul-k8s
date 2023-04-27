@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package main
 
 import (
@@ -6,8 +9,12 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
+	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/loglevel"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/status"
+	"github.com/hashicorp/consul-k8s/cli/cmd/troubleshoot"
+	troubleshoot_proxy "github.com/hashicorp/consul-k8s/cli/cmd/troubleshoot/proxy"
+	"github.com/hashicorp/consul-k8s/cli/cmd/troubleshoot/upstreams"
 	"github.com/hashicorp/consul-k8s/cli/cmd/uninstall"
 	"github.com/hashicorp/consul-k8s/cli/cmd/upgrade"
 	cmdversion "github.com/hashicorp/consul-k8s/cli/cmd/version"
@@ -19,7 +26,6 @@ import (
 )
 
 func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseCommand, map[string]cli.CommandFactory) {
-
 	baseCommand := &common.BaseCommand{
 		Ctx: ctx,
 		Log: log,
@@ -63,8 +69,28 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 				BaseCommand: baseCommand,
 			}, nil
 		},
+		"proxy log": func() (cli.Command, error) {
+			return &loglevel.LogLevelCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
 		"proxy read": func() (cli.Command, error) {
 			return &read.ReadCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"troubleshoot": func() (cli.Command, error) {
+			return &troubleshoot.TroubleshootCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"troubleshoot proxy": func() (cli.Command, error) {
+			return &troubleshoot_proxy.ProxyCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"troubleshoot upstreams": func() (cli.Command, error) {
+			return &upstreams.UpstreamsCommand{
 				BaseCommand: baseCommand,
 			}, nil
 		},

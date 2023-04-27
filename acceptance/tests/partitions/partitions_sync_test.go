@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package partitions
 
 import (
@@ -245,7 +248,7 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Log(t, "checking that the service has been synced to Consul")
 			var services map[string][]string
-			counter := &retry.Counter{Count: 20, Wait: 30 * time.Second}
+			counter := &retry.Counter{Count: 30, Wait: 30 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var err error
 				// list services in default partition catalog.

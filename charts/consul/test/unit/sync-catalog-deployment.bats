@@ -338,7 +338,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.aclSyncToken.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -349,7 +349,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.aclSyncToken.secretName=foo' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -361,7 +361,7 @@ load _helpers
       --set 'syncCatalog.aclSyncToken.secretName=foo' \
       --set 'syncCatalog.aclSyncToken.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

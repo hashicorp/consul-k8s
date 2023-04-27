@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Script to copy generated CRD yaml into chart directory and modify it to match
 // the expected chart format (e.g. formatted YAML).
 package main
@@ -7,6 +10,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+)
+
+var (
+	// HACK IT!
+	requiresPeering = map[string]struct{}{
+		"consul.hashicorp.com_peeringacceptors.yaml": {},
+		"consul.hashicorp.com_peeringdialers.yaml":   {},
+	}
 )
 
 func main() {
@@ -43,8 +54,13 @@ func realMain(helmPath string) error {
 		// Strip leading newline.
 		contents = strings.TrimPrefix(contents, "\n")
 
-		// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
-		contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)
+		if _, ok := requiresPeering[info.Name()]; ok {
+			// Add {{- if and .Values.connectInject.enabled .Values.global.peering.enabled  }} {{- end }} wrapper.
+			contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.global.peering.enabled }}\n%s{{- end }}\n", contents)
+		} else {
+			// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
+			contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)
+		}
 
 		// Add labels, this is hacky because we're relying on the line number
 		// but it means we don't need to regex or yaml parse.

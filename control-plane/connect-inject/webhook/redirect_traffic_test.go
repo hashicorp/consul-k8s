@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package webhook
 
 import (
@@ -70,6 +73,39 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				ProxyInboundPort:  constants.ProxyDefaultInboundPort,
 				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"5996"},
+			},
+		},
+		{
+			name: "proxy health checks enabled",
+			webhook: MeshWebhook{
+				Log:                   logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: defaultNamespace,
+					Name:      defaultPodName,
+					Annotations: map[string]string{
+						constants.AnnotationUseProxyHealthCheck: "true",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "test",
+						},
+					},
+				},
+			},
+			expCfg: iptables.Config{
+				ConsulDNSIP:         "",
+				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
+				ProxyInboundPort:    constants.ProxyDefaultInboundPort,
+				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
+				ExcludeUIDs:         []string{"5996"},
+				ExcludeInboundPorts: []string{"21000"},
 			},
 		},
 		{

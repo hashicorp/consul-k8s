@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package constants
 
 const (
@@ -6,6 +9,9 @@ const (
 
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000
+
+	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
+	ProxyDefaultHealthPort = 21000
 
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"

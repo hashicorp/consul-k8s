@@ -146,6 +146,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - samenessgroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - samenessgroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - servicedefaults
   verbs:
   - create
