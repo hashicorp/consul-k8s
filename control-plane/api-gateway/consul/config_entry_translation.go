@@ -28,6 +28,8 @@ const (
 	AnnotationHTTPRoute = "consul.hashicorp.com/http-route"
 	// AnnotationTCPRoute is the annotation used to override the http route name.
 	AnnotationTCPRoute = "consul.hashicorp.com/tcp-route"
+	// AnnotationInlineCertificate is the annotation used to override the inline certificate name.
+	AnnotationInlineCertificate = "consul.hashicorp.com/inline-certificate"
 )
 
 type consulIdentifier struct {
@@ -51,7 +53,12 @@ func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types
 	for _, listener := range k8sGW.Spec.Listeners {
 		certificates := make([]capi.ResourceReference, 0, len(listener.TLS.CertificateRefs))
 		for _, certificate := range listener.TLS.CertificateRefs {
-			certRef, ok := certs[types.NamespacedName{Name: string(certificate.Name), Namespace: string(*certificate.Namespace)}]
+			k8sNS := ""
+			if certificate.Namespace != nil {
+				k8sNS = string(*certificate.Namespace)
+			}
+			nsn := types.NamespacedName{Name: string(certificate.Name), Namespace: k8sNS}
+			certRef, ok := certs[nsn]
 			if !ok {
 				// we don't have a ref for this certificate in consul
 				// drop the ref from the created gateway
@@ -333,6 +340,30 @@ func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs 
 	}
 
 	return consulRoute
+}
+
+func (t Translator) SecretToInlineCertificate(k8sSecret gwv1beta1.SecretObjectReference, certs map[types.NamespacedName]consulIdentifier) capi.InlineCertificateConfigEntry {
+	inlineCert := capi.InlineCertificateConfigEntry{Kind: capi.InlineCertificate}
+
+	for namespaceName, consulIdentifier := range certs {
+		k8sSecretNS := ""
+		if k8sSecret.Namespace != nil {
+			k8sSecretNS = string(*k8sSecret.Namespace)
+		}
+		nsn := types.NamespacedName{Name: string(k8sSecret.Name), Namespace: k8sSecretNS}
+		if namespaceName == nsn {
+			inlineCert.Name = consulIdentifier.name
+			inlineCert.Namespace = consulIdentifier.namespace
+			inlineCert.Partition = consulIdentifier.partition
+			inlineCert.Meta = map[string]string{
+				metaKeyManagedBy:       metaValueManagedBy,
+				metaKeyKubeNS:          k8sSecretNS,
+				metaKeyKubeServiceName: string(k8sSecret.Name),
+			}
+			return inlineCert
+		}
+	}
+	return inlineCert
 }
 
 func (t Translator) getConsulNamespace(k8sNS string) string {

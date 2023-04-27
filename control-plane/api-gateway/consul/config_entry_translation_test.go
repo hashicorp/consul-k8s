@@ -1557,3 +1557,55 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 		})
 	}
 }
+
+func TestTranslator_SecretToInlineCertificate(t *testing.T) {
+	type args struct {
+		k8sSecret gwv1beta1.SecretObjectReference
+		certs     map[types.NamespacedName]consulIdentifier
+	}
+	tests := map[string]struct {
+		args args
+		want capi.InlineCertificateConfigEntry
+	}{
+		"base test": {
+			args: args{
+				k8sSecret: gwv1beta1.SecretObjectReference{
+					Name:      "my-secret",
+					Namespace: ptrTo(gwv1beta1.Namespace("k8s-ns")),
+				},
+				certs: map[types.NamespacedName]consulIdentifier{
+					{
+						Namespace: "k8s-ns",
+						Name:      "my-secret",
+					}: {
+						name:      "inline certs",
+						namespace: "my-ns",
+						partition: "",
+					},
+				},
+			},
+			want: capi.InlineCertificateConfigEntry{
+				Kind: capi.InlineCertificate,
+				Name: "inline certs",
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "my-secret",
+				},
+				Namespace: "my-ns",
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tr := Translator{
+				EnableConsulNamespaces: true,
+				EnableK8sMirroring:     true,
+			}
+			got := tr.SecretToInlineCertificate(tt.args.k8sSecret, tt.args.certs)
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("Translator.SecretToInlineCertificate() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
