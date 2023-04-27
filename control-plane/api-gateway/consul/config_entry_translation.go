@@ -41,7 +41,7 @@ type Translator struct {
 	MirroringPrefix        string
 }
 
-// GatewayToAPIGateway translates a k8s API gateway into a consul API gateway.
+// GatewayToAPIGateway translates a k8s API gateway into a Consul API gateway.
 func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]consulIdentifier) capi.APIGatewayConfigEntry {
 	listeners := make([]capi.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
 	consulPartition := os.Getenv("CONSUL_PARTITION")
@@ -136,20 +136,28 @@ func translateHTTPRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, par
 	parents := make([]capi.ResourceReference, 0, len(k8sParentRefs))
 	for _, k8sParentRef := range k8sParentRefs {
 		parentRef, ok := parentRefs[types.NamespacedName{Name: string(k8sParentRef.Name), Namespace: string(*k8sParentRef.Namespace)}]
-		if !ok {
+		if !(ok && isRefAPIGateway(k8sParentRef)) {
 			// we drop any parent refs that consul does not know about
 			continue
+		}
+		sectionName := ""
+		if k8sParentRef.SectionName != nil {
+			sectionName = string(*k8sParentRef.SectionName)
 		}
 		ref := capi.ResourceReference{
 			Kind:        capi.APIGateway, // Will this ever not be a gateway? is that something we need to handle?
 			Name:        parentRef.name,
-			SectionName: string(*k8sParentRef.SectionName),
+			SectionName: sectionName,
 			Partition:   parentRef.partition,
 			Namespace:   parentRef.namespace,
 		}
 		parents = append(parents, ref)
 	}
 	return parents
+}
+
+func isRefAPIGateway(ref gwv1beta1.ParentReference) bool {
+	return ref.Kind != nil && *ref.Kind == gwv1beta1.Kind("Gateway") || ref.Group != nil && string(*ref.Group) == gwv1beta1.GroupName
 }
 
 func (t Translator) translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRouteRule {
