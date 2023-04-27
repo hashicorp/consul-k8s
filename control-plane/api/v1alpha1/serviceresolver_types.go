@@ -485,7 +485,9 @@ func (in ServiceResolverFailoverMap) toConsul() map[string]capi.ServiceResolverF
 	}
 	m := make(map[string]capi.ServiceResolverFailover)
 	for k, v := range in {
-		m[k] = *v.toConsul()
+		if f := v.toConsul(); f != nil {
+			m[k] = *f
+		}
 	}
 	return m
 }
