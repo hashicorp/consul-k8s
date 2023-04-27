@@ -124,6 +124,7 @@ rules:
   - gateways
   - httproutes
   - tcproutes
+  - referencegrants
   verbs:
   - create
   - delete
@@ -159,10 +160,10 @@ rules:
 - apiGroups:
     - core
   resources:
-    - referencegrants
     - services
   verbs:
     - watch
+    - list
 - apiGroups: [ "" ]
   resources: [ "secrets" ]
   verbs:

@@ -168,7 +168,7 @@ func (r *GatewayController) transformTCPRoute(ctx context.Context) func(o client
 func (r *GatewayController) transformSecret(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		secret := o.(*corev1.Secret)
-		gatewayList := &gwv1alpha2.GatewayList{}
+		gatewayList := &gwv1beta1.GatewayList{}
 		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, secret.Name),
 		}); err != nil {
@@ -181,7 +181,7 @@ func (r *GatewayController) transformSecret(ctx context.Context) func(o client.O
 func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		// just reconcile all gateways within the namespace
-		grant := o.(*gwv1alpha2.ReferenceGrant)
+		grant := o.(*gwv1beta1.ReferenceGrant)
 		gatewayList := &gwv1beta1.GatewayList{}
 		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 			Namespace: grant.Namespace,

@@ -5,7 +5,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -75,7 +74,7 @@ func gatewayClassForGateway(o client.Object) []string {
 }
 
 func gatewayForSecret(o client.Object) []string {
-	gateway := o.(*gwv1alpha2.Gateway)
+	gateway := o.(*gwv1beta1.Gateway)
 	var secretReferences []string
 	for _, listener := range gateway.Spec.Listeners {
 		if listener.TLS == nil || *listener.TLS.Mode != gwv1beta1.TLSModeTerminate {
