@@ -159,6 +159,7 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 		}
 		if err != nil {
 			log.Error(err, "unable to fetch GatewayClassConfig")
+			return false, err
 		}
 	}
 
