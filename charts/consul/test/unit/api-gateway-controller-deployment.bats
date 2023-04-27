@@ -1572,6 +1572,21 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set when using Vault as a secrets backend" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
 @test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1584,6 +1599,21 @@ load _helpers
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using Vault as secrets backend" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
