@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	capi "github.com/hashicorp/consul/api"
@@ -1349,6 +1350,207 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 			got := tr.HTTPRouteToHTTPRoute(tc.args.k8sHTTPRoute, tc.args.parentRefs)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("Translator.HTTPRouteToHTTPRoute() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
+	type args struct {
+		k8sRoute   gwv1alpha2.TCPRoute
+		parentRefs map[types.NamespacedName]consulIdentifier
+	}
+	tests := map[string]struct {
+		args args
+		want capi.TCPRouteConfigEntry
+	}{
+		"base test": {
+			args: args{
+				k8sRoute: gwv1alpha2.TCPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-route",
+						Namespace: "k8s-ns",
+					},
+					Spec: gwv1alpha2.TCPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("another-ns")),
+									Name:        "mygw",
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-one")),
+								},
+							},
+						},
+						Rules: []gwv1alpha2.TCPRouteRule{
+							{
+								BackendRefs: []gwv1beta1.BackendRef{
+									{
+										BackendObjectReference: gwv1beta1.BackendObjectReference{
+											Name:      "some-service",
+											Namespace: ptrTo(gwv1beta1.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
+							{
+								BackendRefs: []gwv1beta1.BackendRef{
+									{
+										BackendObjectReference: gwv1beta1.BackendObjectReference{
+											Name:      "some-service-part-two",
+											Namespace: ptrTo(gwv1beta1.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
+						},
+					},
+				},
+				parentRefs: map[types.NamespacedName]consulIdentifier{
+					{
+						Namespace: "another-ns",
+						Name:      "mygw",
+					}: {
+						name:      "mygw",
+						namespace: "another-ns",
+						partition: "",
+					},
+				},
+			},
+			want: capi.TCPRouteConfigEntry{
+				Kind:      capi.TCPRoute,
+				Name:      "tcp-route",
+				Namespace: "k8s-ns",
+				Parents: []capi.ResourceReference{
+					{
+						Kind:        capi.APIGateway,
+						Name:        "mygw",
+						SectionName: "listener-one",
+						Partition:   "",
+						Namespace:   "another-ns",
+					},
+				},
+				Services: []capi.TCPService{
+					{
+						Name:      "some-service",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+					{
+						Name:      "some-service-part-two",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+				},
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "tcp-route",
+				},
+			},
+		},
+
+		"overwrite the route name via annotaions": {
+			args: args{
+				k8sRoute: gwv1alpha2.TCPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-route",
+						Namespace: "k8s-ns",
+						Annotations: map[string]string{
+							AnnotationTCPRoute: "replaced-name",
+						},
+					},
+					Spec: gwv1alpha2.TCPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Namespace:   ptrTo(gwv1beta1.Namespace("another-ns")),
+									Name:        "mygw",
+									SectionName: ptrTo(gwv1beta1.SectionName("listener-one")),
+								},
+							},
+						},
+						Rules: []gwv1alpha2.TCPRouteRule{
+							{
+								BackendRefs: []gwv1beta1.BackendRef{
+									{
+										BackendObjectReference: gwv1beta1.BackendObjectReference{
+											Name:      "some-service",
+											Namespace: ptrTo(gwv1beta1.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
+							{
+								BackendRefs: []gwv1beta1.BackendRef{
+									{
+										BackendObjectReference: gwv1beta1.BackendObjectReference{
+											Name:      "some-service-part-two",
+											Namespace: ptrTo(gwv1beta1.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
+						},
+					},
+				},
+				parentRefs: map[types.NamespacedName]consulIdentifier{
+					{
+						Namespace: "another-ns",
+						Name:      "mygw",
+					}: {
+						name:      "mygw",
+						namespace: "another-ns",
+						partition: "",
+					},
+				},
+			},
+			want: capi.TCPRouteConfigEntry{
+				Kind:      capi.TCPRoute,
+				Name:      "replaced-name",
+				Namespace: "k8s-ns",
+				Parents: []capi.ResourceReference{
+					{
+						Kind:        capi.APIGateway,
+						Name:        "mygw",
+						SectionName: "listener-one",
+						Partition:   "",
+						Namespace:   "another-ns",
+					},
+				},
+				Services: []capi.TCPService{
+					{
+						Name:      "some-service",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+					{
+						Name:      "some-service-part-two",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+				},
+				Meta: map[string]string{
+					metaKeyManagedBy:       metaValueManagedBy,
+					metaKeyKubeNS:          "k8s-ns",
+					metaKeyKubeServiceName: "tcp-route",
+				},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tr := Translator{
+				EnableConsulNamespaces: true,
+				EnableK8sMirroring:     true,
+			}
+
+			got := tr.TCPRouteToTCPRoute(tt.args.k8sRoute, tt.args.parentRefs)
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("Translator.TCPRouteToTCPRoute() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

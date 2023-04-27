@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -25,6 +26,8 @@ const (
 	AnnotationGateway = "consul.hashicorp.com/gateway"
 	// AnnotationHTTPRoute is the annotation used to override the http route name.
 	AnnotationHTTPRoute = "consul.hashicorp.com/http-route"
+	// AnnotationTCPRoute is the annotation used to override the http route name.
+	AnnotationTCPRoute = "consul.hashicorp.com/tcp-route"
 )
 
 type consulIdentifier struct {
@@ -124,7 +127,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 	consulHTTPRoute.Hostnames = hostnames
 
 	// translate parent refs
-	consulHTTPRoute.Parents = translateHTTPRouteParentRefs(k8sHTTPRoute.Spec.CommonRouteSpec.ParentRefs, parentRefs)
+	consulHTTPRoute.Parents = translateRouteParentRefs(k8sHTTPRoute.Spec.CommonRouteSpec.ParentRefs, parentRefs)
 
 	// translate rules
 	consulHTTPRoute.Rules = t.translateHTTPRouteRules(k8sHTTPRoute.Spec.Rules)
@@ -132,7 +135,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 	return consulHTTPRoute
 }
 
-func translateHTTPRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]consulIdentifier) []capi.ResourceReference {
+func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]consulIdentifier) []capi.ResourceReference {
 	parents := make([]capi.ResourceReference, 0, len(k8sParentRefs))
 	for _, k8sParentRef := range k8sParentRefs {
 		parentRef, ok := parentRefs[types.NamespacedName{Name: string(k8sParentRef.Name), Namespace: string(*k8sParentRef.Namespace)}]
@@ -286,6 +289,46 @@ func (t Translator) translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackend
 	}
 
 	return services
+}
+
+func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.TCPRouteConfigEntry {
+	consulPartition := os.Getenv("CONSUL_PARTITION")
+
+	routeName := k8sRoute.Name
+	if routeNameFromAnnotation, ok := k8sRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
+		routeName = routeNameFromAnnotation
+	}
+
+	consulRoute := capi.TCPRouteConfigEntry{
+		Kind: capi.TCPRoute,
+		Name: routeName,
+		Meta: map[string]string{
+			metaKeyManagedBy:       metaValueManagedBy,
+			metaKeyKubeNS:          k8sRoute.GetObjectMeta().GetNamespace(),
+			metaKeyKubeServiceName: k8sRoute.GetObjectMeta().GetName(),
+		},
+		Partition: consulPartition,
+
+		Namespace: t.getConsulNamespace(k8sRoute.GetObjectMeta().GetNamespace()),
+	}
+
+	// translate parent refs
+	consulRoute.Parents = translateRouteParentRefs(k8sRoute.Spec.CommonRouteSpec.ParentRefs, parentRefs)
+
+	// translate the services
+	consulRoute.Services = make([]capi.TCPService, 0)
+	for _, rule := range k8sRoute.Spec.Rules {
+		for _, k8sref := range rule.BackendRefs {
+			tcpService := capi.TCPService{
+				Name:      string(k8sref.Name),
+				Partition: consulPartition,
+				Namespace: t.getConsulNamespace(string(*k8sref.Namespace)),
+			}
+			consulRoute.Services = append(consulRoute.Services, tcpService)
+		}
+	}
+
+	return consulRoute
 }
 
 func (t Translator) getConsulNamespace(k8sNS string) string {
