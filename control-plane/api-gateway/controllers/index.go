@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,9 +25,7 @@ const (
 // They allow us to quickly find objects based on a field value.
 func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
 	for _, index := range indexes {
-		fmt.Println("############Index: ", index)
 		if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, index.name, index.indexerFunc); err != nil {
-			fmt.Println("RRRrrrrrrrrrrrrrrrrrrrrrrrRegistering Index ERror")
 			return err
 		}
 	}
@@ -53,14 +50,9 @@ var indexes = []index{
 		indexerFunc: gatewayClassForGateway,
 	},
 	{
-		name:        HTTPRoute_GatewayIndex,
-		target:      &gwv1beta1.HTTPRoute{},
-		indexerFunc: gatewayForHTTPRoute,
-	},
-	{
-		name:        TCPRoute_GatewayIndex,
-		target:      &gwv1alpha2.TCPRoute{},
-		indexerFunc: gatewayForTCPRoute,
+		name:        Secret_GatewayIndex,
+		target:      &gwv1beta1.Gateway{},
+		indexerFunc: gatewayForSecret,
 	},
 }
 
@@ -82,22 +74,19 @@ func gatewayClassForGateway(o client.Object) []string {
 	return []string{string(g.Spec.GatewayClassName)}
 }
 
-// gatewayForHTTPRoute creates an index of every Gateway referenced by an HTTPRoute.
-func gatewayForHTTPRoute(o client.Object) []string {
-	g := o.(*gwv1beta1.HTTPRoute)
-	parents := make([]string, 0, len(g.Spec.ParentRefs))
-	for _, p := range g.Spec.ParentRefs {
-		parents = append(parents, string(p.Name))
+func gatewayForSecret(o client.Object) []string {
+	gateway := o.(*gwv1alpha2.Gateway)
+	var secretReferences []string
+	for _, listener := range gateway.Spec.Listeners {
+		if listener.TLS == nil || *listener.TLS.Mode != gwv1beta1.TLSModeTerminate {
+			continue
+		}
+		for _, cert := range listener.TLS.CertificateRefs {
+			if nilOrEqual(cert.Group, "") && nilOrEqual(cert.Kind, "Secret") {
+				// If an explicit Secret namespace is not provided, use the Gateway namespace to lookup the provided Secret Name.
+				secretReferences = append(secretReferences, indexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace).String())
+			}
+		}
 	}
-	return parents
-}
-
-// gatewayForTCPRoute creates an index of every Gateway referenced by a TCPRoute.
-func gatewayForTCPRoute(o client.Object) []string {
-	g := o.(*gwv1alpha2.TCPRoute)
-	parents := make([]string, 0, len(g.Spec.ParentRefs))
-	for _, p := range g.Spec.ParentRefs {
-		parents = append(parents, string(p.Name))
-	}
-	return parents
+	return secretReferences
 }
