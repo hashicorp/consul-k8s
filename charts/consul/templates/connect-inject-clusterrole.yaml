@@ -164,7 +164,7 @@ rules:
   verbs:
     - watch
 - apiGroups: [ "" ]
-  resources: [ "secrets", "serviceaccounts" ]
+  resources: [ "secrets" ]
   verbs:
     - "get"
     - "list"

@@ -5,6 +5,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -18,6 +19,8 @@ import (
 
 const (
 	gatewayFinalizer = "gateway-finalizer.consul.hashicorp.com"
+
+	kindGateway = "Gateway"
 )
 
 // GatewayController reconciles a Gateway object.
@@ -30,8 +33,9 @@ type GatewayController struct {
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
-	log.Info("------------Reconciling the Gateway GatewayController", "name", req.Name)
+	log.Info("Reconciling the Gateway in the GatewayController", "name", req.Name)
 
+	// If gateway doesn't exist log an error.
 	gw := &gwv1beta1.Gateway{}
 	err := r.Client.Get(ctx, req.NamespacedName, gw)
 	if err != nil {
@@ -39,7 +43,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// if gw class doesn't exist log an error
+	// If gateway class on the gateway does not exist, log an error.
 	gwc := &gwv1beta1.GatewayClass{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName)}, gwc)
 	if err != nil {
@@ -48,9 +52,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if string(gwc.Spec.ControllerName) != GatewayClassControllerName || !gw.ObjectMeta.DeletionTimestamp.IsZero() {
-		// This Gateway is not for this controller or the gateway is being deleted
-		// TODO: Cleanup Consul resources
-		log.Info("This Gateway is not for this controller or the gateway is being deleted")
+		// This Gateway is not for this controller or the gateway is being deleted.
+		// TODO: Cleanup Consul resources.
 		_, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer)
 		if err != nil {
 			log.Error(err, "unable to remove finalizer")
@@ -59,7 +62,27 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	if !gw.ObjectMeta.DeletionTimestamp.IsZero() {
+		// We have a deletion request. Ensure we are not in use.
+		used, err := r.isGatewayInUse(ctx, gw)
+		if err != nil {
+			log.Error(err, "unable to check if GatewayClass is in use")
+			return ctrl.Result{}, err
+		}
+		if used {
+			log.Info("GatewayClass is in use, cannot delete")
+			return ctrl.Result{}, nil
+		}
+		// Remove our finalizer.
+		if _, err := RemoveFinalizer(ctx, r.Client, gwc, gatewayFinalizer); err != nil {
+			log.Error(err, "unable to remove finalizer")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
 	//TODO: serialize gatewayClassConfig onto Gateway.
+
 	didUpdate, err := EnsureFinalizer(ctx, r.Client, gw, gatewayFinalizer)
 	if err != nil {
 		log.Error(err, "unable to add finalizer")
@@ -70,12 +93,21 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	//TODO: Handle reconcilation.
-	// do the tcp routes
-
-	// do the gateway
+	//TODO: Handle reconciliation.
 
 	return ctrl.Result{}, nil
+}
+
+// isGatewayClassInUse returns true if the given GatewayClass is referenced by any Gateway objects.
+func (r *GatewayController) isGatewayInUse(ctx context.Context, g *gwv1beta1.Gateway) (bool, error) {
+	list := &gwv1beta1.GatewayList{}
+	if err := r.Client.List(ctx, list, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, g.Name),
+	}); err != nil {
+		return false, err
+	}
+
+	return len(list.Items) != 0, nil
 }
 
 // SetupWithManager registers the controller with the given manager.
@@ -84,81 +116,147 @@ func (r *GatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
-		Owns(&corev1.ServiceAccount{}).
-		Owns(&corev1.Secret{}).
+		Owns(&corev1.Pod{}).
 		Watches(
-			source.NewKindWithCache(&gwv1alpha2.TCPRoute{}, mgr.GetCache()), r.tcpRouteFieldIndexEventHandler(ctx),
+			source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass(ctx)),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.HTTPRoute{}, mgr.GetCache()), r.httpRouteFieldIndexEventHandler(ctx),
-		).
-		//Watches(
-		//	&source.Kind{Type: &corev1.Pod{}},
-		//	handler.EnqueueRequestsFromMapFunc(podToGatewayRequest),
-		//	builder.WithPredicates(predicate),
-		//).
-		//Watches(
-		//	&source.Kind{Type: &gwv1alpha2.ReferenceGrant{}},
-		//	handler.EnqueueRequestsFromMapFunc(r.referenceGrantToGatewayRequests),
-		//).
-		//Watches(
-		//	&source.Kind{Type: &gwv1alpha2.ReferencePolicy{}},
-		//	handler.EnqueueRequestsFromMapFunc(r.referencePolicyToGatewayRequests),
-		//).
+			source.NewKindWithCache(&gwv1beta1.HTTPRoute{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute(ctx)),
+		).Watches(
+		source.NewKindWithCache(&gwv1alpha2.TCPRoute{}, mgr.GetCache()),
+		handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute(ctx)),
+	).Watches(
+		source.NewKindWithCache(&corev1.Secret{}, mgr.GetCache()),
+		handler.EnqueueRequestsFromMapFunc(r.transformSecret(ctx)),
+	).Watches(
+		source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
+		handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
+	).
 		// TODO: Watches for consul resources.
 		Complete(r)
 }
 
-// gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
-// reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
-// object that triggered the event.
-func (r *GatewayController) httpRouteFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
-		var gList gwv1beta1.GatewayList
-
-		err := r.Client.List(ctx, &gList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, o.GetName()),
-		})
-		if err != nil {
-			r.Log.Error(err, "unable to list gateways")
+func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		gatewayClass := o.(*gwv1beta1.GatewayClass)
+		gatewayList := &gwv1beta1.GatewayList{}
+		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
+		}); err != nil {
+			return nil
 		}
-
-		return makeListOfRequestsToReconcile(gList)
-	})
+		return objectsToRequests(pointersOf(gatewayList.Items))
+	}
 }
 
-// gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
-// reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
-// object that triggered the event.
-func (r *GatewayController) tcpRouteFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
-		var gList gwv1beta1.GatewayList
-		err := r.Client.List(ctx, &gList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, o.GetName()),
-		})
-		if err != nil {
-			r.Log.Error(err, "unable to list gateway")
-		}
-
-		return makeListOfRequestsToReconcile(gList)
-	})
+func (r *GatewayController) transformHTTPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		route := o.(*gwv1beta1.HTTPRoute)
+		return refsToRequests(parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs))
+	}
 }
 
-// TODO: Melisa think about efficiency
-// TODO: Is this where we want this to live
-// makeListOfRequestsToReconcile will take a list of Gateways and return a list of
+func (r *GatewayController) transformTCPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		route := o.(*gwv1alpha2.TCPRoute)
+		return refsToRequests(parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs))
+	}
+}
+
+func (r *GatewayController) transformSecret(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		secret := o.(*corev1.Secret)
+		gatewayList := &gwv1alpha2.GatewayList{}
+		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, secret.Name),
+		}); err != nil {
+			return nil
+		}
+		return objectsToRequests(pointersOf(gatewayList.Items))
+	}
+}
+
+func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		// just reconcile all gateways within the namespace
+		grant := o.(*gwv1alpha2.ReferenceGrant)
+		gatewayList := &gwv1beta1.GatewayList{}
+		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
+			Namespace: grant.Namespace,
+		}); err != nil {
+			return nil
+		}
+		return objectsToRequests(pointersOf(gatewayList.Items))
+	}
+}
+
+// objectsToRequests will take a list of objects and return a list of
 // reconcile Requests.
-func makeListOfRequestsToReconcile(gateways gwv1beta1.GatewayList) []reconcile.Request {
-	requests := make([]reconcile.Request, 0, len(gateways.Items))
-	for _, gw := range gateways.Items {
+func objectsToRequests[T metav1.Object](objects []T) []reconcile.Request {
+	requests := make([]reconcile.Request, 0, len(objects))
+
+	// TODO: is it possible to receive empty objects?
+	for _, object := range objects {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Name:      gw.Name,
-				Namespace: gw.Namespace,
+				Namespace: object.GetNamespace(),
+				Name:      object.GetName(),
 			},
 		})
 	}
 	return requests
+}
+
+// pointersOf returns a list of pointers to the list of objects passed in.
+func pointersOf[T any](objects []T) []*T {
+	pointers := make([]*T, 0, len(objects))
+	for _, object := range objects {
+		pointers = append(pointers, pointerTo(object))
+	}
+	return pointers
+}
+
+// pointerTo returns a pointer to the object type passed in.
+func pointerTo[T any](v T) *T {
+	return &v
+}
+
+func refsToRequests(objects []types.NamespacedName) []reconcile.Request {
+	requests := make([]reconcile.Request, 0, len(objects))
+	for _, object := range objects {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: object,
+		})
+	}
+	return requests
+}
+
+func parentRefs(group, kind, namespace string, refs []gwv1beta1.ParentReference) []types.NamespacedName {
+	indexed := []types.NamespacedName{}
+	for _, parent := range refs {
+		if nilOrEqual(parent.Group, group) && nilOrEqual(parent.Kind, kind) {
+			indexed = append(indexed, indexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace))
+		}
+	}
+	return indexed
+}
+
+func nilOrEqual[T ~string](v *T, check string) bool {
+	return v == nil || string(*v) == check
+}
+
+func indexedNamespacedNameWithDefault[T ~string, U ~string, V ~string](t T, u *U, v V) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: derefStringOr(u, v),
+		Name:      string(t),
+	}
+}
+
+func derefStringOr[T ~string, U ~string](v *T, val U) string {
+	if v == nil {
+		return string(val)
+	}
+	return string(*v)
 }
