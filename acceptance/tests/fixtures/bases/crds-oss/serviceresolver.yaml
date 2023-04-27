@@ -8,4 +8,3 @@ metadata:
 spec:
   redirect:
     service: bar
-    samenessGroup: "sg2"
