@@ -67,6 +67,10 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
+	// Flags to support Kubernetes Ingress resources
+	flagEnableIngress   bool // Register services using the hostname from an ingress resource
+	flagLoadBalancerIPs bool // Use the load balancer IP of an ingress resource instead of the hostname
+
 	clientset kubernetes.Interface
 
 	// ready indicates whether this controller is ready to sync services. This will be changed to true once the
@@ -150,6 +154,11 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+
+	c.flags.BoolVar(&c.flagEnableIngress, "enable-ingress", false,
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
+	c.flags.BoolVar(&c.flagLoadBalancerIPs, "loadBalancer-ips", false,
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 
 	c.consul = &flags.ConsulFlags{}
 	c.k8s = &flags.K8SFlags{}
@@ -294,6 +303,8 @@ func (c *Command) Run(args []string) int {
 				EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 				K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 				ConsulNodeName:             c.flagConsulNodeName,
+				EnableIngress:              c.flagEnableIngress,
+				SyncLoadBalancerIPs:        c.flagLoadBalancerIPs,
 			},
 		}
 
