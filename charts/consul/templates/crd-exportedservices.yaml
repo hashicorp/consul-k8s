@@ -76,7 +76,8 @@ spec:
                               the service to.
                             type: string
                           peer:
-                            description: Peer is the name of the peer to export the service to.
+                            description: Peer is the name of the peer to export the
+                              service to.
                             type: string
                           samenessGroup:
                             description: SamenessGroup is the name of the sameness
