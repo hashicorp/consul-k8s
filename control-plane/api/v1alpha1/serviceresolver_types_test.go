@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestServiceResolver_MatchesConsul(t *testing.T) {
@@ -74,6 +76,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								Mode:    "sequential",
 								Regions: []string{"us-west-2"},
 							},
+							SamenessGroup: "sg2",
 						},
 						"failover2": {
 							Service:       "failover2",
@@ -84,6 +87,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								Mode:    "",
 								Regions: []string{"us-west-1"},
 							},
+							SamenessGroup: "sg3",
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
@@ -153,6 +157,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Mode:    "sequential",
 							Regions: []string{"us-west-2"},
 						},
+						SamenessGroup: "sg2",
 					},
 					"failover2": {
 						Service:       "failover2",
@@ -163,6 +168,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Mode:    "",
 							Regions: []string{"us-west-1"},
 						},
+						SamenessGroup: "sg3",
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
@@ -281,6 +287,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								Mode:    "sequential",
 								Regions: []string{"us-west-2"},
 							},
+							SamenessGroup: "sg2",
 						},
 						"failover2": {
 							Service:       "failover2",
@@ -291,6 +298,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								Mode:    "",
 								Regions: []string{"us-west-1"},
 							},
+							SamenessGroup: "sg3",
 						},
 						"failover3": {
 							Targets: []ServiceResolverFailoverTarget{
@@ -360,6 +368,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Mode:    "sequential",
 							Regions: []string{"us-west-2"},
 						},
+						SamenessGroup: "sg2",
 					},
 					"failover2": {
 						Service:       "failover2",
@@ -370,6 +379,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Mode:    "",
 							Regions: []string{"us-west-1"},
 						},
+						SamenessGroup: "sg3",
 					},
 					"failover3": {
 						Targets: []capi.ServiceResolverFailoverTarget{
@@ -543,15 +553,14 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: ServiceResolverSpec{
-					Redirect: &ServiceResolverRedirect{
-						Service:   "bar",
-						Namespace: "namespace-a",
-					},
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Service:   "baz",
 							Namespace: "namespace-b",
 						},
+					},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {Filter: "Service.Meta.version == v1"},
 					},
 				},
 			},
@@ -568,10 +577,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Redirect: &ServiceResolverRedirect{
 						Service: "bar",
 					},
-					Failover: map[string]ServiceResolverFailover{
-						"failA": {
-							Service: "baz",
-						},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {Filter: "Service.Meta.version == v1"},
 					},
 				},
 			},
@@ -585,16 +592,14 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: ServiceResolverSpec{
-					Redirect: &ServiceResolverRedirect{
-						Service:   "bar",
-						Namespace: "namespace-a",
-						Partition: "other",
-					},
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Service:   "baz",
 							Namespace: "namespace-b",
 						},
+					},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {Filter: "Service.Meta.version == v1"},
 					},
 				},
 			},
@@ -611,11 +616,6 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Redirect: &ServiceResolverRedirect{
 						Service: "bar",
 					},
-					Failover: map[string]ServiceResolverFailover{
-						"failA": {
-							Service: "baz",
-						},
-					},
 				},
 			},
 			namespacesEnabled: false,
@@ -629,13 +629,13 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Service:       "",
 							ServiceSubset: "",
 							Namespace:     "",
 							Datacenters:   nil,
 						},
-						"failB": {
+						"v2": {
 							Service:       "",
 							ServiceSubset: "",
 							Namespace:     "",
@@ -646,9 +646,31 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
-				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+				"spec.failover[v1]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+				"spec.failover[v2]: Invalid value: \"{}\": service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
 			},
+		},
+		"service resolver redirect and failover cannot both be set": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
+						Namespace: "namespace-a",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service:   "baz",
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs:   []string{"service resolver redirect and failover cannot both be set"},
 		},
 		"hashPolicy.field invalid": {
 			input: &ServiceResolver{
@@ -723,11 +745,19 @@ func TestServiceResolver_Validate(t *testing.T) {
 							},
 						},
 					},
+					Subsets: map[string]ServiceResolverSubset{
+						"": {
+							Filter: "random string",
+						},
+					},
 				},
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+				`spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+				`subset defined with empty name`,
+				`subset name must begin or end with lower case alphanumeric characters, and contain lower case alphanumeric characters or '-' in between`,
+				`filter for subset is not a valid expression`,
 			},
 		},
 		"hashPolicy nothing set is valid": {
@@ -778,6 +808,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
 						Namespace: "namespace-a",
 					},
 				},
@@ -794,6 +825,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
 						Namespace: "namespace-a",
 						Partition: "other",
 					},
@@ -812,14 +844,19 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 				Spec: ServiceResolverSpec{
 					Failover: map[string]ServiceResolverFailover{
-						"failA": {
+						"v1": {
 							Namespace: "namespace-a",
+						},
+					},
+					Subsets: map[string]ServiceResolverSubset{
+						"v1": {
+							Filter: "Service.Meta.version == v1",
 						},
 					},
 				},
 			},
 			expectedErrMsgs: []string{
-				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.failover[v1].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
 			},
 			namespacesEnabled: false,
 		},
@@ -857,6 +894,500 @@ func TestServiceResolver_Validate(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestServiceResolverRedirect_ToConsul(t *testing.T) {
+	cases := map[string]struct {
+		Ours *ServiceResolverRedirect
+		Exp  *capi.ServiceResolverRedirect
+	}{
+		"nil": {
+			Ours: nil,
+			Exp:  nil,
+		},
+		"empty fields": {
+			Ours: &ServiceResolverRedirect{},
+			Exp:  &capi.ServiceResolverRedirect{},
+		},
+		"every field set": {
+			Ours: &ServiceResolverRedirect{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				Namespace:     "ns1",
+				Datacenter:    "dc1",
+				Partition:     "default",
+				Peer:          "peer1",
+				SamenessGroup: "sg1",
+			},
+			Exp: &capi.ServiceResolverRedirect{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				Namespace:     "ns1",
+				Datacenter:    "dc1",
+				Partition:     "default",
+				Peer:          "peer1",
+				SamenessGroup: "sg1",
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := c.Ours.toConsul()
+			require.Equal(t, c.Exp, actual)
+		})
+	}
+}
+
+func TestServiceResolverRedirect_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input           *ServiceResolverRedirect
+		consulMeta      common.ConsulMeta
+		expectedErrMsgs []string
+	}{
+		"empty redirect": {
+			input:      &ServiceResolverRedirect{},
+			consulMeta: common.ConsulMeta{},
+			expectedErrMsgs: []string{
+				"service resolver redirect cannot be empty",
+			},
+		},
+		"cross-datacenter redirect is only supported in the default partition": {
+			input: &ServiceResolverRedirect{
+				Datacenter: "dc2",
+				Partition:  "p2",
+				Service:    "foo",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "p2",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"cross-datacenter redirect is only supported in the default partition",
+			},
+		},
+		"cross-datacenter and cross-partition redirect is not supported": {
+			input: &ServiceResolverRedirect{
+				Partition:  "p1",
+				Datacenter: "dc2",
+				Service:    "foo",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"cross-datacenter and cross-partition redirect is not supported",
+			},
+		},
+		"samenessGroup cannot be set with serviceSubset": {
+			input: &ServiceResolverRedirect{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				SamenessGroup: "sg2",
+			},
+			expectedErrMsgs: []string{
+				"samenessGroup cannot be set with serviceSubset",
+			},
+		},
+		"samenessGroup cannot be set with partition": {
+			input: &ServiceResolverRedirect{
+				Partition:     "default",
+				Service:       "foo",
+				SamenessGroup: "sg2",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"partition cannot be set with samenessGroup",
+			},
+		},
+		"samenessGroup cannot be set with datacenter": {
+			input: &ServiceResolverRedirect{
+				Datacenter:    "dc2",
+				Service:       "foo",
+				SamenessGroup: "sg2",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"cross-datacenter and cross-partition redirect is not supported",
+				"samenessGroup cannot be set with datacenter",
+			},
+		},
+		"peer cannot be set with serviceSubset": {
+			input: &ServiceResolverRedirect{
+				Peer:          "p2",
+				Service:       "foo",
+				ServiceSubset: "v1",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"peer cannot be set with serviceSubset",
+			},
+		},
+		"partition cannot be set with peer": {
+			input: &ServiceResolverRedirect{
+				Partition: "default",
+				Peer:      "p2",
+				Service:   "foo",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"partition cannot be set with peer",
+			},
+		},
+		"peer cannot be set with datacenter": {
+			input: &ServiceResolverRedirect{
+				Peer:       "p2",
+				Service:    "foo",
+				Datacenter: "dc2",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"peer cannot be set with datacenter",
+				"cross-datacenter and cross-partition redirect is not supported",
+			},
+		},
+		"serviceSubset defined without service": {
+			input: &ServiceResolverRedirect{
+				ServiceSubset: "v1",
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"serviceSubset defined without service",
+			},
+		},
+		"namespace defined without service": {
+			input: &ServiceResolverRedirect{
+				Namespace: "ns1",
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"namespace defined without service",
+			},
+		},
+		"partition defined without service": {
+			input: &ServiceResolverRedirect{
+				Partition: "default",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"partition defined without service",
+			},
+		},
+		"peer defined without service": {
+			input: &ServiceResolverRedirect{
+				Peer: "p2",
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"peer defined without service",
+			},
+		},
+	}
+
+	path := field.NewPath("spec.redirect")
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			errList := testCase.input.validate(path, testCase.consulMeta)
+			compareErrorLists(t, testCase.expectedErrMsgs, errList)
+		})
+	}
+}
+
+func compareErrorLists(t *testing.T, expectedErrMsgs []string, errList field.ErrorList) {
+	if len(expectedErrMsgs) != 0 {
+		require.Equal(t, len(expectedErrMsgs), len(errList))
+		for _, m := range expectedErrMsgs {
+			found := false
+			for _, e := range errList {
+				errMsg := e.ErrorBody()
+				if strings.Contains(errMsg, m) {
+					found = true
+					break
+				}
+			}
+			require.Equal(t, true, found)
+		}
+	} else {
+		require.Equal(t, 0, len(errList))
+	}
+}
+
+func TestServiceResolverFailover_ToConsul(t *testing.T) {
+	cases := map[string]struct {
+		Ours *ServiceResolverFailover
+		Exp  *capi.ServiceResolverFailover
+	}{
+		"nil": {
+			Ours: nil,
+			Exp:  nil,
+		},
+		"empty fields": {
+			Ours: &ServiceResolverFailover{},
+			Exp:  &capi.ServiceResolverFailover{},
+		},
+		"every field set": {
+			Ours: &ServiceResolverFailover{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				Namespace:     "ns1",
+				Datacenters:   []string{"dc1"},
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer: "p2",
+					},
+				},
+				Policy: &FailoverPolicy{
+					Mode:    "sequential",
+					Regions: []string{"us-west-2"},
+				},
+				SamenessGroup: "sg1",
+			},
+			Exp: &capi.ServiceResolverFailover{
+				Service:       "foo",
+				ServiceSubset: "v1",
+				Namespace:     "ns1",
+				Datacenters:   []string{"dc1"},
+				Targets: []capi.ServiceResolverFailoverTarget{
+					{
+						Peer: "p2",
+					},
+				},
+				Policy: &capi.ServiceResolverFailoverPolicy{
+					Mode:    "sequential",
+					Regions: []string{"us-west-2"},
+				},
+				SamenessGroup: "sg1",
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := c.Ours.toConsul()
+			require.Equal(t, c.Exp, actual)
+		})
+	}
+}
+
+func TestServiceResolverFailover_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input           *ServiceResolverFailover
+		consulMeta      common.ConsulMeta
+		expectedErrMsgs []string
+	}{
+		"empty failover": {
+			input:      &ServiceResolverFailover{},
+			consulMeta: common.ConsulMeta{},
+			expectedErrMsgs: []string{
+				"service, serviceSubset, namespace, datacenters, policy, and targets cannot all be empty at once",
+			},
+		},
+		"cross-datacenter failover is only supported in the default partition": {
+			input: &ServiceResolverFailover{
+				Datacenters: []string{"dc2"},
+				Service:     "foo",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "p2",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"cross-datacenter failover is only supported in the default partition",
+			},
+		},
+		"samenessGroup cannot be set with datacenters": {
+			input: &ServiceResolverFailover{
+				Service:       "foo",
+				Datacenters:   []string{"dc2"},
+				SamenessGroup: "sg2",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"samenessGroup cannot be set with datacenters",
+			},
+		},
+		"samenessGroup cannot be set with serviceSubset": {
+			input: &ServiceResolverFailover{
+				ServiceSubset: "v1",
+				Service:       "foo",
+				SamenessGroup: "sg2",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"samenessGroup cannot be set with serviceSubset",
+			},
+		},
+		"samenessGroup cannot be set with targets": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer: "p2",
+					},
+				},
+				SamenessGroup: "sg2",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"samenessGroup cannot be set with targets",
+			},
+		},
+		"targets cannot be set with datacenters": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer: "p2",
+					},
+				},
+				Datacenters: []string{"dc1"},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"targets cannot be set with datacenters",
+			},
+		},
+		"targets cannot be set with serviceSubset or service": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer: "p2",
+					},
+				},
+				ServiceSubset: "v1",
+				Service:       "foo",
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"targets cannot be set with serviceSubset",
+				"targets cannot be set with service",
+			},
+		},
+		"target.peer cannot be set with target.serviceSubset": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer:          "p2",
+						ServiceSubset: "v1",
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"target.peer cannot be set with target.serviceSubset",
+			},
+		},
+		"target.partition cannot be set with target.peer": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer:      "p2",
+						Partition: "partition2",
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"target.partition cannot be set with target.peer",
+			},
+		},
+		"target.peer cannot be set with target.datacenter": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Peer:       "p2",
+						Datacenter: "dc2",
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"target.peer cannot be set with target.datacenter",
+			},
+		},
+		"target.partition cannot be set with target.datacenter": {
+			input: &ServiceResolverFailover{
+				Targets: []ServiceResolverFailoverTarget{
+					{
+						Partition:  "p2",
+						Datacenter: "dc2",
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"target.partition cannot be set with target.datacenter",
+			},
+		},
+		"found empty datacenter": {
+			input: &ServiceResolverFailover{
+				Datacenters: []string{""},
+			},
+			consulMeta: common.ConsulMeta{
+				Partition:         "default",
+				PartitionsEnabled: true,
+			},
+			expectedErrMsgs: []string{
+				"found empty datacenter",
+			},
+		},
+	}
+
+	path := field.NewPath("spec.redirect")
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			errList := testCase.input.validate(path, testCase.consulMeta)
+			compareErrorLists(t, testCase.expectedErrMsgs, errList)
 		})
 	}
 }
