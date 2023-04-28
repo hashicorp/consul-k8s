@@ -22,5 +22,5 @@ func (c *ConfigCommand) Help() string {
 }
 
 func (c *ConfigCommand) Synopsis() string {
-	return "Inspect Envoy proxies managed by Consul."
+	return "Operate on configuration"
 }
