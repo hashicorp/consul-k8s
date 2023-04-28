@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -85,6 +86,8 @@ type SourceIntention struct {
 	Peer string `json:"peer,omitempty"`
 	// Partition is the Admin Partition for the Name parameter.
 	Partition string `json:"partition,omitempty"`
+	// SamenessGroup is the name of the sameness group, if applicable.
+	SamenessGroup string `json:"samenessGroup,omitempty"`
 	// Action is required for an L4 intention, and should be set to one of
 	// "allow" or "deny" for the action that should be taken if this intention matches a request.
 	Action IntentionAction `json:"action,omitempty"`
@@ -272,10 +275,10 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 		} else {
 			errs = append(errs, source.Permissions.validate(path.Child("sources").Index(i))...)
 		}
+		errs = append(errs, source.validate(path.Child("sources").Index(i), consulMeta.PartitionsEnabled)...)
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
-	errs = append(errs, in.validateSourcePeerAndPartitions(consulMeta.PartitionsEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -283,6 +286,46 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func (in *SourceIntention) validate(path *field.Path, partitionsEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+
+	if in.Name == "" {
+		errs = append(errs, field.Required(path.Child("name"), "name is required."))
+	}
+
+	if strings.Contains(in.Partition, WildcardSpecifier) {
+		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, "partition cannot use or contain wildcard '*'"))
+	}
+	if strings.Contains(in.Peer, WildcardSpecifier) {
+		errs = append(errs, field.Invalid(path.Child("peer"), in.Peer, "peer cannot use or contain wildcard '*'"))
+	}
+	if strings.Contains(in.SamenessGroup, WildcardSpecifier) {
+		errs = append(errs, field.Invalid(path.Child("samenessgroup"), in.SamenessGroup, "samenessgroup cannot use or contain wildcard '*'"))
+	}
+
+	if in.Partition != "" && !partitionsEnabled {
+		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
+	}
+
+	if in.Peer != "" && in.Partition != "" {
+		errs = append(errs, field.Invalid(path, *in, "cannot set peer and partition at the same time."))
+	}
+
+	if in.SamenessGroup != "" && in.Partition != "" {
+		errs = append(errs, field.Invalid(path, *in, "cannot set samenessgroup and partition at the same time."))
+	}
+
+	if in.SamenessGroup != "" && in.Peer != "" {
+		errs = append(errs, field.Invalid(path, *in, "cannot set samenessgroup and peer at the same time."))
+	}
+
+	if len(in.Description) > metaValueMaxLength {
+		errs = append(errs, field.Invalid(path, "", fmt.Sprintf("description exceeds maximum length %d", metaValueMaxLength)))
+	}
+
+	return errs
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.destination to their default values if namespaces are enabled.
@@ -313,13 +356,14 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 		return nil
 	}
 	return &capi.SourceIntention{
-		Name:        in.Name,
-		Namespace:   in.Namespace,
-		Partition:   in.Partition,
-		Peer:        in.Peer,
-		Action:      in.Action.toConsul(),
-		Permissions: in.Permissions.toConsul(),
-		Description: in.Description,
+		Name:          in.Name,
+		Namespace:     in.Namespace,
+		Partition:     in.Partition,
+		Peer:          in.Peer,
+		SamenessGroup: in.SamenessGroup,
+		Action:        in.Action.toConsul(),
+		Permissions:   in.Permissions.toConsul(),
+		Description:   in.Description,
 	}
 }
 
@@ -456,21 +500,6 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 			if source.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `Consul Enterprise namespaces must be enabled to set source.namespace`))
 			}
-		}
-	}
-	return errs
-}
-
-func (in *ServiceIntentions) validateSourcePeerAndPartitions(partitionsEnabled bool) field.ErrorList {
-	var errs field.ErrorList
-	path := field.NewPath("spec")
-	for i, source := range in.Spec.Sources {
-		if source.Partition != "" && !partitionsEnabled {
-			errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
-		}
-
-		if source.Peer != "" && source.Partition != "" {
-			errs = append(errs, field.Invalid(path.Child("sources").Index(i), source, `Both source.peer and source.partition cannot be set.`))
 		}
 	}
 	return errs

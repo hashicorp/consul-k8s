@@ -16,6 +16,8 @@ import (
 
 // This file contains structs that are shared between multiple config entries.
 
+const metaValueMaxLength = 512
+
 type MeshGatewayMode string
 
 // Expose describes HTTP paths to expose through Envoy outside of Connect.
