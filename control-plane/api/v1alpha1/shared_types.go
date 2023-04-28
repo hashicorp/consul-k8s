@@ -16,6 +16,9 @@ import (
 
 // This file contains structs that are shared between multiple config entries.
 
+// metaValueMaxLength is the maximum allowed string length of a metadata value.
+const metaValueMaxLength = 512
+
 type MeshGatewayMode string
 
 // Expose describes HTTP paths to expose through Envoy outside of Connect.
