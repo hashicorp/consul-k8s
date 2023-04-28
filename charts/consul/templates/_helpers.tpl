@@ -335,7 +335,7 @@ Consul server environment variables for consul-k8s commands.
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
-  value: "true" 
+  value: "true"
 {{- end }}
 {{- end -}}
 
@@ -366,7 +366,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }} 
+{{- if and .Values.global.cloud.enabled }}
 {{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
 {{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
 {{- end }}
