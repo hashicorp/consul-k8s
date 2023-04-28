@@ -2,8 +2,9 @@ package controllers
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"testing"
+
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -72,7 +73,7 @@ func TestGatewayReconciler(t *testing.T) {
 				{
 					Type:    accepted,
 					Status:  metav1.ConditionTrue,
-					Reason:  configurationAccepted,
+					Reason:  accepted,
 					Message: "Configuration accepted",
 				},
 			},

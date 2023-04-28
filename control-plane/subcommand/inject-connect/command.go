@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/management"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
@@ -476,8 +477,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err := (&controllers.GatewayController{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Gateway"),
+		DefaultConfig: management.DefaultConfig{},
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("Gateway"),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1

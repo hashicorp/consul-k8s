@@ -1,7 +1,6 @@
 package management
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -9,24 +8,17 @@ import (
 )
 
 type Gateway struct {
-	DefaultConfig
-	v1alpha1.GatewayClassConfig
+	defaultCfg    DefaultConfig
+	gatewayClass  gwv1beta1.GatewayClass
 	gatewayConfig gwv1beta1.Gateway
 }
 
-func (g *Gateway) WithDefaultConfig(cfg DefaultConfig) *Gateway {
-	g.DefaultConfig = cfg
-	return g
-}
-
-func (g *Gateway) WithGatewayClassConfig(cfg v1alpha1.GatewayClassConfig) *Gateway {
-	g.GatewayClassConfig = cfg
-	return g
-}
-
-func (g *Gateway) WithGatewayConfig(cfg gwv1beta1.Gateway) *Gateway {
-	g.gatewayConfig = cfg
-	return g
+func NewGateway(defaultCfg DefaultConfig, gatewayClassCfg gwv1beta1.GatewayClass, gatewayCfg gwv1beta1.Gateway) *Gateway {
+	return &Gateway{
+		defaultCfg:    defaultCfg,
+		gatewayClass:  gatewayClassCfg,
+		gatewayConfig: gatewayCfg,
+	}
 }
 
 func (g Gateway) Deployment() *appsv1.Deployment {
@@ -36,7 +28,7 @@ func (g Gateway) Deployment() *appsv1.Deployment {
 			Namespace: g.gatewayConfig.Name,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &g.Replicas,
+			Replicas: &g.defaultCfg.Replicas,
 		},
 	}
 }
