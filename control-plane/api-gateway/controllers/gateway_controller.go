@@ -5,6 +5,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +34,7 @@ type GatewayController struct {
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
-	log.Info("Reconciling the Gateway in the GatewayController", "name", req.Name)
+	log.Info("Reconciling the Gateway: ", req.Name)
 
 	// If gateway does not exist, log an error.
 	gw := &gwv1beta1.Gateway{}
@@ -47,11 +48,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	gwc := &gwv1beta1.GatewayClass{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName)}, gwc)
 	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		log.Error(err, "unable to get GatewayClass")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 
-	// TODO: Why did we do it this way?
 	if string(gwc.Spec.ControllerName) != GatewayClassControllerName || !gw.ObjectMeta.DeletionTimestamp.IsZero() {
 		// This Gateway is not for this controller or the gateway is being deleted.
 		// TODO: Cleanup Consul resources.
@@ -64,17 +67,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if !gw.ObjectMeta.DeletionTimestamp.IsZero() {
-		// We have a deletion request. Ensure we are not in use.
-		used, err := r.isGatewayInUse(ctx, gw)
-		if err != nil {
-			log.Error(err, "unable to check if Gateway is in use")
-			return ctrl.Result{}, err
-		}
-		if used {
-			log.Info("Gateway is in use, cannot delete")
-			return ctrl.Result{}, nil
-		}
-		// Remove our finalizer.
+		// We have a deletion request. Remove our finalizer.
 		if _, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer); err != nil {
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
@@ -97,18 +90,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	//TODO: Handle reconciliation.
 
 	return ctrl.Result{}, nil
-}
-
-// isGatewayInUse returns true if the given Gateway is referenced by any Gateway objects.
-func (r *GatewayController) isGatewayInUse(ctx context.Context, g *gwv1beta1.Gateway) (bool, error) {
-	list := &gwv1beta1.GatewayList{}
-	if err := r.Client.List(ctx, list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, g.Name),
-	}); err != nil {
-		return false, err
-	}
-
-	return len(list.Items) != 0, nil
 }
 
 // SetupWithManager registers the controller with the given manager.
