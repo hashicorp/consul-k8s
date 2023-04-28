@@ -198,4 +198,3 @@ func (c *ReadCommand) Help() string {
 func (c *ReadCommand) Synopsis() string {
 	return "Returns the helm config of a Consul installation on Kubernetes."
 }
-
