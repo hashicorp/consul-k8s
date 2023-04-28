@@ -146,7 +146,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 	// if the Version is empty consulVersion will be nil
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
-	vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
 
 	return &config.TestConfig{
 		Kubeconfig:    t.flagKubeconfig,
@@ -177,7 +176,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		ConsulVersion:         consulVersion,
 		EnvoyImage:            t.flagEnvoyImage,
 		VaultHelmChartVersion: t.flagVaultHelmChartVersion,
-		VaultServerVersion:    vaultserverVersion,
+		VaultServerVersion:    t.flagVaultServerVersion,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
