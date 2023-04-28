@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: set agent localities on Consul servers to the server node's `topology.kubernetes.io/region` label.
+```
