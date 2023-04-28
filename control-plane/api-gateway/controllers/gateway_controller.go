@@ -124,7 +124,7 @@ func (r *GatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
-// class, then return a list of reconcile Requests for them
+// class, then return a list of reconcile Requests for it.
 func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		gatewayClass := o.(*gwv1beta1.GatewayClass)
@@ -230,7 +230,7 @@ func refsToRequests(objects []types.NamespacedName) []reconcile.Request {
 	return requests
 }
 
-// parentRefs takes a list of ParentReference objects and returns a list of NamespacedName objects
+// parentRefs takes a list of ParentReference objects and returns a list of NamespacedName objects.
 func parentRefs(group, kind, namespace string, refs []gwv1beta1.ParentReference) []types.NamespacedName {
 	indexed := make([]types.NamespacedName, 0, len(refs))
 	for _, parent := range refs {
