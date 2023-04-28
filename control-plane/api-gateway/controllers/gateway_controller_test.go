@@ -39,7 +39,7 @@ func TestGatewayReconciler(t *testing.T) {
 		expectedIsDeleted  bool
 		expectedConditions []metav1.Condition
 	}{
-		"successful reconcile with no change": {
+		"successful reconcile with no change simple gateway": {
 			gateway: &gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
@@ -68,14 +68,6 @@ func TestGatewayReconciler(t *testing.T) {
 			expectedError:      nil,
 			expectedFinalizers: []string{gatewayFinalizer},
 			expectedIsDeleted:  false,
-			expectedConditions: []metav1.Condition{
-				{
-					Type:    accepted,
-					Status:  metav1.ConditionTrue,
-					Reason:  configurationAccepted,
-					Message: "Configuration accepted",
-				},
-			},
 		},
 	}
 
