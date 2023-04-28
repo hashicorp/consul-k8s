@@ -26,7 +26,7 @@ const (
 	AnnotationGateway = "consul.hashicorp.com/gateway"
 	// AnnotationHTTPRoute is the annotation used to override the http route name.
 	AnnotationHTTPRoute = "consul.hashicorp.com/http-route"
-	// AnnotationTCPRoute is the annotation used to override the http route name.
+	// AnnotationTCPRoute is the annotation used to override the tcp route name.
 	AnnotationTCPRoute = "consul.hashicorp.com/tcp-route"
 	// AnnotationInlineCertificate is the annotation used to override the inline certificate name.
 	AnnotationInlineCertificate = "consul.hashicorp.com/inline-certificate"
@@ -46,7 +46,7 @@ type Translator struct {
 	MirroringPrefix        string
 }
 
-// GatewayToAPIGateway translates a k8s API gateway into a Consul API gateway.
+// GatewayToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
 func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]consulIdentifier) capi.APIGatewayConfigEntry {
 	listeners := make([]capi.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
 	consulPartition := os.Getenv("CONSUL_PARTITION")
@@ -104,7 +104,7 @@ func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types
 	}
 }
 
-// HTTPRouteToHTTPRoute translates a k8s http route into a consul config http route.
+// HTTPRouteToHTTPRoute translates a k8s HTTPRoute into a Consul HTTPRoute Config Entry.
 func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.HTTPRouteConfigEntry {
 	consulPartition := os.Getenv("CONSUL_PARTITION")
 
@@ -142,6 +142,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 	return consulHTTPRoute
 }
 
+// translates parent refs for Routes into Consul Resource References
 func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]consulIdentifier) []capi.ResourceReference {
 	parents := make([]capi.ResourceReference, 0, len(k8sParentRefs))
 	for _, k8sParentRef := range k8sParentRefs {
@@ -166,10 +167,12 @@ func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentR
 	return parents
 }
 
+// isRefAPIGateway checks if the parent resource is an APIGateway
 func isRefAPIGateway(ref gwv1beta1.ParentReference) bool {
 	return ref.Kind != nil && *ref.Kind == gwv1beta1.Kind("Gateway") || ref.Group != nil && string(*ref.Group) == gwv1beta1.GroupName
 }
 
+// translate the rules portion of a HTTPRoute
 func (t Translator) translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRouteRule {
 	rules := make([]capi.HTTPRouteRule, 0, len(k8sRules))
 	for _, k8sRule := range k8sRules {
@@ -298,6 +301,7 @@ func (t Translator) translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackend
 	return services
 }
 
+// TCPRouteToTCPRoute translates a Kuberenetes TCPRoute into a Consul TCPRoute Config Entry.
 func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.TCPRouteConfigEntry {
 	consulPartition := os.Getenv("CONSUL_PARTITION")
 
@@ -342,6 +346,7 @@ func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs 
 	return consulRoute
 }
 
+// SecretToInlineCertificate translates a Kuberenetes Secret into a Consul Inline Certificate Config Entry.
 func (t Translator) SecretToInlineCertificate(k8sSecret gwv1beta1.SecretObjectReference, certs map[types.NamespacedName]consulIdentifier) capi.InlineCertificateConfigEntry {
 	inlineCert := capi.InlineCertificateConfigEntry{Kind: capi.InlineCertificate}
 
