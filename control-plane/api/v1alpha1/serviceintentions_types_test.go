@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -616,6 +617,8 @@ func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 }
 
 func TestServiceIntentions_Validate(t *testing.T) {
+	longDescription := strings.Repeat("x", metaValueMaxLength+1)
+
 	cases := map[string]struct {
 		input             *ServiceIntentions
 		namespacesEnabled bool
@@ -1138,6 +1141,54 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "{\"name\":\"svc-2\",\"namespace\":\"bar\",\"action\":\"deny\",\"permissions\":[{\"action\":\"allow\",\"http\":{\"pathExact\":\"/bar\"}}]}": action and permissions are mutually exclusive and only one of them can be specified`,
 			},
 		},
+		"name not specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Namespace: "bar",
+							Action:    "deny",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].name: Required value: name is required.`,
+			},
+		},
+		"description is too long": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:        "foo",
+							Namespace:   "bar",
+							Action:      "deny",
+							Description: longDescription,
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "": description exceeds maximum length 512`,
+			},
+		},
 		"namespaces disabled: destination namespace specified": {
 			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1457,6 +1508,46 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			expectedErrMsgs: []string{
 				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", SamenessGroup:"", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
 				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", SamenessGroup:"", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
+			},
+		},
+		"multiple errors: wildcard peer and partition and samenessgroup specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "*",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+							Peer:      "*",
+						},
+						{
+							Name:          "db2",
+							Action:        "deny",
+							Namespace:     "namespace-d",
+							SamenessGroup: "*",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`partition cannot use or contain wildcard '*'`,
+				`peer cannot use or contain wildcard '*'`,
+				`samenessgroup cannot use or contain wildcard '*'`,
 			},
 		},
 	}
