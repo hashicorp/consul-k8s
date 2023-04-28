@@ -181,6 +181,10 @@ spec:
                             type: object
                         type: object
                       type: array
+                    samenessGroup:
+                      description: SamenessGroup is the name of the sameness group,
+                        if applicable.
+                      type: string
                   type: object
                 type: array
             type: object
