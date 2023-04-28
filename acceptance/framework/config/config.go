@@ -53,7 +53,7 @@ type TestConfig struct {
 	EnvoyImage       string
 
 	VaultHelmChartVersion string
-	VaultServerVersion    string
+	VaultServerVersion    *version.Version
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string
