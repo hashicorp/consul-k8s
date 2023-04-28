@@ -61,8 +61,8 @@ func TestConfigRead(t *testing.T) {
 								Version: "1.0.0",
 							},
 						},
-            Config: map[string]interface{}{"global": "true"},
-          }, nil
+						Config: map[string]interface{}{"global": "true"},
+					}, nil
 				},
 			},
 			expectedReturnCode: 0,

@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 
+	"github.com/hashicorp/consul-k8s/cli/cmd/config"
+	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/status"
-	"github.com/hashicorp/consul-k8s/cli/cmd/config"
-	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/uninstall"
 	"github.com/hashicorp/consul-k8s/cli/cmd/upgrade"
 	cmdversion "github.com/hashicorp/consul-k8s/cli/cmd/version"
