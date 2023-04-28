@@ -11,6 +11,7 @@ import (
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
+	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
@@ -89,6 +90,9 @@ func init() {
 		},
 		"install-cni": func() (cli.Command, error) {
 			return &cmdInstallCNI.Command{UI: ui}, nil
+		},
+		"fetch-server-region": func() (cli.Command, error) {
+			return &cmdFetchServerRegion.Command{UI: ui}, nil
 		},
 	}
 }

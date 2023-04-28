@@ -65,7 +65,14 @@ spec:
         {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
+          {{- /* When Vault is being used as a secrets backend, auto-encrypt must be enabled. Since clients use a separate
+          root CA from servers when auto-encrypt is enabled, and our controller communicates with the agent when clients are
+          enabled, we only use the Vault server CA if clients are disabled and our controller will be communicating w/ the server. */}}
+          {{- if and (not .Values.client.enabled) .Values.global.secretsBackend.vault.enabled }}
+          value: /vault/secrets/serverca.crt
+          {{- else }}
           value: /consul/tls/ca/tls.crt
+          {{- end }}
         {{- end }}
         {{- end }}
         - name: HOST_IP
@@ -156,7 +163,7 @@ spec:
         - name: consul-bin
           mountPath: /consul-bin
         {{- end }}
-        {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
+        {{- if or (not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         {{- if and .Values.client.enabled .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
@@ -186,7 +193,7 @@ spec:
         emptyDir: { }
       {{- end }}
       {{- if .Values.global.tls.enabled }}
-      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
       - name: consul-ca-cert
         secret:
           {{- if .Values.global.tls.caCert.secretName }}
@@ -253,7 +260,7 @@ spec:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
-        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
         {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca

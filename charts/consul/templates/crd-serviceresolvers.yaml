@@ -95,6 +95,10 @@ spec:
                             type: string
                           type: array
                       type: object
+                    samenessGroup:
+                      description: SamenessGroup is the name of the sameness group
+                        to try during failover.
+                      type: string
                     service:
                       description: Service is the service to resolve instead of the
                         default as the failover group of instances during failover.
@@ -247,6 +251,10 @@ spec:
                   peer:
                     description: Peer is the name of the cluster peer to resolve the
                       service from instead of the current one.
+                    type: string
+                  samenessGroup:
+                    description: SamenessGroup is the name of the sameness group to
+                      resolve the service from instead of the current one.
                     type: string
                   service:
                     description: Service is a service to resolve instead of the current
