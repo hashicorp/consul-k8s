@@ -21,9 +21,6 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmTime "helm.sh/helm/v3/pkg/time"
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -138,23 +135,4 @@ func getInitializedCommand(t *testing.T, buf io.Writer) *ReadCommand {
 	}
 	c.init()
 	return c
-}
-
-func createServers(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
-	servers := appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-		},
-		Status: appsv1.StatefulSetStatus{
-			Replicas:      replicas,
-			ReadyReplicas: readyReplicas,
-		},
-	}
-	_, err := k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
-	return err
 }
