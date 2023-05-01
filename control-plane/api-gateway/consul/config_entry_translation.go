@@ -142,7 +142,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 	return consulHTTPRoute
 }
 
-// translates parent refs for Routes into Consul Resource References
+// translates parent refs for Routes into Consul Resource References.
 func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]consulIdentifier) []capi.ResourceReference {
 	parents := make([]capi.ResourceReference, 0, len(k8sParentRefs))
 	for _, k8sParentRef := range k8sParentRefs {
@@ -167,12 +167,12 @@ func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentR
 	return parents
 }
 
-// isRefAPIGateway checks if the parent resource is an APIGateway
+// isRefAPIGateway checks if the parent resource is an APIGateway.
 func isRefAPIGateway(ref gwv1beta1.ParentReference) bool {
 	return ref.Kind != nil && *ref.Kind == gwv1beta1.Kind("Gateway") || ref.Group != nil && string(*ref.Group) == gwv1beta1.GroupName
 }
 
-// translate the rules portion of a HTTPRoute
+// translate the rules portion of a HTTPRoute.
 func (t Translator) translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRouteRule {
 	rules := make([]capi.HTTPRouteRule, 0, len(k8sRules))
 	for _, k8sRule := range k8sRules {
