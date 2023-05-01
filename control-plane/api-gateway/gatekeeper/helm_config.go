@@ -1,6 +1,6 @@
 package management
 
-type DefaultConfig struct {
+type HelmConfig struct {
 	Image           string
 	Replicas        int32
 	LogLevel        string
