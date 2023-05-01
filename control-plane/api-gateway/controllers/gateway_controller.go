@@ -25,7 +25,7 @@ const (
 )
 
 // GatewayController reconciles a Gateway object.
-// The GatewayClass is responsible for defining the behavior of API gateways.
+// The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
 	Log logr.Logger
 	client.Client
@@ -33,7 +33,7 @@ type GatewayController struct {
 
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
+	log := r.Log.WithValues("gateway", req.NamespacedName)
 	log.Info("Reconciling the Gateway: ", req.Name)
 
 	// If gateway does not exist, log an error.
