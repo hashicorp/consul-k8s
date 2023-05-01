@@ -26,7 +26,7 @@ type GatekeeperConfig struct {
 	HelmConfig         HelmConfig
 }
 
-func NewGatekeeper(cfg GatekeeperConfig) *Gatekeeper {
+func New(cfg GatekeeperConfig) *Gatekeeper {
 	return &Gatekeeper{cfg}
 }
 
