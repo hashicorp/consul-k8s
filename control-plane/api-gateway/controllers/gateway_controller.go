@@ -40,9 +40,9 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	gw := &gwv1beta1.Gateway{}
 	err := r.Client.Get(ctx, req.NamespacedName, gw)
 	if err != nil {
-	    if k8serror.IsNotFound(err) {
-	        return ctrl.Result{}, nil
-	    }
+		if k8serrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		log.Error(err, "unable to get Gateway")
 		return ctrl.Result{}, err
 	}
