@@ -5,7 +5,6 @@
 package consul
 
 import (
-	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -44,12 +43,12 @@ type Translator struct {
 	ConsulDestNamespace    string
 	EnableK8sMirroring     bool
 	MirroringPrefix        string
+	ConsulPartition        string
 }
 
 // GatewayToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
 func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]consulIdentifier) capi.APIGatewayConfigEntry {
 	listeners := make([]capi.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
-	consulPartition := os.Getenv("CONSUL_PARTITION")
 	for _, listener := range k8sGW.Spec.Listeners {
 		certificates := make([]capi.ResourceReference, 0, len(listener.TLS.CertificateRefs))
 		for _, certificate := range listener.TLS.CertificateRefs {
@@ -99,15 +98,13 @@ func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types
 			metaKeyKubeServiceName: k8sGW.GetObjectMeta().GetName(),
 		},
 		Listeners: listeners,
-		Partition: consulPartition,
+		Partition: t.ConsulPartition,
 		Namespace: t.getConsulNamespace(k8sGW.GetObjectMeta().GetNamespace()),
 	}
 }
 
 // HTTPRouteToHTTPRoute translates a k8s HTTPRoute into a Consul HTTPRoute Config Entry.
 func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.HTTPRouteConfigEntry {
-	consulPartition := os.Getenv("CONSUL_PARTITION")
-
 	routeName := k8sHTTPRoute.Name
 	if routeNameFromAnnotation, ok := k8sHTTPRoute.Annotations[AnnotationHTTPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -121,7 +118,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 			metaKeyKubeNS:          k8sHTTPRoute.GetObjectMeta().GetNamespace(),
 			metaKeyKubeServiceName: k8sHTTPRoute.GetObjectMeta().GetName(),
 		},
-		Partition: consulPartition,
+		Partition: t.ConsulPartition,
 
 		Namespace: t.getConsulNamespace(k8sHTTPRoute.GetObjectMeta().GetNamespace()),
 	}
@@ -303,8 +300,6 @@ func (t Translator) translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackend
 
 // TCPRouteToTCPRoute translates a Kuberenetes TCPRoute into a Consul TCPRoute Config Entry.
 func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.TCPRouteConfigEntry {
-	consulPartition := os.Getenv("CONSUL_PARTITION")
-
 	routeName := k8sRoute.Name
 	if routeNameFromAnnotation, ok := k8sRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -318,7 +313,7 @@ func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs 
 			metaKeyKubeNS:          k8sRoute.GetObjectMeta().GetNamespace(),
 			metaKeyKubeServiceName: k8sRoute.GetObjectMeta().GetName(),
 		},
-		Partition: consulPartition,
+		Partition: t.ConsulPartition,
 
 		Namespace: t.getConsulNamespace(k8sRoute.GetObjectMeta().GetNamespace()),
 	}
@@ -336,7 +331,7 @@ func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs 
 			}
 			tcpService := capi.TCPService{
 				Name:      string(k8sref.Name),
-				Partition: consulPartition,
+				Partition: t.ConsulPartition,
 				Namespace: t.getConsulNamespace(k8srefNS),
 			}
 			consulRoute.Services = append(consulRoute.Services, tcpService)
