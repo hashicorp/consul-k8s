@@ -59,8 +59,8 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
-	if cfg.VaultServerVersion != nil {
-		values["server.image.tag"] = cfg.VaultServerVersion.String()
+	if cfg.VaultServerVersion != "" {
+		values["server.image.tag"] = cfg.VaultServerVersion
 	}
 	vaultHelmChartVersion := defaultVaultHelmChartVersion
 
