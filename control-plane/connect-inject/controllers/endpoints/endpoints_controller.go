@@ -1,6 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
-
 package endpoints
 
 import (
@@ -292,6 +291,15 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
+			return err
+		}
+
+		// Add manual ip to the VIP table
+		r.Log.Info("adding manual ip to virtual ip table in Consul", "name", serviceRegistration.Service.Service,
+			"id", serviceRegistration.ID)
+		err = assignServiceVirtualIP(r.Context, apiClient, serviceRegistration.Service)
+		if err != nil {
+			r.Log.Error(err, "failed to add ip to virtual ip table", "name", serviceRegistration.Service.Service)
 			return err
 		}
 
@@ -1256,6 +1264,21 @@ func (r *Controller) appendNodeMeta(registration *api.CatalogRegistration) {
 	for k, v := range r.NodeMeta {
 		registration.NodeMeta[k] = v
 	}
+}
+
+// assignServiceVirtualIPs manually assigns the ClusterIP to the virtual IP table so that transparent proxy routing works.
+func assignServiceVirtualIP(ctx context.Context, apiClient *api.Client, svc *api.AgentService) error {
+	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{svc.TaggedAddresses[clusterIPTaggedAddressName].Address}, &api.WriteOptions{})
+	if err != nil {
+		// Maintain backwards compatibility with older versions of Consul that do not support the VIP improvements. Tproxy
+		// will not work 100% correctly but the mesh will still work
+		if strings.Contains(err.Error(), "404") {
+			return fmt.Errorf("failed to add ip for service %s to virtual ip table. Please upgrade Consul to version 1.16 or higher", svc.Service)
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
