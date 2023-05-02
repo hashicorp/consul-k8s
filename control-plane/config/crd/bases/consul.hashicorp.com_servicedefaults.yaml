@@ -167,6 +167,18 @@ spec:
                   CRD and should be set using annotations on the services that are
                   part of the mesh.'
                 type: string
+              mutualTLSMode:
+                description: 'MutualTLSMode controls whether mutual TLS is required
+                  for all incoming connections when transparent proxy is enabled.
+                  This can be set to "permissive" or "strict". "strict" is the default
+                  which requires mutual TLS for incoming connections. In the insecure
+                  "permissive" mode, connections to the sidecar proxy public listener
+                  port require mutual TLS, but connections to the service port do
+                  not require mutual TLS and are proxied to the application unmodified.
+                  Note: Intentions are not enforced for non-mTLS connections. To keep
+                  your services secure, we recommend using "strict" mode whenever
+                  possible and enabling "permissive" mode only when necessary.'
+                type: string
               protocol:
                 description: Protocol sets the protocol of the service. This is used
                   by Connect proxies for things like observability features and to
