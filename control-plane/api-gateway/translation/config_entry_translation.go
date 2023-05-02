@@ -1,8 +1,8 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-// Package consul handles interaction with consul servers from the controller
-package consul
+// Package translation handles translating resources between different types
+package translation
 
 import (
 	"strings"
