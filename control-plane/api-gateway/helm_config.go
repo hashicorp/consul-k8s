@@ -1,4 +1,4 @@
-package management
+package apigateway
 
 type HelmConfig struct {
 	Image           string

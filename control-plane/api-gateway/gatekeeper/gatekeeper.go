@@ -1,9 +1,10 @@
-package management
+package gatekeeper
 
 import (
 	"context"
 
 	"github.com/go-logr/logr"
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -23,7 +24,7 @@ type GatekeeperConfig struct {
 
 	Gateway            gwv1beta1.Gateway
 	GatewayClassConfig v1alpha1.GatewayClassConfig
-	HelmConfig         HelmConfig
+	HelmConfig         apigateway.HelmConfig
 }
 
 func New(cfg GatekeeperConfig) *Gatekeeper {

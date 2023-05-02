@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/management"
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +28,8 @@ const (
 // GatewayController reconciles a Gateway object.
 // The GatewayClass is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	DefaultConfig management.DefaultConfig
-	Log           logr.Logger
+	HelmConfig apigateway.HelmConfig
+	Log        logr.Logger
 	client.Client
 }
 
@@ -37,8 +37,6 @@ type GatewayController struct {
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName)
 	log.Info("Reconciling the Gateway in the GatewayController", "name", req.Name)
-
-	gatekeeper := management.NewGatekeeper(r.Client, log)
 
 	// If gateway doesn't exist log an error.
 	gw := &gwv1beta1.Gateway{}
@@ -79,24 +77,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, nil
 		}
 
-		// Delete the gateway.
-		if err := gatekeeper.DeleteGateway(ctx, req.NamespacedName); err != nil {
-			log.Error(err, "unable to delete gateway")
-			return ctrl.Result{}, err
-		}
-
 		// Remove our finalizer.
 		if _, err := RemoveFinalizer(ctx, r.Client, gwc, gatewayFinalizer); err != nil {
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
-	}
-
-	gateway := management.NewGateway(r.DefaultConfig, *gwc, *gw)
-	if err := gatekeeper.UpsertGateway(ctx, gateway); err != nil {
-		log.Error(err, "unable to upsert gateway")
-		return ctrl.Result{}, err
 	}
 
 	didUpdate, err := EnsureFinalizer(ctx, r.Client, gw, gatewayFinalizer)
