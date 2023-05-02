@@ -2,6 +2,7 @@ package gatekeeper
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
@@ -64,4 +65,11 @@ func (g Gatekeeper) namespacedName() types.NamespacedName {
 		Namespace: g.Gateway.Namespace,
 		Name:      g.Gateway.Name,
 	}
+}
+
+func (g Gatekeeper) serviceAccountName() string {
+	authspecaccount := "" // TODO do I need to add this to GatewayClassConfig?
+	fmt.Println(authspecaccount)
+
+	return ""
 }

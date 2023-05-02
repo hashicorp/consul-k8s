@@ -5,6 +5,7 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,7 +31,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 	}
 
 	if exists {
-		// TODO what do we need to do if the deployment exists?
+		// If the user has set the number of replicas, let's respect that.
 	}
 
 	// Create the Deployment.
@@ -60,11 +61,42 @@ func (g Gatekeeper) deployment() *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      g.Gateway.Name,
-			Namespace: g.Gateway.Name,
+			Namespace: g.Gateway.Namespace,
 			Labels:    apigateway.LabelsForGateway(&g.Gateway),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &g.HelmConfig.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: apigateway.LabelsForGateway(&g.Gateway),
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: apigateway.LabelsForGateway(&g.Gateway),
+					Annotations: map[string]string{
+						"consul.hashicorp.com/connect-inject": "false",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								{
+									Weight: 1,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: apigateway.LabelsForGateway(&g.Gateway),
+										},
+										TopologyKey: "kubernetes.io/hostname",
+									},
+								},
+							},
+						},
+					},
+					NodeSelector:       g.GatewayClassConfig.Spec.NodeSelector,
+					Tolerations:        g.GatewayClassConfig.Spec.Tolerations,
+					ServiceAccountName: g.serviceAccountName(),
+				},
+			},
 		},
 	}
 }
