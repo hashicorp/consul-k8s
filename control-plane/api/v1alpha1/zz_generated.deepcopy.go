@@ -7,6 +7,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -922,6 +923,16 @@ func (in *PassiveHealthCheck) DeepCopyInto(out *PassiveHealthCheck) {
 	if in.EnforcingConsecutive5xx != nil {
 		in, out := &in.EnforcingConsecutive5xx, &out.EnforcingConsecutive5xx
 		*out = new(uint32)
+		**out = **in
+	}
+	if in.MaxEjectionPercent != nil {
+		in, out := &in.MaxEjectionPercent, &out.MaxEjectionPercent
+		*out = new(uint32)
+		**out = **in
+	}
+	if in.BaseEjectionTime != nil {
+		in, out := &in.BaseEjectionTime, &out.BaseEjectionTime
+		*out = new(v1.Duration)
 		**out = **in
 	}
 }

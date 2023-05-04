@@ -270,6 +270,13 @@ spec:
                           upstream proxy instances will be monitored for removal from
                           the load balancing pool.
                         properties:
+                          baseEjectionTime:
+                            description: The base time that a host is ejected for.
+                              The real time is equal to the base time multiplied by
+                              the number of times the host has been ejected and is
+                              capped by max_ejection_time (Default 300s). Defaults
+                              to 30000ms or 30s.
+                            type: string
                           enforcing_consecutive_5xx:
                             description: EnforcingConsecutive5xx is the % chance that
                               a host will be actually ejected when an outlier status
@@ -281,6 +288,13 @@ spec:
                             description: Interval between health check analysis sweeps.
                               Each sweep may remove hosts or return hosts to the pool.
                             type: string
+                          maxEjectionPercent:
+                            description: The maximum % of an upstream cluster that
+                              can be ejected due to outlier detection. Defaults to
+                              10% but will eject at least one host regardless of the
+                              value.
+                            format: int32
+                            type: integer
                           maxFailures:
                             description: MaxFailures is the count of consecutive failures
                               that results in a host being removed from the pool.
@@ -373,6 +387,13 @@ spec:
                             how upstream proxy instances will be monitored for removal
                             from the load balancing pool.
                           properties:
+                            baseEjectionTime:
+                              description: The base time that a host is ejected for.
+                                The real time is equal to the base time multiplied
+                                by the number of times the host has been ejected and
+                                is capped by max_ejection_time (Default 300s). Defaults
+                                to 30000ms or 30s.
+                              type: string
                             enforcing_consecutive_5xx:
                               description: EnforcingConsecutive5xx is the % chance
                                 that a host will be actually ejected when an outlier
@@ -385,6 +406,13 @@ spec:
                                 sweeps. Each sweep may remove hosts or return hosts
                                 to the pool.
                               type: string
+                            maxEjectionPercent:
+                              description: The maximum % of an upstream cluster that
+                                can be ejected due to outlier detection. Defaults
+                                to 10% but will eject at least one host regardless
+                                of the value.
+                              format: int32
+                              type: integer
                             maxFailures:
                               description: MaxFailures is the count of consecutive
                                 failures that results in a host being removed from
