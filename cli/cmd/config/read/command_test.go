@@ -3,6 +3,7 @@ package read
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -45,8 +46,18 @@ func TestConfigRead(t *testing.T) {
 			},
 			expectedReturnCode: 0,
 		},
+		"error": {
+			messages: []string{"error", "\n"},
+
+			helmActionsRunner: &helm.MockActionRunner{
+				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+					return nil, errors.New("error")
+				},
+			},
+			expectedReturnCode: 1,
+		},
 		"some config": {
-			messages: []string{"\n"},
+			messages: []string{"global: \"true\"", "\n"},
 
 			helmActionsRunner: &helm.MockActionRunner{
 				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
