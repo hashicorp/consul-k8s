@@ -22,6 +22,8 @@ spec:
         interval: 1s
         maxFailures: 10
         enforcing_consecutive_5xx: 60
+        maxEjectionPercent: 100
+        baseEjectionTime: 20s
     - name: "bar"
       limits:
         maxConnections: 5
