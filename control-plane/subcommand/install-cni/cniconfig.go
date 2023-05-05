@@ -111,18 +111,19 @@ func confListFileFromConfFile(cfgFile string) (string, error) {
 
 // The format of the main cni config file is unstructured json consisting of a header and list of plugins
 //
-// {
-//  "cniVersion": "0.3.1",
-//  "name": "kindnet",
-//  "plugins": [
-//    {
-//        <plugin 1>
-//    },
-//    {
-//       <plugin 2>
-//    }
-//   ]
-// }
+//	{
+//	 "cniVersion": "0.3.1",
+//	 "name": "kindnet",
+//	 "plugins": [
+//	   {
+//	       <plugin 1>
+//	   },
+//	   {
+//	      <plugin 2>
+//	   }
+//	  ]
+//	}
+//
 // appendCNIConfig appends the consul-cni configuration to the main configuration file.
 func appendCNIConfig(consulCfg *config.CNIConfig, cfgFile string) error {
 	// Read the config file and convert it to a map.
