@@ -370,6 +370,15 @@ func (t Translator) getConsulNamespace(k8sNS string) string {
 	return namespaces.ConsulNamespace(k8sNS, t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix)
 }
 
+func EntryToReference(entry capi.ConfigEntry) capi.ResourceReference {
+	return capi.ResourceReference{
+		Kind:      entry.GetKind(),
+		Name:      entry.GetName(),
+		Partition: entry.GetPartition(),
+		Namespace: entry.GetNamespace(),
+	}
+}
+
 func ptrTo[T any](v T) *T {
 	return &v
 }
