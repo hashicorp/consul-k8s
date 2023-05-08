@@ -3,6 +3,7 @@ package gatekeeper
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
@@ -12,16 +13,20 @@ import (
 )
 
 func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
-	// TODO Do I need to check if the authspec is not managed?
+	// We don't create the ServiceAccount if we are not using ManagedGatewayClass.
+	if !g.HelmConfig.ManageSystemACLs {
+		return nil
+	}
 
 	var (
-		serviceAccount *corev1.ServiceAccount
-		exists         bool
+		serviceAccount = &corev1.ServiceAccount{}
+		exists         = false
 	)
 
 	// Get ServiceAccount if it exists.
 	{
 		if err := g.Client.Get(ctx, g.namespacedName(), serviceAccount); err != nil {
+			fmt.Println(err)
 			if k8serrors.IsNotFound(err) {
 				exists = false
 			} else {
@@ -30,6 +35,7 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 		} else {
 			exists = true
 		}
+		fmt.Println(exists)
 	}
 
 	if exists {
@@ -43,7 +49,7 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 		return errors.New("ServiceAccount not owned by controller")
 	}
 
-	// Create the ServiceAccount if it doesn't exist.
+	// Create the ServiceAccount.
 	serviceAccount = g.serviceAccount()
 	if err := ctrl.SetControllerReference(&g.Gateway, serviceAccount, g.Client.Scheme()); err != nil {
 		return err

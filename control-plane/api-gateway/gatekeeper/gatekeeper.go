@@ -33,15 +33,13 @@ func New(cfg Config) *Gatekeeper {
 }
 
 func (g *Gatekeeper) Upsert(ctx context.Context) error {
-	if g.HelmConfig.ConsulNamespaceMirroring {
-		// TODO ensure namespace exists
-	}
+	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", g.Gateway.Namespace, g.Gateway.Name))
 
-	if err := g.upsertServiceAccount(ctx); err != nil {
+	if err := g.upsertRole(ctx); err != nil {
 		return err
 	}
 
-	if err := g.upsertDeployment(ctx); err != nil {
+	if err := g.upsertServiceAccount(ctx); err != nil {
 		return err
 	}
 
@@ -49,11 +47,27 @@ func (g *Gatekeeper) Upsert(ctx context.Context) error {
 		return err
 	}
 
+	if err := g.upsertDeployment(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (g *Gatekeeper) Delete(ctx context.Context) error {
+	if err := g.deleteDeployment(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deleteService(ctx); err != nil {
+		return err
+	}
+
 	if err := g.deleteServiceAccount(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deleteRole(ctx); err != nil {
 		return err
 	}
 

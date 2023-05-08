@@ -12,10 +12,8 @@ import (
 )
 
 func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
-	var (
-		deployment *appsv1.Deployment
-		exists     bool
-	)
+	deployment := &appsv1.Deployment{}
+	exists := false
 
 	// Get Deployment if it exists.
 	{
@@ -31,6 +29,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 	}
 
 	if exists {
+		g.Log.Info("Existing Gateway Deployment found.")
 		// If the user has set the number of replicas, let's respect that.
 	}
 
