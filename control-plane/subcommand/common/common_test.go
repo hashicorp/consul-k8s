@@ -207,7 +207,7 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 
 func TestWriteFileWithPerms_InvalidOutputFile(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	randFileName := fmt.Sprintf("/tmp/tmp/tmp/%d", rand.Int())
 	t.Cleanup(func() {
 		os.RemoveAll(randFileName)
@@ -218,7 +218,7 @@ func TestWriteFileWithPerms_InvalidOutputFile(t *testing.T) {
 
 func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
 	err := os.WriteFile(randFileName, []byte("foo"), os.FileMode(0444))
 	require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 func TestWriteFileWithPerms(t *testing.T) {
 	t.Parallel()
 	payload := "foo-foo-foo-foo"
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
 	t.Cleanup(func() {
 		os.RemoveAll(randFileName)
