@@ -5,7 +5,10 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -20,12 +23,15 @@ func (g *Gatekeeper) upsertService(ctx context.Context) error {
 		return nil
 	}
 
+	service := g.service()
+
+	mutated := service.DeepCopy()
 	mutator := func() error {
-		// TODO Talk with Andrew about this.
-		return nil
+		mutated = mergeService(service, mutated)
+		return ctrl.SetControllerReference(&g.Gateway, mutated, g.Client.Scheme())
 	}
 
-	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, g.service().DeepCopy(), mutator)
+	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
 		return err
 	}
@@ -43,6 +49,13 @@ func (g *Gatekeeper) upsertService(ctx context.Context) error {
 }
 
 func (g *Gatekeeper) deleteService(ctx context.Context) error {
+	if err := g.Client.Delete(ctx, g.service()); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	return nil
 }
 
@@ -81,4 +94,38 @@ func (g Gatekeeper) service() *corev1.Service {
 			Ports:    ports,
 		},
 	}
+}
+
+// mergeService is used to keep annotations and ports from the `from` Service
+// to the `to` service. This prevents an infinite reconciliation loop when
+// Kubernetes adds this configuration back in.
+func mergeService(from, to *corev1.Service) *corev1.Service {
+	if areServicesEqual(from, to) {
+		return to
+	}
+
+	to.Annotations = from.Annotations
+	to.Spec.Ports = from.Spec.Ports
+
+	return to
+}
+
+func areServicesEqual(a, b *corev1.Service) bool {
+	if !equality.Semantic.DeepEqual(a.Annotations, b.Annotations) {
+		return false
+	}
+	if len(b.Spec.Ports) != len(a.Spec.Ports) {
+		return false
+	}
+
+	for i, port := range a.Spec.Ports {
+		otherPort := b.Spec.Ports[i]
+		if port.Port != otherPort.Port {
+			return false
+		}
+		if port.Protocol != otherPort.Protocol {
+			return false
+		}
+	}
+	return true
 }

@@ -5,6 +5,7 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	rbac "k8s.io/api/rbac/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,6 +25,13 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 }
 
 func (g *Gatekeeper) deleteRole(ctx context.Context) error {
+	if err := g.Client.Delete(ctx, g.role()); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	return nil
 }
 
