@@ -20,6 +20,7 @@ const (
 	metaValueManagedBy     = "consul-k8s-gateway-controller"
 	metaKeyKubeNS          = "k8s-namespace"
 	metaKeyKubeServiceName = "k8s-service-name"
+	metaKeyKubeName        = "k8s-name"
 
 	// AnnotationGateway is the annotation used to override the gateway name.
 	AnnotationGateway = "consul.hashicorp.com/gateway"
@@ -96,6 +97,7 @@ func (t Translator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types
 			metaKeyManagedBy:       metaValueManagedBy,
 			metaKeyKubeNS:          k8sGW.GetObjectMeta().GetNamespace(),
 			metaKeyKubeServiceName: k8sGW.GetObjectMeta().GetName(),
+			metaKeyKubeName:        k8sGW.GetObjectMeta().GetName(),
 		},
 		Listeners: listeners,
 		Partition: t.ConsulPartition,
@@ -117,6 +119,7 @@ func (t Translator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, paren
 			metaKeyManagedBy:       metaValueManagedBy,
 			metaKeyKubeNS:          k8sHTTPRoute.GetObjectMeta().GetNamespace(),
 			metaKeyKubeServiceName: k8sHTTPRoute.GetObjectMeta().GetName(),
+			metaKeyKubeName:        k8sHTTPRoute.GetObjectMeta().GetName(),
 		},
 		Partition: t.ConsulPartition,
 
@@ -312,6 +315,7 @@ func (t Translator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs 
 			metaKeyManagedBy:       metaValueManagedBy,
 			metaKeyKubeNS:          k8sRoute.GetObjectMeta().GetNamespace(),
 			metaKeyKubeServiceName: k8sRoute.GetObjectMeta().GetName(),
+			metaKeyKubeName:        k8sRoute.GetObjectMeta().GetName(),
 		},
 		Partition: t.ConsulPartition,
 
@@ -359,6 +363,7 @@ func (t Translator) SecretToInlineCertificate(k8sSecret gwv1beta1.SecretObjectRe
 				metaKeyManagedBy:       metaValueManagedBy,
 				metaKeyKubeNS:          k8sSecretNS,
 				metaKeyKubeServiceName: string(k8sSecret.Name),
+				metaKeyKubeName:        string(k8sSecret.Name),
 			}
 			return inlineCert
 		}

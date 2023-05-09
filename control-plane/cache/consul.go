@@ -83,10 +83,8 @@ func newConfigEntryObject(namespacedName types.NamespacedName) *configEntryObjec
 	}
 }
 
-type Translator func(api.ConfigEntry) []types.NamespacedName
-
 type Subscription struct {
-	translator Translator
+	translator translation.TranslatorFn
 	ctx        context.Context
 	cancelCtx  context.CancelFunc
 	events     chan event.GenericEvent
@@ -152,7 +150,7 @@ func (c *Cache) WaitSynced(ctx context.Context) {
 }
 
 // Subscribe handles adding a new subscription for resources of a given kind
-func (c *Cache) Subscribe(ctx context.Context, kind string, translator Translator) *Subscription {
+func (c *Cache) Subscribe(ctx context.Context, kind string, translator translation.TranslatorFn) *Subscription {
 	c.subscriberMutex.Lock()
 	defer c.subscriberMutex.Unlock()
 
