@@ -122,6 +122,9 @@ rules:
   resources:
   - gatewayclasses
   - gateways
+  - httproutes
+  - tcproutes
+  - referencegrants
   verbs:
   - create
   - delete
@@ -144,4 +147,27 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+    - apps
+  resources:
+    - deployments
+  verbs:
+    - create
+    - get
+    - list
+    - update
+    - watch
+- apiGroups:
+    - core
+  resources:
+    - services
+  verbs:
+    - watch
+    - list
+- apiGroups: [ "" ]
+  resources: [ "secrets" ]
+  verbs:
+    - "get"
+    - "list"
+    - "watch"
 {{- end }}

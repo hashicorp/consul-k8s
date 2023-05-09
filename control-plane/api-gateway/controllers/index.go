@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +48,11 @@ var indexes = []index{
 		target:      &gwv1beta1.Gateway{},
 		indexerFunc: gatewayClassForGateway,
 	},
+	{
+		name:        Secret_GatewayIndex,
+		target:      &gwv1beta1.Gateway{},
+		indexerFunc: gatewayForSecret,
+	},
 }
 
 // gatewayClassConfigForGatewayClass creates an index of every GatewayClassConfig referenced by a GatewayClass.
@@ -67,4 +71,21 @@ func gatewayClassConfigForGatewayClass(o client.Object) []string {
 func gatewayClassForGateway(o client.Object) []string {
 	g := o.(*gwv1beta1.Gateway)
 	return []string{string(g.Spec.GatewayClassName)}
+}
+
+func gatewayForSecret(o client.Object) []string {
+	gateway := o.(*gwv1beta1.Gateway)
+	var secretReferences []string
+	for _, listener := range gateway.Spec.Listeners {
+		if listener.TLS == nil || *listener.TLS.Mode != gwv1beta1.TLSModeTerminate {
+			continue
+		}
+		for _, cert := range listener.TLS.CertificateRefs {
+			if nilOrEqual(cert.Group, "") && nilOrEqual(cert.Kind, "Secret") {
+				// If an explicit Secret namespace is not provided, use the Gateway namespace to lookup the provided Secret Name.
+				secretReferences = append(secretReferences, indexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace).String())
+			}
+		}
+	}
+	return secretReferences
 }
