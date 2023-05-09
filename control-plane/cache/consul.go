@@ -247,6 +247,8 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 
 	diffs := c.cache[kind].diff(cache)
 
+	c.cache[kind] = cache
+
 	// we run this the first time the cache is filled to notify the waiter
 	once.Do(func() {
 		c.synced <- struct{}{}

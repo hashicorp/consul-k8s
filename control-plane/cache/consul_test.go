@@ -2,18 +2,18 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/go-logr/logr"
+	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -1284,66 +1284,6 @@ func TestCache_Subscribe(t *testing.T) {
 	}
 }
 
-func TestCache_notifySubscribers(t *testing.T) {
-	ctx := context.Background()
-	kind := api.HTTPRoute
-	entries := []api.ConfigEntry{&api.HTTPRouteConfigEntry{}}
-
-	c := New(Config{
-		ConsulClientConfig:  &consul.Config{},
-		ConsulServerConnMgr: consul.NewMockServerConnectionManager(t),
-		NamespacesEnabled:   false,
-		Kinds:               []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate},
-		Logger:              logr.Logger{},
-	})
-
-	nsn := types.NamespacedName{
-		Namespace: "ns",
-		Name:      "my route",
-	}
-
-	expectedEvent := event.GenericEvent{Object: newConfigEntryObject(nsn)}
-
-	sub1 := c.Subscribe(ctx, kind, func(_ api.ConfigEntry) []types.NamespacedName {
-		return []types.NamespacedName{
-			nsn,
-		}
-	})
-
-	canceledSub := c.Subscribe(ctx, kind, func(_ api.ConfigEntry) []types.NamespacedName {
-		return []types.NamespacedName{
-			{
-				Namespace: "ns",
-				Name:      "my route",
-			},
-		}
-	})
-
-	// mark this subscription as ended
-	canceledSub.cancelCtx()
-
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func(w *sync.WaitGroup) {
-		defer w.Done()
-		c.notifySubscribers(ctx, kind, entries)
-	}(wg)
-
-	actualEvent := <-sub1.Events()
-
-	// ensure everything is done
-	wg.Wait()
-
-	if diff := cmp.Diff(actualEvent, expectedEvent); diff != "" {
-		t.Errorf("Cache.notifySubscribers mismatch (-want +got):\n%s", diff)
-	}
-
-	// we started with two subscribers
-	if len(c.subscribers[kind]) != 1 || slices.Contains(c.subscribers[kind], canceledSub) {
-		t.Error("Expected the canceled subscription to be removed from the active subscribers but it was not")
-	}
-}
-
 func TestCache_Write(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -1488,5 +1428,402 @@ func TestCache_Write(t *testing.T) {
 			err = c.Write(entry)
 			require.Equal(t, err, tt.expectedErr)
 		})
+	}
+}
+
+func Test_Run(t *testing.T) {
+	// setup httproutes
+	httpRouteOne, httpRouteTwo := setupHTTPRoutes()
+	httpRoutes := []*api.HTTPRouteConfigEntry{httpRouteOne, httpRouteTwo}
+
+	// setup gateway
+	gw := setupGateway()
+	gateways := []*api.APIGatewayConfigEntry{gw}
+
+	// setup TCPRoutes
+	tcpRoute := setupTCPRoute()
+	tcpRoutes := []*api.TCPRouteConfigEntry{tcpRoute}
+
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/config/http-route":
+			val, err := json.Marshal(httpRoutes)
+			if err != nil {
+				w.WriteHeader(500)
+				fmt.Fprintln(w, err)
+				return
+			}
+			fmt.Fprintln(w, string(val))
+		case "/v1/config/api-gateway":
+			val, err := json.Marshal(gateways)
+			if err != nil {
+				w.WriteHeader(500)
+				fmt.Fprintln(w, err)
+				return
+			}
+			fmt.Fprintln(w, string(val))
+		case "/v1/config/tcp-route":
+			val, err := json.Marshal(tcpRoutes)
+			if err != nil {
+				w.WriteHeader(500)
+				fmt.Fprintln(w, err)
+				return
+			}
+			fmt.Fprintln(w, string(val))
+		default:
+			w.WriteHeader(500)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+		}
+	}))
+	defer consulServer.Close()
+
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(serverURL.Port())
+	require.NoError(t, err)
+
+	c := New(Config{
+		ConsulClientConfig: &consul.Config{
+			APIClientConfig: &api.Config{},
+			HTTPPort:        port,
+			GRPCPort:        port,
+			APITimeout:      0,
+		},
+		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		NamespacesEnabled:   false,
+		Partition:           "",
+		Kinds:               []string{api.HTTPRoute, api.TCPRoute, api.APIGateway},
+		Logger:              logrtest.NewTestLogger(t),
+	})
+	prevCache := make(map[string]resourceCache)
+	for kind, cache := range c.cache {
+		resCache := make(resourceCache)
+		for resourceRef, entry := range cache {
+			resCache[resourceRef] = entry
+		}
+		prevCache[kind] = resCache
+	}
+
+	expectedCache := map[string]resourceCache{
+		api.APIGateway: {
+			{Kind: api.APIGateway, Name: gw.Name}: gw,
+		},
+		api.TCPRoute: {
+			{Kind: api.TCPRoute, Name: tcpRoute.Name}: tcpRoute,
+		},
+		api.HTTPRoute: {
+			{Kind: api.HTTPRoute, Name: httpRouteOne.Name}: httpRouteOne,
+			{Kind: api.HTTPRoute, Name: httpRouteTwo.Name}: httpRouteTwo,
+		},
+	}
+
+	ctx, cancelFn := context.WithCancel(context.Background())
+
+	httpRouteOneNsn := types.NamespacedName{
+		Name:      httpRouteOne.Name,
+		Namespace: httpRouteOne.Namespace,
+	}
+
+	httpRouteTwoNsn := types.NamespacedName{
+		Name:      httpRouteTwo.Name,
+		Namespace: httpRouteTwo.Namespace,
+	}
+
+	httpRouteSubscriber := c.Subscribe(ctx, api.HTTPRoute, func(cfe api.ConfigEntry) []types.NamespacedName {
+		return []types.NamespacedName{
+			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
+		}
+	})
+
+	canceledSub := c.Subscribe(ctx, api.HTTPRoute, func(cfe api.ConfigEntry) []types.NamespacedName {
+		return []types.NamespacedName{
+			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
+		}
+	})
+
+	gwNsn := types.NamespacedName{
+		Name:      gw.Name,
+		Namespace: gw.Namespace,
+	}
+
+	gwSubscriber := c.Subscribe(ctx, api.APIGateway, func(cfe api.ConfigEntry) []types.NamespacedName {
+		return []types.NamespacedName{
+			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
+		}
+	})
+
+	tcpRouteNsn := types.NamespacedName{
+		Name:      tcpRoute.Name,
+		Namespace: tcpRoute.Namespace,
+	}
+
+	tcpRouteSubscriber := c.Subscribe(ctx, api.TCPRoute, func(cfe api.ConfigEntry) []types.NamespacedName {
+		return []types.NamespacedName{
+			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
+		}
+	})
+
+	// mark this subscription as ended
+	canceledSub.Cancel()
+
+	go c.Run(ctx)
+
+	// Check subscribers
+	httpRouteExpectedEvents := []event.GenericEvent{{Object: newConfigEntryObject(httpRouteOneNsn)}, {Object: newConfigEntryObject(httpRouteTwoNsn)}}
+	gwExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(gwNsn)}
+	tcpExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(tcpRouteNsn)}
+
+	i := 4
+	for {
+		if i == 0 {
+			break
+		}
+		select {
+		case actualHTTPRouteEvent := <-httpRouteSubscriber.Events():
+			require.Contains(t, httpRouteExpectedEvents, actualHTTPRouteEvent)
+		case actualGWEvent := <-gwSubscriber.Events():
+			require.Equal(t, gwExpectedEvent, actualGWEvent)
+		case actualTCPRouteEvent := <-tcpRouteSubscriber.Events():
+			require.Equal(t, tcpExpectedEvent, actualTCPRouteEvent)
+		}
+		i -= 1
+	}
+
+	// the canceled Subscription should not receive any events
+	require.Zero(t, len(canceledSub.Events()))
+	c.WaitSynced(ctx)
+
+	// cancel the context so the Run function exits
+	cancelFn()
+
+	// Check cache
+	// expect the cache to have changed
+	if diff := cmp.Diff(prevCache, c.cache); diff == "" {
+		t.Error("Expect cache to have changed but it did not")
+	}
+
+	if diff := cmp.Diff(expectedCache, c.cache); diff != "" {
+		t.Errorf("Cache.cache mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func setupHTTPRoutes() (*api.HTTPRouteConfigEntry, *api.HTTPRouteConfigEntry) {
+	routeOne := &api.HTTPRouteConfigEntry{
+		Kind: api.HTTPRoute,
+		Name: "my route",
+		Parents: []api.ResourceReference{
+			{
+				Kind:        api.APIGateway,
+				Name:        "api-gw",
+				SectionName: "listener-1",
+				Partition:   "part-1",
+				Namespace:   "ns",
+			},
+		},
+		Rules: []api.HTTPRouteRule{
+			{
+				Filters: api.HTTPFilters{
+					Headers: []api.HTTPHeaderFilter{
+						{
+							Add: map[string]string{
+								"add it on": "the value",
+							},
+							Remove: []string{"time to go"},
+							Set: map[string]string{
+								"Magic":       "v2",
+								"Another One": "dj khaled",
+							},
+						},
+					},
+					URLRewrite: &api.URLRewrite{Path: "v1"},
+				},
+				Matches: []api.HTTPMatch{
+					{
+						Headers: []api.HTTPHeaderMatch{
+							{
+								Match: api.HTTPHeaderMatchExact,
+								Name:  "my header match",
+								Value: "the value",
+							},
+						},
+						Method: api.HTTPMatchMethodGet,
+						Path: api.HTTPPathMatch{
+							Match: api.HTTPPathMatchPrefix,
+							Value: "/v1",
+						},
+						Query: []api.HTTPQueryMatch{
+							{
+								Match: api.HTTPQueryMatchExact,
+								Name:  "search",
+								Value: "term",
+							},
+						},
+					},
+				},
+				Services: []api.HTTPService{
+					{
+						Name:   "service one",
+						Weight: 45,
+						Filters: api.HTTPFilters{
+							Headers: []api.HTTPHeaderFilter{
+								{
+									Add: map[string]string{
+										"svc - add it on": "svc - the value",
+									},
+									Remove: []string{"svc - time to go"},
+									Set: map[string]string{
+										"svc - Magic":       "svc - v2",
+										"svc - Another One": "svc - dj khaled",
+									},
+								},
+							},
+							URLRewrite: &api.URLRewrite{
+								Path: "path",
+							},
+						},
+						Namespace: "some ns",
+					},
+				},
+			},
+		},
+		Hostnames: []string{"hostname.com"},
+		Meta: map[string]string{
+			"metaKey": "metaVal",
+		},
+		Status: api.ConfigEntryStatus{},
+	}
+	routeTwo := &api.HTTPRouteConfigEntry{
+		Kind: api.HTTPRoute,
+		Name: "my route 2",
+		Parents: []api.ResourceReference{
+			{
+				Kind:        api.APIGateway,
+				Name:        "api-gw",
+				SectionName: "listener-2",
+				Partition:   "part-1",
+				Namespace:   "ns",
+			},
+		},
+		Rules: []api.HTTPRouteRule{
+			{
+				Filters: api.HTTPFilters{
+					Headers: []api.HTTPHeaderFilter{
+						{
+							Add: map[string]string{
+								"add it on": "the value",
+							},
+							Remove: []string{"time to go"},
+							Set: map[string]string{
+								"Magic":       "v2",
+								"Another One": "dj khaled",
+							},
+						},
+					},
+					URLRewrite: &api.URLRewrite{Path: "v1"},
+				},
+				Matches: []api.HTTPMatch{
+					{
+						Headers: []api.HTTPHeaderMatch{
+							{
+								Match: api.HTTPHeaderMatchExact,
+								Name:  "my header match",
+								Value: "the value",
+							},
+						},
+						Method: api.HTTPMatchMethodGet,
+						Path: api.HTTPPathMatch{
+							Match: api.HTTPPathMatchPrefix,
+							Value: "/v1",
+						},
+						Query: []api.HTTPQueryMatch{
+							{
+								Match: api.HTTPQueryMatchExact,
+								Name:  "search",
+								Value: "term",
+							},
+						},
+					},
+				},
+				Services: []api.HTTPService{
+					{
+						Name:   "service one",
+						Weight: 45,
+						Filters: api.HTTPFilters{
+							Headers: []api.HTTPHeaderFilter{
+								{
+									Add: map[string]string{
+										"svc - add it on": "svc - the value",
+									},
+									Remove: []string{"svc - time to go"},
+									Set: map[string]string{
+										"svc - Magic":       "svc - v2",
+										"svc - Another One": "svc - dj khaled",
+									},
+								},
+							},
+							URLRewrite: &api.URLRewrite{
+								Path: "path",
+							},
+						},
+						Namespace: "some ns",
+					},
+				},
+			},
+		},
+		Hostnames: []string{"hostname.com"},
+		Meta: map[string]string{
+			"metakey": "meta val",
+		},
+
+		Status: api.ConfigEntryStatus{},
+	}
+	return routeOne, routeTwo
+}
+
+func setupGateway() *api.APIGatewayConfigEntry {
+	return &api.APIGatewayConfigEntry{
+		Kind: api.APIGateway,
+		Name: "api-gw",
+		Meta: map[string]string{
+			"metakey": "meta val",
+		},
+		Listeners: []api.APIGatewayListener{
+			{
+				Name:     "listener one",
+				Hostname: "hostname.com",
+				Port:     3350,
+				Protocol: "https",
+				TLS:      api.APIGatewayTLSConfiguration{},
+			},
+		},
+		Status:      api.ConfigEntryStatus{},
+		CreateIndex: 0,
+		ModifyIndex: 0,
+	}
+}
+
+func setupTCPRoute() *api.TCPRouteConfigEntry {
+	return &api.TCPRouteConfigEntry{
+		Kind: api.TCPRoute,
+		Name: "tcp route",
+		Parents: []api.ResourceReference{
+			{
+				Kind:        api.APIGateway,
+				Name:        "api-gw",
+				SectionName: "listener two",
+			},
+		},
+		Services: []api.TCPService{
+			{
+				Name: "tcp service",
+			},
+		},
+		Meta: map[string]string{
+			"metakey": "meta val",
+		},
+		Status:      api.ConfigEntryStatus{},
+		CreateIndex: 0,
+		ModifyIndex: 0,
 	}
 }
