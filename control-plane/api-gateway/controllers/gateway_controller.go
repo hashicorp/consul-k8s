@@ -27,6 +27,7 @@ const (
 )
 
 // GatewayController reconciles a Gateway object.
+// The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
 	HelmConfig apigateway.HelmConfig
 	Log        logr.Logger
