@@ -2,9 +2,14 @@ package controllers
 
 import (
 	"context"
+<<<<<<< HEAD
 	"testing"
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+=======
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"testing"
+>>>>>>> @{-1}
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -40,7 +45,11 @@ func TestGatewayReconciler(t *testing.T) {
 		expectedIsDeleted  bool
 		expectedConditions []metav1.Condition
 	}{
+<<<<<<< HEAD
 		"successful reconcile with no change": {
+=======
+		"successful reconcile with no change simple gateway": {
+>>>>>>> @{-1}
 			gateway: &gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
@@ -69,6 +78,7 @@ func TestGatewayReconciler(t *testing.T) {
 			expectedError:      nil,
 			expectedFinalizers: []string{gatewayFinalizer},
 			expectedIsDeleted:  false,
+<<<<<<< HEAD
 			expectedConditions: []metav1.Condition{
 				{
 					Type:    accepted,
@@ -77,6 +87,8 @@ func TestGatewayReconciler(t *testing.T) {
 					Message: "Configuration accepted",
 				},
 			},
+=======
+>>>>>>> @{-1}
 		},
 	}
 
