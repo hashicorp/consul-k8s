@@ -34,11 +34,13 @@ type TestFlags struct {
 
 	flagEnableTransparentProxy bool
 
-	flagHelmChartVersion string
-	flagConsulImage      string
-	flagConsulK8sImage   string
-	flagConsulVersion    string
-	flagEnvoyImage       string
+	flagHelmChartVersion      string
+	flagConsulImage           string
+	flagConsulK8sImage        string
+	flagConsulVersion         string
+	flagEnvoyImage            string
+	flagVaultHelmChartVersion string
+	flagVaultServerVersion    string
 
 	flagNoCleanupOnFailure bool
 
@@ -72,6 +74,8 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
+	flag.StringVar(&t.flagVaultServerVersion, "vault-server-version", "", "The vault serverversion used for all tests.")
+	flag.StringVar(&t.flagVaultHelmChartVersion, "vault-helm-chart-version", "", "The Vault helm chart used for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -142,6 +146,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 	// if the Version is empty consulVersion will be nil
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
+	//vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
 
 	return &config.TestConfig{
 		Kubeconfig:    t.flagKubeconfig,
@@ -166,11 +171,13 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		DisablePeering: t.flagDisablePeering,
 
-		HelmChartVersion: t.flagHelmChartVersion,
-		ConsulImage:      t.flagConsulImage,
-		ConsulK8SImage:   t.flagConsulK8sImage,
-		ConsulVersion:    consulVersion,
-		EnvoyImage:       t.flagEnvoyImage,
+		HelmChartVersion:      t.flagHelmChartVersion,
+		ConsulImage:           t.flagConsulImage,
+		ConsulK8SImage:        t.flagConsulK8sImage,
+		ConsulVersion:         consulVersion,
+		EnvoyImage:            t.flagEnvoyImage,
+		VaultHelmChartVersion: t.flagVaultHelmChartVersion,
+		VaultServerVersion:    t.flagVaultServerVersion,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
