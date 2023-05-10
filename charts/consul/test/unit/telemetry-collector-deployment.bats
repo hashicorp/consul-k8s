@@ -49,24 +49,24 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "apiGateway/Deployment: nodeSelector is not set by default" {
+@test "telemetry-collector/Deployment: nodeSelector is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
-@test "apiGateway/Deployment: specified nodeSelector" {
+@test "telemetry-collector/Deployment: specified nodeSelector" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'apiGateway.controller.nodeSelector=testing' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'telemetryCollector.nodeSelector=testing' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "testing" ]
