@@ -3,7 +3,7 @@
 
 //go:build enterprise
 
-package controller_test
+package controllers
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -29,11 +29,323 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// NOTE: We're not testing each controller type here because that's done in
+// NOTE: We're not testing each controller type here because that's mostly done in
 // the OSS tests and it would result in too many permutations. Instead
-// we're only testing with the ServiceDefaults and ProxyDefaults controller which will exercise
-// all the namespaces code for config entries that are namespaced and those that
+// we're only testing with the ServiceDefaults and ProxyDefaults controllers which
+// will exercise all the namespaces code for config entries that are namespaced and those that
 // exist in the global namespace.
+// We also test Enterprise only features like SamenessGroups.
+
+func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
+	t.Parallel()
+	kubeNS := "default"
+
+	cases := []struct {
+		kubeKind            string
+		consulKind          string
+		consulPrereqs       []capi.ConfigEntry
+		configEntryResource common.ConfigEntryResource
+		reconciler          func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+		compare             func(t *testing.T, consul capi.ConfigEntry)
+	}{
+		{
+			kubeKind:   "SamenessGroup",
+			consulKind: capi.SamenessGroup,
+			configEntryResource: &v1alpha1.SamenessGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.SamenessGroupSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []v1alpha1.SamenessGroupMember{
+						{
+							Peer:      "dc1",
+							Partition: "",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &SamenessGroupController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.SamenessGroupConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, true, resource.DefaultForFailover)
+				require.Equal(t, true, resource.IncludeLocal)
+				require.Equal(t, "dc1", resource.Members[0].Peer)
+				require.Equal(t, "", resource.Members[0].Partition)
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.kubeKind, func(t *testing.T) {
+			req := require.New(t)
+			ctx := context.Background()
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
+
+			for _, configEntry := range c.consulPrereqs {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+			namespacedName := types.NamespacedName{
+				Namespace: kubeNS,
+				Name:      c.configEntryResource.KubernetesName(),
+			}
+			resp, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			req.NoError(err)
+			req.False(resp.Requeue)
+
+			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
+			req.NoError(err)
+			req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
+			c.compare(t, cfg)
+
+			// Check that the status is "synced".
+			err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
+			req.NoError(err)
+			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
+
+			// Check that the finalizer is added.
+			req.Contains(c.configEntryResource.Finalizers(), FinalizerName)
+		})
+	}
+}
+
+func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
+	t.Parallel()
+	kubeNS := "default"
+
+	cases := []struct {
+		kubeKind            string
+		consulKind          string
+		consulPrereqs       []capi.ConfigEntry
+		configEntryResource common.ConfigEntryResource
+		reconciler          func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+		updateF             func(common.ConfigEntryResource)
+		compare             func(t *testing.T, consul capi.ConfigEntry)
+	}{
+		{
+			kubeKind:   "SamenessGroup",
+			consulKind: capi.SamenessGroup,
+			configEntryResource: &v1alpha1.SamenessGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.SamenessGroupSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []v1alpha1.SamenessGroupMember{
+						{
+							Peer:      "dc1",
+							Partition: "",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &SamenessGroupController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				sg := resource.(*v1alpha1.SamenessGroup)
+				sg.Spec.IncludeLocal = false
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.SamenessGroupConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, true, resource.DefaultForFailover)
+				require.Equal(t, false, resource.IncludeLocal)
+				require.Equal(t, "dc1", resource.Members[0].Peer)
+				require.Equal(t, "", resource.Members[0].Partition)
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.kubeKind, func(t *testing.T) {
+			req := require.New(t)
+			ctx := context.Background()
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
+
+			// Create any prereqs.
+			for _, configEntry := range c.consulPrereqs {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// We haven't run reconcile yet so we must create the config entry
+			// in Consul ourselves.
+			{
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(datacenterName), nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// Now run reconcile which should update the entry in Consul.
+			{
+				namespacedName := types.NamespacedName{
+					Namespace: kubeNS,
+					Name:      c.configEntryResource.KubernetesName(),
+				}
+				// First get it so we have the latest revision number.
+				err := fakeClient.Get(ctx, namespacedName, c.configEntryResource)
+				req.NoError(err)
+
+				// Update the entry in Kube and run reconcile.
+				c.updateF(c.configEntryResource)
+				err = fakeClient.Update(ctx, c.configEntryResource)
+				req.NoError(err)
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+				resp, err := r.Reconcile(ctx, ctrl.Request{
+					NamespacedName: namespacedName,
+				})
+				req.NoError(err)
+				req.False(resp.Requeue)
+
+				// Now check that the object in Consul is as expected.
+				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
+				req.NoError(err)
+				req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
+				c.compare(t, cfg)
+			}
+		})
+	}
+}
+
+func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
+	t.Parallel()
+	kubeNS := "default"
+
+	cases := []struct {
+		kubeKind                        string
+		consulKind                      string
+		consulPrereq                    []capi.ConfigEntry
+		configEntryResourceWithDeletion common.ConfigEntryResource
+		reconciler                      func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+	}{
+		{
+			kubeKind:   "SamenessGroup",
+			consulKind: capi.SamenessGroup,
+			configEntryResourceWithDeletion: &v1alpha1.SamenessGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.SamenessGroupSpec{
+					DefaultForFailover: true,
+					IncludeLocal:       true,
+					Members: []v1alpha1.SamenessGroupMember{
+						{
+							Peer:      "dc1",
+							Partition: "",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &SamenessGroupController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.kubeKind, func(t *testing.T) {
+			req := require.New(t)
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
+
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			testClient.TestServer.WaitForServiceIntentions(t)
+			consulClient := testClient.APIClient
+
+			// Create any prereqs.
+			for _, configEntry := range c.consulPrereq {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// We haven't run reconcile yet so we must create the config entry
+			// in Consul ourselves.
+			{
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(datacenterName), nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// Now run reconcile. It's marked for deletion so this should delete it.
+			{
+				namespacedName := types.NamespacedName{
+					Namespace: kubeNS,
+					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
+				}
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+				resp, err := r.Reconcile(context.Background(), ctrl.Request{
+					NamespacedName: namespacedName,
+				})
+				req.NoError(err)
+				req.False(resp.Requeue)
+
+				_, _, err = consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.ConsulName(), nil)
+				req.EqualError(err,
+					fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)",
+						c.consulKind, c.configEntryResourceWithDeletion.ConsulName()))
+			}
+		})
+	}
+}
 
 func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T) {
 	tt.Parallel()
@@ -88,7 +400,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind        string
 			ConsulNamespace   string
 			KubeResource      common.ConfigEntryResource
-			GetController     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler
+			GetController     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler
 			AssertValidConfig func(entry capi.ConfigEntry) bool
 		}{
 			"namespaced": {
@@ -102,8 +414,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						Protocol: "http",
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceDefaultsController{
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ServiceDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -132,8 +444,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						},
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ProxyDefaultsController{
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ProxyDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -170,8 +482,8 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						},
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceIntentionsController{
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ServiceIntentionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -206,7 +518,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.TestLogger{T: t},
 					s,
-					&controller.ConfigEntryController{
+					&ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
@@ -299,7 +611,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind            string
 			ConsulNamespace       string
 			KubeResource          common.ConfigEntryResource
-			GetControllerFunc     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler
+			GetControllerFunc     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler
 			AssertValidConfigFunc func(entry capi.ConfigEntry) bool
 			WriteConfigEntryFunc  func(consulClient *capi.Client, namespace string) error
 			UpdateResourceFunc    func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error
@@ -310,15 +622,15 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "foo",
 						Namespace:  c.SourceKubeNS,
-						Finalizers: []string{controller.FinalizerName},
+						Finalizers: []string{FinalizerName},
 					},
 					Spec: v1alpha1.ServiceDefaultsSpec{
 						Protocol: "http",
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ServiceDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -352,7 +664,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       common.Global,
 						Namespace:  c.SourceKubeNS,
-						Finalizers: []string{controller.FinalizerName},
+						Finalizers: []string{FinalizerName},
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
 						MeshGateway: v1alpha1.MeshGateway{
@@ -361,8 +673,8 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ProxyDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ProxyDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -398,7 +710,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "test",
 						Namespace:  c.SourceKubeNS,
-						Finalizers: []string{controller.FinalizerName},
+						Finalizers: []string{FinalizerName},
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
 						Destination: v1alpha1.IntentionDestination{
@@ -415,8 +727,8 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceIntentionsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ServiceIntentionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -468,7 +780,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.TestLogger{T: t},
 					s,
-					&controller.ConfigEntryController{
+					&ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
@@ -577,7 +889,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind           string
 			ConsulNamespace      string
 			KubeResource         common.ConfigEntryResource
-			GetControllerFunc    func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler
+			GetControllerFunc    func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler
 			WriteConfigEntryFunc func(consulClient *capi.Client, namespace string) error
 		}{
 			"namespaced": {
@@ -588,7 +900,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "foo",
 						Namespace:         c.SourceKubeNS,
-						Finalizers:        []string{controller.FinalizerName},
+						Finalizers:        []string{FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ServiceDefaultsSpec{
@@ -596,8 +908,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ServiceDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -621,7 +933,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              common.Global,
 						Namespace:         c.SourceKubeNS,
-						Finalizers:        []string{controller.FinalizerName},
+						Finalizers:        []string{FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
@@ -631,8 +943,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ProxyDefaultsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ProxyDefaultsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -658,7 +970,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "foo",
 						Namespace:         c.SourceKubeNS,
-						Finalizers:        []string{controller.FinalizerName},
+						Finalizers:        []string{FinalizerName},
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
@@ -676,8 +988,8 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
-					return &controller.ServiceIntentionsController{
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+					return &ServiceIntentionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -717,7 +1029,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.TestLogger{T: t},
 					s,
-					&controller.ConfigEntryController{
+					&ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,

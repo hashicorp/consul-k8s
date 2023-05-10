@@ -80,7 +80,7 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-server-ca-key-file=file",
 				"-ca-file", f.Name(),
 				"-mesh-gateway-service-name=name",
-				"-consul-api-timeout=5s",
+				"-consul-api-timeout=10s",
 				"-log-level=invalid",
 			},
 			expErr: "unknown log level: invalid",
@@ -117,7 +117,7 @@ func TestRun_CAFileMissing(t *testing.T) {
 		"-server-ca-cert-file", f.Name(),
 		"-server-ca-key-file", f.Name(),
 		"-ca-file=/this/does/not/exist",
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "error reading CA file")
@@ -140,7 +140,7 @@ func TestRun_ServerCACertFileMissing(t *testing.T) {
 		"-ca-file", f.Name(),
 		"-server-ca-cert-file=/this/does/not/exist",
 		"-server-ca-key-file", f.Name(),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "Error reading server CA cert file")
@@ -163,7 +163,7 @@ func TestRun_ServerCAKeyFileMissing(t *testing.T) {
 		"-ca-file", f.Name(),
 		"-server-ca-cert-file", f.Name(),
 		"-server-ca-key-file=/this/does/not/exist",
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "Error reading server CA key file")
@@ -187,7 +187,7 @@ func TestRun_GossipEncryptionKeyFileMissing(t *testing.T) {
 		"-server-ca-cert-file", f.Name(),
 		"-server-ca-key-file", f.Name(),
 		"-gossip-key-file=/this/does/not/exist",
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "Error reading gossip encryption key file")
@@ -211,7 +211,7 @@ func TestRun_GossipEncryptionKeyFileEmpty(t *testing.T) {
 		"-server-ca-cert-file", f.Name(),
 		"-server-ca-key-file", f.Name(),
 		"-gossip-key-file", f.Name(),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), fmt.Sprintf("gossip key file %q was empty", f.Name()))
@@ -249,7 +249,7 @@ func TestRun_ReplicationTokenMissingExpectedKey(t *testing.T) {
 		"-server-ca-cert-file", f.Name(),
 		"-server-ca-key-file", f.Name(),
 		"-export-replication-token",
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 }
@@ -448,7 +448,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 				"-server-ca-cert-file", caFile,
 				"-server-ca-key-file", keyFile,
 				"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-				"-consul-api-timeout", "5s",
+				"-consul-api-timeout", "10s",
 			}
 			if c.aclsEnabled {
 				flags = append(flags, "-export-replication-token")
@@ -555,7 +555,7 @@ func TestRun_WaitsForMeshGatewayInstances(t *testing.T) {
 		"-server-ca-cert-file", certFile,
 		"-server-ca-key-file", keyFile,
 		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
@@ -609,7 +609,7 @@ func TestRun_MeshGatewayNoWANAddr(t *testing.T) {
 		"-server-ca-cert-file", caFile,
 		"-server-ca-key-file", keyFile,
 		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
 }
@@ -695,7 +695,7 @@ func TestRun_MeshGatewayUniqueAddrs(tt *testing.T) {
 				"-server-ca-cert-file", caFile,
 				"-server-ca-key-file", keyFile,
 				"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-				"-consul-api-timeout", "5s",
+				"-consul-api-timeout", "10s",
 			})
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
@@ -838,7 +838,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 		"-server-ca-key-file", keyFile,
 		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
 		"-export-replication-token",
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	}
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
@@ -908,7 +908,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 			"-server-ca-cert-file", certFile,
 			"-server-ca-key-file", keyFile,
 			"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-			"-consul-api-timeout", "5s",
+			"-consul-api-timeout", "10s",
 		})
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
@@ -950,7 +950,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 			"-server-ca-cert-file", caFile,
 			"-server-ca-key-file", keyFile,
 			"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-			"-consul-api-timeout", "5s",
+			"-consul-api-timeout", "10s",
 		})
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
@@ -1044,7 +1044,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 		"-server-ca-cert-file", caFile,
 		"-server-ca-key-file", keyFile,
 		"-http-addr", fmt.Sprintf("https://127.0.0.1:%d", randomPorts[2]),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	}
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
@@ -1112,7 +1112,7 @@ func TestRun_Autoencrypt(t *testing.T) {
 		"-server-ca-cert-file", keyFile,
 		"-server-ca-key-file", keyFile,
 		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 

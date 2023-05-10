@@ -93,6 +93,10 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 							Required:  true,
 						},
 					},
+					FailoverPolicy: &FailoverPolicy{
+						Mode:    "sequential",
+						Regions: []string{"us-west-1"},
+					},
 				},
 			},
 			Theirs: &capi.ProxyConfigEntry{
@@ -150,6 +154,10 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						},
 						Required: true,
 					},
+				},
+				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
+					Mode:    "sequential",
+					Regions: []string{"us-west-1"},
 				},
 			},
 			Matches: true,
@@ -303,6 +311,10 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 							Required:  true,
 						},
 					},
+					FailoverPolicy: &FailoverPolicy{
+						Mode:    "sequential",
+						Regions: []string{"us-west-1"},
+					},
 				},
 			},
 			Exp: &capi.ProxyConfigEntry{
@@ -361,6 +373,10 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						},
 						Required: true,
 					},
+				},
+				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
+					Mode:    "sequential",
+					Regions: []string{"us-west-1"},
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -607,6 +623,19 @@ func TestProxyDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
+		},
+		"failoverPolicy.mode invalid": {
+			input: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					FailoverPolicy: &FailoverPolicy{
+						Mode: "wrong-mode",
+					},
+				},
+			},
+			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.failoverPolicy.mode: Invalid value: "wrong-mode": must be one of "", "sequential", "order-by-locality"`,
 		},
 		"multi-error": {
 			input: &ProxyDefaults{
