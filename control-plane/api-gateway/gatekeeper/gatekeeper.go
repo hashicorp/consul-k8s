@@ -55,11 +55,7 @@ func (g *Gatekeeper) Upsert(ctx context.Context) error {
 }
 
 func (g *Gatekeeper) Delete(ctx context.Context) error {
-	if err := g.deleteDeployment(ctx); err != nil {
-		return err
-	}
-
-	if err := g.deleteService(ctx); err != nil {
+	if err := g.deleteRole(ctx); err != nil {
 		return err
 	}
 
@@ -67,7 +63,11 @@ func (g *Gatekeeper) Delete(ctx context.Context) error {
 		return err
 	}
 
-	if err := g.deleteRole(ctx); err != nil {
+	if err := g.deleteService(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deleteDeployment(ctx); err != nil {
 		return err
 	}
 

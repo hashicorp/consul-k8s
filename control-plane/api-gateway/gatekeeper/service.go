@@ -64,7 +64,7 @@ func (g Gatekeeper) service() *corev1.Service {
 	for _, listener := range g.Gateway.Spec.Listeners {
 		ports = append(ports, corev1.ServicePort{
 			Name:     string(listener.Name),
-			Protocol: "TCP",
+			Protocol: corev1.Protocol(listener.Protocol),
 			Port:     int32(listener.Port),
 		})
 	}
