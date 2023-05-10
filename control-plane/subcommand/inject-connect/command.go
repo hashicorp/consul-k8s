@@ -15,18 +15,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
-	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controller"
-	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +29,19 @@ import (
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
+	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
+	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -475,13 +476,22 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err := (&controllers.GatewayController{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Gateway"),
-	}).SetupWithManager(ctx, mgr); err != nil {
+	cache, err := controllers.SetupGatewayControllerWithManager(ctx, mgr, controllers.GatewayControllerConfig{
+		ConsulClientConfig:  consulConfig,
+		ConsulServerConnMgr: watcher,
+		NamespacesEnabled:   c.flagEnableNamespaces,
+		Partition:           c.consul.Partition,
+		Logger:              ctrl.Log.WithName("controllers").WithName("Gateway"),
+	})
+	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1
 	}
+
+	go cache.Run(ctx)
+
+	// wait for the cache to fill
+	cache.WaitSynced(ctx)
 
 	configEntryReconciler := &controller.ConfigEntryController{
 		ConsulClientConfig:         c.consul.ConsulClientConfig(),

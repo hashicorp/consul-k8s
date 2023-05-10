@@ -3,7 +3,11 @@ package translation
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -16,6 +20,10 @@ type resourceGetter interface {
 
 type ConsulToNSNTranslator struct {
 	cache resourceGetter
+}
+
+func NewConsulToNSNTranslator(cache resourceGetter) ConsulToNSNTranslator {
+	return ConsulToNSNTranslator{cache: cache}
 }
 
 func (c ConsulToNSNTranslator) TranslateConsulGateway(ctx context.Context) TranslatorFn {
@@ -50,14 +58,21 @@ func (c ConsulToNSNTranslator) TranslateConsulTCPRoute(ctx context.Context) Tran
 	}
 }
 
-func (c ConsulToNSNTranslator) TranslateConsulInlineSecret(ctx context.Context) TranslatorFn {
+type secretTransfomer func(context.Context) func(client.Object) []reconcile.Request
+
+func (c ConsulToNSNTranslator) TranslateConsulInlineSecret(ctx context.Context, secretTransformer secretTransfomer) TranslatorFn {
 	return func(config api.ConfigEntry) []types.NamespacedName {
 		meta, ok := metaToK8sNamespacedName(config)
 		if !ok {
 			return nil
 		}
 
-		return []types.NamespacedName{meta}
+		return requestsToRefs(secretTransformer(ctx)(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      meta.Name,
+				Namespace: meta.Namespace,
+			},
+		}))
 	}
 }
 
@@ -96,4 +111,12 @@ func consulRefsToNSN(cache resourceGetter, refs []api.ResourceReference) []types
 		nsns = append(nsns, nsn)
 	}
 	return nsns
+}
+
+func requestsToRefs(objects []reconcile.Request) []types.NamespacedName {
+	var refs []types.NamespacedName
+	for _, object := range objects {
+		refs = append(refs, object.NamespacedName)
+	}
+	return refs
 }

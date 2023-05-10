@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -405,8 +407,18 @@ func Test_ConsulToNSNTranslator_TranslateInlineSecret(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			transformer := func(ctx context.Context) func(client.Object) []reconcile.Request {
+				return func(o client.Object) []reconcile.Request {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{Name: o.GetName(), Namespace: o.GetNamespace()},
+						},
+					}
+				}
+			}
+
 			translator := ConsulToNSNTranslator{}
-			fn := translator.TranslateConsulInlineSecret(context.Background())
+			fn := translator.TranslateConsulInlineSecret(context.Background(), transformer)
 			got := fn(tt.args.config)
 			if diff := cmp.Diff(got, tt.want, sortTransformer()); diff != "" {
 				t.Errorf("ConsulToNSNTranslator.TranslateConsulInlineCertificate() mismatch (-want +got):\n%s", diff)
