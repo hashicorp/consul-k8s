@@ -418,7 +418,7 @@ func Test_ConsulToNSNTranslator_TranslateInlineSecret(t *testing.T) {
 			}
 
 			translator := ConsulToNSNTranslator{}
-			fn := translator.TranslateConsulInlineSecret(context.Background(), transformer)
+			fn := translator.TranslateConsulInlineCertificate(context.Background(), transformer)
 			got := fn(tt.args.config)
 			if diff := cmp.Diff(got, tt.want, sortTransformer()); diff != "" {
 				t.Errorf("ConsulToNSNTranslator.TranslateConsulInlineCertificate() mismatch (-want +got):\n%s", diff)

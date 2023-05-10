@@ -61,6 +61,7 @@ func (oldCache resourceCache) diff(newCache resourceCache) []api.ConfigEntry {
 	return diffs
 }
 
+// configEntryObject is used for generic k8s events so we maintain the consul name/namespace
 type configEntryObject struct {
 	client.Object // embed so we fufill the object interface
 
@@ -83,6 +84,7 @@ func newConfigEntryObject(namespacedName types.NamespacedName) *configEntryObjec
 	}
 }
 
+// Subscription represents a watcher for events on a specific kind
 type Subscription struct {
 	translator translation.TranslatorFn
 	ctx        context.Context
@@ -98,7 +100,8 @@ func (s *Subscription) Events() chan event.GenericEvent {
 	return s.events
 }
 
-// Cache subscribes to and caches Consul objects.
+// Cache subscribes to and caches Consul objects, it also responsible for mainting subscriptions to
+// resources that it caches
 type Cache struct {
 	config    *consul.Config
 	serverMgr consul.ServerConnectionManager
@@ -139,6 +142,7 @@ func New(config Config) *Cache {
 	}
 }
 
+// WaitSynced is used to coordinate with the caller when the cache is initially filled
 func (c *Cache) WaitSynced(ctx context.Context) {
 	for range c.kinds {
 		select {
@@ -179,6 +183,7 @@ func (c *Cache) Subscribe(ctx context.Context, kind string, translator translati
 	return sub
 }
 
+// Run starts the cache watch cycle, on the first call it will fill the cache with existing resources
 func (c *Cache) Run(ctx context.Context) {
 	wg := &sync.WaitGroup{}
 
@@ -293,6 +298,8 @@ func (c *Cache) notifySubscribers(ctx context.Context, kind string, entries []ap
 	}
 }
 
+// Write handles writing back the config entry back to consul, if the current reference of the
+// config entry is stale then it returns an error
 func (c *Cache) Write(entry api.ConfigEntry) error {
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
@@ -324,6 +331,7 @@ func (c *Cache) Write(entry api.ConfigEntry) error {
 	return nil
 }
 
+// Get returns a config entry from the cache that corresponds to the given resource reference
 func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
