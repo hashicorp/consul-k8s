@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
@@ -1192,7 +1193,7 @@ func TestCache_Subscribe(t *testing.T) {
 	type args struct {
 		ctx        context.Context
 		kind       string
-		translator Translator
+		translator translation.TranslatorFn
 	}
 	tests := []struct {
 		name             string
