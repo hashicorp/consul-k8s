@@ -3088,10 +3088,20 @@ tests:
 
 telemetryCollector:
   enabled: false
-  image: "clly/ctc2:latest"
-  # resources: {}
+  image: null
+
+  # The resource settings for telemetry-collector pods.
+  # @recurse: false
+  # @type: map
+  resources: {}
+
   replicas: 1
   # customExporterConfig: {}
+
+  # Optional YAML string to specify a nodeSelector config.
+  # @type: string
+  nodeSelector: null
+
   cloud:
     clientId:
       secretName: null

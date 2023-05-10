@@ -106,4 +106,8 @@ spec:
         resources:
           {{- toYaml .Values.telemetryCollector.resources | nindent 12 }}
         {{- end }}
+      {{- if .Values.telemetryCollector.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.telemetryCollector.nodeSelector . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
