@@ -52,6 +52,9 @@ type TestConfig struct {
 	ConsulVersion    *version.Version
 	EnvoyImage       string
 
+	VaultHelmChartVersion string
+	VaultServerVersion    string
+
 	NoCleanupOnFailure bool
 	DebugDirectory     string
 
