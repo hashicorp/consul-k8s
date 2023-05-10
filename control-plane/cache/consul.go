@@ -323,3 +323,20 @@ func (c *Cache) Write(entry api.ConfigEntry) error {
 
 	return nil
 }
+
+func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+
+	entryMap, ok := c.cache[ref.Kind]
+	if !ok {
+		return nil
+	}
+
+	entry, ok := entryMap[ref]
+	if !ok {
+		return nil
+	}
+
+	return entry
+}

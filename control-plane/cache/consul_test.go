@@ -1432,6 +1432,117 @@ func TestCache_Write(t *testing.T) {
 	}
 }
 
+func TestCache_Get(t *testing.T) {
+	type args struct {
+		ref api.ResourceReference
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  api.ConfigEntry
+		cache map[string]resourceCache
+	}{
+		{
+			name: "entry exists",
+			args: args{
+				ref: api.ResourceReference{
+					Kind: api.APIGateway,
+					Name: "api-gw",
+				},
+			},
+			want: &api.APIGatewayConfigEntry{
+				Kind: api.APIGateway,
+				Name: "api-gw",
+				Meta: map[string]string{},
+			},
+			cache: map[string]resourceCache{
+				api.APIGateway: {
+					api.ResourceReference{
+						Kind: api.APIGateway,
+						Name: "api-gw",
+					}: &api.APIGatewayConfigEntry{
+						Kind: api.APIGateway,
+						Name: "api-gw",
+						Meta: map[string]string{},
+					},
+					api.ResourceReference{
+						Kind: api.APIGateway,
+						Name: "api-gw-2",
+					}: &api.APIGatewayConfigEntry{
+						Kind: api.APIGateway,
+						Name: "api-gw-2",
+						Meta: map[string]string{},
+					},
+				},
+			},
+		},
+		{
+			name: "entry does not exist",
+			args: args{
+				ref: api.ResourceReference{
+					Kind: api.APIGateway,
+					Name: "api-gw-4",
+				},
+			},
+			want: nil,
+			cache: map[string]resourceCache{
+				api.APIGateway: {
+					api.ResourceReference{
+						Kind: api.APIGateway,
+						Name: "api-gw",
+					}: &api.APIGatewayConfigEntry{
+						Kind: api.APIGateway,
+						Name: "api-gw",
+						Meta: map[string]string{},
+					},
+					api.ResourceReference{
+						Kind: api.APIGateway,
+						Name: "api-gw-2",
+					}: &api.APIGatewayConfigEntry{
+						Kind: api.APIGateway,
+						Name: "api-gw-2",
+						Meta: map[string]string{},
+					},
+				},
+			},
+		},
+		{
+			name: "kind key does not exist",
+			args: args{
+				ref: api.ResourceReference{
+					Kind: api.APIGateway,
+					Name: "api-gw-4",
+				},
+			},
+			want: nil,
+			cache: map[string]resourceCache{
+				api.HTTPRoute: {
+					api.ResourceReference{
+						Kind: api.HTTPRoute,
+						Name: "api-gw",
+					}: &api.HTTPRouteConfigEntry{
+						Kind: api.HTTPRoute,
+						Name: "route",
+						Meta: map[string]string{},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := New(Config{})
+			c.cache = tt.cache
+
+			got := c.Get(tt.args.ref)
+
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("Cache.Get mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func Test_Run(t *testing.T) {
 	// setup httproutes
 	httpRouteOne, httpRouteTwo := setupHTTPRoutes()
