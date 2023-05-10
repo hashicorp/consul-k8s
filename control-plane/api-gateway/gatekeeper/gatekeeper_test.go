@@ -338,6 +338,42 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 		},
+		"updating a gateway deployment respects the number of replicas a user has set": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+				},
+			},
+			helmConfig: apigateway.HelmConfig{
+				Replicas: 3,
+			},
+			initialResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 5, nil, nil, ""),
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 5, nil, nil, ""),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -571,6 +607,7 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		require.Equal(t, expected.Namespace, actual.Namespace)
 		require.Equal(t, expected.APIVersion, actual.APIVersion)
 		require.Equal(t, expected.Labels, actual.Labels)
+		require.Equal(t, expected.Spec.Replicas, actual.Spec.Replicas)
 	}
 
 	for _, expected := range resources.roles {

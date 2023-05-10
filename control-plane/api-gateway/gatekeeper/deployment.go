@@ -30,7 +30,9 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 
 	if exists {
 		g.Log.Info("Existing Gateway Deployment found.")
+
 		// If the user has set the number of replicas, let's respect that.
+		// TODO upsert deployment correctly
 	}
 
 	// Create the Deployment.
