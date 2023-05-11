@@ -572,6 +572,22 @@ func TestDelete(t *testing.T) {
 }
 
 func joinResources(resources resources) (objs []client.Object) {
+	for _, deployment := range resources.deployments {
+		objs = append(objs, deployment)
+	}
+
+	for _, role := range resources.roles {
+		objs = append(objs, role)
+	}
+
+	for _, service := range resources.services {
+		objs = append(objs, service)
+	}
+
+	for _, serviceAccount := range resources.serviceAccounts {
+		objs = append(objs, serviceAccount)
+	}
+
 	return objs
 }
 
