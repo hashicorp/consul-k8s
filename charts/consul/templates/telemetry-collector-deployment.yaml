@@ -1,5 +1,6 @@
 {{- if .Values.telemetryCollector.enabled }}
 {{- if not .Values.telemetryCollector.image}}{{ fail "telemetryCollector.image must be set to enable consul-telemetry-collector" }}{{ end }}
+{{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
@@ -29,7 +30,17 @@ spec:
       component: consul-telemetry-collector
   template:
     metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        # This annotation tells the endpoints controller that this pod was injected even though it wasn't. The
+        # endpoints controller would then sync the endpoint into Consul
+        "consul.hashicorp.com/connect-inject-status": "injected"
+        # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
+        # to gateways
+        "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"
+        "consul.hashicorp.com/connect-k8s-version": {{ $.Chart.Version }}
       labels:
+        consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
@@ -39,6 +50,80 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-telemetry-collector
+      initContainers:
+      - name: consul-connect-inject-init
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
+          {{- if .Values.global.acls.manageSystemACLs }}
+            # The auth method should be k8s-component-auth-method but we would need to modify the acl-init job. We'll follow up with that
+          - name: CONSUL_LOGIN_AUTH_METHOD
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            value: {{ template "consul.fullname" . }}-k8s-auth-method-{{ .Values.global.datacenter }}
+            {{- else }}
+            value: {{ template "consul.fullname" . }}-k8s-auth-method
+            {{- end }}
+          - name: CONSUL_LOGIN_DATACENTER
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            value: {{ .Values.global.federation.primaryDatacenter }}
+            {{- else }}
+            value: {{ .Values.global.datacenter }}
+            {{- end }}
+          - name: CONSUL_LOGIN_META
+            value: "component=consul-telemetry-collector,pod=$(NAMESPACE)/$(POD_NAME)"
+          {{- end }}
+          - name: CONSUL_NODE_NAME
+            value: $(NODE_NAME)-virtual
+        command:
+          - /bin/sh
+          - -ec
+          - |-
+            consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+              -log-level={{ default .Values.global.logLevel }} \
+              -log-json={{ .Values.global.logJSON }} \
+              -service-account-name="consul-telemetry-collector" \
+              -service-name="" \
+
+        image: {{ .Values.global.imageK8S }}
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 50m
+            memory: 150Mi
+          requests:
+            cpu: 50m
+            memory: 25Mi
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
+          privileged: true
+          runAsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+          - mountPath: /consul/connect-inject
+            name: consul-connect-inject-data
+            {{- if .Values.global.tls.enabled }}
+            {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: true
+            {{- end }}
+            {{- end }}
       containers:
       - name: consul-telemetry-collector
         image: {{ .Values.telemetryCollector.image }}
@@ -110,4 +195,15 @@ spec:
       nodeSelector:
         {{ tpl .Values.telemetryCollector.nodeSelector . | indent 8 | trim }}
       {{- end }}
+      volumes:
+        - emptyDir:
+            medium: Memory
+          name: consul-connect-inject-data
+        - name: consul-ca-cert
+          secret:
+            defaultMode: 420
+            items:
+              - key: tls.crt
+                path: tls.crt
+            secretName: consul-ca-cert
 {{- end }}
