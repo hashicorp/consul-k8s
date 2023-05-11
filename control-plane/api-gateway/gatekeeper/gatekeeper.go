@@ -14,11 +14,6 @@ import (
 
 // Gatekeeper is used to manage the lifecycle of Gateway deployments and services.
 type Gatekeeper struct {
-	Config
-}
-
-// Config is the configuration for the Gatekeeper.
-type Config struct {
 	Log    logr.Logger
 	Client client.Client
 
@@ -28,10 +23,17 @@ type Config struct {
 }
 
 // New creates a new Gatekeeper from the Config.
-func New(cfg Config) *Gatekeeper {
-	return &Gatekeeper{cfg}
+func New(log logr.Logger, client client.Client, gateway gwv1beta1.Gateway, gatewayClassConfig v1alpha1.GatewayClassConfig, helmConfig apigateway.HelmConfig) *Gatekeeper {
+	return &Gatekeeper{
+		Log:                log,
+		Client:             client,
+		Gateway:            gateway,
+		GatewayClassConfig: gatewayClassConfig,
+		HelmConfig:         helmConfig,
+	}
 }
 
+// Upsert creates or updates the resources for handling routing of network traffic.
 func (g *Gatekeeper) Upsert(ctx context.Context) error {
 	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", g.Gateway.Namespace, g.Gateway.Name))
 
@@ -54,6 +56,7 @@ func (g *Gatekeeper) Upsert(ctx context.Context) error {
 	return nil
 }
 
+// Delete removes the resources for handling routing of network traffic.
 func (g *Gatekeeper) Delete(ctx context.Context) error {
 	if err := g.deleteRole(ctx); err != nil {
 		return err

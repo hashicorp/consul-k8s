@@ -390,13 +390,7 @@ func TestUpsert(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 
-			gatekeeper := New(Config{
-				Log:                log,
-				Client:             client,
-				Gateway:            tc.gateway,
-				GatewayClassConfig: tc.gatewayClassConfig,
-				HelmConfig:         tc.helmConfig,
-			})
+			gatekeeper := New(log, client, tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 
 			err := gatekeeper.Upsert(context.Background())
 			require.NoError(t, err)
@@ -567,13 +561,7 @@ func TestDelete(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 
-			gatekeeper := New(Config{
-				Log:                log,
-				Client:             client,
-				Gateway:            tc.gateway,
-				GatewayClassConfig: tc.gatewayClassConfig,
-				HelmConfig:         tc.helmConfig,
-			})
+			gatekeeper := New(log, client, tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 
 			err := gatekeeper.Delete(context.Background())
 			require.NoError(t, err)
