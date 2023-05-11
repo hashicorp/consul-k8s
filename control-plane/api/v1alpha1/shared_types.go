@@ -58,6 +58,35 @@ type TransparentProxy struct {
 	DialedDirectly bool `json:"dialedDirectly,omitempty"`
 }
 
+type MutualTLSMode string
+
+const (
+	// MutualTLSModeDefault represents no specific mode and should
+	// be used to indicate that a different layer of the configuration
+	// chain should take precedence.
+	MutualTLSModeDefault MutualTLSMode = ""
+
+	// MutualTLSModeStrict requires mTLS for incoming traffic.
+	MutualTLSModeStrict MutualTLSMode = "strict"
+
+	// MutualTLSModePermissive allows incoming non-mTLS traffic.
+	MutualTLSModePermissive MutualTLSMode = "permissive"
+)
+
+func (m MutualTLSMode) validate() error {
+	switch m {
+	case MutualTLSModeDefault, MutualTLSModeStrict, MutualTLSModePermissive:
+		return nil
+	}
+	return fmt.Errorf("Must be one of %q, %q, or %q.",
+		MutualTLSModeDefault, MutualTLSModeStrict, MutualTLSModePermissive,
+	)
+}
+
+func (m MutualTLSMode) toConsul() capi.MutualTLSMode {
+	return capi.MutualTLSMode(m)
+}
+
 // MeshGateway controls how Mesh Gateways are used for upstream Connect
 // services.
 type MeshGateway struct {
