@@ -94,6 +94,7 @@ spec:
               -log-json={{ .Values.global.logJSON }} \
               -service-account-name="consul-telemetry-collector" \
               -service-name="" \
+              -proxy-id-file="/consul/connect-inject/proxyid"
 
         image: {{ .Values.global.imageK8S }}
         imagePullPolicy: IfNotPresent
@@ -138,19 +139,19 @@ spec:
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
             # - HCP_RESOURCE_ID is created for use in the
             #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
-            {{- if .Values.telemetryCollector.clientId }}
+            {{- if .Values.telemetryCollector.cloud.clientId.secretName }}
             - name: HCP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.telemetryCollector.clientId.secretName }}
-                  key: {{ .Values.telemetryCollector.clientId.secretKey }}
+                  name: {{ .Values.telemetryCollector.cloud.clientId.secretName }}
+                  key: {{ .Values.telemetryCollector.cloud.clientId.secretKey }}
             {{- end }}
-            {{- if .Values.telemetryCollector.clientSecret }}
+            {{- if .Values.telemetryCollector.cloud.clientSecret.secretName }}
             - name: HCP_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.telemetryCollector.clientSecret.secretName }}
-                  key: {{ .Values.telemetryCollector.clientSecret.secretKey }}
+                  name: {{ .Values.telemetryCollector.cloud.clientSecret.secretName }}
+                  key: {{ .Values.telemetryCollector.cloud.clientSecret.secretKey }}
             {{- end}}
             {{- if .Values.global.cloud.resourceId.secretName }}
             - name: HCP_RESOURCE_ID
@@ -186,11 +187,123 @@ spec:
         - "-ec"
         - |
           consul-telemetry-collector agent
-        volumeMounts:
-        {{- if .Values.telemetryCollector.resources }}
         resources:
+        {{- if .Values.telemetryCollector.resources }}
           {{- toYaml .Values.telemetryCollector.resources | nindent 12 }}
         {{- end }}
+      # consul-dataplane container
+      - name: consul-dataplane
+        image: "{{ .Values.global.imageConsulDataplane }}"
+        imagePullPolicy: IfNotPresent
+        command:
+          - consul-dataplane
+        args:
+          # addresses
+          {{- if .Values.externalServers.enabled }}
+          - -addresses={{ .Values.externalServers.hosts | first }}
+          {{- else }}
+          - -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+          {{- end }}
+          # grpc
+          {{- if .Values.externalServers.enabled }}
+          - -grpc-port={{ .Values.externalServers.grpcPort }}
+          {{- else }}
+          - -grpc-port=8502
+          {{- end }}
+          - -proxy-service-id-path=/consul/connect-inject/proxyid
+          # tls
+          {{- if .Values.global.tls.enabled }}
+          {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          - -ca-certs=/vault/secrets/serverca.crt
+          {{- else }}
+          - -ca-certs=/consul/tls/ca/tls.crt
+          {{- end }}
+          {{- end }}
+          {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+          - -tls-server-name={{.Values.externalServers.tlsServerName }}
+          {{- else if .Values.global.cloud.enabled }}
+          - -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
+          {{- end }}
+          {{- else }}
+          - -tls-disabled
+          {{- end }}
+          # credentials
+          {{- if .Values.global.acls.manageSystemACLs }}
+          - -credential-type=login
+          - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          # fix this login method to use the component login method later
+          - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method-{{ .Values.global.datacenter }}
+          - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
+          {{- else }}
+          - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
+          {{- end }}
+          {{- if .Values.global.adminPartitions.enabled }}
+          - -login-partition={{ .Values.global.adminPartitions.name }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.global.adminPartitions.enabled }}
+          - -service-partition={{ .Values.global.adminPartitions.name }}
+          {{- end }}
+          - -log-level={{ default .Values.global.logLevel }}
+          - -log-json={{ .Values.global.logJSON }}
+          {{- if .Values.global.metrics.enabled }}
+          - -telemetry-prom-scrape-path=/metrics
+          {{- end }}
+          - -log-level={{ default .Values.global.logLevel }}
+          - -log-json={{ .Values.global.logJSON }}
+          - -envoy-concurrency=2
+          - -login-meta=pod=consul/
+          {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
+          - -server-watch-disabled=true
+          {{- end }}
+        env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: DP_CREDENTIAL_LOGIN_META1
+            value: pod=$(NAMESPACE)/$(POD_NAME)
+          - name: DP_CREDENTIAL_LOGIN_META2
+            value: component=consul-telemetry-collector
+          - name: DP_SERVICE_NODE_NAME
+            value: $(NODE_NAME)-virtual
+          - name: TMPDIR
+            value: /consul/connect-inject
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 20000
+          timeoutSeconds: 1
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsGroup: 5995
+          runAsNonRoot: true
+          runAsUser: 5995
+        # dataplane volume mounts
+        volumeMounts:
+          - mountPath: /consul/connect-inject
+            name: consul-connect-inject-data
+            {{- if .Values.global.tls.enabled }}
+            {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: true
+            {{- end }}
+            {{- end }}
+
       {{- if .Values.telemetryCollector.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.telemetryCollector.nodeSelector . | indent 8 | trim }}
