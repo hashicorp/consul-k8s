@@ -55,6 +55,11 @@ spec:
           spec:
             description: MeshSpec defines the desired state of Mesh.
             properties:
+              allowEnablingPermissiveMutualTLS:
+                description: AllowEnablingPermissiveMutualTLS must be true in order
+                  to allow setting MutualTLSMode=permissive in either service-defaults
+                  or proxy-defaults.
+                type: boolean
               http:
                 description: HTTP defines the HTTP configuration for the service mesh.
                 properties:
