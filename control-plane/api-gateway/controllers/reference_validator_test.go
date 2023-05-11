@@ -58,7 +58,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 	secretRefGroup = Group
 
 	var secretRefKind gwv1beta1.Kind
-	secretRefKind = GatewayKind
+	secretRefKind = SecretKind
 
 	var secretRefNamespace gwv1beta1.Namespace
 	secretRefNamespace = toNamespace
@@ -77,7 +77,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 			ctx:          context.TODO(),
 			gateway: gwv1beta1.Gateway{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       HTTPRouteKind,
+					Kind:       GatewayKind,
 					APIVersion: Group + V1Beta1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
