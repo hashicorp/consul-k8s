@@ -1,0 +1,3 @@
+```release-note:improvement
+cli: Add `consul-k8s config read` command that returns the helm configuration in yaml format.
+```
