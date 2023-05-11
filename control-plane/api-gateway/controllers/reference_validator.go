@@ -203,7 +203,7 @@ func referenceAllowed(ctx context.Context, fromGK metav1.GroupKind, fromNamespac
 	return false, nil
 }
 
-// This function will get all reference grants in the given namespace
+// This function will get all reference grants in the given namespace.
 func getReferenceGrantsInNamespace(ctx context.Context, namespace string, c client.Client) ([]gwv1beta1.ReferenceGrant, error) {
 	refGrantList := &gwv1beta1.ReferenceGrantList{}
 	if err := c.List(ctx, refGrantList, client.InNamespace(namespace)); err != nil {

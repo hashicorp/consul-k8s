@@ -29,8 +29,7 @@ const (
 func TestGatewayCanReferenceSecret(t *testing.T) {
 	t.Parallel()
 
-	var objName gwv1beta1.ObjectName
-	objName = "mysecret"
+	objName := gwv1beta1.ObjectName("mysecret")
 
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
@@ -118,8 +117,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 	t.Parallel()
 
-	var objName gwv1beta1.ObjectName
-	objName = "mygateway"
+	objName := gwv1beta1.ObjectName("mygateway")
 
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
@@ -209,8 +207,7 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 	t.Parallel()
 
-	var objName gwv1beta1.ObjectName
-	objName = "myBackendRef"
+	objName := gwv1beta1.ObjectName("myBackendRef")
 
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
@@ -302,8 +299,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 func TestTCPRouteCanReferenceGateway(t *testing.T) {
 	t.Parallel()
 
-	var objName gwv1beta1.ObjectName
-	objName = "mygateway"
+	objName := gwv1beta1.ObjectName("mygateway")
 
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
@@ -393,8 +389,7 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 func TestTCPRouteCanReferenceBackend(t *testing.T) {
 	t.Parallel()
 
-	var objName gwv1beta1.ObjectName
-	objName = "myBackendRef"
+	objName := gwv1beta1.ObjectName("myBackendRef")
 
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
