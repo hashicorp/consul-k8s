@@ -74,6 +74,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					MutualTLSMode: MutualTLSModePermissive,
 					AccessLogs: &AccessLogs{
 						Enabled:             true,
 						DisableListenerLogs: true,
@@ -129,6 +130,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
+				MutualTLSMode: capi.MutualTLSModePermissive,
 				AccessLogs: &capi.AccessLogsConfig{
 					Enabled:             true,
 					DisableListenerLogs: true,
@@ -292,6 +294,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					MutualTLSMode: MutualTLSModeStrict,
 					AccessLogs: &AccessLogs{
 						Enabled:             true,
 						DisableListenerLogs: true,
@@ -348,6 +351,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
+				MutualTLSMode: capi.MutualTLSModeStrict,
 				AccessLogs: &capi.AccessLogsConfig{
 					Enabled:             true,
 					DisableListenerLogs: true,
@@ -496,6 +500,17 @@ func TestProxyDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
+		},
+		"mutualTLSMode": {
+			input: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					MutualTLSMode: MutualTLSMode("asdf"),
+				},
+			},
+			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
 		},
 		"accessLogs.type": {
 			input: &ProxyDefaults{

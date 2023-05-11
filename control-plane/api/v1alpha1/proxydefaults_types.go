@@ -67,6 +67,17 @@ type ProxyDefaultsSpec struct {
 	// Note: This cannot be set using the CRD and should be set using annotations on the
 	// services that are part of the mesh.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
+	// MutualTLSMode controls whether mutual TLS is required for all incoming
+	// connections when transparent proxy is enabled. This can be set to
+	// "permissive" or "strict". "strict" is the default which requires mutual
+	// TLS for incoming connections. In the insecure "permissive" mode,
+	// connections to the sidecar proxy public listener port require mutual
+	// TLS, but connections to the service port do not require mutual TLS and
+	// are proxied to the application unmodified. Note: Intentions are not
+	// enforced for non-mTLS connections. To keep your services secure, we
+	// recommend using "strict" mode whenever possible and enabling
+	// "permissive" mode only when necessary.
+	MutualTLSMode MutualTLSMode `json:"mutualTLSMode,omitempty"`
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.
 	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
@@ -174,6 +185,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Expose:           in.Spec.Expose.toConsul(),
 		Config:           consulConfig,
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		MutualTLSMode:    in.Spec.MutualTLSMode.toConsul(),
 		AccessLogs:       in.Spec.AccessLogs.toConsul(),
 		EnvoyExtensions:  in.Spec.EnvoyExtensions.toConsul(),
 		FailoverPolicy:   in.Spec.FailoverPolicy.toConsul(),
@@ -200,6 +212,9 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 	}
 	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
 		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.MutualTLSMode.validate(); err != nil {
+		allErrs = append(allErrs, field.Invalid(path.Child("mutualTLSMode"), in.Spec.MutualTLSMode, err.Error()))
 	}
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
