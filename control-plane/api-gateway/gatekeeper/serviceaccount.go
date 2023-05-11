@@ -18,24 +18,15 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 		return nil
 	}
 
-	var (
-		serviceAccount = &corev1.ServiceAccount{}
-		exists         = false
-	)
+	serviceAccount := &corev1.ServiceAccount{}
+	exists := false
 
 	// Get ServiceAccount if it exists.
-	{
-		if err := g.Client.Get(ctx, g.namespacedName(), serviceAccount); err != nil {
-			fmt.Println(err)
-			if k8serrors.IsNotFound(err) {
-				exists = false
-			} else {
-				return err
-			}
-		} else {
-			exists = true
-		}
-		fmt.Println(exists)
+	err := g.Client.Get(ctx, g.namespacedName(), serviceAccount)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	} else {
+		exists = true
 	}
 
 	if exists {

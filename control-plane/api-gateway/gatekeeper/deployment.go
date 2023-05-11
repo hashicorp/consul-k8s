@@ -16,16 +16,11 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 	exists := false
 
 	// Get Deployment if it exists.
-	{
-		if err := g.Client.Get(ctx, g.namespacedName(), deployment); err != nil {
-			if k8serrors.IsNotFound(err) {
-				exists = false
-			} else {
-				return err
-			}
-		} else {
-			exists = true
-		}
+	err := g.Client.Get(ctx, g.namespacedName(), deployment)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	} else {
+		exists = true
 	}
 
 	if exists {
