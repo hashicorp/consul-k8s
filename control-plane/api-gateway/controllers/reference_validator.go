@@ -4,28 +4,44 @@ import (
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
-
-//
-// client. (K8s client)
 
 type ReferenceValidator struct {
 	client.Client
 }
 
-/*
-		bindValidator.CanBind(ctx, gateway, secret) -> true, false, error
-		bindValidator.CanBind(ctx, httproute, gatewayref)
-		bindValidator.CanBind(ctx, tcproute, gatewayref)
-	    bindValidator.CanBind(ctx, httproute, backendref)
-		bindValidator.CanBind(ctx, tcproute, backendref)
-*/
-
 func NewReferenceValidator(client client.Client) *ReferenceValidator {
 	return &ReferenceValidator{
 		client,
 	}
+}
+
+func (rv ReferenceValidator) GatewayCanReferenceSecret(ctx context.Context, gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) (bool, error) {
+	fromNS := gateway.GetNamespace()
+	fromGK := metav1.GroupKind{
+		Group: gateway.GroupVersionKind().Group,
+		Kind:  gateway.GroupVersionKind().Kind,
+	}
+
+	toName := string(secretRef.Name)
+	toNS := ""
+	if secretRef.Namespace != nil {
+		toNS = string(*secretRef.Namespace)
+	}
+
+	// Kind should default to Secret if not set
+	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#LL59C21-L59C21
+	toGK := metav1.GroupKind{Kind: "Secret"}
+	if secretRef.Group != nil {
+		toGK.Group = string(*secretRef.Group)
+	}
+	if secretRef.Kind != nil {
+		toGK.Kind = string(*secretRef.Kind)
+	}
+
+	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, toName, rv.Client)
 }
 
 func (rv ReferenceValidator) HTTPRouteCanReferenceGateway(ctx context.Context, httproute gwv1beta1.HTTPRoute, gatewayRef gwv1beta1.ParentReference) (bool, error) {
@@ -52,6 +68,85 @@ func (rv ReferenceValidator) HTTPRouteCanReferenceGateway(ctx context.Context, h
 	}
 
 	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, toName, rv.Client)
+}
+
+func (rv ReferenceValidator) HTTPRouteCanReferenceBackend(ctx context.Context, httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) (bool, error) {
+	fromNS := httproute.GetNamespace()
+	fromGK := metav1.GroupKind{
+		Group: httproute.GroupVersionKind().Group,
+		Kind:  httproute.GroupVersionKind().Kind,
+	}
+
+	toName := string(backendRef.Name)
+	toNS := ""
+	if backendRef.Namespace != nil {
+		toNS = string(*backendRef.Namespace)
+	}
+
+	// Kind should default to Service if not set
+	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#L106
+	toGK := metav1.GroupKind{Kind: "Service"}
+	if backendRef.Group != nil {
+		toGK.Group = string(*backendRef.Group)
+	}
+	if backendRef.Kind != nil {
+		toGK.Kind = string(*backendRef.Kind)
+	}
+
+	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, toName, rv.Client)
+
+}
+
+func (rv ReferenceValidator) TCPRouteCanReferenceGateway(ctx context.Context, tcpRoute gwv1alpha2.TCPRoute, gatewayRef gwv1beta1.ParentReference) (bool, error) {
+	fromNS := tcpRoute.GetNamespace()
+	fromGK := metav1.GroupKind{
+		Group: tcpRoute.GroupVersionKind().Group,
+		Kind:  tcpRoute.GroupVersionKind().Kind,
+	}
+
+	toName := string(gatewayRef.Name)
+	toNS := ""
+	if gatewayRef.Namespace != nil {
+		toNS = string(*gatewayRef.Namespace)
+	}
+
+	// Kind should default to Gateway if not set
+	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/shared_types.go#L48
+	toGK := metav1.GroupKind{Kind: "Gateway"}
+	if gatewayRef.Group != nil {
+		toGK.Group = string(*gatewayRef.Group)
+	}
+	if gatewayRef.Kind != nil {
+		toGK.Kind = string(*gatewayRef.Kind)
+	}
+
+	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, toName, rv.Client)
+}
+
+func (rv ReferenceValidator) TCPRouteCanReferenceBackend(ctx context.Context, tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) (bool, error) {
+	fromNS := tcpRoute.GetNamespace()
+	fromGK := metav1.GroupKind{
+		Group: tcpRoute.GroupVersionKind().Group,
+		Kind:  tcpRoute.GroupVersionKind().Kind,
+	}
+
+	toName := string(backendRef.Name)
+	toNS := ""
+	if backendRef.Namespace != nil {
+		toNS = string(*backendRef.Namespace)
+	}
+
+	// Kind should default to Service if not set
+	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#L106
+	toGK := metav1.GroupKind{Kind: "Service"}
+	if backendRef.Group != nil {
+		toGK.Group = string(*backendRef.Group)
+	}
+	if backendRef.Kind != nil {
+		toGK.Kind = string(*backendRef.Kind)
+	}
+
+	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, toName, rv.Client)
 
 }
 
@@ -69,7 +164,7 @@ func referenceAllowed(ctx context.Context, fromGK metav1.GroupKind, fromNamespac
 	}
 
 	// Fetch all ReferenceGrants in the referenced namespace
-	refGrants, err := GetReferenceGrantsInNamespace(ctx, toNamespace, c)
+	refGrants, err := getReferenceGrantsInNamespace(ctx, toNamespace, c)
 	if err != nil || len(refGrants) == 0 {
 		return false, err
 	}
@@ -108,7 +203,8 @@ func referenceAllowed(ctx context.Context, fromGK metav1.GroupKind, fromNamespac
 	return false, nil
 }
 
-func GetReferenceGrantsInNamespace(ctx context.Context, namespace string, c client.Client) ([]gwv1beta1.ReferenceGrant, error) {
+// This function will get all reference grants in the given namespace
+func getReferenceGrantsInNamespace(ctx context.Context, namespace string, c client.Client) ([]gwv1beta1.ReferenceGrant, error) {
 	refGrantList := &gwv1beta1.ReferenceGrantList{}
 	if err := c.List(ctx, refGrantList, client.InNamespace(namespace)); err != nil {
 		return nil, err
