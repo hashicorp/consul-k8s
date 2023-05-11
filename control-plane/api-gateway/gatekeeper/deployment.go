@@ -43,17 +43,15 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 }
 
 func (g *Gatekeeper) deleteDeployment(ctx context.Context) error {
-	if err := g.Client.Delete(ctx, g.deployment()); err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil
-		}
-		return err
+	err := g.Client.Delete(ctx, g.deployment())
+	if k8serrors.IsNotFound(err) {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
-func (g Gatekeeper) deployment() *appsv1.Deployment {
+func (g *Gatekeeper) deployment() *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      g.Gateway.Name,

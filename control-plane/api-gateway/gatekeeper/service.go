@@ -59,7 +59,7 @@ func (g *Gatekeeper) deleteService(ctx context.Context) error {
 	return nil
 }
 
-func (g Gatekeeper) service() *corev1.Service {
+func (g *Gatekeeper) service() *corev1.Service {
 	ports := []corev1.ServicePort{}
 	for _, listener := range g.Gateway.Spec.Listeners {
 		ports = append(ports, corev1.ServicePort{

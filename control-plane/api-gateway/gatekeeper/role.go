@@ -35,7 +35,7 @@ func (g *Gatekeeper) deleteRole(ctx context.Context) error {
 	return nil
 }
 
-func (g Gatekeeper) role() *rbac.Role {
+func (g *Gatekeeper) role() *rbac.Role {
 	return &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      g.Gateway.Name,

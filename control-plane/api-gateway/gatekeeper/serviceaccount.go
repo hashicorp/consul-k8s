@@ -3,7 +3,6 @@ package gatekeeper
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +62,7 @@ func (g *Gatekeeper) deleteServiceAccount(ctx context.Context) error {
 	return nil
 }
 
-func (g Gatekeeper) serviceAccount() *corev1.ServiceAccount {
+func (g *Gatekeeper) serviceAccount() *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      g.Gateway.Name,
