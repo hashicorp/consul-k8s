@@ -8,8 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 var (
@@ -17,6 +19,8 @@ var (
 		"external-dns.alpha.kubernetes.io/hostname",
 	}
 )
+
+type mutator = func() error
 
 func (g *Gatekeeper) upsertService(ctx context.Context) error {
 	if g.HelmConfig.ServiceType == nil {
@@ -26,10 +30,7 @@ func (g *Gatekeeper) upsertService(ctx context.Context) error {
 	service := g.service()
 
 	mutated := service.DeepCopy()
-	mutator := func() error {
-		mutated = mergeService(service, mutated)
-		return ctrl.SetControllerReference(&g.Gateway, mutated, g.Client.Scheme())
-	}
+	mutator := buildMutator(service, mutated, g.Gateway, g.Client.Scheme())
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -128,4 +129,11 @@ func areServicesEqual(a, b *corev1.Service) bool {
 		}
 	}
 	return true
+}
+
+func buildMutator(service, mutated *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) mutator {
+	return func() error {
+		mutated = mergeService(service, mutated)
+		return ctrl.SetControllerReference(&gateway, mutated, scheme)
+	}
 }
