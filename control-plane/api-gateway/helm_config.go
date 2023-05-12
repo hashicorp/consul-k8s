@@ -13,11 +13,13 @@ type HelmConfig struct {
 	// Tolerations place Pods in the Deployment on Kubernetes Nodes by toleration.
 	Tolerations map[string]string
 	// ServiceType is the type of service that should be attached to a given Deployment.
-	ServiceType              *string
-	UseHostPorts             bool
-	CopyAnnotations          map[string]string
-	MaxInstances             int32
-	MinInstances             int32
-	ConsulNamespaceMirroring bool
-	ManageSystemACLs         bool
+	ServiceType *string
+	// CopyAnnotations defines a mapping of annotations to be copied from the Gateway to the Service created.
+	CopyAnnotations map[string]string
+	// MaxInstances is the maximum number of replicas in the Deployment of API Gateway for handling requests.
+	MaxInstances int32
+	// MinInstances is the minimum number of replicas in the Deployment of API Gateway for handling requests.
+	MinInstances int32
+	// ManageSystemACLs toggles the behavior of Consul on Kubernetes creating ACLs and RBAC resources for Gateway deployments.
+	ManageSystemACLs bool
 }
