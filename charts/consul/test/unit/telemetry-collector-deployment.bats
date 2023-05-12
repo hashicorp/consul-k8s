@@ -96,7 +96,7 @@ load _helpers
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
 }
 
