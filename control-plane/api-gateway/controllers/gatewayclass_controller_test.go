@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -239,7 +239,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			r := &GatewayClassController{
 				Client:         fakeClient,
 				ControllerName: GatewayClassControllerName,
-				Log:            logrtest.NewTestLogger(t),
+				Log:            logrtest.New(t),
 			}
 			result, err := r.Reconcile(context.Background(), req)
 
