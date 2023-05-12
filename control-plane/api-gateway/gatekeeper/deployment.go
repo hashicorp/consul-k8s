@@ -142,11 +142,7 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 		}
 	}
 
-	if *b.Spec.Replicas != *a.Spec.Replicas {
-		return false
-	}
-
-	return true
+	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
 func newDeploymentMutator(deployment, mutated *appsv1.Deployment, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
