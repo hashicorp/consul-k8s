@@ -2,10 +2,11 @@ package controllers
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +87,7 @@ func TestGatewayReconciler(t *testing.T) {
 
 			r := &GatewayController{
 				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
+				Log:    logrtest.New(t),
 			}
 			result, err := r.Reconcile(context.Background(), req)
 
