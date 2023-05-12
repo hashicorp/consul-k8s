@@ -125,7 +125,7 @@ func TestUpsert(t *testing.T) {
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{},
 				services: []*corev1.Service{

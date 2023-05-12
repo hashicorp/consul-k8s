@@ -77,6 +77,9 @@ func (g *Gatekeeper) Delete(ctx context.Context) error {
 	return nil
 }
 
+// resourceMutator is passed to create or update functions to mutate Kubernetes resources.
+type resourceMutator = func() error
+
 func (g Gatekeeper) namespacedName() types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: g.Gateway.Namespace,
