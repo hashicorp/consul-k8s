@@ -866,16 +866,18 @@ load _helpers
 
 }
 
-@test "telemetryCollector/Deployment: CONSUL_HTTP_SSL set correctly when using TLS." {
+@test "telemetryCollector/Deployment: -ca-certs set correctly when using TLS." {
   cd `chart_dir`
-  local actual=$(helm template \
+  local flags=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[3].value' | tee /dev/stderr)
-  [ "${actual}" = "\"true\"" ]
+      yq -r '.spec.template.spec.containers[1].args' | tee /dev/stderr)
+
+  local actual=$(echo $flags | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }
 
 #--------------------------------------------------------------------
