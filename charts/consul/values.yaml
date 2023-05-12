@@ -3123,3 +3123,7 @@ telemetryCollector:
   # Optional YAML string to specify a nodeSelector config.
   # @type: string
   nodeSelector: null
+
+  # Optional priorityClassName.
+  # @type: string
+  priorityClassName: ""
