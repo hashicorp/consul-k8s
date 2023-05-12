@@ -312,11 +312,18 @@ spec:
         - emptyDir:
             medium: Memory
           name: consul-connect-inject-data
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
         - name: consul-ca-cert
           secret:
-            defaultMode: 420
+          {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
             items:
-              - key: tls.crt
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
                 path: tls.crt
-            secretName: consul-ca-cert
+      {{- end }}
+      {{- end }}
 {{- end }}
