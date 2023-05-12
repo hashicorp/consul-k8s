@@ -19,6 +19,7 @@ import (
 )
 
 func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		ctx context.Context
 		gw  *gwv1beta1.Gateway
@@ -224,6 +225,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 }
 
 func TestSerializeGatewayClassConfig_SadPath(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		ctx context.Context
 		gw  *gwv1beta1.Gateway
@@ -624,6 +626,7 @@ func TestSerializeGatewayClassConfig_SadPath(t *testing.T) {
 			wantErr:           false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := runtime.NewScheme()
