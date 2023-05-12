@@ -54,14 +54,9 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 		},
 	}
 
-	var secretRefGroup gwv1beta1.Group
-	secretRefGroup = Group
-
-	var secretRefKind gwv1beta1.Kind
-	secretRefKind = SecretKind
-
-	var secretRefNamespace gwv1beta1.Namespace
-	secretRefNamespace = toNamespace
+	secretRefGroup := gwv1beta1.Group(Group)
+	secretRefKind := gwv1beta1.Kind(SecretKind)
+	secretRefNamespace := gwv1beta1.Namespace(toNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -142,14 +137,9 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 		},
 	}
 
-	var gatewayRefGroup gwv1beta1.Group
-	gatewayRefGroup = Group
-
-	var gatewayRefKind gwv1beta1.Kind
-	gatewayRefKind = GatewayKind
-
-	var gatewayRefNamespace gwv1beta1.Namespace
-	gatewayRefNamespace = toNamespace
+	gatewayRefGroup := gwv1beta1.Group(Group)
+	gatewayRefKind := gwv1beta1.Kind(GatewayKind)
+	gatewayRefNamespace := gwv1beta1.Namespace(toNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -232,14 +222,9 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 		},
 	}
 
-	var backendRefGroup gwv1beta1.Group
-	backendRefGroup = Group
-
-	var backendRefKind gwv1beta1.Kind
-	backendRefKind = BackendRefKind
-
-	var backendRefNamespace gwv1beta1.Namespace
-	backendRefNamespace = toNamespace
+	backendRefGroup := gwv1beta1.Group(Group)
+	backendRefKind := gwv1beta1.Kind(BackendRefKind)
+	backendRefNamespace := gwv1beta1.Namespace(toNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -324,14 +309,9 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 		},
 	}
 
-	var gatewayRefGroup gwv1beta1.Group
-	gatewayRefGroup = Group
-
-	var gatewayRefKind gwv1beta1.Kind
-	gatewayRefKind = GatewayKind
-
-	var gatewayRefNamespace gwv1beta1.Namespace
-	gatewayRefNamespace = toNamespace
+	gatewayRefGroup := gwv1beta1.Group(Group)
+	gatewayRefKind := gwv1beta1.Kind(GatewayKind)
+	gatewayRefNamespace := gwv1beta1.Namespace(toNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -414,14 +394,9 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 		},
 	}
 
-	var backendRefGroup gwv1beta1.Group
-	backendRefGroup = Group
-
-	var backendRefKind gwv1beta1.Kind
-	backendRefKind = BackendRefKind
-
-	var backendRefNamespace gwv1beta1.Namespace
-	backendRefNamespace = toNamespace
+	backendRefGroup := gwv1beta1.Group(Group)
+	backendRefKind := gwv1beta1.Kind(BackendRefKind)
+	backendRefNamespace := gwv1beta1.Namespace(toNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
