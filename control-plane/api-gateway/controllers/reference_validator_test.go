@@ -456,8 +456,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 func TestReferenceAllowed(t *testing.T) {
 	t.Parallel()
 
-	var objName gwv1beta1.ObjectName
-	objName = "barHttpRoute"
+	objName := gwv1beta1.ObjectName("myObject")
 
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
