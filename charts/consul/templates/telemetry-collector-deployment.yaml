@@ -323,6 +323,9 @@ spec:
       nodeSelector:
         {{ tpl .Values.telemetryCollector.nodeSelector . | indent 8 | trim }}
       {{- end }}
+      {{- if .Values.telemetryCollector.priorityClassName }}
+      priorityClassName: {{ .Values.telemetryCollector.priorityClassName }}
+      {{- end }}
       volumes:
         - emptyDir:
             medium: Memory
