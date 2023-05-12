@@ -3103,10 +3103,6 @@ telemetryCollector:
   replicas: 1
   # customExporterConfig: {}
 
-  # Optional YAML string to specify a nodeSelector config.
-  # @type: string
-  nodeSelector: null
-
   cloud:
     clientId:
       secretName: null
@@ -3115,3 +3111,15 @@ telemetryCollector:
       secretName: null
       secretKey: null
 
+  initContainer:
+    resources: {}
+
+  # This value defines the tolerations for api-gateway-controller pod, this should be a multi-line string matching the
+  # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+  #
+  # @type: string
+  tolerations: null
+
+  # Optional YAML string to specify a nodeSelector config.
+  # @type: string
+  nodeSelector: null
