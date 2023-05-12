@@ -845,18 +845,25 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# CONSUL_HTTP_SSL
+# global.tls.enabled
 
-@test "telemetryCollector/Deployment: CONSUL_HTTP_SSL set correctly when not using TLS." {
+@test "telemetryCollector/Deployment: sets -tls-disabled args when when not using TLS." {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[2].value' | tee /dev/stderr)
-  [ "${actual}" = "\"false\"" ]
+
+  local flags=$(helm template  \
+    -s templates/telemetry-collector-deployment.yaml \
+    --set 'telemetryCollector.enabled=true'     \
+    --set 'telemetryCollector.image=bar'    \
+    --set 'global.tls.enabled=false'    \
+    . | yq -r .spec.template.spec.containers[1].args)
+
+  local actual=$(echo $flags | yq -r '. | any(contains("-tls-disabled"))')
+  [ "${actual}" = 'true' ]
+
+  #local actual=$(echo $flags | yq -r '. | any(contains("-tls-disabled"))')
+  #echo $actual
+  [ "${actual}" = 'true' ]
+
 }
 
 @test "telemetryCollector/Deployment: CONSUL_HTTP_SSL set correctly when using TLS." {
