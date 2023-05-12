@@ -52,7 +52,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					"static-server-sidecar-proxy",
 				} {
 					logger.Logf(t, "checking for %s service in Consul catalog", name)
-					instances, _, err := connHelper.consulClient.Catalog().Service(name, "", nil)
+					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 					r.Check(err)
 
 					if len(instances) != 1 {
@@ -126,7 +126,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					"static-client-sidecar-proxy",
 				} {
 					logger.Logf(t, "checking for %s service in Consul catalog", name)
-					instances, _, err := connHelper.consulClient.Catalog().Service(name, "", nil)
+					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 					r.Check(err)
 
 					for _, instance := range instances {
