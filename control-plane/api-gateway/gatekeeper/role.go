@@ -2,11 +2,13 @@ package gatekeeper
 
 import (
 	"context"
+	"errors"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func (g *Gatekeeper) upsertRole(ctx context.Context) error {
@@ -16,8 +18,35 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 
 	// TODO check and do upsert
 
-	err := g.Client.Create(ctx, g.role())
-	if err != nil {
+	role := &rbac.Role{}
+	exists := false
+
+	// Get ServiceAccount
+	err := g.Client.Get(ctx, g.namespacedName(), role)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	} else if k8serrors.IsNotFound(err) {
+		exists = false
+	} else {
+		exists = true
+	}
+
+	if exists {
+		// Ensure we own the Role.
+		for _, ref := range role.GetOwnerReferences() {
+			if ref.UID == g.Gateway.GetUID() && ref.Name == g.Gateway.GetName() {
+				// We found ourselves!
+				return nil
+			}
+		}
+		return errors.New("Role not owned by controller")
+	}
+
+	role = g.role()
+	if err := ctrl.SetControllerReference(&g.Gateway, role, g.Client.Scheme()); err != nil {
+		return err
+	}
+	if err := g.Client.Create(ctx, role); err != nil {
 		return err
 	}
 

@@ -88,11 +88,10 @@ func TestUpsert(t *testing.T) {
 			helmConfig: apigateway.HelmConfig{
 				Replicas: 3,
 			},
-
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
@@ -140,7 +139,7 @@ func TestUpsert(t *testing.T) {
 							Protocol: "UDP",
 							Port:     8081,
 						},
-					}),
+					}, "1"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -172,10 +171,10 @@ func TestUpsert(t *testing.T) {
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels),
+					configureRole(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -189,10 +188,10 @@ func TestUpsert(t *testing.T) {
 							Protocol: "UDP",
 							Port:     8081,
 						},
-					}),
+					}, "1"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels),
+					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
 		},
@@ -222,10 +221,10 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels),
+					configureRole(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -234,18 +233,18 @@ func TestUpsert(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8080,
 						},
-					}),
+					}, "1"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels),
+					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels),
+					configureRole(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -259,10 +258,10 @@ func TestUpsert(t *testing.T) {
 							Protocol: "UDP",
 							Port:     8081,
 						},
-					}),
+					}, "2"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels),
+					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
 		},
@@ -294,10 +293,10 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels),
+					configureRole(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -311,18 +310,18 @@ func TestUpsert(t *testing.T) {
 							Protocol: "UDP",
 							Port:     8081,
 						},
-					}),
+					}, "1"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels),
+					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels),
+					configureRole(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -331,10 +330,10 @@ func TestUpsert(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8080,
 						},
-					}),
+					}, "2"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels),
+					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
 		},
@@ -362,12 +361,12 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 5, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
 				},
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 5, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
@@ -427,7 +426,7 @@ func TestDelete(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 			},
 			finalResources: resources{
@@ -463,7 +462,7 @@ func TestDelete(t *testing.T) {
 			initialResources: resources{
 
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{},
 				services: []*corev1.Service{
@@ -478,7 +477,7 @@ func TestDelete(t *testing.T) {
 							Protocol: "UDP",
 							Port:     8081,
 						},
-					}),
+					}, "1"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -515,10 +514,10 @@ func TestDelete(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, ""),
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels),
+					configureRole(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -532,10 +531,10 @@ func TestDelete(t *testing.T) {
 							Protocol: "UDP",
 							Port:     8081,
 						},
-					}),
+					}, "1"),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels),
+					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
 			finalResources: resources{
@@ -718,7 +717,7 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 	return nil
 }
 
-func configureDeployment(name, namespace string, labels map[string]string, replicas int32, nodeSelector map[string]string, tolerations []corev1.Toleration, serviceAccoutName string) *appsv1.Deployment {
+func configureDeployment(name, namespace string, labels map[string]string, replicas int32, nodeSelector map[string]string, tolerations []corev1.Toleration, serviceAccoutName, resourceVersion string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -728,7 +727,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 			Name:            name,
 			Namespace:       namespace,
 			Labels:          labels,
-			ResourceVersion: "1",
+			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
@@ -776,7 +775,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 	}
 }
 
-func configureRole(name, namespace string, labels map[string]string) *rbac.Role {
+func configureRole(name, namespace string, labels map[string]string, resourceVersion string) *rbac.Role {
 	return &rbac.Role{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
@@ -786,7 +785,16 @@ func configureRole(name, namespace string, labels map[string]string) *rbac.Role 
 			Name:            name,
 			Namespace:       namespace,
 			Labels:          labels,
-			ResourceVersion: "1",
+			ResourceVersion: resourceVersion,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					Kind:               "Gateway",
+					Name:               name,
+					Controller:         ptrTo(true),
+					BlockOwnerDeletion: ptrTo(true),
+				},
+			},
 		},
 		Rules: []rbac.PolicyRule{{
 			APIGroups: []string{"policy"},
@@ -796,7 +804,7 @@ func configureRole(name, namespace string, labels map[string]string) *rbac.Role 
 	}
 }
 
-func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort) *corev1.Service {
+func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort, resourceVersion string) *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -807,7 +815,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 			Namespace:       namespace,
 			Labels:          labels,
 			Annotations:     annotations,
-			ResourceVersion: "1",
+			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
@@ -826,7 +834,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 	}
 }
 
-func configureServiceAccount(name, namespace string, labels map[string]string) *corev1.ServiceAccount {
+func configureServiceAccount(name, namespace string, labels map[string]string, resourceVersion string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -836,7 +844,7 @@ func configureServiceAccount(name, namespace string, labels map[string]string) *
 			Name:            name,
 			Namespace:       namespace,
 			Labels:          labels,
-			ResourceVersion: "1",
+			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",

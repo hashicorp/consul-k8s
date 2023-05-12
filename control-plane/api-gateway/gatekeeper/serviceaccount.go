@@ -24,6 +24,8 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 	err := g.Client.Get(ctx, g.namespacedName(), serviceAccount)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
+	} else if k8serrors.IsNotFound(err) {
+		exists = false
 	} else {
 		exists = true
 	}
