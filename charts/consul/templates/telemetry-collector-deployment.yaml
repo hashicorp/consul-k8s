@@ -113,6 +113,10 @@ spec:
 
         image: {{ .Values.global.imageK8S }}
         imagePullPolicy: IfNotPresent
+        {{- if .Values.telemetryCollector.initContainer.resources }}
+        resources:
+          {{- toYaml .Values.telemetryCollector.initContainer.resources | nindent 12 }}
+        {{- else }}
         resources:
           limits:
             cpu: 50m
@@ -120,6 +124,7 @@ spec:
           requests:
             cpu: 50m
             memory: 25Mi
+        {{- end }}
         securityContext:
           capabilities:
             add:
