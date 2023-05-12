@@ -80,7 +80,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
           {{- if .Values.global.acls.manageSystemACLs }}
             # The auth method should be k8s-component-auth-method but we would need to modify the acl-init job. We'll follow up with that
           - name: CONSUL_LOGIN_AUTH_METHOD
@@ -100,6 +99,7 @@ spec:
           {{- end }}
           - name: CONSUL_NODE_NAME
             value: $(NODE_NAME)-virtual
+          {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
         command:
           - /bin/sh
           - -ec
