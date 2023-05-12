@@ -197,10 +197,10 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
 
-  [ $(echo "${actual}" | yq -r '.requests.memory') = "100Mi" ]
-  [ $(echo "${actual}" | yq -r '.requests.cpu') = "100m" ]
-  [ $(echo "${actual}" | yq -r '.limits.memory') = "100Mi" ]
-  [ $(echo "${actual}" | yq -r '.limits.cpu') = "100m" ]
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "512Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "1000m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "512Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "1000m" ]
 }
 
 @test "telemetryCollector/Deployment: resources can be overridden" {

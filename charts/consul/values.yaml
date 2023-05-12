@@ -3092,7 +3092,13 @@ telemetryCollector:
   # The resource settings for telemetry-collector pods.
   # @recurse: false
   # @type: map
-  resources: {}
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "1000m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
 
   replicas: 1
   # customExporterConfig: {}
