@@ -24,6 +24,7 @@ import (
 )
 
 func Test_resourceCache_diff(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		newCache resourceCache
 	}
@@ -1190,6 +1191,7 @@ func Test_resourceCache_diff(t *testing.T) {
 }
 
 func TestCache_Subscribe(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		ctx        context.Context
 		kind       string
@@ -1431,6 +1433,7 @@ func TestCache_Write(t *testing.T) {
 }
 
 func TestCache_Get(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		ref api.ResourceReference
 	}
@@ -1542,6 +1545,7 @@ func TestCache_Get(t *testing.T) {
 }
 
 func Test_Run(t *testing.T) {
+	t.Parallel()
 	// setup httproutes
 	httpRouteOne, httpRouteTwo := setupHTTPRoutes()
 	httpRoutes := []*api.HTTPRouteConfigEntry{httpRouteOne, httpRouteTwo}

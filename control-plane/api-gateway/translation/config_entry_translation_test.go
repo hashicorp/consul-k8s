@@ -17,6 +17,7 @@ import (
 )
 
 func TestTranslator_GatewayToAPIGateway(t *testing.T) {
+	t.Parallel()
 	k8sObjectName := "my-k8s-gw"
 	k8sNamespace := "my-k8s-namespace"
 
@@ -247,6 +248,7 @@ func TestTranslator_GatewayToAPIGateway(t *testing.T) {
 }
 
 func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		k8sHTTPRoute gwv1beta1.HTTPRoute
 		parentRefs   map[types.NamespacedName]consulIdentifier
@@ -1362,6 +1364,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 }
 
 func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		k8sRoute   gwv1alpha2.TCPRoute
 		parentRefs map[types.NamespacedName]consulIdentifier
@@ -1567,6 +1570,7 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 }
 
 func TestTranslator_SecretToInlineCertificate(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		k8sSecret gwv1beta1.SecretObjectReference
 		certs     map[types.NamespacedName]consulIdentifier

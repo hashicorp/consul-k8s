@@ -13,7 +13,8 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-func Test_ConsulToNSNTranslator_TranslateConsulGateway(t *testing.T) {
+func Test_ConsulToNamespaceNameTranslator_TranslateConsulGateway(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		config *api.APIGatewayConfigEntry
 	}
@@ -94,7 +95,8 @@ func Test_ConsulToNSNTranslator_TranslateConsulGateway(t *testing.T) {
 	}
 }
 
-func TestConsulToNSNTranslator_TranslateConsulHTTPRoute(t *testing.T) {
+func TestConsulToNamespaceNameTranslator_TranslateConsulHTTPRoute(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		cache resourceGetter
 	}
@@ -215,7 +217,8 @@ func TestConsulToNSNTranslator_TranslateConsulHTTPRoute(t *testing.T) {
 	}
 }
 
-func TestConsulToNSNTranslator_TranslateConsulTCPRoute(t *testing.T) {
+func TestConsulToNamespaceNameTranslator_TranslateConsulTCPRoute(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		cache resourceGetter
 	}
@@ -336,7 +339,8 @@ func TestConsulToNSNTranslator_TranslateConsulTCPRoute(t *testing.T) {
 	}
 }
 
-func Test_ConsulToNSNTranslator_TranslateInlineCertificate(t *testing.T) {
+func Test_ConsulToNamespaceNameTranslator_TranslateInlineCertificate(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		config *api.InlineCertificateConfigEntry
 	}
