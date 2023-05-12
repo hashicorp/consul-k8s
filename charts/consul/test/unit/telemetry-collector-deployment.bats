@@ -177,11 +177,11 @@ load _helpers
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+      yq '[.env[4].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("dc2"))' | tee /dev/stderr)
+      yq '[.env[4].value] | any(contains("dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
