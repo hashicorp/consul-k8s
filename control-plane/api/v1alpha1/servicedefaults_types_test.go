@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
@@ -5,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestServiceDefaults_ToConsul(t *testing.T) {
@@ -66,6 +70,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					MutualTLSMode: MutualTLSModePermissive,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -86,6 +91,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								},
 								MaxFailures:             uint32(20),
 								EnforcingConsecutive5xx: pointer.Uint32(100),
+								MaxEjectionPercent:      pointer.Uint32(10),
+								BaseEjectionTime: &metav1.Duration{
+									Duration: 10 * time.Second,
+								},
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -111,6 +120,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(20),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 20 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -135,6 +148,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(30),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 30 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -193,6 +210,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
+				MutualTLSMode: capi.MutualTLSModePermissive,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -211,6 +229,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
 							EnforcingConsecutive5xx: pointer.Uint32(100),
+							MaxEjectionPercent:      pointer.Uint32(10),
+							BaseEjectionTime:        pointer.Duration(10 * time.Second),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -234,6 +254,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(20),
+								BaseEjectionTime:        pointer.Duration(20 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -256,6 +278,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(30),
+								BaseEjectionTime:        pointer.Duration(30 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -363,6 +387,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					MutualTLSMode: MutualTLSModeStrict,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -382,6 +407,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								},
 								MaxFailures:             uint32(20),
 								EnforcingConsecutive5xx: pointer.Uint32(100),
+								MaxEjectionPercent:      pointer.Uint32(10),
+								BaseEjectionTime: &metav1.Duration{
+									Duration: 10 * time.Second,
+								},
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -406,6 +435,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(20),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 20 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -429,6 +462,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(30),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 30 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -483,6 +520,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
+				MutualTLSMode: capi.MutualTLSModeStrict,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -500,6 +538,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
 							EnforcingConsecutive5xx: pointer.Uint32(100),
+							MaxEjectionPercent:      pointer.Uint32(10),
+							BaseEjectionTime:        pointer.Duration(10 * time.Second),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -522,6 +562,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(20),
+								BaseEjectionTime:        pointer.Duration(20 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -543,6 +585,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(30),
+								BaseEjectionTime:        pointer.Duration(30 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -676,6 +720,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
+					MutualTLSMode: MutualTLSModePermissive,
 					Expose: Expose{
 						Checks: false,
 						Paths: []ExposePath{
@@ -811,6 +856,17 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
+		"mutualTLSMode": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MutualTLSMode: MutualTLSMode("asdf"),
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
+		},
 		"mode": {
 			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -854,6 +910,21 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.name: Invalid value: "foobar": upstream.name for a default upstream must be ""`,
 		},
+		"upstreamConfig.defaults.namespace": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Namespace: "foobar",
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.namespace: Invalid value: "foobar": upstream.namespace for a default upstream must be ""`,
+		},
 		"upstreamConfig.defaults.partition": {
 			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -868,7 +939,22 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			partitionsEnabled: false,
-			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
+			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.defaults.partition: Invalid value: "upstream": upstream.partition for a default upstream must be "", spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
+		},
+		"upstreamConfig.defaults.peer": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Peer: "foobar",
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.peer: Invalid value: "foobar": upstream.peer for a default upstream must be ""`,
 		},
 		"upstreamConfig.overrides.meshGateway": {
 			input: &ServiceDefaults{
@@ -924,6 +1010,44 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
+		},
+		"upstreamConfig.overrides.partition and namespace": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								Name:      "service",
+								Namespace: "namespace",
+								Peer:      "peer",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"namespace", Partition:"", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both namespace and peer cannot be specified.`,
+		},
+		"upstreamConfig.overrides.partition and peer": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								Name:      "service",
+								Partition: "upstream",
+								Peer:      "peer",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"", Partition:"upstream", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both partition and peer cannot be specified., spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
 		},
 		"multi-error": {
 			input: &ServiceDefaults{
@@ -1224,7 +1348,7 @@ func TestServiceDefaults_ConsulName(t *testing.T) {
 }
 
 func TestServiceDefaults_KubernetesName(t *testing.T) {
-	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
 }
 
 func TestServiceDefaults_ConsulNamespace(t *testing.T) {

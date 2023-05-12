@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -95,8 +98,7 @@ spec:
                       description: Partition is the Admin Partition for the Name parameter.
                       type: string
                     peer:
-                      description: '[Experimental] Peer is the peer name for the Name
-                        parameter.'
+                      description: Peer is the peer name for the Name parameter.
                       type: string
                     permissions:
                       description: Permissions is the list of all additional L7 attributes
@@ -179,6 +181,10 @@ spec:
                             type: object
                         type: object
                       type: array
+                    samenessGroup:
+                      description: SamenessGroup is the name of the sameness group,
+                        if applicable.
+                      type: string
                   type: object
                 type: array
             type: object

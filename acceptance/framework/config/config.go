@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package config
 
 import (
@@ -48,6 +51,9 @@ type TestConfig struct {
 	ConsulK8SImage   string
 	ConsulVersion    *version.Version
 	EnvoyImage       string
+
+	VaultHelmChartVersion string
+	VaultServerVersion    string
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string

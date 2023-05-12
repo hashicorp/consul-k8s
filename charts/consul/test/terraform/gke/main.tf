@@ -1,6 +1,10 @@
-provider "google-beta" {
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+provider "google" {
   project = var.project
-  version = "~> 3.49.0"
+  version = "~> 4.58.0"
+  zone    = var.zone
 }
 
 resource "random_id" "suffix" {
@@ -10,13 +14,17 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.23."
+  version_prefix = "1.25."
+}
+
+# We assume that the subnets are already created to save time.
+data "google_compute_subnetwork" "subnet" {
+  name = var.subnet
 }
 
 resource "google_container_cluster" "cluster" {
-  provider = "google-beta"
-
-  count = var.cluster_count
+  provider = "google"
+  count    = var.cluster_count
 
   name               = "consul-k8s-${random_id.suffix[count.index].dec}"
   project            = var.project
@@ -26,12 +34,9 @@ resource "google_container_cluster" "cluster" {
   node_version       = data.google_container_engine_versions.main.latest_master_version
   node_config {
     tags         = ["consul-k8s-${random_id.suffix[count.index].dec}"]
-    machine_type = "e2-standard-4"
+    machine_type = "e2-standard-8"
   }
-  pod_security_policy_config {
-    enabled = true
-  }
-
+  subnetwork      = data.google_compute_subnetwork.subnet.name
   resource_labels = var.labels
 }
 

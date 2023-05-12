@@ -346,7 +346,11 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '[.env[7].value] | any(contains("5s"))' | tee /dev/stderr)
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '[.env[8].value] | any(contains("5s"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -494,6 +498,30 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.datacenter=dc1' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc2' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[3].value] | any(contains("dc2"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "apiGateway/Deployment: primary-datacenter flag provided when federation enabled in non-primary datacenter" {
   cd `chart_dir`
   local object=$(helm template \
@@ -546,7 +574,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("-datacenter=dc1"))' | tee /dev/stderr)
+      yq '[.env[3].value] | any(contains("dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1390,6 +1418,24 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME will not be set for when clients are used" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=external-consul.host' \
+      --set 'externalServers.httpsPort=8501' \
+      --set 'externalServers.tlsServerName=hashi' \
+      --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select (.name == "api-gateway-controller") | .env[] | select(.name == "CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
 #--------------------------------------------------------------------
 # Admin Partitions
 
@@ -1476,6 +1522,23 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "apiGateway/Deployment: CONSUL_CACERT has correct path with Vault as secrets backend and client disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'server.enabled=true' \
+      --set 'client.enabled=false' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      . | tee /dev/stderr|
+      yq '.spec.template.spec.containers[0].env[0].value == "/vault/secrets/serverca.crt"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "apiGateway/Deployment: CONSUL_CACERT is not set when using tls and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1509,6 +1572,21 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set when using Vault as a secrets backend" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
 @test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1521,6 +1599,21 @@ load _helpers
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using Vault as secrets backend" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]

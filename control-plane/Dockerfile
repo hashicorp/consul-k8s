@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # This Dockerfile contains multiple targets.
 # Use 'docker build --target=<name> .' to build one.
 #
@@ -19,7 +22,7 @@ RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
-FROM alpine:3.16 AS dev
+FROM alpine:3.17 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -41,7 +44,7 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
-RUN apk add --no-cache ca-certificates gnupg libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -71,7 +74,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.16 AS release-default
+FROM alpine:3.17 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
@@ -89,7 +92,7 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates gnupg libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -152,7 +155,7 @@ ARG TARGETARCH
 # Copy license for Red Hat certification.
 COPY LICENSE /licenses/mozilla.txt
 
-RUN microdnf install -y ca-certificates gnupg libcap openssl shadow-utils iptables
+RUN microdnf install -y ca-certificates libcap openssl shadow-utils iptables
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group

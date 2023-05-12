@@ -1,0 +1,27 @@
+# Dispatch to the consul-k8s-workflows with a nightly cron
+name: nightly-cleanup
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # Run nightly at 12PM UTC/8AM EST/5AM PST
+    - cron: '0 12 * * *'
+
+# these should be the only settings that you will ever need to change
+env:
+  CONSUL_IMAGE: "not used"
+  BRANCH: ${{ github.ref_name }}
+  CONTEXT: "nightly"
+
+jobs:
+  cleanup:
+    name: cleanup
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+      name: cleanup
+      with:
+        workflow: cleanup.yml
+        repo: hashicorp/consul-k8s-workflows
+        ref: main
+        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'

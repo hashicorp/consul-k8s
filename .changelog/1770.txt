@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling.
+```

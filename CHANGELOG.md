@@ -1,13 +1,100 @@
-## UNRELEASED
+## 1.0.5 (March 9, 2023)
+
+SECURITY:
+
+* upgrade to use Go 1.19.6. This resolves vulnerabilities CVE-2022-41724 in crypto/tls and CVE-2022-41723 in net/http. [[GH-1976](https://github.com/hashicorp/consul-k8s/issues/1976)]
+
+IMPROVEMENTS:
+
+* control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/issues/1770)]
+* control-plane: update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/issues/1934)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/issues/1953)]
+
+## 0.49.5 (March 9, 2023)
+
+SECURITY:
+
+* upgrade to use Go 1.19.6. This resolves vulnerabilities CVE-2022-41724 in crypto/tls and CVE-2022-41723 in net/http. [[GH-1975](https://github.com/hashicorp/consul-k8s/issues/1975)]
+
+IMPROVEMENTS:
+
+* cli: update minimum go version for project to 1.19. [[GH-1975](https://github.com/hashicorp/consul-k8s/issues/1975)]
+* control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/issues/1770)]
+* control-plane: update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/issues/1934)]
+* control-plane: update minimum go version for project to 1.19. [[GH-1975](https://github.com/hashicorp/consul-k8s/issues/1975)]
+
+BUG FIXES:
+
+* control-plane: fix issue where consul-connect-injector acl token was unintentionally being deleted and not recreated when a container was restarted due to a livenessProbe failure. [[GH-1914](https://github.com/hashicorp/consul-k8s/issues/1914)]
+
+## 1.1.0 (February 27, 2023)
+
+BREAKING CHANGES:
+* Helm:
+  * Change defaults to exclude the `openebs` namespace from sidecar injection. If you previously had pods in that namespace
+    that you wanted to be injected, you must now set `namespaceSelector` as follows:
+  
+    ```yaml
+    connectInject:
+      namespaceSelector: |
+        matchExpressions:
+        - key: "kubernetes.io/metadata.name"
+          operator: "NotIn"
+          values: ["kube-system","local-path-storage"]
+    ```
+    [[GH-1869](https://github.com/hashicorp/consul-k8s/pull/1869)]
 
 IMPROVEMENTS:
 * Helm:
+  * CNI: Add `connectInject.cni.namespace` stanza which allows the CNI plugin resources to be deployed in a namespace other than the namespace that Consul is installed. [[GH-1756](https://github.com/hashicorp/consul-k8s/pull/1756)]
+  * Kubernetes v1.26 is now supported. Minimum tested version of Kubernetes is now v1.23. [[GH-1852](https://github.com/hashicorp/consul-k8s/pull/1852)]
   * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
   * Add the `accessLogs` field to the `ProxyDefaults` CRD. [[GH-1816](https://github.com/hashicorp/consul-k8s/pull/1816)]
   * Add the `envoyExtensions` field to the `ProxyDefaults` and `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
   * Add the `balanceInboundConnections` field to the `ServiceDefaults` CRD. [[GH-1823]](https://github.com/hashicorp/consul-k8s/pull/1823)
+  * Add the `upstreamConfig.overrides[].peer` field to the `ServiceDefaults` CRD. [[GH-1853]](https://github.com/hashicorp/consul-k8s/pull/1853)
 * Control-Plane
-  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1824)]
+  * Update minimum go version for project to 1.20 [[GH-1908](https://github.com/hashicorp/consul-k8s/pull/1908)]
+  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
+  * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
+  * Remove extraneous `gnupg` dependency from `consul-k8s-control-plane` since it is no longer needed for validating binary artifacts prior to release. [[GH-1882](https://github.com/hashicorp/consul-k8s/pull/1882)]
+  * Server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/pull/1770)]
+  * Update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/pull/1934)]
+* CLI:
+  * Update minimum go version for project to 1.20 [[GH-1908](https://github.com/hashicorp/consul-k8s/pull/1908)]
+  * Add `consul-k8s proxy log podname` command for displaying and modifying Envoy log levels for a given Pod. [GH-1844](https://github.com/hashicorp/consul-k8s/pull/1844), [GH-1849](https://github.com/hashicorp/consul-k8s/pull/1849), [GH-1864](https://github.com/hashicorp/consul-k8s/pull/1864)
+
+BUG FIXES:
+* Control Plane
+  * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
+  * Add discover binary to control-plane image [[GH-1749](https://github.com/hashicorp/consul-k8s/pull/1749)]
+* Helm:
+  * Don't pass in a CA file to the API Gateway controller when `externalServers.useSystemRoots` is `true`. [[GH-1743](https://github.com/hashicorp/consul-k8s/pull/1743)]
+  * Use the correct autogenerated cert for the API Gateway Controller when connecting to servers versus clients. [[GH-1753](https://github.com/hashicorp/consul-k8s/pull/1753)]
+* Security:
+  * Upgrade to use Go 1.20.1 This resolves vulnerabilities [CVE-2022-41724](https://go.dev/issue/58001) in `crypto/tls` and [CVE-2022-41723](https://go.dev/issue/57855) in `net/http`. [[GH-1908](https://github.com/hashicorp/consul-k8s/pull/1908)]
+
+## 1.0.3 (January 30, 2023)
+
+IMPROVEMENTS:
+* Helm:
+  * Kubernetes v1.26 is now supported. Minimum tested version of Kubernetes is now v1.23. [[GH-1852](https://github.com/hashicorp/consul-k8s/pull/1852)]
+  * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
+* Control-Plane
+  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1841](https://github.com/hashicorp/consul-k8s/pull/1841)]
+  * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
+
+BUG FIXES:
+* Control Plane
+   * Don't incorrectly diff intention config entries when upgrading from Consul pre-1.12 to 1.12+ [[GH-1804](https://github.com/hashicorp/consul-k8s/pull/1804)]
+
+## 0.49.3 (January 30, 2023)
+
+IMPROVEMENTS:
+* Helm:
+  * Add a `global.extraLabels` stanza to allow setting global Kubernetes labels for all components deployed by the `consul-k8s` Helm chart. [[GH-1778](https://github.com/hashicorp/consul-k8s/pull/1778)]
+* Control-Plane
+  * Add support for the annotation `consul.hashicorp.com/use-proxy-health-check`. When this annotation is used by a service, it configures a readiness endpoint on Consul Dataplane and queries it instead of the proxy's inbound port which forwards requests to the application. [[GH-1824](https://github.com/hashicorp/consul-k8s/pull/1824)], [[GH-1843](https://github.com/hashicorp/consul-k8s/pull/1843)]
   * Add health check for synced services based on the status of the Kubernetes readiness probe on synced pod. [[GH-1821](https://github.com/hashicorp/consul-k8s/pull/1821)]
 
 BUG FIXES:

@@ -65,7 +65,14 @@ spec:
         {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
+          {{- /* When Vault is being used as a secrets backend, auto-encrypt must be enabled. Since clients use a separate
+          root CA from servers when auto-encrypt is enabled, and our controller communicates with the agent when clients are
+          enabled, we only use the Vault server CA if clients are disabled and our controller will be communicating w/ the server. */}}
+          {{- if and (not .Values.client.enabled) .Values.global.secretsBackend.vault.enabled }}
+          value: /vault/secrets/serverca.crt
+          {{- else }}
           value: /consul/tls/ca/tls.crt
+          {{- end }}
         {{- end }}
         {{- end }}
         - name: HOST_IP
@@ -75,6 +82,7 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: "/consul/login/acl-token"
+          # CONSUL_LOGIN_DATACENTER is passed to the gateway that gets created. The controller does not use this to log in
         - name: CONSUL_LOGIN_DATACENTER
           value: {{ .Values.global.datacenter }}
         {{- end }}
@@ -111,7 +119,7 @@ spec:
           {{- end }}
         - name: CONSUL_HTTP_SSL
           value: "{{ .Values.global.tls.enabled }}"
-        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+        {{- if and (not .Values.client.enabled) .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
         - name: CONSUL_TLS_SERVER_NAME
           value: {{ .Values.externalServers.tlsServerName }}
         {{- end }}
@@ -155,7 +163,7 @@ spec:
         - name: consul-bin
           mountPath: /consul-bin
         {{- end }}
-        {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
+        {{- if or (not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         {{- if and .Values.client.enabled .Values.global.tls.enableAutoEncrypt }}
         - name: consul-auto-encrypt-ca-cert
@@ -185,7 +193,7 @@ spec:
         emptyDir: { }
       {{- end }}
       {{- if .Values.global.tls.enabled }}
-      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
       - name: consul-ca-cert
         secret:
           {{- if .Values.global.tls.caCert.secretName }}
@@ -240,13 +248,19 @@ spec:
               fieldPath: metadata.name
         - name: CONSUL_LOGIN_META  
           value: "component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"
+        - name: CONSUL_LOGIN_DATACENTER
+        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          value: {{ .Values.global.federation.primaryDatacenter }}
+        {{- else }}
+          value: {{ .Values.global.datacenter }}
+        {{- end}}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data
           readOnly: false
-        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
         {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
           mountPath: /consul/tls/ca
@@ -260,7 +274,6 @@ spec:
           consul-k8s-control-plane acl-init \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
             -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
-            -datacenter={{ .Values.global.federation.primaryDatacenter }} \
             {{- else }}
             -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method \
             {{- end }}
