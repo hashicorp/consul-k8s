@@ -21,12 +21,13 @@ const namespaceWildcard = "*"
 
 var ErrStaleEntry = errors.New("entry is stale")
 
+var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
+
 type Config struct {
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
 	NamespacesEnabled   bool
 	Partition           string
-	Kinds               []string
 	Logger              logr.Logger
 }
 
@@ -122,8 +123,8 @@ type Cache struct {
 }
 
 func New(config Config) *Cache {
-	cache := make(map[string]resourceCache, len(config.Kinds))
-	for _, kind := range config.Kinds {
+	cache := make(map[string]resourceCache, len(Kinds))
+	for _, kind := range Kinds {
 		cache[kind] = make(resourceCache)
 	}
 
@@ -136,8 +137,8 @@ func New(config Config) *Cache {
 		cacheMutex:        &sync.Mutex{},
 		subscribers:       make(map[string][]*Subscription),
 		subscriberMutex:   &sync.Mutex{},
-		kinds:             config.Kinds,
-		synced:            make(chan struct{}, len(config.Kinds)),
+		kinds:             Kinds,
+		synced:            make(chan struct{}, len(Kinds)),
 		logger:            config.Logger,
 	}
 }

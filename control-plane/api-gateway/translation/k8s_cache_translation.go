@@ -20,18 +20,18 @@ type resourceGetter interface {
 	Get(api.ResourceReference) api.ConfigEntry
 }
 
-// ConsulToNSNTranslator handles translating consul config entries to k8s namespaced names
-type ConsulToNSNTranslator struct {
+// ConsulToNamespaceNameTranslator handles translating consul config entries to k8s namespaced names
+type ConsulToNamespaceNameTranslator struct {
 	cache resourceGetter
 }
 
-// NewConsulToNSNTranslator creates an instance of the ConsulToNSNTranslator
-func NewConsulToNSNTranslator(cache resourceGetter) ConsulToNSNTranslator {
-	return ConsulToNSNTranslator{cache: cache}
+// NewConsulToNamespaceNameTranslator creates an instance of the ConsulToNSNTranslator
+func NewConsulToNamespaceNameTranslator(cache resourceGetter) ConsulToNamespaceNameTranslator {
+	return ConsulToNamespaceNameTranslator{cache: cache}
 }
 
-// TranslateConsulGateway creates a slice k8s types.NamespacedName from the meta fields of the api gateway config entry.
-func (c ConsulToNSNTranslator) TranslateConsulGateway(ctx context.Context) TranslatorFn {
+// BuildConsulGatewayTranslator creates a slice k8s types.NamespacedName from the meta fields of the api gateway config entry.
+func (c ConsulToNamespaceNameTranslator) BuildConsulGatewayTranslator(ctx context.Context) TranslatorFn {
 	return func(config api.ConfigEntry) []types.NamespacedName {
 		meta, ok := metaToK8sNamespacedName(config)
 		if !ok {
@@ -42,8 +42,8 @@ func (c ConsulToNSNTranslator) TranslateConsulGateway(ctx context.Context) Trans
 	}
 }
 
-// TranslateConsulHTTPRoute creates a slice of k8s types.NamespacedName from the meta fields of the http route parent refs.
-func (c ConsulToNSNTranslator) TranslateConsulHTTPRoute(ctx context.Context) TranslatorFn {
+// BuildConsulHTTPRouteTranslator creates a slice of k8s types.NamespacedName from the meta fields of the http route parent refs.
+func (c ConsulToNamespaceNameTranslator) BuildConsulHTTPRouteTranslator(ctx context.Context) TranslatorFn {
 	return func(config api.ConfigEntry) []types.NamespacedName {
 		route, ok := config.(*api.HTTPRouteConfigEntry)
 		if !ok {
@@ -54,8 +54,8 @@ func (c ConsulToNSNTranslator) TranslateConsulHTTPRoute(ctx context.Context) Tra
 	}
 }
 
-// TranslateConsulTCPRoute creates a slice of k8s types.NamespacedName from the meta fields of the tcp route parent refs.
-func (c ConsulToNSNTranslator) TranslateConsulTCPRoute(ctx context.Context) TranslatorFn {
+// BuildConsulTCPRouteTranslator creates a slice of k8s types.NamespacedName from the meta fields of the tcp route parent refs.
+func (c ConsulToNamespaceNameTranslator) BuildConsulTCPRouteTranslator(ctx context.Context) TranslatorFn {
 	return func(config api.ConfigEntry) []types.NamespacedName {
 		route, ok := config.(*api.TCPRouteConfigEntry)
 		if !ok {
@@ -66,10 +66,10 @@ func (c ConsulToNSNTranslator) TranslateConsulTCPRoute(ctx context.Context) Tran
 	}
 }
 
-// TranslateConsulInlineCertificate creates a slice of k8s types.NamespacedName from the meta fields of the secret. It does this
+// BuildConsulInlineCertificateTranslator creates a slice of k8s types.NamespacedName from the meta fields of the secret. It does this
 // by using a secret transformer function to get a list of reconcile requests from k8s for the given secret and then converts
 // those requests to the slice of NamespaceName
-func (c ConsulToNSNTranslator) TranslateConsulInlineCertificate(ctx context.Context, secretTransformer secretTransfomer) TranslatorFn {
+func (c ConsulToNamespaceNameTranslator) BuildConsulInlineCertificateTranslator(ctx context.Context, secretTransformer secretTransfomer) TranslatorFn {
 	return func(config api.ConfigEntry) []types.NamespacedName {
 		meta, ok := metaToK8sNamespacedName(config)
 		if !ok {

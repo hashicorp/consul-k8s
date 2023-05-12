@@ -481,7 +481,6 @@ func (c *Command) Run(args []string) int {
 		ConsulServerConnMgr: watcher,
 		NamespacesEnabled:   c.flagEnableNamespaces,
 		Partition:           c.consul.Partition,
-		Logger:              ctrl.Log.WithName("controllers").WithName("Gateway"),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")

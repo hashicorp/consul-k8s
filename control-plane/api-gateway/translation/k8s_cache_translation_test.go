@@ -84,8 +84,8 @@ func Test_ConsulToNSNTranslator_TranslateConsulGateway(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			translator := ConsulToNSNTranslator{}
-			fn := translator.TranslateConsulGateway(context.Background())
+			translator := ConsulToNamespaceNameTranslator{}
+			fn := translator.BuildConsulGatewayTranslator(context.Background())
 			got := fn(tt.args.config)
 			if diff := cmp.Diff(got, tt.want, sortTransformer()); diff != "" {
 				t.Errorf("ConsulToNSNTranslator.TranslateConsulGateway() mismatch (-want +got):\n%s", diff)
@@ -201,13 +201,13 @@ func TestConsulToNSNTranslator_TranslateConsulHTTPRoute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := ConsulToNSNTranslator{
+			c := ConsulToNamespaceNameTranslator{
 				cache: tt.fields.cache,
 			}
 			config := &api.HTTPRouteConfigEntry{
 				Parents: tt.parentRefs,
 			}
-			got := c.TranslateConsulHTTPRoute(context.Background())(config)
+			got := c.BuildConsulHTTPRouteTranslator(context.Background())(config)
 			if diff := cmp.Diff(got, tt.want, sortTransformer()); diff != "" {
 				t.Errorf("ConsulToNSNTranslator.TranslateConsulHTTPRoute() mismatch (-want +got):\n%s", diff)
 			}
@@ -322,13 +322,13 @@ func TestConsulToNSNTranslator_TranslateConsulTCPRoute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := ConsulToNSNTranslator{
+			c := ConsulToNamespaceNameTranslator{
 				cache: tt.fields.cache,
 			}
 			config := &api.TCPRouteConfigEntry{
 				Parents: tt.parentRefs,
 			}
-			got := c.TranslateConsulTCPRoute(context.Background())(config)
+			got := c.BuildConsulTCPRouteTranslator(context.Background())(config)
 			if diff := cmp.Diff(got, tt.want, sortTransformer()); diff != "" {
 				t.Errorf("ConsulToNSNTranslator.TranslateConsulTCPRoute() mismatch (-want +got):\n%s", diff)
 			}
@@ -336,7 +336,7 @@ func TestConsulToNSNTranslator_TranslateConsulTCPRoute(t *testing.T) {
 	}
 }
 
-func Test_ConsulToNSNTranslator_TranslateInlineSecret(t *testing.T) {
+func Test_ConsulToNSNTranslator_TranslateInlineCertificate(t *testing.T) {
 	type args struct {
 		config *api.InlineCertificateConfigEntry
 	}
@@ -417,8 +417,8 @@ func Test_ConsulToNSNTranslator_TranslateInlineSecret(t *testing.T) {
 				}
 			}
 
-			translator := ConsulToNSNTranslator{}
-			fn := translator.TranslateConsulInlineCertificate(context.Background(), transformer)
+			translator := ConsulToNamespaceNameTranslator{}
+			fn := translator.BuildConsulInlineCertificateTranslator(context.Background(), transformer)
 			got := fn(tt.args.config)
 			if diff := cmp.Diff(got, tt.want, sortTransformer()); diff != "" {
 				t.Errorf("ConsulToNSNTranslator.TranslateConsulInlineCertificate() mismatch (-want +got):\n%s", diff)

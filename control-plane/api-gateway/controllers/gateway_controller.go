@@ -36,7 +36,6 @@ type GatewayControllerConfig struct {
 	ConsulServerConnMgr consul.ServerConnectionManager
 	NamespacesEnabled   bool
 	Partition           string
-	Logger              logr.Logger
 }
 
 // GatewayController reconciles a Gateway object.
@@ -118,17 +117,16 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ConsulServerConnMgr: config.ConsulServerConnMgr,
 		NamespacesEnabled:   config.NamespacesEnabled,
 		Partition:           config.Partition,
-		Kinds:               []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate},
-		Logger:              config.Logger,
+		Logger:              mgr.GetLogger(),
 	})
 
 	r := &GatewayController{
 		Client: mgr.GetClient(),
 		cache:  c,
-		Log:    config.Logger,
+		Log:    mgr.GetLogger(),
 	}
 
-	translator := translation.NewConsulToNSNTranslator(c)
+	translator := translation.NewConsulToNamespaceNameTranslator(c)
 
 	return c, ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.Gateway{}).
@@ -157,22 +155,22 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		).
 		Watches(
 			// Subscribe to changes from Consul for APIGateways
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.TranslateConsulGateway(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulGatewayTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
 			// Subscribe to changes from Consul for HTTPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.TranslateConsulHTTPRoute(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulHTTPRouteTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
 			// Subscribe to changes from Consul for TCPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.TranslateConsulTCPRoute(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulTCPRouteTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
 			// Subscribe to changes from Consul for InlineCertificates
-			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, translator.TranslateConsulInlineSecret(ctx, r.transformSecret)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, translator.BuildConsulInlineCertificateTranslator(ctx, r.transformSecret)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).Complete(r)
 }

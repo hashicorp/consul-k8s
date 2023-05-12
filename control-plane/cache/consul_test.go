@@ -1254,7 +1254,6 @@ func TestCache_Subscribe(t *testing.T) {
 				ConsulClientConfig:  &consul.Config{},
 				ConsulServerConnMgr: consul.NewMockServerConnectionManager(t),
 				NamespacesEnabled:   false,
-				Kinds:               []string{api.APIGateway, api.TCPRoute, api.HTTPRoute},
 				Logger:              logr.Logger{},
 			})
 
@@ -1339,7 +1338,6 @@ func TestCache_Write(t *testing.T) {
 				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				NamespacesEnabled:   false,
 				Partition:           "",
-				Kinds:               []string{},
 				Logger:              logr.Logger{},
 			})
 
@@ -1556,6 +1554,10 @@ func Test_Run(t *testing.T) {
 	tcpRoute := setupTCPRoute()
 	tcpRoutes := []*api.TCPRouteConfigEntry{tcpRoute}
 
+	// setup inline certs
+	inlineCert := setupInlineCertificate()
+	certs := []*api.InlineCertificateConfigEntry{inlineCert}
+
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/config/http-route":
@@ -1576,6 +1578,14 @@ func Test_Run(t *testing.T) {
 			fmt.Fprintln(w, string(val))
 		case "/v1/config/tcp-route":
 			val, err := json.Marshal(tcpRoutes)
+			if err != nil {
+				w.WriteHeader(500)
+				fmt.Fprintln(w, err)
+				return
+			}
+			fmt.Fprintln(w, string(val))
+		case "/v1/config/inline-certificate":
+			val, err := json.Marshal(certs)
 			if err != nil {
 				w.WriteHeader(500)
 				fmt.Fprintln(w, err)
@@ -1605,7 +1615,6 @@ func Test_Run(t *testing.T) {
 		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 		NamespacesEnabled:   false,
 		Partition:           "",
-		Kinds:               []string{api.HTTPRoute, api.TCPRoute, api.APIGateway},
 		Logger:              logrtest.NewTestLogger(t),
 	})
 	prevCache := make(map[string]resourceCache)
@@ -1627,6 +1636,9 @@ func Test_Run(t *testing.T) {
 		api.HTTPRoute: {
 			{Kind: api.HTTPRoute, Name: httpRouteOne.Name}: httpRouteOne,
 			{Kind: api.HTTPRoute, Name: httpRouteTwo.Name}: httpRouteTwo,
+		},
+		api.InlineCertificate: {
+			{Kind: api.InlineCertificate, Name: inlineCert.Name}: inlineCert,
 		},
 	}
 
@@ -1676,6 +1688,17 @@ func Test_Run(t *testing.T) {
 		}
 	})
 
+	certNsn := types.NamespacedName{
+		Name:      inlineCert.Name,
+		Namespace: inlineCert.Namespace,
+	}
+
+	certSubscriber := c.Subscribe(ctx, api.InlineCertificate, func(cfe api.ConfigEntry) []types.NamespacedName {
+		return []types.NamespacedName{
+			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
+		}
+	})
+
 	// mark this subscription as ended
 	canceledSub.Cancel()
 
@@ -1685,8 +1708,10 @@ func Test_Run(t *testing.T) {
 	httpRouteExpectedEvents := []event.GenericEvent{{Object: newConfigEntryObject(httpRouteOneNsn)}, {Object: newConfigEntryObject(httpRouteTwoNsn)}}
 	gwExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(gwNsn)}
 	tcpExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(tcpRouteNsn)}
+	certExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(certNsn)}
 
-	i := 4
+	// 2 http routes + 1 gw + 1 tcp route + 1 cert = 5
+	i := 5
 	for {
 		if i == 0 {
 			break
@@ -1698,6 +1723,8 @@ func Test_Run(t *testing.T) {
 			require.Equal(t, gwExpectedEvent, actualGWEvent)
 		case actualTCPRouteEvent := <-tcpRouteSubscriber.Events():
 			require.Equal(t, tcpExpectedEvent, actualTCPRouteEvent)
+		case actualCertExpectedEvent := <-certSubscriber.Events():
+			require.Equal(t, certExpectedEvent, actualCertExpectedEvent)
 		}
 		i -= 1
 	}
@@ -1887,8 +1914,6 @@ func setupHTTPRoutes() (*api.HTTPRouteConfigEntry, *api.HTTPRouteConfigEntry) {
 		Meta: map[string]string{
 			"metakey": "meta val",
 		},
-
-		Status: api.ConfigEntryStatus{},
 	}
 	return routeOne, routeTwo
 }
@@ -1909,9 +1934,6 @@ func setupGateway() *api.APIGatewayConfigEntry {
 				TLS:      api.APIGatewayTLSConfiguration{},
 			},
 		},
-		Status:      api.ConfigEntryStatus{},
-		CreateIndex: 0,
-		ModifyIndex: 0,
 	}
 }
 
@@ -1934,8 +1956,18 @@ func setupTCPRoute() *api.TCPRouteConfigEntry {
 		Meta: map[string]string{
 			"metakey": "meta val",
 		},
-		Status:      api.ConfigEntryStatus{},
-		CreateIndex: 0,
-		ModifyIndex: 0,
+		Status: api.ConfigEntryStatus{},
+	}
+}
+
+func setupInlineCertificate() *api.InlineCertificateConfigEntry {
+	return &api.InlineCertificateConfigEntry{
+		Kind:        api.InlineCertificate,
+		Name:        "inline-cert",
+		Certificate: "cert",
+		PrivateKey:  "super secret",
+		Meta: map[string]string{
+			"metaKey": "meta val",
+		},
 	}
 }
