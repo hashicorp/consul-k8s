@@ -342,7 +342,7 @@ load _helpers
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
-      --set 'telemetryCollector.controller.replicas=3' \
+      --set 'telemetryCollector.replicas=3' \
       . | tee /dev/stderr |
       yq '.spec.replicas' | tee /dev/stderr)
 
