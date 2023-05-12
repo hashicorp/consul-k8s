@@ -14,6 +14,7 @@ load _helpers
   run helm template \
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=null' \
       .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "telemetryCollector.image must be set to enable consul-telemetry-collector" ]]
@@ -75,36 +76,36 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "apiGateway/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
+@test "telemetryCollector/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
 }
 
-@test "apiGateway/Deployment: Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
+@test "telemetryCollector/Deployment: Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
 }
 
-@test "apiGateway/Deployment: can overwrite CA secret with the provided one" {
+@test "telemetryCollector/Deployment: can overwrite CA secret with the provided one" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
       --set 'global.tls.caCert.secretKey=key' \
@@ -126,81 +127,27 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enableAutoEncrypt
 
-@test "apiGateway/Deployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
+@test "telemetryCollector/Deployment: consul-ca-cert volumeMount is added when TLS with auto-encrypt is enabled without clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled with clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: consul-ca-cert volumeMount is added when TLS with auto-encrypt is enabled without clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[1].volumeMounts[] | select(.name == "consul-ca-cert") | length > 0' | tee
+      /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
+@test "telemetryCollector/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: adds both init containers when TLS with auto-encrypt and ACLs + namespaces are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers | length == 3' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'externalServers.enabled=true' \
@@ -214,246 +161,12 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "apiGateway/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
+@test "telemetryCollector/Deployment: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul logout"))' | tee /dev/stderr)
-  [ "${object}" = "true" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[1].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_LOGIN_DATACENTER is set when acls are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[2].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "api-gateway-controller-acl-init" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[0].name] | any(contains("NAMESPACE"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[1].name] | any(contains("POD_NAME"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].name] | any(contains("CONSUL_LOGIN_META"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[2].value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '[.env[8].value] | any(contains("5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.consulAPITimeout=5s' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.adminPartitions.name=default' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-auth-method-name=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_PARTITION") | [.value] | any(contains("default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_LOGIN_PARTITION") | [.value] | any(contains("default"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'meshGateway.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.datacenter=dc1' \
@@ -461,7 +174,7 @@ load _helpers
       --set 'global.federation.primaryDatacenter=dc2' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq '[.env[3].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
@@ -472,198 +185,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: primary-datacenter flag provided when federation enabled in non-primary datacenter" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.datacenter=dc2' \
-      --set 'global.federation.enabled=true' \
-      --set 'global.federation.primaryDatacenter=dc1' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name == "api-gateway-controller")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-api-gateway server"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-primary-datacenter=dc1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command when federation enabled in non-primary datacenter" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.datacenter=dc2' \
-      --set 'global.federation.enabled=true' \
-      --set 'global.federation.primaryDatacenter=dc1' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("-auth-method-name=release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[3].value] | any(contains("dc1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "api-gateway-controller-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "NAMESPACE") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.namespace"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "POD_NAME") | [.valueFrom.fieldRef.fieldPath] | any(contains("metadata.name"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_LOGIN_META") | [.value] | any(contains("component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_GRPC_PORT") | [.value] | any(contains("8502"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_HTTP_PORT") | [.value] | any(contains("8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_DATACENTER") | [.value] | any(contains("dc1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_API_TIMEOUT") | [.value] | any(contains("5s"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_USE_TLS") | [.value] | any(contains("true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_CACERT_FILE") | [.value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[] | select(.name == "consul-ca-cert") | [.mountPath] | any(contains("/consul/tls/ca"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '.volumeMounts[] | select(.name == "consul-data") | [.mountPath] | any(contains("/consul/login"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: init container for copy consul is created when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "copy-consul-bin")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("cp"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq -r '.volumeMounts[0] | any(contains("consul-bin"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: volumeMount for copy consul is created on container when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[0] | any(contains("consul-bin"))' | tee /dev/stderr)
-
-  [ "${object}" = "true" ]
-}
-
-@test "apiGateway/Deployment: volume for copy consul is created when global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[0] | any(contains("consul-bin"))' | tee /dev/stderr)
-
-  [ "${object}" = "true" ]
-}
-
-@test "apiGateway/Deployment: auto-encrypt init container is created and is the first init-container when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[1]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "get-auto-encrypt-client-ca" ]
-}
-
 #--------------------------------------------------------------------
 # resources
 
-@test "apiGateway/Deployment: resources has default" {
+@test "telemetryCollector/Deployment: resources has default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
 
@@ -673,13 +203,13 @@ load _helpers
   [ $(echo "${actual}" | yq -r '.limits.cpu') = "100m" ]
 }
 
-@test "apiGateway/Deployment: resources can be overridden" {
+@test "telemetryCollector/Deployment: resources can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'apiGateway.resources.foo=bar' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'telemetryCollector.resources.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
@@ -688,12 +218,12 @@ load _helpers
 #--------------------------------------------------------------------
 # init container resources
 
-@test "apiGateway/Deployment: init container has default resources" {
+@test "telemetryCollector/Deployment: init container has default resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
@@ -704,17 +234,17 @@ load _helpers
   [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
 }
 
-@test "apiGateway/Deployment: init container resources can be set" {
+@test "telemetryCollector/Deployment: init container resources can be set" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'apiGateway.initCopyConsulContainer.resources.requests.memory=memory' \
-      --set 'apiGateway.initCopyConsulContainer.resources.requests.cpu=cpu' \
-      --set 'apiGateway.initCopyConsulContainer.resources.limits.memory=memory2' \
-      --set 'apiGateway.initCopyConsulContainer.resources.limits.cpu=cpu2' \
+      --set 'telemetryCollector.initContainer.resources.requests.memory=memory' \
+      --set 'telemetryCollector.initContainer.resources.requests.cpu=cpu' \
+      --set 'telemetryCollector.initContainer.resources.limits.memory=memory2' \
+      --set 'telemetryCollector.initContainer.resources.limits.cpu=cpu2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
 
@@ -734,25 +264,25 @@ load _helpers
 #--------------------------------------------------------------------
 # priorityClassName
 
-@test "apiGateway/Deployment: no priorityClassName by default" {
+@test "telemetryCollector/Deployment: no priorityClassName by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
 
   [ "${actual}" = "null" ]
 }
 
-@test "apiGateway/Deployment: can set a priorityClassName" {
+@test "telemetryCollector/Deployment: can set a priorityClassName" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'apiGateway.controller.priorityClassName=name' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'telemetryCollector.priorityClassName=name' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
 
@@ -762,12 +292,12 @@ load _helpers
 #--------------------------------------------------------------------
 # logLevel
 
-@test "apiGateway/Deployment: logLevel info by default from global" {
+@test "telemetryCollector/Deployment: logLevel info by default from global" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -776,13 +306,13 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: logLevel can be overridden" {
+@test "telemetryCollector/Deployment: logLevel can be overridden" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'apiGateway.logLevel=debug' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'telemetryCollector.logLevel=debug' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -794,72 +324,40 @@ load _helpers
 #--------------------------------------------------------------------
 # replicas
 
-@test "apiGateway/Deployment: replicas defaults to 1" {
+@test "telemetryCollector/Deployment: replicas defaults to 1" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
       yq '.spec.replicas' | tee /dev/stderr)
 
   [ "${actual}" = "1" ]
 }
 
-@test "apiGateway/Deployment: replicas can be set" {
+@test "telemetryCollector/Deployment: replicas can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'apiGateway.controller.replicas=3' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'telemetryCollector.controller.replicas=3' \
       . | tee /dev/stderr |
       yq '.spec.replicas' | tee /dev/stderr)
 
   [ "${actual}" = "3" ]
 }
 
-
-#--------------------------------------------------------------------
-# get-auto-encrypt-client-ca
-
-@test "apiGateway/Deployment: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
-  [ "${actual}" = "true" ]
-
-  # check server port
-  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
-
-  # check consul-api-timeout
-  actual=$(echo $command | jq ' . | contains("-consul-api-timeout=5s")')
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # Vault
 
-@test "apiGateway/Deployment: vault CA is not configured by default" {
+@test "telemetry-collector/Deployment: vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/api-gateway-controller-deployment.yaml  \
-    --set 'apiGateway.enabled=true' \
-    --set 'apiGateway.image=foo' \
+    -s templates/telemetry-collector-deployment.yaml  \
+    --set 'telemetryCollector.enabled=true' \
+    --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -876,12 +374,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "apiGateway/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
+@test "telemetryCollector/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/api-gateway-controller-deployment.yaml  \
-    --set 'apiGateway.enabled=true' \
-    --set 'apiGateway.image=foo' \
+    -s templates/telemetry-collector-deployment.yaml  \
+    --set 'telemetryCollector.enabled=true' \
+    --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -899,12 +397,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "apiGateway/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
+@test "telemetryCollector/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/api-gateway-controller-deployment.yaml  \
-    --set 'apiGateway.enabled=true' \
-    --set 'apiGateway.image=foo' \
+    -s templates/telemetry-collector-deployment.yaml  \
+    --set 'telemetryCollector.enabled=true' \
+    --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -922,12 +420,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "apiGateway/Deployment: vault CA is configured when both secretName and secretKey are set" {
+@test "telemetryCollector/Deployment: vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/api-gateway-controller-deployment.yaml  \
-    --set 'apiGateway.enabled=true' \
-    --set 'apiGateway.image=foo' \
+    -s templates/telemetry-collector-deployment.yaml  \
+    --set 'telemetryCollector.enabled=true' \
+    --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -946,12 +444,12 @@ load _helpers
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
 
-@test "apiGateway/Deployment: vault tls annotations are set when tls is enabled" {
+@test "telemetryCollector/Deployment: vault tls annotations are set when tls is enabled" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -985,12 +483,12 @@ load _helpers
   [ "${actual}" = "test" ]
 }
 
-@test "apiGateway/Deployment: vault agent annotations can be set" {
+@test "telemetryCollector/Deployment: vault agent annotations can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -1349,24 +847,24 @@ load _helpers
 #--------------------------------------------------------------------
 # CONSUL_HTTP_SSL
 
-@test "apiGateway/Deployment: CONSUL_HTTP_SSL set correctly when not using TLS." {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_SSL set correctly when not using TLS." {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].env[2].value' | tee /dev/stderr)
   [ "${actual}" = "\"false\"" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_SSL set correctly when using TLS." {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_SSL set correctly when using TLS." {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].env[3].value' | tee /dev/stderr)
@@ -1376,12 +874,12 @@ load _helpers
 #--------------------------------------------------------------------
 # CONSUL_HTTP_ADDR
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, TLS, and no clients." {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, TLS, and no clients." {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
@@ -1393,12 +891,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, no TLS, and no clients" {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, no TLS, and no clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
@@ -1410,12 +908,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and clients" {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
@@ -1423,12 +921,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and clients" {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=false' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
@@ -1436,12 +934,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and no clients" {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and no clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
@@ -1449,12 +947,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and no clients" {
+@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and no clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=false' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
@@ -1465,12 +963,12 @@ load _helpers
 #--------------------------------------------------------------------
 # externalServers tlsServerName
 
-@test "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME can be set for externalServers" {
+@test "telemetryCollector/Deployment: CONSUL_TLS_SERVER_NAME can be set for externalServers" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
@@ -1482,12 +980,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_TLS_SERVER_NAME will not be set for when clients are used" {
+@test "telemetryCollector/Deployment: CONSUL_TLS_SERVER_NAME will not be set for when clients are used" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
@@ -1496,19 +994,19 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select (.name == "api-gateway-controller") | .env[] | select(.name == "CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[] | select (.name == "telemetry-collector") | .env[] | select(.name == "CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
 #--------------------------------------------------------------------
 # Admin Partitions
 
-@test "apiGateway/Deployment: CONSUL_PARTITION is set when using admin partitions" {
+@test "telemetryCollector/Deployment: CONSUL_PARTITION is set when using admin partitions" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=hashi' \
@@ -1517,12 +1015,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_LOGIN_PARTITION is set when using admin partitions with ACLs" {
+@test "telemetryCollector/Deployment: CONSUL_LOGIN_PARTITION is set when using admin partitions with ACLs" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=hashi' \
@@ -1532,82 +1030,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is set when not using clients" {
+@test "telemetryCollector/Deployment: consul-ca-cert volume mount is not set when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[3].value == "true"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_DYNAMIC_SERVER_DISCOVERY is not set when using clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[3]' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_CACERT is set when using tls and clients even when useSystemRoots is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.useSystemRoots=true' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_CACERT is set when using tls and internal servers" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'server.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/Deployment: CONSUL_CACERT is not set when using tls and useSystemRoots" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.useSystemRoots=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[0].name == "CONSUL_CACERT"' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "apiGateway/Deployment: consul-ca-cert volume mount is not set when using externalServers and useSystemRoots" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=false' \
@@ -1619,12 +1047,12 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
-@test "apiGateway/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
+@test "telemetryCollector/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=false' \
@@ -1636,12 +1064,12 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
-@test "apiGateway/Deployment: consul-auto-encrypt-ca-cert volume mount is set when tls.enabled, client.enabled, externalServers, useSystemRoots, and autoencrypt" {
+@test "telemetryCollector/Deployment: consul-auto-encrypt-ca-cert volume mount is set when tls.enabled, client.enabled, externalServers, useSystemRoots, and autoencrypt" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'client.enabled=true' \
@@ -1658,23 +1086,23 @@ load _helpers
 #--------------------------------------------------------------------
 # extraLabels
 
-@test "apiGateway/Deployment: no extra labels defined by default" {
+@test "telemetryCollector/Deployment: no extra labels defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
-@test "apiGateway/Deployment: extra global labels can be set" {
+@test "telemetryCollector/Deployment: extra global labels can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.extraLabels.foo=bar' \
       . | tee /dev/stderr)
   local actualBar=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
@@ -1683,12 +1111,12 @@ load _helpers
   [ "${actualTemplateBar}" = "bar" ]
 }
 
-@test "apiGateway/Deployment: multiple global extra labels can be set" {
+@test "telemetryCollector/Deployment: multiple global extra labels can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=bar' \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
       --set 'global.extraLabels.foo=bar' \
       --set 'global.extraLabels.baz=qux' \
       . | tee /dev/stderr)
