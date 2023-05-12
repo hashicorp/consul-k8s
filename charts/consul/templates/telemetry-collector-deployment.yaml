@@ -37,6 +37,7 @@ spec:
         "consul.hashicorp.com/connect-inject-status": "injected"
         # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
         # to gateways
+        "consul.hashicorp.com/transparent-proxy": "false"
         "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"
         "consul.hashicorp.com/connect-k8s-version": {{ $.Chart.Version }}
         # vault annotations
@@ -125,14 +126,6 @@ spec:
             cpu: 50m
             memory: 25Mi
         {{- end }}
-        securityContext:
-          capabilities:
-            add:
-              - NET_ADMIN
-          privileged: true
-          runAsGroup: 0
-          runAsNonRoot: false
-          runAsUser: 0
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
