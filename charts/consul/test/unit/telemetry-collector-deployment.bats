@@ -860,10 +860,6 @@ load _helpers
   local actual=$(echo $flags | yq -r '. | any(contains("-tls-disabled"))')
   [ "${actual}" = 'true' ]
 
-  #local actual=$(echo $flags | yq -r '. | any(contains("-tls-disabled"))')
-  #echo $actual
-  [ "${actual}" = 'true' ]
-
 }
 
 @test "telemetryCollector/Deployment: -ca-certs set correctly when using TLS." {
@@ -881,11 +877,11 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# CONSUL_HTTP_ADDR
+# External Server
 
-@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, TLS, and no clients." {
+@test "telemetryCollector/Deployment: sets external server args when global.tls.enabled and externalServers.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local flags=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
@@ -893,11 +889,21 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=external-consul.host' \
       --set 'externalServers.httpsPort=8501' \
+      --set 'externalServers.tlsServerName=foo.tls.server' \
+      --set 'externalServers.useSystemRoots=true' \
       --set 'server.enabled=false' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("external-consul.host:8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.spec.template.spec.containers[1].args' | tee /dev/stderr)
+
+  local actual=$(echo $flags | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = 'false' ]
+
+  local actual=$(echo $flags | yq -r '. | any(contains("-tls-server-name=foo.tls.server"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $flags | jq -r '. | any(contains("-addresses=external-consul.host"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }
 
 @test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, no TLS, and no clients" {
