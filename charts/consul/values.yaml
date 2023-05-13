@@ -3102,6 +3102,17 @@ telemetryCollector:
 
   replicas: 1
 
+  # This value defines additional configuration for the telemetry collector. It should be formatted as a multi-line
+  # json blob string
+  #
+  # ```yaml
+  # customExporterConfig: |
+  #   {"http_collector_endpoint": "other-otel-collector"}
+  # ```
+  #
+  # @type: string
+  customExporterConfig: null
+
   service:
     # This value defines additional annotations for the server service account. This should be formatted as a multi-line
     # string.
@@ -3114,7 +3125,6 @@ telemetryCollector:
     #
     # @type: string
     annotations: null
-  # customExporterConfig: {}
 
   serviceAccount:
     # This value defines additional annotations for the ingress gateways' service account. This should be formatted
