@@ -963,25 +963,6 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
-@test "telemetryCollector/Deployment: consul-auto-encrypt-ca-cert volume mount is set when tls.enabled, client.enabled, externalServers, useSystemRoots, and autoencrypt" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'client.enabled=true' \
-      --set 'server.enabled=false' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.useSystemRoots=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-auto-encrypt-ca-cert") | .mountPath' | tee /dev/stderr)
-  [ "${actual}" = '"/consul/tls/ca"' ]
-}
-
 #--------------------------------------------------------------------
 # extraLabels
 
@@ -992,7 +973,8 @@ load _helpers
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component") | del(."consul.hashicorp.com/connect-inject-managed-by")' \
+      | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

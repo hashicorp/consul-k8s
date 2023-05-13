@@ -253,14 +253,13 @@ spec:
           - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
           {{- end }}
           {{- if .Values.global.adminPartitions.enabled }}
+          - foo
           - -login-partition={{ .Values.global.adminPartitions.name }}
           {{- end }}
           {{- end }}
           {{- if .Values.global.adminPartitions.enabled }}
           - -service-partition={{ .Values.global.adminPartitions.name }}
           {{- end }}
-          - -log-level={{ default .Values.global.logLevel }}
-          - -log-json={{ .Values.global.logJSON }}
           {{- if .Values.global.metrics.enabled }}
           - -telemetry-prom-scrape-path=/metrics
           {{- end }}
