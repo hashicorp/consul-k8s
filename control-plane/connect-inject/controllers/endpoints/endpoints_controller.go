@@ -300,7 +300,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		err = assignServiceVirtualIP(r.Context, apiClient, serviceRegistration.Service)
 		if err != nil {
 			r.Log.Error(err, "failed to add ip to virtual ip table", "name", serviceRegistration.Service.Service)
-			return err
 		}
 
 		// Register the proxy service instance with Consul.
