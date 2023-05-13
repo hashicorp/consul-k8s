@@ -906,133 +906,12 @@ load _helpers
   [ "${actual}" = 'true' ]
 }
 
-@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with external servers, no TLS, and no clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.httpsPort=8500' \
-      --set 'server.enabled=false' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("external-consul.host:8500"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("$(HOST_IP):8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=false' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("$(HOST_IP):8500"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, TLS, and no clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[2].value] | any(contains("release-name-consul-server:8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: CONSUL_HTTP_ADDR set correctly with local servers, no TLS, and no clients" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=false' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[1].value] | any(contains("release-name-consul-server:8500"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# externalServers tlsServerName
-
-@test "telemetryCollector/Deployment: CONSUL_TLS_SERVER_NAME can be set for externalServers" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.httpsPort=8501' \
-      --set 'externalServers.tlsServerName=hashi' \
-      --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[4].value == "hashi"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: CONSUL_TLS_SERVER_NAME will not be set for when clients are used" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.tls.enabled=true' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=external-consul.host' \
-      --set 'externalServers.httpsPort=8501' \
-      --set 'externalServers.tlsServerName=hashi' \
-      --set 'client.enabled=true' \
-      --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select (.name == "telemetry-collector") | .env[] | select(.name == "CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
-}
-
 #--------------------------------------------------------------------
 # Admin Partitions
 
-@test "telemetryCollector/Deployment: CONSUL_PARTITION is set when using admin partitions" {
+@test "telemetryCollector/Deployment: partition flags are set when using admin partitions" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.adminPartitions.name=hashi' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[3].value == "hashi"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: CONSUL_LOGIN_PARTITION is set when using admin partitions with ACLs" {
-  cd `chart_dir`
-  local actual=$(helm template \
+  local flags=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
@@ -1041,7 +920,12 @@ load _helpers
       --set 'global.adminPartitions.name=hashi' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[6].value == "hashi"' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[1].args' | tee /dev/stderr)
+
+  local actual=$(echo $flags | jq -r '. | any(contains("-login-partition=hashi"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $flags | jq -r '. | any(contains("-service-partition=hashi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
