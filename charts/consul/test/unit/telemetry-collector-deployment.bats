@@ -946,6 +946,32 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "telemetryCollector/Deployment: config volume mount is set when config exists" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'telemetryCollector.customExporterConfig="foo"' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "config") | .name' | tee /dev/stderr)
+  [ "${actual}" = "config" ]
+}
+
+@test "telemetryCollector/Deployment: config flag is set when config exists" {
+  cd `chart_dir`
+  local flags=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'telemetryCollector.customExporterConfig="foo"' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].args')
+
+  local actual=$(echo $flags | yq -r '.  | any(contains("-config-file-path /consul/config/config.json"))')
+  [ "${actual}" = "true" ]
+}
+
 @test "telemetryCollector/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
