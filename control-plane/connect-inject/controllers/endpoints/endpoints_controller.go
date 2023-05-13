@@ -1267,7 +1267,11 @@ func (r *Controller) appendNodeMeta(registration *api.CatalogRegistration) {
 
 // assignServiceVirtualIPs manually assigns the ClusterIP to the virtual IP table so that transparent proxy routing works.
 func assignServiceVirtualIP(ctx context.Context, apiClient *api.Client, svc *api.AgentService) error {
-	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{svc.TaggedAddresses[clusterIPTaggedAddressName].Address}, &api.WriteOptions{})
+	IP := svc.TaggedAddresses[clusterIPTaggedAddressName].Address
+	if IP == "" {
+		return nil
+	}
+	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{IP}, &api.WriteOptions{})
 	if err != nil {
 		// Maintain backwards compatibility with older versions of Consul that do not support the VIP improvements. Tproxy
 		// will not work 100% correctly but the mesh will still work
