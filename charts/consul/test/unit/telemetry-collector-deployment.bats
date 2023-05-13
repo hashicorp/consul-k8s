@@ -2,14 +2,14 @@
 
 load _helpers
 
-@test "telemetry-collector/Deployment: disabled by default" {
+@test "telemetryCollector/Deployment: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/telemetry-collector-deployment.yaml  \
       .
 }
 
-@test "telemetry-collector/Deployment: fails if no image is set" {
+@test "telemetryCollector/Deployment: fails if no image is set" {
   cd `chart_dir`
   run helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -20,7 +20,7 @@ load _helpers
   [[ "$output" =~ "telemetryCollector.image must be set to enable consul-telemetry-collector" ]]
 }
 
-@test "telemetry-collector/Deployment: disable with telemetry-collector.enabled" {
+@test "telemetryCollector/Deployment: disable with telemetry-collector.enabled" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -28,7 +28,7 @@ load _helpers
       .
 }
 
-@test "telemetry-collector/Deployment: disable with global.enabled" {
+@test "telemetryCollector/Deployment: disable with global.enabled" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -36,7 +36,7 @@ load _helpers
       .
 }
 
-@test "telemetry-collector/Deployment: container image overrides" {
+@test "telemetryCollector/Deployment: container image overrides" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -50,7 +50,7 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "telemetry-collector/Deployment: nodeSelector is not set by default" {
+@test "telemetryCollector/Deployment: nodeSelector is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -61,7 +61,7 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "telemetry-collector/Deployment: specified nodeSelector" {
+@test "telemetryCollector/Deployment: specified nodeSelector" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -352,7 +352,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Vault
 
-@test "telemetry-collector/Deployment: vault CA is not configured by default" {
+@test "telemetryCollector/Deployment: vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/telemetry-collector-deployment.yaml  \
@@ -505,7 +505,7 @@ load _helpers
 #--------------------------------------------------------------------
 # telemetryCollector.cloud
 
-@test "telemetry-collector/Deployment: success with all cloud bits set" {
+@test "telemetryCollector/Deployment: success with all cloud bits set" {
   cd `chart_dir`
   run helm template \
       -s templates/telemetry-collector-deployment.yaml  \
