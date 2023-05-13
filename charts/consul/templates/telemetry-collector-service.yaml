@@ -1,4 +1,4 @@
-{{/*{{- if .Values.telemetryCollector.enabled }}*/}}
+{{- if .Values.telemetryCollector.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,6 +9,10 @@ metadata:
     chart: {{ template "consul.chart" . }}
     release: {{ .Release.Name }}
     component: consul-telemetry-collector
+  {{ if .Values.telemetryCollector.service.annotations }}
+  annotations:
+    {{ tpl .Values.telemetryCollector.service.annotations . | nindent 4 | trim }}
+  {{- end }}
 spec:
   type: ClusterIP
   ports:
@@ -17,4 +21,4 @@ spec:
   selector:
     app: consul
     component: consul-telemetry-collector
-{{/*{{- end }}*/}}
+{{- end }}

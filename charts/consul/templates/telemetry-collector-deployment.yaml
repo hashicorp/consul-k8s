@@ -146,6 +146,9 @@ spec:
         - containerPort: 9090
           name: metrics
           protocol: TCP
+        - containerPort: 9356
+          name: metricsserver
+          protocol: TCP
         env:
             # These are mounted as secrets so that the telemetry-collector can use them when cloud is enabled.
             # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
