@@ -6441,13 +6441,13 @@ func TestReconcileAssignServiceVirtualIP(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "service missing IP should error",
+			name: "service missing IP should not error",
 			service: &api.AgentService{
 				ID:      "",
 				Service: "bar",
 				Meta:    map[string]string{constants.MetaKeyKubeNS: "default"},
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 	}
 	for _, c := range cases {
